@@ -331,7 +331,7 @@ export default function ProviderSelectionEmptyState({
                               <div className="flex min-w-0 items-center gap-2">
                                 <span className="truncate">{model.label}</span>
                                 {model.isCustom && (
-                                  <Badge className="h-4 shrink-0 rounded-full px-1.5 text-[8px]">Custom</Badge>
+                                  <Badge className="h-4 shrink-0 px-1.5 text-[8px]">Custom</Badge>
                                 )}
                               </div>
                               {model.label !== model.value && (

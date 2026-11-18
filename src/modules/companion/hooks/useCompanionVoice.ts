@@ -33,18 +33,24 @@ function writeVoiceSwitch(on: boolean): void {
 type CompanionVoiceHook = {
   /** This page's voice as her panel draws it: the switch, the sentence sounding, the breath after a cut. */
   voice: CompanionVoice;
+  /** Whether this page sounds the companion's sentences: its switch is on and it holds the floor. The words on screen keep the voice's time only then. */
+  active: boolean;
   /** Opens or resumes the page's audio inside a gesture, when the switch is on. */
   unlock: () => void;
   /** The press that opens his mic asks this first: holds the pull while he records, and cuts her off if she is sounding (see `createSpeechPull().cutOff`). */
   cutOff: () => Promise<void> | null;
   /** The press that ends his recording: the pull is asked again from what she says next. */
   release: () => void;
+  /** Says the newest answer again from its first sentence (`createSpeechPull().again`), unlocking the page's audio first: the press is a gesture. Nothing while the switch is off. */
+  again: () => void;
   /** Stops what sounds and asks for nothing more of the turn, with the floor kept (Stop, Clear). It leaves the timed mouth shapes the page has heard: `forgetMouth` is Clear's. */
   silence: () => void;
   /** The player's `level()` — its RMS over the last 43 ms, 0..1, and 0 when nothing sounds — for her face's mouth. One function for the page's life. */
   level: () => number;
-  /** The player's `progress()` — the sounding sentence's seconds elapsed and, once its body has ended, its length — for the vowel her mouth shapes. One function for the page's life. */
+  /** The player's `progress()` — the sounding sentence's seconds elapsed and, once its body has ended, its length — for the word her face plates on its ring. One function for the page's life. */
   progress: PcmPlayer['progress'];
+  /** The player's `analyser()` — the tap her face's ear reads for loudness, bands, pitch and onsets, or null before the graph. One function for the page's life. */
+  analyser: PcmPlayer['analyser'];
   /** The timed mouth shapes heard for a sentence (`createMouthPieces().of`), for her face's exact mouth: `[]` for a sentence none have arrived for. One function for the page's life. */
   mouth: CompanionFaceVoice['mouth'];
   /** Keeps one `companion_mouth` frame's piece for its sentence (the three most recent turns are kept). One function for the page's life. */
@@ -141,15 +147,20 @@ export function useCompanionVoice({ picture, clientId }: { picture: CompanionPic
   }, [engine]);
 
   const silence = useCallback(() => engine.silence(), [engine]);
+  const again = useCallback(() => {
+    if (!onRef.current) return;
+    player.unlock().catch((failure: unknown) => console.warn('[Companion] Her voice could not be unlocked on this page:', failure));
+    engine.again();
+  }, [engine, player]);
   const release = useCallback(() => engine.release(), [engine]);
 
   const voice = useMemo<CompanionVoice>(() => ({ on, setOn, speaking, cut }), [on, setOn, speaking, cut]);
   // The player's `level` and `progress` close over the player's own graph and never read `this`, so they are handed out as they stand and keep one identity.
-  const { level, progress } = player;
+  const { level, progress, analyser } = player;
   // The store's three functions close over its own map and never read `this`, so they too are handed out as they stand and keep one identity.
   const { of: mouth, hear: hearMouth, forget: forgetMouth } = mouthPieces;
   return useMemo(
-    () => ({ voice, unlock, cutOff, release, silence, level, progress, mouth, hearMouth, forgetMouth }),
-    [voice, unlock, cutOff, release, silence, level, progress, mouth, hearMouth, forgetMouth],
+    () => ({ voice, active, unlock, cutOff, release, silence, again, level, progress, analyser, mouth, hearMouth, forgetMouth }),
+    [voice, active, unlock, cutOff, release, silence, again, level, progress, analyser, mouth, hearMouth, forgetMouth],
   );
 }

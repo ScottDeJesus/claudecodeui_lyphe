@@ -27,7 +27,7 @@ export function faceNotFound(): AppError {
 
 /** 503 `COMPANION_STOPPING`: the server is shutting down, so no face is taken or restored. */
 export function faceStopping(): AppError {
-  return new AppError('The server is shutting down, so her face cannot be changed just now; try again once it is back.', {
+  return new AppError('The server is shutting down, so the face cannot be changed just now; try again once it is back.', {
     code: 'COMPANION_STOPPING',
     statusCode: 503,
   });

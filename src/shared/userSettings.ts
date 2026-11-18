@@ -13,7 +13,7 @@ import {
   settleEntryPatch,
   unreflectedEntries,
 } from '@/shared/preferenceEntryPatch';
-import type { ClaudeSettings, PreferenceEntryPatch } from '@/shared/types';
+import type { ClaudeSettings, CompanionMaterial, PreferenceEntryPatch } from '@/shared/types';
 
 /**
  * The one reader and writer for the settings that used to live in browser
@@ -51,17 +51,14 @@ export type UserPreferences = {
   dispatcher: unknown;
   /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
   plainMode: boolean;
-  /** Where each chat-gutter widget sits and whether it is open, per chat, plus the fallback a chat
-   *  with no arrangement of its own opens with. See `modules/chat-gutters/hooks/useGutterPlacements.ts`. */
-  chatGutters: unknown;
   /** The name of the roadmap on screen in the Roadmap tab and its widget, or null before one is chosen. Written WHOLE — the last device to choose wins — and a name the picture no longer holds reads as the first roadmap. See `modules/roadmap/hooks/useRoadmap.ts`. */
   roadmapSelected: string | null;
   /** The completion each roadmap last celebrated for this user, one entry list written by entry patch (`writeUserPreferenceEntries`): `{ seen: { name: string, at: string }[] }` — `name` the roadmap's, `at` the dispatcher's UTC string of the newest `shipped_at`, `completed_at` or `reached_at` played. Phone and desktop share it, so a completion plays once between them — provided a writer never sends an `at` older than the one it read: the merge replaces the named entry and does not compare (see `ENTRY_LISTED_KEYS` in `user-preferences.db.ts`). See `modules/roadmap/hooks/useCelebrations.ts`. */
   roadmapSeen: unknown;
   /** The folders pinned on the Files tab's strip, one entry list written by entry patch (`writeUserPreferenceEntries`): `{ pinned: string[] }` — each entry a folder's absolute path, which is also its own key, in pin order (the newest last). Pins follow the operator to every device, and a pin made on one must survive a stale device's write: `{ pinned: { [path]: path } }` adds a pin and `{ pinned: { [path]: null } }` removes it, neither touching another. See `modules/file-manager/hooks/useFilesPins.ts`. */
   filesPins: unknown;
-  /** When he last looked away from Kaylee Station, as an ISO stamp, or null before he ever has. Written WHOLE — the last look-away on any device wins, which is what "the last look" means — by the station's provider on each look-away (its document hidden, the page gone, its window blurring after a focus, the station route unmounting) and on his "<n> new" press, and never on a timer. A page that sat open while another device wrote it takes the server's stamp when it comes back (`adoptUserPreference`), if that stamp is the newer. A landing is new when its `at` is after this stamp; null makes every landing of the week new. See `modules/station/context/StationLandedContext.tsx`. */
-  stationSeenAt: string | null;
+  /** The material Kaylee's face is drawn in — `mercury` (chrome, the default), `tube` (amber glass), `wire` (cyan wireframe) or `plasma` (a violet charge in dark glass) — written WHOLE from her Settings card. See `modules/companion/hooks/useCompanionMaterial.ts`. */
+  companionMaterial: CompanionMaterial;
 };
 
 export type UserPreferenceKey = keyof UserPreferences;
@@ -107,11 +104,10 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   chatFontSize: null,
   dispatcher: null,
   plainMode: null,
-  chatGutters: null,
   roadmapSelected: null,
   roadmapSeen: null,
   filesPins: null,
-  stationSeenAt: null,
+  companionMaterial: null,
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];
@@ -218,38 +214,11 @@ const isRetryableStatus = (status: number | null): boolean => (
 );
 
 /**
- * Folds a queued save into the one already waiting. Every key but `chatGutters` and the entry-patched
- * ones (`ENTRY_PATCHED_KEYS`, folded per entry) replaces: the newest value of a setting is the
- * setting. A gutter message names ONE chat (or, for a chat not sent yet,
- * only the fallback), so replacing it would drop the chat the earlier message carried — two arranges
- * inside the debounce window is enough — and the queue must keep the promise the wire value makes:
- * a message never asserts a chat it did not touch.
- *
- * Three shapes can arrive here, and the third is why this is not simply a union. A message with a
- * record `sessions` names that chat; a message that is only `{ fallback }` names no chat; and an
- * older build's flat record (`{ runner, memory, subagents }` — no `fallback`, no `sessions`) IS the
- * fallback it means, which is how the server reads it too. Folding that one like the others would
- * throw its arrangement away, so it becomes the fallback over whatever chats are pending.
+ * Folds a queued save into the one already waiting. Every key but the entry-patched ones
+ * (`ENTRY_PATCHED_KEYS`, folded per entry) replaces: the newest value of a setting is the setting.
  */
 function foldServerWrite(key: UserPreferenceKey, pending: unknown, incoming: unknown): unknown {
-  if (ENTRY_PATCHED_KEYS.has(key)) {
-    return foldEntryPatches(pending, incoming);
-  }
-  if (key !== 'chatGutters' || !isRecord(pending) || !isRecord(incoming)) {
-    return incoming;
-  }
-
-  const sessionsOf = (value: Record<string, unknown>) => (isRecord(value.sessions) ? value.sessions : {});
-  const orderOf = (value: Record<string, unknown>) => (Array.isArray(value.order) ? value.order : []);
-  const legacy = (value: Record<string, unknown>) => !('fallback' in value) && !('sessions' in value);
-
-  const fallback = legacy(incoming) ? incoming : incoming.fallback ?? (legacy(pending) ? pending : pending.fallback);
-  const sessions = { ...sessionsOf(pending), ...sessionsOf(incoming) };
-  const order = [
-    ...orderOf(pending).filter((id) => !orderOf(incoming).includes(id)),
-    ...orderOf(incoming),
-  ];
-  return { fallback, sessions, order };
+  return ENTRY_PATCHED_KEYS.has(key) ? foldEntryPatches(pending, incoming) : incoming;
 }
 
 /**
@@ -260,10 +229,8 @@ function foldServerWrite(key: UserPreferenceKey, pending: unknown, incoming: unk
  * landed: the screen and the server would disagree until the next change. `chatDrafts.ts` retries
  * the current value for the same reason.
  *
- * For `chatGutters` that means the current arrangement of the chats THIS message named, and no
- * others — the retry must keep the wire's promise that a message never asserts a chat it did not
- * touch. A chat the store has since forgotten is dropped from it. An entry patch keeps the same
- * promise per entry (`refreshEntryPatch`).
+ * An entry patch is rebuilt per entry (`refreshEntryPatch`): the entries this message named, as the
+ * store holds them now, and no others, so a message never asserts an entry it did not touch.
  */
 function refreshForRetry(key: UserPreferenceKey, sent: unknown): unknown {
   const current = preferences[key];
@@ -271,29 +238,7 @@ function refreshForRetry(key: UserPreferenceKey, sent: unknown): unknown {
     // The entries this patch named, as the store holds them now, and no others.
     return refreshEntryPatch(current, sent);
   }
-  if (key !== 'chatGutters') {
-    return current === undefined ? sent : current;
-  }
-  if (!isRecord(current) || !isRecord(sent)) {
-    return sent;
-  }
-
-  const named = isRecord(sent.sessions) ? Object.keys(sent.sessions) : [];
-  if (named.length === 0) {
-    // A chat that had no id yet: the message only ever carried the fallback, and the store's copy of
-    // it is the value the operator just set.
-    return { fallback: current.fallback ?? (isRecord(sent) ? sent.fallback : undefined) };
-  }
-
-  const held = isRecord(current.sessions) ? current.sessions : {};
-  const sessions: Record<string, unknown> = {};
-  for (const sessionId of named) {
-    if (sessionId in held) sessions[sessionId] = held[sessionId];
-  }
-  // No `fallback`: this message names chats, and the copy of the fallback beside them is exactly as
-  // stale as the sections the narrowing exists to keep off the wire. The fallback travels only in the
-  // message that carries nothing else, above.
-  return { sessions, order: Object.keys(sessions) };
+  return current === undefined ? sent : current;
 }
 
 /**
@@ -305,7 +250,7 @@ const KEEPALIVE_BODY_MAX_BYTES = 60_000;
 /** Whether `updates` may go as a `keepalive` request, the kind that outlives the page that sent it. */
 const fitsKeepalive = (updates: PreferenceRecord): boolean => new Blob([JSON.stringify(updates)]).size <= KEEPALIVE_BODY_MAX_BYTES;
 
-/** Sends the pending writes now. `keepalive` is for a flush made as the page may be leaving (`flushUserPreferences`). */
+/** Sends the pending writes now. `keepalive` is for a flush made as the page may be leaving. */
 function flushServerWrites(keepalive = false): void {
   serverWriteTimer = null;
   const updates = pendingServerWrites;
@@ -434,9 +379,9 @@ export function writeUserPreference(key: UserPreferenceKey, value: unknown, wire
   const wire = wireValue === undefined ? wireOf(key, preferences[key], value) : wireValue;
   preferences = { ...preferences, [key]: value };
   writeMirror();
-  // `wireValue` is for a preference the server merges rather than replaces (`chatGutters`, whose
-  // value holds a section per chat): the browser keeps the whole document, and sends only the part
-  // it changed, so a section another device wrote — and this one last read hours ago — is neither
+  // `wireValue` is for a write the server merges rather than replaces (an entry patch, from
+  // `writeUserPreferenceEntries`): the browser keeps the whole document, and sends only the part
+  // it changed, so an entry another device wrote — and this one last read hours ago — is neither
   // asserted nor reverted. Absent, the value itself goes up, which is right for every other key
   // but the whole-document entry keys (`wireOf`), whose difference goes up.
   if (wire !== NOTHING_TO_SEND) queueServerWrite({ [key]: wire });
@@ -479,36 +424,6 @@ export function writeUserPreferences(updates: PreferenceRecord): void {
   preferences = { ...preferences, ...changed };
   writeMirror();
   if (Object.keys(wired).length > 0) queueServerWrite(wired);
-  notifyListeners();
-}
-
-/**
- * Sends what is waiting for the server now, instead of at the end of the debounce. For a writer whose write is a LOOK-AWAY
- * (`StationLandedProvider`'s last look): the page that wrote it may be frozen or gone 400 ms later, and a phone is frozen
- * almost at once, so a stamp left for the timer would reach the server only when he came back. While saves are failing
- * (`failedServerWrites > 0`) nothing is sent early: the write that was just queued goes at the end of its 400 ms debounce, as any
- * write does (a new write re-arms the timer, so it never waits out the retry delay), and a page that closes in that window loses it.
- */
-export function flushUserPreferences(): void {
-  if (serverWriteTimer === null || failedServerWrites > 0) return;
-  clearTimeout(serverWriteTimer);
-  flushServerWrites(true);
-}
-
-/**
- * Takes a value the SERVER holds for one preference into this device's copy, and sends nothing back. For a reader that asks the
- * server again after the page was away, because another device may have written the preference since the sign-in read
- * (`StationLandedProvider`: the last look another device wrote). The CALLER decides that the server's value is the one to keep;
- * a write of the same key still waiting to be sent is newer than anything the server holds, so it is left alone. Only for a key
- * written whole: an entry-patched key or `chatGutters` merges on the server, and a copy adopted whole would erase this device's entries.
- */
-export function adoptUserPreference(key: UserPreferenceKey, value: unknown): void {
-  if (ENTRY_PATCHED_KEYS.has(key) || key === 'chatGutters') {
-    throw new Error(`adoptUserPreference: ${key} merges on the server and cannot be adopted whole`);
-  }
-  if (key in pendingServerWrites || JSON.stringify(preferences[key]) === JSON.stringify(value)) return;
-  preferences = { ...preferences, [key]: value };
-  writeMirror();
   notifyListeners();
 }
 

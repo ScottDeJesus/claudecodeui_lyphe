@@ -18,14 +18,15 @@ export default function SteeredMessageCard({ steer, providerLabel }: SteeredMess
   const attachmentCount = steer.uploadedAttachments.length || steer.attachments.length;
 
   return (
-    <div className="settings-content-enter mx-auto mb-2 max-w-[54.25rem] rounded-xl rounded-t-none border border-primary/30 bg-primary/[0.06] px-3 py-2">
+    // The same form as a queued line, with no wash: its dot is the accent, breathing, because this one is already on its way in.
+    <div data-chat-waiting="steered" className="settings-content-enter mx-auto mb-2 max-w-[var(--chat-measure,54.25rem)] rounded-lg border border-border px-3 py-2">
       <div className="flex items-start gap-2.5">
         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" aria-hidden />
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-primary/80">
+          <div className="flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
             <span>{t('input.steer.label', { defaultValue: 'Steering' })}</span>
-            <span className="normal-case text-muted-foreground/70" role="status">
+            <span className="font-sans normal-case tracking-normal text-muted-foreground" role="status">
               · {steer.status === 'sending'
                 ? t('input.steer.sending', { defaultValue: 'Sending…' })
                 : t('input.steer.willRead', { provider: providerLabel, defaultValue: '{{provider}} reads it at its next tool call' })}

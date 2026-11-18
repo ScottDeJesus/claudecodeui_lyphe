@@ -70,9 +70,9 @@ export function failureSentence(lead: string, reason: string): string {
 
 /** The failure sentence of a result, or `null` for a turn that succeeded. */
 function resultFailure(result: SDKResultMessage): string | null {
-  if (result.subtype === 'success') return result.is_error ? failureSentence('Her answer failed', result.result) : null;
-  if (result.subtype === 'error_max_turns') return 'Her turn ran out of steps before she finished.';
-  return failureSentence('Her answer failed', result.errors.join('; ') || result.subtype);
+  if (result.subtype === 'success') return result.is_error ? failureSentence('The answer failed', result.result) : null;
+  if (result.subtype === 'error_max_turns') return 'The turn ran out of steps before it finished.';
+  return failureSentence('The answer failed', result.errors.join('; ') || result.subtype);
 }
 
 /** Reads one message of her stream; `null` for every message her session has no use for. Consumed by `companion-session.ts`. */

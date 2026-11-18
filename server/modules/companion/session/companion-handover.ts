@@ -108,9 +108,9 @@ function handoverInstructions(operatorName: string, name: string, last: LastWord
   const he = operatorName.trim() || 'the operator';
   const she = name.trim() || 'Kaylee';
   const lines = [
-    `This is not a compaction of a coding chat. The conversation above is between ${he} (the User) and ${she}, his voice companion (the Assistant). ${she} is starting a new conversation and keeps nothing of this one except what you write now: write the handover she reads first thing, so she can pick the thread up by voice.`,
+    `This is not a compaction of a coding chat. The conversation above is between ${he} (the User) and ${she}, his voice companion (the Assistant). ${she} is starting a new conversation and keeps nothing of this one except what you write now: write the handover ${she} reads first thing, to pick the thread up by voice.`,
     '',
-    `Write to her, in the second person ("you and ${he} were…"), in plain spoken words and short sentences: no headings, no numbering, no lists of ids, no citations, no markdown, no quoted messages. At most eight short lines, one idea each, in this order, leaving out any line that has nothing to say:`,
+    `Write to ${she}, in the second person ("you and ${he} were…"), in plain spoken words and short sentences: no headings, no numbering, no lists of ids, no citations, no markdown, no quoted messages. At most eight short lines, one idea each, in this order, leaving out any line that has nothing to say:`,
     `- what you and ${he} were discussing;`,
     '- which chat or session was in focus, and why;',
     `- what ${he} decided;`,

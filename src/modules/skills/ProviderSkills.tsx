@@ -72,12 +72,12 @@ const SCOPE_LABELS: Record<SkillsScope, string> = {
 };
 
 const SCOPE_BADGE_CLASSES: Record<SkillsScope, string> = {
-  user: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  plugin: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
-  repo: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  project: 'border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300',
-  admin: 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300',
-  system: 'border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+  user: 'bg-[var(--pos-soft)] text-[var(--pos-ink)]',
+  plugin: 'border-[var(--info-dot)] bg-[var(--info-soft)] text-[var(--info-ink)]',
+  repo: 'bg-[var(--warn-soft)] text-[var(--warn-ink)]',
+  project: 'bg-[var(--warn-soft)] text-[var(--warn-ink)]',
+  admin: 'border-[var(--danger-dot)] bg-[var(--danger-soft)] text-[var(--danger-ink)]',
+  system: 'bg-secondary text-muted-foreground',
 };
 
 const SCOPE_ORDER: SkillsScope[] = ['user', 'plugin', 'repo', 'project', 'admin', 'system'];
@@ -422,26 +422,30 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
               Folders can include scripts, references, and assets.
             </div>
           </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <div className="flex w-full flex-col gap-2 finger:w-auto finger:flex-row sm:w-auto sm:flex-row">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full sm:w-auto"
+              className="finger:h-11 finger:w-11 finger:px-0"
+              aria-label="Choose Files"
+              title="Choose Files"
             >
               <FileUp className="h-4 w-4" />
-              Choose Files
+              <span className="finger:hidden">Choose Files</span>
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => folderInputRef.current?.click()}
-              className="w-full sm:w-auto"
+              className="finger:h-11 finger:w-11 finger:px-0"
+              aria-label="Choose Folder"
+              title="Choose Folder"
             >
               <FolderUp className="h-4 w-4" />
-              Choose Folder
+              <span className="finger:hidden">Choose Folder</span>
             </Button>
           </div>
         </div>
@@ -507,6 +511,9 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
     </div>
   );
 
+  // The install press's words: how many skills wait in the queue. Shown on the button at a desk, and as its name under a finger.
+  const installLabel = `Install ${queuedFiles.length > 0 ? `${queuedFiles.length} Skill${queuedFiles.length === 1 ? '' : 's'}` : 'Skill'}`;
+
   return (
     <div className="min-w-0 space-y-4 overflow-x-hidden">
       <div className="flex min-w-0 items-start gap-3">
@@ -522,7 +529,7 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
       </div>
 
       <div className="space-y-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 finger:flex-row sm:flex-row sm:items-center">
           <div className="relative min-w-0 flex-1 sm:max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -547,21 +554,25 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
           <Button
             type="button"
             size="sm"
-            className="w-full sm:w-auto"
+            className="finger:h-11 finger:w-11 finger:px-0"
             onClick={() => handleAddDialogOpenChange(true)}
+            aria-label="Add Skill"
+            title="Add Skill"
           >
             <Plus className="h-4 w-4" />
-            Add Skill
+            <span className="finger:hidden">Add Skill</span>
           </Button>
           <Button
             onClick={() => void refreshSkills({ force: true })}
             variant="outline"
             size="sm"
-            className="w-full sm:w-auto"
+            className="finger:h-11 finger:w-11 finger:px-0"
             disabled={isLoading || isLoadingProjectScopes}
+            aria-label="Refresh"
+            title="Refresh"
           >
             <RefreshCw className={cn('h-4 w-4', (isLoading || isLoadingProjectScopes) && 'animate-spin')} />
-            Refresh
+            <span className="finger:hidden">Refresh</span>
           </Button>
         </div>
         {isLoadingProjectScopes && (
@@ -613,8 +624,8 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
                 <div className={cn(
                   'max-h-24 overflow-y-auto whitespace-pre-wrap rounded-lg border px-3 py-2 text-sm',
                   submitError || loadError
-                    ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200'
-                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+                    ? 'bg-[var(--danger-soft)] text-[var(--danger-ink)]'
+                    : 'bg-[var(--pos-soft)] text-[var(--pos-ink)]',
                 )}>
                   {submitError || loadError || 'Skills saved successfully.'}
                 </div>
@@ -624,26 +635,31 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
                 </span>
               )}
             </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-col-reverse gap-2 finger:flex-row sm:flex-row sm:items-center">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="w-full sm:w-auto"
+                className="finger:h-11 finger:w-11 finger:px-0"
                 disabled={isSubmitting}
                 onClick={() => handleAddDialogOpenChange(false)}
+                aria-label="Cancel"
+                title="Cancel"
               >
-                Cancel
+                <X aria-hidden="true" />
+                <span className="finger:hidden">Cancel</span>
               </Button>
               <Button
                 type="button"
                 size="sm"
-                className="w-full sm:w-auto"
+                className="finger:h-11 finger:w-11 finger:px-0"
                 onClick={() => void handleUploadInstall()}
                 disabled={isSubmitting || queuedFiles.length === 0}
+                aria-label={installLabel}
+                title={installLabel}
               >
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Install {queuedFiles.length > 0 ? `${queuedFiles.length} Skill${queuedFiles.length === 1 ? '' : 's'}` : 'Skill'}
+                <span className="finger:hidden">{installLabel}</span>
               </Button>
             </div>
           </div>
@@ -651,13 +667,13 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
       </Dialog>
 
       {!isAddDialogOpen && (submitError || loadError) && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200">
+        <div className="bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
           {submitError || loadError}
         </div>
       )}
 
       {justInstalled && saveStatus === 'success' && !isAddDialogOpen && (
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+        <div className="inline-flex items-center gap-2 bg-[var(--pos-soft)] px-3 py-1 text-xs font-medium text-[var(--pos-ink)]">
           <CheckCircle2 className="h-4 w-4" />
           Skills saved successfully.
         </div>
@@ -695,7 +711,7 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
         {groupedSkills.map((group) => (
           <section key={group.scope} className="min-w-0 space-y-3">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className={cn('rounded-full px-2.5 py-1 text-xs', SCOPE_BADGE_CLASSES[group.scope])}>
+              <Badge variant="outline" className={cn('px-2.5 py-1 text-xs', SCOPE_BADGE_CLASSES[group.scope])}>
                 {SCOPE_LABELS[group.scope]}
               </Badge>
               <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -707,7 +723,7 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
               {group.skills.map((skill) => (
                 <div
                   key={`${skill.command}:${skill.sourcePath}:${skill.projectPath || 'global'}`}
-                  className="min-w-0 rounded-lg border border-border bg-card/50 p-4"
+                  className="min-w-0 border-y border-border/50 p-4"
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="break-all font-mono text-sm font-semibold text-foreground">{skill.command}</div>

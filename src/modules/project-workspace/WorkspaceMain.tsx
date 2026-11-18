@@ -1,8 +1,8 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
-import { ChatGutterLayout } from '@/modules/chat-gutters';
+import { ChatInterface } from '@/modules/chat';
+import { SessionPanelLayout, SessionPanelProvider } from '@/modules/session-panel';
 import { ChatHostSlot, useChatHost } from '@/modules/chat-host';
 import { FilesView } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
@@ -19,14 +19,20 @@ import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
 import { NotesPanel } from '@/modules/notes';
-import type { AppTab, FileOpenRequest, FilesRoot, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
+import type { AppTab, CompanionPresence, FileOpenRequest, FilesRoot, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { absolutePathIn } from '@/shared/utils';
+import { useChatDeskSide } from '@/modules/project-workspace/hooks/useChatDeskSide';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
 import { useHiddenNavFallback } from '@/modules/project-workspace/hooks/useHiddenNavFallback';
 import { useRunnerLanding } from '@/modules/project-workspace/hooks/useRunnerLanding';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
+import { CompanionAvatar } from '@/modules/companion';
+import { CoreDrawingProvider } from '@/shared/context/CoreDrawingContext';
+import type { CoreDrawingInput } from '@/shared/context/CoreDrawingContext';
+import { ChatDesk } from '@/modules/project-workspace/ChatDesk';
+import ChatHead from '@/modules/project-workspace/ChatHead';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
@@ -88,6 +94,33 @@ async function readCapped(response: Response, cap: number): Promise<Blob | null>
   return new Blob(chunks, { type: response.headers.get('content-type') ?? '' });
 }
 
+
+/** The presence word each of a chat core's forms goes by, for the instrument's own marker (`data-state`); the form itself is handed over as `form`. */
+const CORE_PRESENCE: Record<CoreDrawingInput['state'], CompanionPresence['state']> = {
+  idle: 'idle', thinking: 'thinking', reading: 'reading_code', writing: 'drafting', speaking: 'speaking', listening: 'listening',
+};
+
+/**
+ * A chat's core, drawn: the companion's own instrument (`CompanionAvatar`), made of the material and in the form the chat asks for, with no
+ * voice and no look of its own. Handed to the chat through `CoreDrawingProvider`, because the chat module cannot import the companion's.
+ * One function for the app's life, so the provider's value never changes.
+ */
+const drawChatCore = ({ material, state, drive, size, azimuth }: CoreDrawingInput) => (
+  <CompanionAvatar
+    presence={{ state: CORE_PRESENCE[state], session: null, files: null, walk: null }}
+    voice={null}
+    sentences={null}
+    look={null}
+    material={material}
+    drive={drive}
+    size={size}
+    // The body alone, in the form the chat names: the chat draws the rings round it.
+    bare
+    form={state}
+    bearing={azimuth}
+  />
+);
+
 /**
  * Rendered by ProjectMainRegion to show the active view's pane, with a project selected or not. Nothing in the
  * rail is project-scoped, so the house views (Roadmap, Kanban, Inbox, Browser and the rest) draw on their own;
@@ -130,8 +163,13 @@ function WorkspaceMain({
   useTaskMasterProjectSync(selectedProject);
 
   // While the chat floats it is live outside this tab: it counts as the active chat whichever tab is open,
-  // and the gutters stand down — the floating chat draws its own pinned subagent strip.
+  // and the session's panel stands down with it.
   const floating = useChatHost().placement !== 'home';
+
+  // At a desk the chat has a column beside it for its core, the roadmap's circle and its follow-ups (`ChatDesk`); this is its width,
+  // 0 for none. A chat that floats took its core with it, and with no project there is no chat to have one.
+  const deskSide = useChatDeskSide();
+  const chatSide = floating || selectedProject === null ? 0 : deskSide;
 
   // The one path-opening capability three caller families share — the chat's Edit/Write cards and
   // bare links, the git panel's changed-file rows, and the tree beside the file manager. It lives
@@ -148,14 +186,6 @@ function WorkspaceMain({
   // The counter behind that nonce. A ref, not state: nothing renders from it, and bumping it must
   // not be a second render on top of the request it is part of.
   const openRequestNonce = useRef(0);
-
-  // The chat's token count, lifted so the mobile header can carry it (the composer hides its
-  // copy below `md`). Chat-tab only: the number is that chat's, and the header stays a strip of
-  // navigation on every other tab.
-  const [tokenUsageSurface, setTokenUsageSurface] = useState<TokenUsageSurface | null>(null);
-  // The export button travels the same way and for the same reason: on a phone it used to float
-  // over the transcript it was exporting.
-  const [chatExportSurface, setChatExportSurface] = useState<ChatExportSurface | null>(null);
 
   // The request always carries an ABSOLUTE path, because Files picks the root that holds it. A relative
   // one — a chat card that named a file by its project path — is the open project's, and joins its folder.
@@ -320,28 +350,38 @@ function WorkspaceMain({
   const viewLabel = activeTab === 'chat' ? null : (views.find((view) => view.id === activeTab)?.label ?? null);
 
   return (
+    // The chat's panel is read once here, for the switch in the chat's head, the panel in the talk's place and the follow-ups in
+    // the chat's side column. Only for a chat on screen in this pane: a floating chat, another view and a chat not yet begun have none.
+    <SessionPanelProvider sessionId={activeTab === 'chat' && !floating ? (selectedSession?.id ?? null) : null} followupsApart={chatSide > 0}>
     <div className="flex h-full flex-col">
-      <WorkspaceHeader
-        selectedProject={selectedProject}
-        selectedSession={selectedSession}
-        viewLabel={viewLabel}
-        isMobile={isMobile}
-        onMenuClick={onMenuClick}
-        newSessionLabel={t('mainContent.newSession')}
-        tokenUsage={activeTab === 'chat' ? tokenUsageSurface : null}
-        chatExport={activeTab === 'chat' ? chatExportSurface : null}
-      />
+      {/* The Chat view has a head of its own, at every width: the way back to the sessions home, and the chat's name. It is the first
+          line of the chat's own pane (`ChatDesk` below), so at a desk it stands over the chat and not over the column beside it. Every
+          other view keeps the phone's strip (the drawer's button and the view's name), as does the Chat view while its chat floats. */}
+      {(activeTab !== 'chat' || floating) && (
+        <WorkspaceHeader
+          selectedProject={selectedProject}
+          selectedSession={selectedSession}
+          viewLabel={viewLabel}
+          isMobile={isMobile}
+          onMenuClick={onMenuClick}
+          newSessionLabel={t('mainContent.newSession')}
+        />
+      )}
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
         <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
+          <ChatDesk
+            side={chatSide}
+            head={floating ? null : <ChatHead selectedProject={selectedProject} selectedSession={selectedSession} newSessionLabel={t('mainContent.newSession')} />}
+          >
           {selectedProject ? (
             <WorkspaceErrorBoundary showDetails>
-              {/* The gutters wrap the chat from OUTSIDE, so the transcript and the composer keep
-                  their own column untouched. The boundary is handed down rather than imported
-                  there: each widget body gets its own, and a crashing widget cannot blank the
-                  chat tab. */}
-              <ChatGutterLayout enabled={!isMobile && !floating} sessionId={selectedSession?.id ?? null}
-                boundary={WorkspaceErrorBoundary}>
+              <CoreDrawingProvider value={drawChatCore}>
+              {/* The chat's panel stands in the chat's place when switched to: the chat keeps its place in the tree whatever the panel does. */}
+              <SessionPanelLayout>
+              {/* THE CHAT'S OWN COLUMN: the transcript's cap (868px) and nothing wider, centred, so the scroll pane and the scrollbar
+                  on its right edge end where the transcript ends. At a desk the chat's surface is the cap (`--chat-column`, `ChatDesk`). */}
+              <div data-testid="chat-column" className="mx-auto h-full min-h-0 w-full min-w-0 max-w-[var(--chat-column,868px)]">
                 <ChatHostSlot sessionId={selectedSession?.id ?? null} showing={activeTab === 'chat'}>
                   <ChatInterface
                     isActive={activeTab === 'chat' || floating}
@@ -362,14 +402,15 @@ function WorkspaceMain({
                     sendByCtrlEnter={sendByCtrlEnter}
                     externalMessageUpdate={externalMessageUpdate}
                     newSessionTrigger={newSessionTrigger}
-                    onTokenUsageSurface={setTokenUsageSurface}
-                    onChatExportSurface={setChatExportSurface}
                     onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
                   />
                 </ChatHostSlot>
-              </ChatGutterLayout>
+              </div>
+              </SessionPanelLayout>
+              </CoreDrawingProvider>
             </WorkspaceErrorBoundary>
           ) : chooseProjectBody}
+          </ChatDesk>
         </div>
 
         {shouldShowTasksTab && (selectedProject
@@ -515,6 +556,7 @@ function WorkspaceMain({
         </WorkspaceErrorBoundary>
       </div>
     </div>
+    </SessionPanelProvider>
   );
 }
 

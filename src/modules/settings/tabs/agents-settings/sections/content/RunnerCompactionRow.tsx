@@ -1,4 +1,4 @@
-import { Shrink } from 'lucide-react';
+import { RefreshCw, Shrink } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import SettingsToggle from '@/modules/settings/SettingsToggle';
@@ -131,8 +131,16 @@ export default function RunnerCompactionRow() {
       {unknown ? (
         // A switch with nothing to point at cannot be moved: the slot holds the one act that can be
         // honoured, ask again.
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRetry}
+          aria-label={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          title={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          className="finger:h-11 finger:w-11 finger:px-0"
+        >
+          <RefreshCw aria-hidden="true" />
+          <span className="finger:hidden">{t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}</span>
         </Button>
       ) : (
         <SettingsToggle

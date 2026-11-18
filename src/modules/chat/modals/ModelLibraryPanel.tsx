@@ -266,7 +266,7 @@ export default function ModelLibraryPanel({
             </div>
           )}
           {notice && !error && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--pos-dot)] bg-[var(--pos-soft)] px-3 py-2 text-xs text-[var(--pos-ink)]">
               <Check className="h-3.5 w-3.5" />
               {notice}
             </div>
@@ -304,7 +304,7 @@ export default function ModelLibraryPanel({
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="truncate text-sm font-semibold text-foreground">{option.label}</p>
-                            <Badge className="rounded-full px-2 py-0 text-[9px]">Custom</Badge>
+                            <Badge className="px-2 py-0 text-[9px]">Custom</Badge>
                           </div>
                           <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">{option.value}</p>
                         </div>

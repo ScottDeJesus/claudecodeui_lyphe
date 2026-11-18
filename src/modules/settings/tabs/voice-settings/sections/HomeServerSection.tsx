@@ -1,3 +1,4 @@
+import { RefreshCw, Save, Trash2 } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -81,7 +82,17 @@ export function HomeServerSection({ keyStatus, address, saving, error, onSaveAdd
             <Banner
               tone="warn"
               action={onRetry && (
-                <Button variant="outline" size="sm" onClick={onRetry}>{t('voiceSettings.homeServer.retry', { defaultValue: 'Try again' })}</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRetry}
+                  aria-label={t('voiceSettings.homeServer.retry', { defaultValue: 'Try again' })}
+                  title={t('voiceSettings.homeServer.retry', { defaultValue: 'Try again' })}
+                  className="finger:h-11 finger:w-11 finger:px-0"
+                >
+                  <RefreshCw aria-hidden="true" />
+                  <span className="finger:hidden">{t('voiceSettings.homeServer.retry', { defaultValue: 'Try again' })}</span>
+                </Button>
               )}
             >
               {t('voiceSettings.homeServer.loadFailed', { defaultValue: "Your home server settings couldn't be read: {{reason}}", reason: error })}
@@ -161,10 +172,15 @@ export function HomeServerSection({ keyStatus, address, saving, error, onSaveAdd
               />
               {/* One group, so a narrow card puts both buttons under the field together instead of stranding Clear. */}
               <div className="flex items-center gap-2">
-                <Button type="submit" size="sm" busy={saving} disabled={typedKey.length === 0 || keyInvalid}>
-                  {stored
+                <Button type="submit" size="sm" busy={saving} disabled={typedKey.length === 0 || keyInvalid} aria-label={stored
                     ? t('voiceSettings.homeServer.replace', { defaultValue: 'Replace' })
-                    : t('voiceSettings.homeServer.save', { defaultValue: 'Save' })}
+                    : t('voiceSettings.homeServer.save', { defaultValue: 'Save' })} title={stored
+                    ? t('voiceSettings.homeServer.replace', { defaultValue: 'Replace' })
+                    : t('voiceSettings.homeServer.save', { defaultValue: 'Save' })} className="finger:h-11 finger:w-11 finger:px-0">
+                  <Save aria-hidden="true" />
+                  <span className="finger:hidden">{stored
+                    ? t('voiceSettings.homeServer.replace', { defaultValue: 'Replace' })
+                    : t('voiceSettings.homeServer.save', { defaultValue: 'Save' })}</span>
                 </Button>
                 {stored && (
                   <Button
@@ -174,9 +190,11 @@ export function HomeServerSection({ keyStatus, address, saving, error, onSaveAdd
                     busy={saving}
                     aria-label={t('voiceSettings.homeServer.clearLabel', { defaultValue: 'Clear your home server key' })}
                     onClick={() => setConfirmingClear(true)}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground finger:h-11 finger:w-11 finger:px-0"
+                    title={t('voiceSettings.homeServer.clear', { defaultValue: 'Clear' })}
                   >
-                    {t('voiceSettings.homeServer.clear', { defaultValue: 'Clear' })}
+                    <Trash2 aria-hidden="true" />
+                    <span className="finger:hidden">{t('voiceSettings.homeServer.clear', { defaultValue: 'Clear' })}</span>
                   </Button>
                 )}
               </div>

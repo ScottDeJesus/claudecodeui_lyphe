@@ -126,7 +126,8 @@ function FenceBlock({ raw, language, clamp }: FenceBlockProps) {
   const languageLabel = language.charAt(0).toUpperCase() + language.slice(1);
 
   return (
-    <div className="group my-3 overflow-hidden rounded-xl border border-border bg-muted/50 shadow-sm">
+    // `data-code-fence`: the marker the talk's reading style finds a code block by (`transcript/reading.css`).
+    <div data-code-fence="" className="group my-3 overflow-hidden rounded-xl border border-border bg-muted/50 shadow-sm">
       {/* Label row shares the block's background — no divider, ChatGPT-style */}
       <div className="flex items-center justify-between px-4 pt-2">
         <span className="select-none text-md-meta text-muted-foreground">{languageLabel}</span>

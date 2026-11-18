@@ -106,7 +106,7 @@ function MetricCard({
     tone === 'primary'
       ? 'border-primary/35 bg-primary/10 text-primary'
       : tone === 'success'
-        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+        ? 'border-[var(--pos-dot)] bg-[var(--pos-soft)] text-[var(--pos-ink)]'
         : 'border-border/70 bg-background/75 text-muted-foreground';
 
   return (
@@ -324,7 +324,7 @@ function ModelsContent({
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="break-all font-mono text-sm font-semibold text-foreground">{currentModel}</span>
             {pendingSessionModel && pendingSessionModel !== currentModel && (
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-500 dark:text-emerald-400">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink)]">
                 → {pendingSessionModel} next
               </span>
             )}
@@ -364,7 +364,7 @@ function ModelsContent({
                     isCurrent
                       ? 'border-primary/45 bg-primary/10'
                       : isPendingSelection
-                        ? 'border-emerald-500/35 bg-emerald-500/10'
+                        ? 'border-[var(--pos-dot)] bg-[var(--pos-soft)]'
                         : 'border-border/70 bg-background/80 hover:border-primary/30 hover:bg-background'
                   }`}
                   style={{ animationDelay: `${Math.min(index * 14, 180)}ms` }}
@@ -372,7 +372,7 @@ function ModelsContent({
                   <span className="flex items-center justify-between gap-2">
                     <span className="break-words text-sm font-semibold text-foreground">{option.label || option.value}</span>
                     <span className="flex shrink-0 items-center gap-2">
-                      {option.isCustom && <Badge className="rounded-full px-2 py-0 text-[9px]">Custom</Badge>}
+                      {option.isCustom && <Badge className="px-2 py-0 text-[9px]">Custom</Badge>}
                       {isCurrent ? (
                         <BadgeCheck className="h-4 w-4 shrink-0 text-primary" />
                       ) : isChanging ? (
@@ -390,7 +390,7 @@ function ModelsContent({
                     <span className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Current selection</span>
                   )}
                   {isPendingSelection && !isCurrent && (
-                    <span className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-500 dark:text-emerald-400">
+                    <span className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--pos-ink)]">
                       Session model
                     </span>
                   )}
@@ -532,18 +532,18 @@ function StatusContent({ data }: { data: StatusCommandData }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between rounded-3xl border border-emerald-500/25 bg-emerald-500/10 p-4">
+      <div className="flex items-center justify-between rounded-3xl border border-[var(--pos-dot)] bg-[var(--pos-soft)] p-4">
         <div className="flex items-center gap-3">
           <span className="relative flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--pos-dot)] opacity-75" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-[var(--pos-dot)]" />
           </span>
           <div>
             <p className="text-sm font-semibold text-foreground">Runtime online</p>
             <p className="text-xs text-muted-foreground">Process {data.pid ? `#${data.pid}` : 'status'} is responding.</p>
           </div>
         </div>
-        <Badge className="rounded-full bg-emerald-500 text-white hover:bg-emerald-500">Healthy</Badge>
+        <Badge className="rounded-full bg-[var(--pos-dot)] text-background hover:bg-[var(--pos-dot)]">Healthy</Badge>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

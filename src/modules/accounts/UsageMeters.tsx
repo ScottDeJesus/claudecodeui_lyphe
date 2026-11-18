@@ -1,10 +1,8 @@
-import { Meter } from '@/shared/ui';
-import { WINDOW_NAMES, resetInstant, windowPercent, windowTone, windowValue } from '@/modules/accounts/utils/usageWindows';
-import type { ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types';
+import type { CSSProperties } from 'react';
 
-/** The line that closes the block, because a blank bar has to be readable as "unknown" and not as "you have used nothing". */
-const CLOSING_LINE =
-  'Figures come from the provider and can lag a few minutes. A blank reading means unknown, never zero.';
+import { Meter } from '@/shared/ui';
+import { WINDOW_NAMES, resetInstant, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
+import type { ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types';
 
 /**
  * The server's words for a degraded reading, in the app's.
@@ -50,15 +48,27 @@ function windowLabel(usageWindow: ClaudeUsageWindow): string {
 }
 
 /**
- * The heavy state, in words under the bar.
+ * A dial's figure in words, for a reader that cannot see it: the percent, and the heavy state beside it.
  *
- * The Meter's `▲` is CSS `::before` (`controls.css:228`), so it reaches paint and nothing
- * else — a reader on assistive tech gets "81% used" with no hint that it is the warn one.
- * Doctrine §6 asks for a mark OR a word; the mark is the library's, the word is the caller's.
+ * The dial's `▲` is CSS `::before`, so it reaches paint and nothing else — a reader on assistive tech would get "81%" with no hint
+ * that it is the warn one. Doctrine §6 asks for a mark OR a word; the mark is the library's, the word is the caller's.
  */
-function heavyLine(tone: 'accent' | 'warn', sub: string | undefined): string | undefined {
-  if (tone !== 'warn') return sub;
-  return sub ? `Running heavy · ${sub}` : 'Running heavy';
+function figureInWords(percent: number | null, tone: 'accent' | 'warn'): string {
+  if (percent === null) return 'unknown';
+  return tone === 'warn' ? `${percent}%, running heavy` : `${percent}%`;
+}
+
+/**
+ * When the window turns over, short enough to read at a glance under a dial: "Resets 4:00 PM" today, "Resets Fri 4:00 PM" any other
+ * day. Rounded to the minute for the reason `resetsLine` gives. `undefined` when the window names no reset: the line is not drawn.
+ */
+function resetsShort(resetsAt: string | null): string | undefined {
+  if (!resetsAt) return undefined;
+  const at = new Date(Math.round(resetInstant(resetsAt) / 60_000) * 60_000);
+  if (Number.isNaN(at.getTime())) return undefined;
+  const clock = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (at.toDateString() === new Date().toDateString()) return `Resets ${clock}`;
+  return `Resets ${at.toLocaleDateString([], { weekday: 'short' })} ${clock}`;
 }
 
 /**
@@ -71,7 +81,7 @@ function heavyLine(tone: 'accent' | 'warn', sub: string | undefined): string | u
  * The instant comes from `resetInstant`, the one reader this module has, so the countdown here
  * and the carry past a reset (`windowPastReset`) describe the same moment.
  *
- * Said under each meter, and in each usage ring's words (`UsageRing`, on the rail and in the account rows).
+ * Said as each dial's hover, and in each usage ring's words (`UsageRing`, on the rail and in the account rows).
  */
 export function resetsLine(resetsAt: string | null): string | undefined {
   if (!resetsAt) return undefined;
@@ -110,14 +120,14 @@ function degradedLine(degraded: boolean, staleSince: number | null, reason: stri
   return `As of ${secondsStampInWords(staleSince)} — ${why}.`;
 }
 
-/** A muted line of context under the bars — the "as of" stamp and anything else said in words rather than in colour. */
+/** A muted line of context under the dials — the "as of" stamp and anything else said in words rather than in colour. */
 function UsageNote({ children }: { children: string }) {
   return <p className="text-xs leading-relaxed text-ink-faint">{children}</p>;
 }
 
 const NO_PACE = { tickAt: null, markAt: null, caption: null } as const;
 
-/** The pacer's two annotations for ONE usage window, and the caption the This week meter carries. Every other window — and every meter on a reading with no pace — gets none, so today's block is what it was. */
+/** The pacer's two annotations for ONE usage window, and the sentence the This week dial carries as its hover. Every other window — and every dial on a reading with no pace — gets none. */
 function paceForWindow(key: string, pace: ClaudeUsagePace | null): { tickAt: number | null; markAt: number | null; caption: string | null } {
   if (!pace || key !== 'seven_day') return NO_PACE;
   // `typeof`: the wire is untrusted, and a pace whose `words` is no string keeps its tick and mark and draws no
@@ -126,37 +136,37 @@ function paceForWindow(key: string, pace: ClaudeUsagePace | null): { tickAt: num
   return { tickAt: pace.ceiling7, markAt: pace.projected7, caption: words || null };
 }
 
+/** From three dials up they step down, so a five-hour limit, on an account that has one, stands in the same row as the two weeks. */
+const DIAL_PX = { few: 132, many: 86 } as const;
+
 /**
- * The usage block of the account panel (D7).
- * Used by the accounts module's AccountPanelBody, which the popover and the Accounts widget both draw — the only screens that draw these
- * bars (the rail's UsageRings show the same figure as a ring);
- * it is a separate file because the account rows below it are a different subject and this
- * one is all about what a number does and does not mean.
+ * The usage block of the account panel (D7): ONE DIAL FOR EACH WINDOW the provider measures on the account in use. An account has
+ * its week, usually a week for one model, and sometimes a five-hour limit; the row draws as many as there are and invents none.
+ * Used by the accounts module's AccountPanelBody, which the account switcher and the Accounts widget both draw.
  *
- * There is deliberately no flexible-spend bar: the provider reports no such window, and a third
- * bar reading "—" would invent a limit nobody set.
+ * A DIAL SAYS THREE THINGS AND NO MORE: the figure and its percent sign in the middle, the window's name under it, and when it
+ * resets under that, short and never cut ("Resets Fri 4:00 PM"). The whole sentence ("about 3 days left") is the dial's hover.
  *
- * THE PACER'S PICTURE SITS ON THE WEEKLY BAR, in three pieces and one sentence: a ceiling tick and a
- * projected-end mark on the This week meter (`usage.pace`), and the pacer's own words as one caption under it.
- * The figures arrive as percents from the usage route, which converts them once, so the meter does
- * no arithmetic. An absent pace draws none of it.
+ * There is deliberately no flexible-spend dial: the provider reports no such window, and one reading "—" would invent a limit
+ * nobody set.
+ *
+ * THE PACER'S PICTURE SITS ON THE WEEK'S DIAL: a ceiling tick across its arc and a projected-end mark outside it (`usage.pace`), with
+ * the pacer's own sentence as that dial's hover. The figures arrive as percents from the usage route, which converts them once, so the
+ * dial does no arithmetic. An absent pace draws none of it.
+ *
+ * A reading that cannot be drawn is said in one line where the dials would stand: nothing asked yet, the server out of reach, a poll
+ * in flight, a shape this app could not read. A degraded reading keeps its dials, dimmed, over the line that says how old they are.
  */
 export function UsageMeters({ usage }: { usage: ClaudeUsage | null }) {
   // The pacer's projection as the usage route attached it, in percent; an unreachable answer has no
-  // key of its own, and an absent one draws the meters exactly as they were before it existed.
+  // key of its own, and an absent one draws the dials exactly as they are without it.
   const pace = usage !== null && usage.reachable ? usage.pace ?? null : null;
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">Usage on this account</div>
-      {renderReading(usage, pace)}
-      <UsageNote>{CLOSING_LINE}</UsageNote>
-    </div>
-  );
+  return <div data-usage-dials="" className="flex flex-col gap-2">{renderReading(usage, pace)}</div>;
 }
 
 function renderReading(usage: ClaudeUsage | null, pace: ClaudeUsagePace | null) {
   // Nothing has been asked yet. An em-dash, not a spinner: the first reading normally lands
-  // before the panel is ever opened, and a bar animating in from zero would say "none used".
+  // before the panel is ever opened, and a dial sweeping in from zero would say "none used".
   if (!usage) return <UsageNote>—</UsageNote>;
 
   if (!usage.reachable) {
@@ -185,33 +195,38 @@ function renderReading(usage: ClaudeUsage | null, pace: ClaudeUsagePace | null) 
     return <UsageNote>—</UsageNote>;
   }
 
+  const side = usage.windows.length > 2 ? DIAL_PX.many : DIAL_PX.few;
+
   return (
     <>
-      {/* Muted while degraded: the bars are the LAST figures, not the current ones, and the
+      {/* Muted while degraded: the dials are the LAST figures, not the current ones, and the
           "as of" line under them is what says so. Opacity rather than a tone, because these
           numbers are not a warning — they are simply old. */}
-      <div className={`flex flex-col gap-3${usage.degraded ? ' opacity-60' : ''}`}>
+      <div
+        className={`flex flex-wrap items-start justify-center gap-x-4 gap-y-3${usage.degraded ? ' opacity-60' : ''}`}
+        style={{ '--vv-dial': `${side}px` } as CSSProperties}
+      >
         {usage.windows.map((usageWindow) => {
-          // Rounded once, here, and read by the figure, the tone, the bar and aria alike.
+          // Rounded once, here, and read by the figure, the tone, the arc and aria alike.
           const percent = windowPercent(usageWindow);
           const tone = windowTone(usageWindow, percent);
           const paceMarks = paceForWindow(usageWindow.key, pace);
+          // The whole of it for a pointer that rests on the dial: the long reset line, then the pacer's sentence.
+          const hover = [resetsLine(usageWindow.resetsAt), paceMarks.caption].filter(Boolean).join(' · ');
           return (
-            <div key={usageWindow.key}>
+            <div key={usageWindow.key} data-usage-dial={usageWindow.key} title={hover || undefined}>
               <Meter
+                variant="dial"
                 percent={percent}
                 tone={tone}
                 label={windowLabel(usageWindow)}
-                value={windowValue(percent)}
-                sub={heavyLine(tone, resetsLine(usageWindow.resetsAt))}
+                value={figureInWords(percent, tone)}
+                sub={resetsShort(usageWindow.resetsAt)}
                 tickAt={paceMarks.tickAt}
                 markAt={paceMarks.markAt}
               />
-              {paceMarks.caption && (
-                <p data-usage-pace-caption="" className="mt-1 text-xs leading-relaxed text-ink-faint">
-                  {paceMarks.caption}
-                </p>
-              )}
+              {/* The pacer's sentence, for a reader that has no hover to rest on the dial. */}
+              {paceMarks.caption && <span data-usage-pace-caption="" className="sr-only">{paceMarks.caption}</span>}
             </div>
           );
         })}

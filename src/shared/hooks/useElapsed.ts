@@ -11,9 +11,9 @@ const ONE_HOUR_IN_MINUTES = 60;
 /**
  * How long something has been going, ticking once a second, spelled in the app's OWN words.
  *
- * THE SPELLING IS NOT THIS FILE'S TO INVENT. The chat composer's clock has said elapsed for as
- * long as there has been a composer, through three keys in the `chat` namespace
- * (`src/modules/chat/composer/ActivityIndicator.tsx`, `claudeStatus.elapsed.*`), and this reads
+ * THE SPELLING IS NOT THIS FILE'S TO INVENT. The chat composer's clock said elapsed for as
+ * long as it had one, through three keys in the `chat` namespace (`claudeStatus.elapsed.*`; the
+ * composer's working line is gone, the chat's core says a running turn now), and this reads
  * exactly those. A private helper here would be a SECOND spelling of the same idea — two clocks in
  * one app saying "5m 3s" and "05:03" for the same fact, drifting apart the first time either is
  * touched, and untranslatable besides. Phase 5 added the third key, `hoursMinutes`, beside the two

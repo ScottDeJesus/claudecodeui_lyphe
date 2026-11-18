@@ -7,15 +7,10 @@
 // Everything else in this module is private.
 export { CompanionProvider, useCompanion } from '@/modules/companion/context/CompanionContext';
 export { CompanionPanel } from '@/modules/companion/CompanionPanel';
-export { CompanionFab } from '@/modules/companion/CompanionFab';
 export { CompanionDock } from '@/modules/companion/CompanionDock';
 export { CompanionSettingsSection } from '@/modules/companion/CompanionSettingsSection';
-// The action waiting for his word, as her panel draws it in her dock; its second home is the head of the station's right
-// rail, "What needs you" (`WhatNeedsYou`), with every rule of MAN-9186.
+// The action waiting for his word, as the companion's panel draws it in its dock, with every rule of MAN-9186.
 export { CompanionActionCard } from '@/modules/companion/CompanionActionCard';
-// The same action in one line, the card's words and deadline: the station module's phone arrangement stands it over its bottom
-// bar while the action waits, and its press opens the whole card in Needs you (it never carries his lines, MAN-9186).
-export { CompanionActionLine } from '@/modules/companion/CompanionActionLine';
 // Whether the action waiting for his word has lapsed (its deadline, one timer): the card and the line read it, and the station's
 // count of what needs him (through the station's `useLivePending`) so an action whose card is gone is not counted.
 export { useActionLapse } from '@/modules/companion/hooks/useActionLapse';
@@ -26,12 +21,15 @@ export { CompanionDraftCard } from '@/modules/companion/CompanionDraftCard';
 // The pieces the station composes, each defined with its consumers named:
 // the one state of hers (MAN-9089): this module's panel, button and face read it, and the station's head reads it for its status line.
 export { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
-// her face bound to the provider: this module's button (CompanionFab, inside the disc), and the station's head.
+// her face bound to the provider: the sessions home's docked core and the station's.
 export { CompanionFace } from '@/modules/companion/CompanionFace';
 // her state in words with its dot: this module's panel header (CompanionHeader), and the station's head.
 export { CompanionStatus } from '@/modules/companion/CompanionStatus';
 // her controls (Stop, model, Live, Clear, this device's voice and ears): this module's panel header (CompanionHeader), and the station's head.
 export { CompanionControls } from '@/modules/companion/CompanionControls';
+// Stop alone, while a turn runs: this module's controls, and the station's dock, which shows it beside the companion's core while the
+// controls themselves stand behind a press.
+export { CompanionStopButton } from '@/modules/companion/CompanionStopButton';
 // her exchange with him: this module's panel (CompanionPanel), and the station's conversation.
 export { CompanionLog } from '@/modules/companion/CompanionLog';
 // keeps a scroller on its newest content while the reader is there: this module's log, and the station's portrait, whose words follow her answer as it streams.

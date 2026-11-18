@@ -142,7 +142,7 @@ export function KanbanVitalsStrip({ boardId }: KanbanVitalsStripProps) {
                 className={cn(
                   // `gap-1 px-1`, not the row's roomier pill: on a 320px phone the switcher under it is 50px
                   // wide, and a three-digit ask beside a two-digit one must still end on-screen.
-                  'vv-tabular flex h-4 items-center gap-1 whitespace-nowrap rounded-full px-1 text-[10px] font-medium leading-none ring-2 ring-background',
+                  'vv-tabular flex h-4 items-center gap-1 whitespace-nowrap rounded px-1 text-[10px] font-medium leading-none ring-2 ring-background',
                   reading === null ? 'bg-muted text-muted-foreground' : 'bg-[color:var(--tone-soft)] text-[color:var(--tone-ink)]',
                   loading && 'vv-pulse',
                 )}
@@ -187,7 +187,7 @@ export function KanbanVitalsStrip({ boardId }: KanbanVitalsStripProps) {
                   // One box for every register and every state, so a count going 0 → 1 repaints
                   // a fill and an ink and never moves its neighbours — which is also why the weight
                   // is one weight: tabular figures hold their width within a weight, not across two.
-                  'inline-flex h-6 items-center gap-1 rounded-full px-1.5 text-xs font-medium leading-none',
+                  'inline-flex h-6 items-center gap-1 rounded px-1.5 text-xs font-medium leading-none',
                   !register.speaking && 'text-muted-foreground',
                   register.speaking && register.tone === 'neutral' && 'text-foreground',
                   register.speaking && register.tone === 'positive' && 'text-[color:var(--tone-ink)]',

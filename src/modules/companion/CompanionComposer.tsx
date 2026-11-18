@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, FormEvent, KeyboardEvent, SetStateAction } from 'react';
-import { PaperclipIcon } from 'lucide-react';
+import { PlusIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ComposerAttachmentTray, ComposerDropOverlay } from '@/modules/chat';
@@ -92,16 +92,16 @@ const putBack = (setFiles: Dispatch<SetStateAction<File[]>>, sent: File[]): Prom
  * keeps its Enter. Drawn by this module's CompanionPanel, at the panel's foot, clear of a phone's home indicator, and by the
  * station module's talk control, inside a frame that clears it (`atScreenFoot` false).
  *
- * THE TOOLS CLUSTER stands between the field and send: the paperclip first, then the talk button. The cluster's icon buttons stay
+ * THE TOOLS CLUSTER stands between the field and send: the plus (attach) first, then the talk button. The cluster's icon buttons stay
  * together, as the chat's footer keeps its own, and the field starts at the box's left edge.
  *
  * THE TALK BUTTON (CompanionTalkButton) is the same press as the key or mouse button he binds, here for the phone: drawn from
  * `talk`, the page's one press. What failed with a press on the page itself (`talk.error`) is said right above the box at that
  * end, amber with the ▲, in the flow: it moves her log up a line rather than standing over it or over the draft's sends. Without
- * `talk` the cluster holds the paperclip alone. A voice press carries no attachment: the files waiting in the box stay there
+ * `talk` the cluster holds the plus (attach) alone. A voice press carries no attachment: the files waiting in the box stay there
  * until he sends a typed message.
  *
- * HIS FILES go with his typed words, exactly as in a chat (`useAttachmentIntake`, the chat's one way to take them): the paperclip
+ * HIS FILES go with his typed words, exactly as in a chat (`useAttachmentIntake`, the chat's one way to take them): the plus (attach)
  * (named "Attach a file", a 44 px catch under a finger), a picture pasted into the field, files dropped on the box. At most 10 files
  * of at most 10 MB each, of any kind; they stand as the chat's chips above the field until he sends, and a file not taken is named
  * in one line above them. The chips stand in a tray that scrolls inside itself past a share of the box's height, so ten file cards
@@ -227,7 +227,7 @@ export function CompanionComposer({ name, ready, visible, onSend, talk, touchFie
             // with the keyboard up the panel is the strip above it, and a long message must never push send out of it.
             className={cn('max-h-[25cqh] min-w-0 flex-1 px-3 sm:max-h-[25cqh]', touchField && 'finger:py-2.5')}
           />
-          {/* The tools cluster, before send: the paperclip first, then the talk button. */}
+          {/* The tools cluster, before send: the plus (attach) first, then the talk button. */}
           <PromptInputTools data-companion-talk-slot="" className="mb-1">
             {/* The kit's 32px button keeps its size to the eye and takes a 44px catch under a finger, Verve's touch floor; there it
                 stands 8px further from its neighbour (the talk button, or send), so the two catches meet and neither takes the other's edge. */}
@@ -238,7 +238,7 @@ export function CompanionComposer({ name, ready, visible, onSend, talk, touchFie
               data-companion-attach=""
               className="relative before:absolute before:inset-0 before:content-[''] finger:mr-2 finger:before:-inset-1.5"
             >
-              <PaperclipIcon />
+              <PlusIcon />
             </PromptInputButton>
             {talk && <CompanionTalkButton state={talk.state} error={talk.error} onToggle={talk.toggle} name={name} />}
           </PromptInputTools>

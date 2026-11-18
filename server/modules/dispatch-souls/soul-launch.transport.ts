@@ -277,8 +277,8 @@ function servedModelOf(dir: string, launchId: string, ended: boolean, kept: Map<
  * Everything the lane reads out of one launch directory. Never throws: a torn read answers empty.
  *
  * `servedModelByLaunchId` is the lane's memory of what each child's log announced, owned by the
- * composition root. A caller that reads only a launch's state or words (`running-launchers.service.ts`,
- * `run-reads.service.ts`) omits it, and no log is opened for them.
+ * composition root, and `running-launchers.service.ts` keeps one of its own for the souls it finds running. A caller that
+ * reads only a launch's state or words (`run-reads.service.ts`) omits it, and no log is opened for it.
  */
 export function readLaunchFiles(
   dir: string,

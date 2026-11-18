@@ -1,11 +1,8 @@
 import { useTranslation } from 'react-i18next';
 
-import { CompanionFace, CompanionLog, useCompanion } from '@/modules/companion';
-import { useStation } from '@/modules/station/context/StationContext';
-import { useHerView } from '@/modules/station/hooks/useHerView';
-import { StationPortraitView } from '@/modules/station/StationPortrait';
+import { CompanionLog } from '@/modules/companion';
 import type { CompanionNote, CompanionPicture } from '@/shared/companion-types';
-import type { CompanionSentenceRef, StationDensity, StationRegionProps } from '@/shared/types';
+import type { CompanionSentenceRef, StationDensity } from '@/shared/types';
 import { Banner, Button, Spinner } from '@/shared/ui';
 
 /** What the conversation draws: her picture still being read, a read that failed, or her log. */
@@ -63,6 +60,7 @@ export function StationConversationView({ picture, readFailure, onReread, name, 
       {picture !== null ? (
         <CompanionLog
           entries={picture.log}
+          work={picture.work}
           name={name}
           turnId={picture.turnId}
           visible
@@ -89,41 +87,5 @@ export function StationConversationView({ picture, readFailure, onReread, name, 
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * Her conversation on the page, the `conversation` slot's region (`stationRegions.ts`). By her view on this device (`useHerView`):
- * `chat` hands `StationConversationView` her picture, the read's failure and its Try again, the sentence her voice is sounding, a
- * card's press, and the log's scroller to the station's scroll memory; `portrait` (the default) hands `StationPortraitView` her
- * picture, the sentence her voice is sounding and her face, bound to this page's provider as her head binds it in `chat`. Until
- * her picture has landed, or when its read failed, `portrait` draws the conversation's own loading row and failed banner: with no
- * picture there is no answer to put under her face. It adds no state of its own.
- */
-export function StationConversation({ density }: StationRegionProps) {
-  const { t } = useTranslation();
-  const { picture, readFailure, reread, voice } = useCompanion();
-  // The stage a card's press puts it on, and the log's place: `scrollMemory('conversation')` keeps its identity across renders, so the scroller is bound once.
-  const { setFocus, scrollMemory } = useStation();
-  const [herView] = useHerView();
-  const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
-
-  if (herView === 'portrait' && picture !== null) {
-    // She faces him: no look turns her toward a rail.
-    return <StationPortraitView density={density} picture={picture} name={name} speaking={voice.speaking} face={(px) => <CompanionFace size={px} />} />;
-  }
-
-  return (
-    <StationConversationView
-      density={density}
-      picture={picture}
-      readFailure={readFailure}
-      onReread={reread}
-      name={name}
-      speaking={voice.speaking}
-      // The `note` stage (`NoteStage`, `STAGE_VIEWS`) draws the card this puts in focus.
-      onOpenCard={(note) => setFocus({ kind: 'note', id: note.id, label: note.title })}
-      scrollRef={scrollMemory('conversation')}
-    />
   );
 }

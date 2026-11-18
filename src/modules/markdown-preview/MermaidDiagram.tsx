@@ -14,13 +14,76 @@ const loadMermaid = () => {
   return mermaidPromise;
 };
 
+/** A colour mermaid's own parser reads: the theme's tokens are written as hex, and anything else is not handed to it. */
+const PLAIN_COLOUR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/**
+ * THE DIAGRAM IN THE THEME'S OWN COLOURS. Mermaid's stock themes are its own purple (day) and grey-blue (night), which sit in the
+ * app as a foreign object; this reads the theme's tokens off the page as it stands and hands them to mermaid's `base` theme: boxes
+ * are the surface with the strong hairline, words are the ink, lines and arrows the muted ink, a group is the canvas inside the
+ * hairline. No accent is used: the amber means a word is owed, and a diagram owes none.
+ *
+ * Read when a diagram is drawn, after the page has taken its theme, so a switch of day and night redraws in the new colours.
+ * `null` when a token is missing or is not a plain hex colour (a page without the tokens, a theme written some other way):
+ * the caller then falls back to mermaid's stock theme, so a diagram is never lost to its colours.
+ */
+function themeVariablesOf(dark: boolean): Record<string, string | boolean> | null {
+  const style = window.getComputedStyle(document.documentElement);
+  const read = (token: string) => style.getPropertyValue(token).trim();
+  const surface = read('--surface');
+  const surface2 = read('--surface2');
+  const canvas = read('--canvas');
+  const ink = read('--ink');
+  const inkMuted = read('--ink-muted');
+  const border = read('--border');
+  const borderStrong = read('--border-strong');
+  if (![surface, surface2, canvas, ink, inkMuted, border, borderStrong].every((colour) => PLAIN_COLOUR.test(colour))) return null;
+  return {
+    darkMode: dark,
+    background: canvas,
+    fontFamily: 'inherit',
+    primaryColor: surface,
+    primaryTextColor: ink,
+    primaryBorderColor: borderStrong,
+    secondaryColor: surface2,
+    secondaryTextColor: ink,
+    secondaryBorderColor: borderStrong,
+    tertiaryColor: canvas,
+    tertiaryTextColor: ink,
+    tertiaryBorderColor: border,
+    mainBkg: surface,
+    nodeBorder: borderStrong,
+    textColor: ink,
+    titleColor: ink,
+    lineColor: inkMuted,
+    edgeLabelBackground: canvas,
+    clusterBkg: canvas,
+    clusterBorder: border,
+    noteBkgColor: surface2,
+    noteTextColor: ink,
+    noteBorderColor: borderStrong,
+    actorBkg: surface,
+    actorBorder: borderStrong,
+    actorTextColor: ink,
+    actorLineColor: inkMuted,
+    signalColor: inkMuted,
+    signalTextColor: ink,
+    labelBoxBkgColor: surface,
+    labelBoxBorderColor: borderStrong,
+    labelTextColor: ink,
+    loopTextColor: ink,
+    activationBkgColor: surface2,
+    activationBorderColor: borderStrong,
+  };
+}
+
 type MermaidDiagramProps = {
   /** Raw mermaid source, i.e. the body of a ```mermaid fenced block. */
   code: string;
 };
 
 /**
- * Renders a ```mermaid code block as an SVG diagram, GitHub-preview style.
+ * Renders a ```mermaid code block as an SVG diagram, GitHub-preview style, in the theme's own colours (`themeVariablesOf`).
  *
  * Used by the chat module to render mermaid blocks in assistant messages, and
  * by MarkdownCodeBlock inside this module for markdown previews.
@@ -58,10 +121,12 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
 
     loadMermaid()
       .then((mermaid) => {
+        // Read here, after the page's own effects have run, so the tokens are the theme's that is now on the page.
+        const themeVariables = themeVariablesOf(isDarkMode);
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'strict',
-          theme: isDarkMode ? 'dark' : 'default',
+          ...(themeVariables === null ? { theme: isDarkMode ? 'dark' : 'default' } : { theme: 'base', themeVariables }),
           suppressErrorRendering: true,
         });
         return mermaid.render(renderId, code.trim());

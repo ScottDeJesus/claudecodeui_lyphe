@@ -1,3 +1,4 @@
+import { RefreshCw, Save, Trash2 } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -117,7 +118,17 @@ export function GeminiVoiceSection({
             <Banner
               tone="warn"
               action={onRetry && (
-                <Button variant="outline" size="sm" onClick={onRetry}>{t('voiceSettings.gemini.retry', { defaultValue: 'Try again' })}</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRetry}
+                  aria-label={t('voiceSettings.gemini.retry', { defaultValue: 'Try again' })}
+                  title={t('voiceSettings.gemini.retry', { defaultValue: 'Try again' })}
+                  className="finger:h-11 finger:w-11 finger:px-0"
+                >
+                  <RefreshCw aria-hidden="true" />
+                  <span className="finger:hidden">{t('voiceSettings.gemini.retry', { defaultValue: 'Try again' })}</span>
+                </Button>
               )}
             >
               {t('voiceSettings.gemini.loadFailed', { defaultValue: "Your Gemini settings couldn't be read: {{reason}}", reason: error })}
@@ -185,10 +196,15 @@ export function GeminiVoiceSection({
               />
               {/* One group, so a narrow card puts both buttons under the field together instead of stranding Clear. */}
               <div className="flex items-center gap-2">
-                <Button type="submit" size="sm" busy={saving} disabled={typedKey.length === 0 || keyInvalid}>
-                  {stored
+                <Button type="submit" size="sm" busy={saving} disabled={typedKey.length === 0 || keyInvalid} aria-label={stored
                     ? t('voiceSettings.gemini.replace', { defaultValue: 'Replace' })
-                    : t('voiceSettings.gemini.save', { defaultValue: 'Save' })}
+                    : t('voiceSettings.gemini.save', { defaultValue: 'Save' })} title={stored
+                    ? t('voiceSettings.gemini.replace', { defaultValue: 'Replace' })
+                    : t('voiceSettings.gemini.save', { defaultValue: 'Save' })} className="finger:h-11 finger:w-11 finger:px-0">
+                  <Save aria-hidden="true" />
+                  <span className="finger:hidden">{stored
+                    ? t('voiceSettings.gemini.replace', { defaultValue: 'Replace' })
+                    : t('voiceSettings.gemini.save', { defaultValue: 'Save' })}</span>
                 </Button>
                 {stored && (
                   <Button
@@ -198,9 +214,11 @@ export function GeminiVoiceSection({
                     busy={saving}
                     aria-label={t('voiceSettings.gemini.clearLabel', { defaultValue: 'Clear your Gemini key' })}
                     onClick={() => setConfirmingClear(true)}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground finger:h-11 finger:w-11 finger:px-0"
+                    title={t('voiceSettings.gemini.clear', { defaultValue: 'Clear' })}
                   >
-                    {t('voiceSettings.gemini.clear', { defaultValue: 'Clear' })}
+                    <Trash2 aria-hidden="true" />
+                    <span className="finger:hidden">{t('voiceSettings.gemini.clear', { defaultValue: 'Clear' })}</span>
                   </Button>
                 )}
               </div>
@@ -228,7 +246,7 @@ export function GeminiVoiceSection({
               label={t('voiceSettings.gemini.speechModel', { defaultValue: 'Speech model' })}
               // The cheap model's name is one word: held whole, never broken at a hyphen across two lines.
               help={<WholeWords>{t('voiceSettings.gemini.speechModelHelp', {
-                defaultValue: "The Gemini model that speaks her sentences and the chat's read-aloud, by its exact name. gemini-3.8-flash-lite-tts is the cheap choice.",
+                defaultValue: "The Gemini model that speaks the companion's sentences and the chat's read-aloud, by its exact name. gemini-3.8-flash-lite-tts is the cheap choice.",
               })}</WholeWords>}
               invalid={modelInvalid}
               stored={speechModel}
@@ -242,7 +260,7 @@ export function GeminiVoiceSection({
           {voice !== undefined && onVoice && (
             <GeminiNameField
               label={t('voiceSettings.gemini.voice', { defaultValue: 'Voice' })}
-              help={t('voiceSettings.gemini.voiceHelp', { defaultValue: "The Gemini voice she speaks in, and the chat's read-aloud too, by its exact name." })}
+              help={t('voiceSettings.gemini.voiceHelp', { defaultValue: "The Gemini voice the companion speaks in, and the chat's read-aloud too, by its exact name." })}
               invalid={t('voiceSettings.gemini.voiceInvalid', { defaultValue: 'A voice name is 1–40 letters, digits, dashes or underscores.' })}
               stored={voice}
               placeholder="Kore"

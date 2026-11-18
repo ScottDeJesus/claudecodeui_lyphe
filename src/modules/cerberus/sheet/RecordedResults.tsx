@@ -66,7 +66,7 @@ export function RecordedResults({ rows, emptyText }: { rows: CerberusResultRow[]
       </ol>
       {hiddenCount > 0 && (
         <div className="border-t border-border pt-2">
-          <Button variant="ghost" size="sm" onClick={() => setShowingAll(true)}>
+          <Button variant="outline" size="sm" onClick={() => setShowingAll(true)}>
             {t('cerberus.sheet.moreResults', { count: hiddenCount })}
           </Button>
         </div>

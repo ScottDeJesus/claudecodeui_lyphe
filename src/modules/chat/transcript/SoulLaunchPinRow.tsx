@@ -15,9 +15,7 @@ import { formatSubagentFinishTime } from '@/modules/chat/utils/subagentSummary';
 /**
  * One launcher soul as a row, drawn beside the `Agent`-tool agents.
  *
- * Read by the chat module's pinned strip (`PinnedSubagents.tsx`), which draws it above the chat box
- * when the desktop gutters are not showing, and by `subagents/SubagentWidgetBody.tsx`, the gutter's
- * Subagents widget, which draws the same rows while they are.
+ * Read by the chat module's pinned strip (`PinnedSubagents.tsx`), which draws it above the chat box.
  *
  * It is a SECOND KIND OF ROW IN THE SAME STRIP, and it is drawn to be indistinguishable in shape
  * from the agent rows next to it — same centred mark, same two lines, the same place for the status
@@ -155,8 +153,8 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
             // pulsing dot, lit in its colour, says "running" from the second line, where the clock joins
             // the figures. The role keeps the room the chip took, and a lone dot never wraps onto a line
             // of its own.
-            <span className="ml-auto flex flex-shrink-0 items-center gap-1 text-[11px] text-purple-600 dark:text-purple-300 max-sm:hidden">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
+            <span className="ml-auto flex flex-shrink-0 items-center gap-1 text-[11px] text-[var(--info-ink)] max-sm:hidden">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--info-dot)]" />
               running
               {elapsed && <span className="tabular-nums text-muted-foreground/70">· {elapsed}</span>}
             </span>
@@ -165,10 +163,10 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
               <span
                 className={
                   launch.state === 'failed'
-                    ? 'text-red-600 dark:text-red-400'
+                    ? 'text-[var(--danger-ink)]'
                     : launch.state === 'stopped'
-                      ? 'text-amber-700 dark:text-amber-400'
-                      : 'text-emerald-700 dark:text-emerald-400'
+                      ? 'text-[var(--warn-ink)]'
+                      : 'text-[var(--pos-ink)]'
                 }
               >
                 {launch.state === 'failed' ? 'failed' : launch.state === 'stopped' ? 'stopped' : 'finished'}
@@ -199,7 +197,7 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
         {(launch.brief || cost || running) && (
           <div className={cn('flex items-baseline gap-2 text-[11px] text-muted-foreground/80', !launch.brief && !cost && 'sm:hidden')}>
             {running && (
-              <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse self-center rounded-full bg-purple-500 dark:bg-purple-400 sm:hidden" />
+              <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse self-center rounded-full bg-[var(--info-dot)] sm:hidden" />
             )}
             {launch.brief && (
               <span className="min-w-0 flex-1 truncate font-mono" title={launch.brief}>
@@ -250,7 +248,7 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
         {/* A refused or silent endpoint is why this soul did no work, and it is the one thing a
           * reader would otherwise have to open the launch directory to learn. */}
         {launch.blocked && (
-          <div className="text-[10px] text-amber-700 dark:text-amber-400">
+          <div className="text-[10px] text-[var(--warn-ink)]">
             {t('runner.soulBlocked')}
           </div>
         )}

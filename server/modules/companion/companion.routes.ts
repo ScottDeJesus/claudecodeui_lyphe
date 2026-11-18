@@ -28,13 +28,12 @@ import { createCardsRoutes } from './cards.routes.js';
 import { createEarsRoutes } from './ears/ears.routes.js';
 import { createFaceRoutes } from './face/face.routes.js';
 import { createMemoryRoutes } from './memory/memory.routes.js';
-import { createStationLandedRoutes } from './station/landed.routes.js';
 import { createNeedsRoutes } from './station/needs.routes.js';
 import { createStationSessionsRoutes } from './station/sessions.routes.js';
 
 /**
  * Her door for the page: every route of the companion's table.
- * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint. `/memory` (Settings' "Her memory" card), `/face` (her face, `face/face.routes.ts`), `/ears` (the models her ears load, `ears/ears.routes.ts`), `/station/sessions` (the station's rail, `station/sessions.routes.ts`), `/station/needs` and `/station/asks` (what needs him and one chat's ask answered, `station/needs.routes.ts`) and `/station/landed` (the station's strip, `station/landed.routes.ts`) are routers of their own, mounted at the foot, and so is `cards.routes.ts` (`PUT /notes/:id/pin`, `PUT` and `DELETE /walk`: his pin on a card and his walk), which mounts at the root.
+ * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint. `/memory` (Settings' "Her memory" card), `/face` (her face, `face/face.routes.ts`), `/ears` (the models her ears load, `ears/ears.routes.ts`), `/station/sessions` (the station's rail, `station/sessions.routes.ts`), and `/station/needs` and `/station/asks` (what needs him and one chat's ask answered, `station/needs.routes.ts`) are routers of their own, mounted at the foot, and so is `cards.routes.ts` (`PUT /notes/:id/pin`, `PUT` and `DELETE /walk`: his pin on a card and his walk), which mounts at the root.
  *
  * ONLY TRANSPORT. A route here reads who is asking (`req.user`, which is her account) and which page (the
  * `x-companion-client` header), checks the SHAPE of what came (a body that is an object, a `text` of 1 to 8000
@@ -46,6 +45,8 @@ import { createStationSessionsRoutes } from './station/sessions.routes.js';
  * AN ANSWER IS THE THING ITSELF, not wrapped: `GET /` answers the picture, `PUT /settings` the settings and
  * `PUT /draft` the draft, so a page folds them straight into what it holds. A write that has nothing to
  * say answers 204 — `DELETE /draft` and `DELETE /action` (his × on the card of the action waiting for his word) among them.
+ * `GET /work/:id` answers what one tool call of a turn was given and what it answered (`CompanionWorkBody`), read when the call is
+ * opened in the log, or 404 `COMPANION_WORK_NOT_FOUND` for a call no longer kept.
  *
  * THE TYPED DOOR, `POST /messages`, takes `text` (1-8000 characters, or 0-8000 when the line carries files) and `attachments`: up to ten `{ path, name }`
  * records of files the page already uploaded to the chat's own route (`POST /api/assets/files`); nothing else of a record is read. The service reads each file off
@@ -80,7 +81,7 @@ function readOpened(fields: Record<string, unknown>): PressInput['opened'] {
   const { opened } = fields;
   if (opened === undefined) return 'button';
   if (opened === 'name') return 'name';
-  throw inputInvalid('opened must be "name" for a press her name opened; leave it out for a press of the talk button.', 'opened');
+  throw inputInvalid('opened must be "name" for a press the name opened; leave it out for a press of the talk button.', 'opened');
 }
 
 const pressUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: PRESS_AUDIO_MAX_BYTES } }).single('audio');
@@ -288,6 +289,17 @@ export function createCompanionRoutes(service: CompanionService): Router {
     }),
   );
 
+  // One call of a tool, opened in the log: what it was given and what it answered. The id is read as a card's is (a whole number of 1 or more).
+  router.get(
+    '/work/:id',
+    asyncHandler(async (request: Request, response: Response) => {
+      readClientId(request);
+      const body = service.workBody(readAuthenticatedUserId(request), readNoteIdParam(readPathParam(request.params.id, 'id')));
+      if (body === null) throw new AppError('That call is no longer kept.', { code: 'COMPANION_WORK_NOT_FOUND', statusCode: 404 });
+      response.json(body);
+    }),
+  );
+
   router.delete(
     '/notes/:id',
     asyncHandler(async (request: Request, response: Response) => {
@@ -322,7 +334,6 @@ export function createCompanionRoutes(service: CompanionService): Router {
   router.use(createCardsRoutes(service)); // his pin on a card and his Back, Next and × on the walk
   router.use('/station/sessions', createStationSessionsRoutes()); // the station's rail: his chats as she reads them
   router.use('/station', createNeedsRoutes(service)); // the station's rail: what needs him, and one chat's ask answered
-  router.use('/station', createStationLandedRoutes(service)); // the station's strip: what landed since he last looked
 
   return router;
 }

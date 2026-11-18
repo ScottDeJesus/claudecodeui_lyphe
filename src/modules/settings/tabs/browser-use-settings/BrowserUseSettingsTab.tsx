@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 
-import { Button, SettingRow, SettingsCard, SettingsSection } from '@/shared/ui';
+import { Badge, Button, SettingRow, SettingsCard, SettingsSection } from '@/shared/ui';
 import { api, readApiJson } from '@/shared/api';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 
@@ -123,15 +123,15 @@ export default function BrowserUseSettingsTab() {
 
           <div className="space-y-4 px-4 py-4">
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span className="rounded-md border border-border px-2 py-1">
+              <Badge as="span" variant="outline">
                 Playwright: {runtimeLabel(status?.playwrightInstalled)}
-              </span>
-              <span className="rounded-md border border-border px-2 py-1">
+              </Badge>
+              <Badge as="span" variant="outline">
                 Chromium: {runtimeLabel(status?.chromiumInstalled)}
-              </span>
-              <span className="rounded-md border border-border px-2 py-1">
+              </Badge>
+              <Badge as="span" variant="outline">
                 Status: {isStatusLoading && !status ? 'checking...' : status?.available ? 'ready' : browserEnabled ? 'setup required' : 'disabled'}
-              </span>
+              </Badge>
             </div>
 
             {needsBrowserBinaries && (
@@ -148,20 +148,22 @@ export default function BrowserUseSettingsTab() {
                   size="sm"
                   onClick={() => void installBrowserBinaries()}
                   disabled={isInstalling || status?.installInProgress}
-                  className="flex-shrink-0"
+                  className="flex-shrink-0 finger:h-11 finger:w-11 finger:px-0"
+                  aria-label={isInstalling || status?.installInProgress ? 'Installing...' : 'Install Runtime'}
+                  title={isInstalling || status?.installInProgress ? 'Installing...' : 'Install Runtime'}
                 >
                   {isInstalling || status?.installInProgress ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Download className="h-4 w-4" />
                   )}
-                  {isInstalling || status?.installInProgress ? 'Installing...' : 'Install Runtime'}
+                  <span className="finger:hidden">{isInstalling || status?.installInProgress ? 'Installing...' : 'Install Runtime'}</span>
                 </Button>
               </div>
             )}
 
             {error && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+              <div className="bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                 {error}
               </div>
             )}

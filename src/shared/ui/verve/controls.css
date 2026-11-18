@@ -82,7 +82,7 @@
    * block refuses, paid knowingly and only here: a badge is laid out BY its row instead of
    * sizing one — measured 88×27 → 90×29, centre line unmoved. A button's 2px moved the sidebar. */
   border: 1px solid transparent;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   background: var(--tone-soft);
   color: var(--tone-ink);
   font-size: var(--vv-text-meta, 12.5px);
@@ -183,7 +183,7 @@
 .vv-chip {
   padding: 7px 15px;
   border: 1.5px solid var(--border-strong);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   background: none;
   color: var(--ink-mid);
   font-family: var(--font-body);
@@ -263,7 +263,7 @@
  * tabular-nums and has a floor width, so stepping 9 -> 10 never nudges the plus sideways. */
 .vv-stepper {
   border: 1.5px solid var(--border-strong);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   background: var(--surface);
   overflow: hidden;
 }
@@ -322,7 +322,7 @@
   height: 30px;
   padding: 0;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   background: var(--border-strong);
   cursor: pointer;
   transition: background-color var(--dur-move);
@@ -335,11 +335,11 @@
   left: 3px;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: 1px; /* machined: a square knob in a square track, as Astrolabe draws every control */
   /* White in BOTH modes, as Verve draws it. There is no token for "white in both modes":
    * `--on-accent` flips to near-black in dark and would vanish into the off track. */
   background: #fff;
-  box-shadow: 0 1px 3px rgba(23, 24, 29, 0.2);
+  box-shadow: 0 0 0 1px rgba(8, 9, 11, 0.22); /* an edge, not a cast shadow — dark in both modes, so it reads on grey and on amber */
   transition: transform 0.55s var(--ease-spring);
 }
 .vv-switch[aria-checked='true'] .vv-switch__knob { transform: translateX(22px); }
@@ -366,12 +366,12 @@
 .vv-meter__row { align-items: baseline; }
 .vv-meter__label { font-size: var(--vv-text-meta, 13px); font-weight: 500; color: var(--ink); }
 .vv-meter__value { margin-left: auto; font-size: var(--vv-text-meta, 12.5px); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
-.vv-meter__track { height: 6px; border-radius: var(--radius-pill); background: var(--surface2); overflow: hidden; }
+.vv-meter__track { height: 6px; border-radius: 0; background: var(--track); overflow: hidden; } /* Astrolabe's meter: square-ended, on the track */
 .vv-meter__fill {
   height: 100%;
   width: 100%;
   transform-origin: left;
-  background: linear-gradient(90deg, var(--accent), var(--accent-deep));
+  background: var(--accent); /* flat: the chrome ramp on the core is the only gradient Astrolabe draws */
   transition: transform var(--dur-move) var(--ease-enter);
 }
 /* `warn` is the two-state FILL the plan names, not the five-tone vocabulary — no `--tone-*`
@@ -410,15 +410,68 @@
 .vv-meter__ring-label { position: relative; font-size: 9px; font-weight: 700; line-height: 1; letter-spacing: -0.01em; color: var(--ink-muted); }
 @media (prefers-reduced-motion: reduce) { .vv-meter__arc { transition: none; } }
 
-/* ---------------------------------------------------------------- Spinner */
-.vv-spinner__ring {
-  border-radius: 50%;
-  border: 4px solid var(--surface2);
-  border-top-color: var(--accent);
-  box-sizing: border-box;
-  animation: vv-spin 1s linear infinite, vv-spin-hue 2.4s ease-in-out infinite;
+/* Dial register — the one measure shown large: an arc of 240 degrees, open at the foot, the figure and its percent sign
+ * in the middle as one thing, the label in the arc's opening and a line of context under it that wraps and is never cut.
+ * Its side is `--vv-dial`, so a row of several steps them down together. The arc's ink is the ring's rule: the nearest
+ * data-tone container's `--tone-dot`, else the accent, else the warn amber. The ceiling tick crosses the arc and the
+ * projected end's mark sits just outside it, both in the mode's own ink. */
+.vv-meter--dial { display: flex; width: var(--vv-dial, 132px); min-width: 0; flex: none; flex-direction: column; align-items: center; text-align: center; }
+.vv-meter__dial { position: relative; display: grid; width: 100%; aspect-ratio: 1; place-items: center; }
+.vv-meter__dial svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.vv-meter__dial-track,
+.vv-meter__dial-arc { fill: none; stroke-width: 4; }
+.vv-meter__dial-track { stroke: var(--track); }
+.vv-meter__dial-arc {
+  stroke: var(--tone-dot, var(--accent));
+  transition: stroke-dasharray var(--dur-move) var(--ease-enter), stroke var(--dur-move) var(--ease-enter);
 }
-.vv-spinner__label { font-size: 13.5px; color: var(--ink-faint); }
+.vv-meter--dial.vv-meter--warn .vv-meter__dial-arc { stroke: var(--tone-dot, var(--warn-dot)); }
+.vv-meter__dial-division { stroke: var(--border-strong); stroke-width: 1; }
+.vv-meter__dial-tick { stroke: var(--ink-strong); stroke-width: 1.5; }
+.vv-meter__dial-mark { fill: var(--ink-strong); }
+.vv-meter__dial-read { position: relative; display: flex; align-items: baseline; gap: 1px; color: var(--ink-strong); font-variant-numeric: tabular-nums; }
+.vv-meter__dial-figure { font-size: calc(var(--vv-dial, 132px) * 0.25); font-weight: 500; line-height: 1; letter-spacing: -0.02em; }
+.vv-meter__dial-unit { font-family: var(--font-mono); font-size: calc(var(--vv-dial, 132px) * 0.11); color: var(--ink-muted); }
+.vv-meter__dial-label {
+  margin-top: calc(var(--vv-dial, 132px) * -0.17);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.3;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.vv-meter--dial.vv-meter--warn .vv-meter__dial-label { color: var(--warn-ink); }
+.vv-meter--dial.vv-meter--warn .vv-meter__dial-label::before { content: '▲ '; }
+.vv-meter--dial .vv-meter__sub { margin-top: 6px; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .vv-meter__dial-arc { transition: none; } }
+
+/* ---------------------------------------------------------------- Spinner */
+/* Astrolabe's thinking loop: a hairline ring broken into dashes that turn, the sign her face makes while she thinks. */
+.vv-spinner__ring { overflow: visible; }
+.vv-spinner__track { fill: none; stroke: var(--hairline); stroke-width: 1; }
+.vv-spinner__dashes {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  transform-origin: 22px 22px;
+  animation: vv-spin 2.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .vv-spinner__dashes { animation: none; } }
+.vv-spinner__label { font-family: var(--font-mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-faint); }
+
+/* ---------------------------------------------------------------- SignalLoop */
+/* The loop in small: dashes that turn while an agent thinks, a whole ring that breathes while it works, a still ring at rest. */
+.vv-signal-loop { flex: none; overflow: visible; }
+.vv-signal-loop__track { fill: none; stroke: var(--hairline); stroke-width: 1; }
+.vv-signal-loop__ring { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; transform-origin: 8px 8px; }
+.vv-signal-loop[data-signal="secondary"] .vv-signal-loop__ring { stroke: var(--garnish); }
+.vv-signal-loop[data-state="idle"] .vv-signal-loop__ring { stroke: var(--status-idle); }
+.vv-signal-loop[data-state="thinking"] .vv-signal-loop__ring { animation: vv-spin 2.4s linear infinite; }
+.vv-signal-loop[data-state="working"] .vv-signal-loop__ring { animation: vv-loop-breathe 1.6s ease-in-out infinite; }
+@keyframes vv-loop-breathe { 0%, 100% { stroke-width: 1.2; opacity: .7; } 50% { stroke-width: 2.2; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .vv-signal-loop__ring { animation: none !important; } }
 
 /* ---------------------------------------------------------------- Field */
 .vv-field__label { font-size: 13.5px; font-weight: 500; color: var(--ink); }

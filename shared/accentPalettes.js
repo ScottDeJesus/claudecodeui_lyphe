@@ -1,7 +1,7 @@
 /**
- * The accent palettes a box can wear instead of the app's own green, chosen by `VITE_ACCENT` in that
- * box's git-ignored `.env`. Unset — or any name not listed here — is the green that tokens.css
- * declares, untouched: a palette is an OVERRIDE, never a fork of the token file.
+ * The accent palettes a box can wear instead of the app's default accent (Astrolabe's amber), chosen by
+ * `VITE_ACCENT` in that box's git-ignored `.env`. Unset — or any name not listed here — is the default
+ * that tokens.css declares, untouched: a palette is an OVERRIDE, never a fork of the token file.
  *
  * One home for each palette, read by two consumers:
  *   - vite-plugins/accentPalette.js writes the ladder below into the page (`accentStyle`);
@@ -11,11 +11,12 @@
  * Only the ACCENT is here. Green that means "healthy" or "success" (`--pos-*`, `--success-dot`) is a
  * different colour with a different meaning and stays green under every palette.
  *
- * Contrast the ladder keeps (the green ladder's own, measured with the WCAG formula; blue is at or
- * above each): white on the light accent fill 5.4:1 (green 3.0); `accent-ink` as text on canvas, card,
- * accent-soft and its hover 7.1 / 7.6 / 6.4 / 5.7 (green 4.8 / 5.1 / 4.5 / 4.1); the dark ink #101116
- * on the dark accent fill 8.8:1 (green 8.6); the dark `accent-ink` on the dark soft ground and its
- * hover 9.9 / 8.0 (green 8.9 / 7.2).
+ * Contrast the ladder keeps, measured with the WCAG formula on the app's Astrolabe grounds, with the
+ * default amber ladder's own figure in brackets; every text pairing clears 4.5:1. White on the light
+ * accent fill: 5.4:1 (amber 6.5). `accent-ink` as text on canvas, card, accent-soft and its hover:
+ * 6.6 / 7.4 / 6.4 / 5.7 (amber 6.4 / 7.1 / 5.8 / 5.1). The dark ink #101116 on the dark accent fill:
+ * 8.8:1 (amber's #08090b 9.8). The dark `accent-ink` on the dark soft ground and its hover:
+ * 9.9 / 8.0 (amber 9.3 / 8.3).
  */
 
 export const ACCENT_PALETTES = {
@@ -41,7 +42,7 @@ export const ACCENT_PALETTES = {
   },
 };
 
-/** The palette named `name`, or null for green (unset, or a name this file does not list). */
+/** The palette named `name`, or null for the default (unset, or a name this file does not list). */
 export function accentPaletteFor(name) {
   const key = String(name || '').trim().toLowerCase();
   return Object.hasOwn(ACCENT_PALETTES, key) ? { name: key, ...ACCENT_PALETTES[key] } : null;
@@ -63,9 +64,11 @@ export function accentAssetDir(name) {
  * them before): the light ladder on the root, and the dark ladder on the root when it carries `.dark`
  * AND on any `.dark` wrapper below it (the station and the universe force dark on a subtree).
  *
- * `--accent-fixed` / `--accent-fixed-end` are the pair that never flips with the theme (the focus
- * ring's pulse, the default avatar, the failure-screen buttons): the light accent and the dark accent
- * deep. `--chart-1` / `--chart-4` are the accent and its light tint in the chart series.
+ * `--accent-fixed` / `--accent-fixed-end` are the pair that never flips with the theme (the default
+ * avatar, the failure-screen buttons): the light accent and the dark accent deep. `--chart-1` is the
+ * accent's place in the chart series, first in each theme, so it takes the light accent at the root
+ * and the dark accent under `.dark`. The rest of the series (ice, green, chrome, violet) is not the
+ * accent's, and a palette leaves it alone.
  */
 export function accentStyle(palette) {
   const { name, light, dark } = palette;
@@ -74,6 +77,6 @@ export function accentStyle(palette) {
     + `--accent-soft-hover:${colours.accentSoftHover};--on-accent:${colours.onAccent};`;
   const root = `:root[data-accent="${name}"]`;
   return `${root}{${ladder(light)}--accent-fixed:${light.accent};--accent-fixed-end:${dark.accentDeep};`
-    + `--chart-1:${light.accent};--chart-4:${dark.accentDeep};}`
-    + `${root}.dark,${root} .dark{${ladder(dark)}}`;
+    + `--chart-1:${light.accent};}`
+    + `${root}.dark,${root} .dark{${ladder(dark)}--chart-1:${dark.accent};}`;
 }

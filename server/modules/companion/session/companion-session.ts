@@ -174,7 +174,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     const strangers = unexpectedTools(event.tools, deps.tools);
     if (strangers.length > 0) {
       // Before the model sees a turn: the session is not the one that was asked for.
-      fail(launch, `Her session held tools it should not have (${strangers.join(', ')}), so it was not run.`);
+      fail(launch, `The session held tools it should not have (${strangers.join(', ')}), so it was not run.`);
       return;
     }
     const held = deps.readProviderSession();
@@ -343,13 +343,13 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       console.warn(`[Companion] account ${userId}: the CLI has no conversation ${resume}; she starts fresh`);
       retire(launch);
       writeProviderSession(null);
-      onSystemLine('Her conversation could not be resumed; she starts fresh');
+      onSystemLine('The conversation could not be resumed; it starts fresh');
       // The focus, the draft and the walk lived in the conversation that is gone; the next message restates them.
       assembler.oweState();
       startWith(ledger.carry(), planWith(null));
       return;
     }
-    fail(launch, reason === null ? 'Her process ended without being asked to.' : failureSentence('Her process stopped', reason));
+    fail(launch, reason === null ? 'The process ended without being asked to.' : failureSentence('The process stopped', reason));
   }
 
   /** Starts a launch with `initial` already queued; she is `waking` until its first `init`. */

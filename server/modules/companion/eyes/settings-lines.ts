@@ -34,13 +34,13 @@ const PROVIDER_WORDS: Readonly<Record<VoiceSettings['provider'], string>> = { op
 export function companionSettingsLines(settings: CompanionSettings, modelLabel: string, originalRegister: string): string[] {
   const original = settings.register.trim() === originalRegister.trim();
   return [
-    `Her name: ${settings.name}. His name, as she says it: ${settings.operatorName}.`,
-    `Her model: ${modelLabel}.`,
-    `Her effort: ${COMPANION_EFFORT}, set at her launch, not in Settings.`,
-    `Live: ${settings.live ? 'on, so house alerts reach her' : 'off, so house alerts do not reach her'}.`,
-    `Her delivery note: ${settings.deliveryNote === '' ? '(none)' : settings.deliveryNote}.`,
-    `Her talk button: ${settings.talkBinding === null ? 'none bound' : settings.talkBinding.label}.`,
-    `Her register: ${characterCount(settings.register).toLocaleString('en-US')} characters, ${original ? 'the original' : 'edited from the original'}.`,
+    `Name: ${settings.name}. His name, as spoken: ${settings.operatorName}.`,
+    `Model: ${modelLabel}.`,
+    `Effort: ${COMPANION_EFFORT}, set at launch, not in Settings.`,
+    `Live: ${settings.live ? 'on, so house alerts arrive' : 'off, so house alerts do not arrive'}.`,
+    `Delivery note: ${settings.deliveryNote === '' ? '(none)' : settings.deliveryNote}.`,
+    `Talk button: ${settings.talkBinding === null ? 'none bound' : settings.talkBinding.label}.`,
+    `Register: ${characterCount(settings.register).toLocaleString('en-US')} characters, ${original ? 'the original' : 'edited from the original'}.`,
   ];
 }
 
@@ -53,13 +53,13 @@ export function companionSettingsLines(settings: CompanionSettings, modelLabel: 
 export function voiceSettingsLines(voice: VoiceSettings, source: GeminiKeyStatus['source'], homeServerKey: HomeServerKeyStatus['source']): string[] {
   const homeServerSet = voice.homeServer.address !== null && homeServerKey === 'stored';
   return [
-    `How he is heard (the chat mic and her talk press): ${homeServerSet ? 'his home server transcribes it, with Gemini as the backup when the home server cannot' : 'the home server is not set up, so Gemini transcribes it'}.`,
+    `How he is heard (the chat mic and the talk press): ${homeServerSet ? 'his home server transcribes it, with Gemini as the backup when the home server cannot' : 'the home server is not set up, so Gemini transcribes it'}.`,
     `Chat read-aloud provider: ${PROVIDER_WORDS[voice.provider]}.`,
     `Transcript cleanup: ${voice.cleanTranscripts ? 'on, so um, uh and repeated words are removed from what he says' : 'off, so his fillers, stutters and repeats are kept as said (the vocabulary still corrects his house words)'}.`,
     `Backup transcription model (Gemini's): ${voice.gemini.transcriptionModel}.`,
     `Speech model: ${voice.gemini.speechModel}.`,
-    `Her voice: ${voice.gemini.voice}.`,
-    `Her sounds: ${voice.gemini.soundTags.join(', ')}.`,
+    `Voice: ${voice.gemini.voice}.`,
+    `Sounds: ${voice.gemini.soundTags.join(', ')}.`,
     `Gemini key in use: ${KEY_WORDS[source]}.`,
   ];
 }

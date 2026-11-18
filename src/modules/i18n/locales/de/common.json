@@ -316,23 +316,8 @@
     "expand": "Ausklappen"
   },
   "gutters": {
-    "runner": {
-      "title": "Läufe"
-    },
-    "roadmap": {
-      "title": "Roadmap"
-    },
-    "memory": {
-      "title": "Erinnerungen",
-      "pending": "Warten auf Prüfung",
-      "recent": "Zuletzt abgelegt",
-      "recentEmpty": "Noch nichts abgelegt",
-      "pendingEmpty": "Nichts wartet"
-    },
     "subagents": {
       "title": "Subagenten",
-      "empty": "Keine Subagenten in diesem Chat",
-      "clearCompleted": "Abgeschlossene entfernen",
       "back": "Zurück zu den Subagenten",
       "loading": "Transkript wird geladen…",
       "notFound": "Noch kein Transkript auf der Festplatte",
@@ -342,32 +327,12 @@
       "openRow": "Transkript von {{name}} lesen"
     },
     "embed": {
-      "title": "Einbettung",
-      "empty": "In diesem Chat ist noch nichts eingebettet",
-      "placeholder": "Adresse zum Einbetten…",
-      "address": "Adresse zum Einbetten",
-      "pick": "Welche Einbettung anzeigen",
-      "choose": "Seite auswählen…",
-      "custom": "Adresse eingeben…",
-      "open": "Seite in neuem Tab öffnen",
-      "rejected": "Das ist keine http:// oder https:// Adresse",
       "plainHttpBlocked": "Diese Seite wird über einfaches http ausgeliefert, und ein Browser zeichnet keine http-Seite in dieser App, solange sie über https geöffnet ist. Über den Öffnen-Link erscheint sie in einem eigenen Tab."
     },
-    "notes": {
-      "title": "Notizen"
-    },
-    "accounts": {
-      "title": "Konten"
-    },
-    "open": "{{name}} öffnen",
-    "collapse": "Einklappen",
-    "dragHint": "Auf eine Seite ziehen",
     "pin": {
       "label": "Diese Sitzung",
       "title": "Von dem Chat erstellt, den du geöffnet hast"
-    },
-    "fullscreen": "Vollbild",
-    "exitFullscreen": "Vollbild verlassen"
+    }
   },
   "applications": {
     "fabLabelMenu": "Menü öffnen",

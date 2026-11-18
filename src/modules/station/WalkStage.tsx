@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, Mic, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Square } from 'lucide-react';
 import { useId, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +12,7 @@ import { StageFoot, StageHeadActions } from '@/modules/station/stageSlots';
 import type { CompanionWalk } from '@/shared/companion-types';
 import { useToast } from '@/shared/context/ToastContext';
 import type { StationFocus } from '@/shared/station-types';
-import { Button, Card, Spinner } from '@/shared/ui';
+import { Button, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /** Her walkthrough on the stage: there is one per account, so the focus names nothing but its label. */
@@ -55,10 +55,10 @@ function isPlainArrow(event: KeyboardEvent<HTMLElement>): boolean {
 /**
  * HER WALKTHROUGH ON THE STAGE: "a walkthrough (N of M with next/back)". The stage's head names it ("Walkthrough" over the
  * chat it walks), and "End the walkthrough" stands in that head (`StageHeadActions`), named in words beside the stage's ✕,
- * which only clears the stage and leaves her walk where it is.
+ * which only clears the stage and leaves her walk where it is; under a finger it is a stop mark alone.
  *
- * WHERE IT STANDS FIRST, in a card: "Item 4 of 15" in the display serif, the item's words large under it, and how to answer:
- * "Say “next”, or answer this one". A walk set up and not begun (`at` 0) reads "Not begun", and Next begins it.
+ * WHERE IT STANDS FIRST, on the panel's own ground over a hairline: "Item 4 of 15" in the display serif, and the item's words
+ * large under it. A walk set up and not begun (`at` 0) reads "Not begun", and Next begins it.
  *
  * THE WHOLE LIST under it, every item numbered: a done one checked and dimmed, the current one lit with its arrow and named
  * "Now" in words (`aria-current="step"`: never the tint alone, MAN-578), the rest plain.
@@ -85,13 +85,13 @@ export function WalkStageView({ walk, readFailed = null, sessionName, onBack, on
     if (readFailed !== null) {
       return (
         <div data-station-walk="failed">
-          <StageReadFailed kind="walk" title={t('station.cards.walk.readFailed', { defaultValue: 'Her walkthrough could not be read just now.' })} onRetry={readFailed.onRetry} />
+          <StageReadFailed kind="walk" title={t('station.cards.walk.readFailed', { defaultValue: 'The walkthrough could not be read just now.' })} onRetry={readFailed.onRetry} />
         </div>
       );
     }
     return (
       <div data-station-walk="reading" className="grid place-items-center py-10">
-        <Spinner size={32} label={t('station.cards.walk.reading', { defaultValue: 'Reading her walkthrough…' })} />
+        <Spinner size={32} label={t('station.cards.walk.reading', { defaultValue: 'Reading the walkthrough…' })} />
       </div>
     );
   }
@@ -132,13 +132,23 @@ export function WalkStageView({ walk, readFailed = null, sessionName, onBack, on
       className="flex min-w-0 flex-col gap-5"
     >
       <StageHeadActions>
-        <Button variant="outline" size="sm" data-station-walk-end="" className="finger:h-11" onClick={onEnd}>
-          <X aria-hidden="true" />
-          {t('station.cards.walk.end', { defaultValue: 'End the walkthrough' })}
+        {/* Under a finger it is its mark alone: a stop, not a second × beside the panel's own. */}
+        <Button
+          variant="outline"
+          size="sm"
+          data-station-walk-end=""
+          className="finger:h-11 finger:w-11 finger:px-0"
+          aria-label={t('station.cards.walk.end', { defaultValue: 'End the walkthrough' })}
+          title={t('station.cards.walk.end', { defaultValue: 'End the walkthrough' })}
+          onClick={onEnd}
+        >
+          <Square aria-hidden="true" />
+          <span className="finger:hidden">{t('station.cards.walk.end', { defaultValue: 'End the walkthrough' })}</span>
         </Button>
       </StageHeadActions>
 
-      <Card data-station-walk-now="" className="flex min-w-0 flex-col gap-3 p-4 lg:p-5">
+      {/* Where the walk stands, on the panel's own ground: its place large, then the item's words. */}
+      <div data-station-walk-now="" className="flex min-w-0 flex-col gap-3 border-b border-border pb-4">
         <p data-station-walk-place="" className="font-serif text-[30px] leading-none text-foreground md:text-[34px]">
           {begun
             ? t('station.cards.walk.place', { at: walk.at, total, defaultValue: 'Item {{at}} of {{total}}' })
@@ -153,13 +163,7 @@ export function WalkStageView({ walk, readFailed = null, sessionName, onBack, on
             {t('station.cards.walk.waiting', { count: total, defaultValue_one: '{{count}} item, waiting to begin', defaultValue_other: '{{count}} items, waiting to begin' })}
           </p>
         )}
-        <p data-station-walk-say="" className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Mic aria-hidden="true" className="size-4 shrink-0" />
-          {begun
-            ? t('station.cards.walk.say', { defaultValue: 'Say “next”, or answer this one' })
-            : t('station.cards.walk.sayBegin', { defaultValue: 'Say “next”, or press Next, to begin' })}
-        </p>
-      </Card>
+      </div>
 
       <section aria-labelledby={listId} className="flex min-w-0 flex-col gap-1.5">
         <h3 id={listId} className="px-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">

@@ -19,7 +19,7 @@ export default function VoiceInputButton({ state, onToggle }: Props) {
 
   const icon =
     state === 'recording' ? (
-      <Square className="text-red-500" />
+      <Square className="text-[var(--danger-ink)]" />
     ) : state === 'transcribing' ? (
       <Loader2 className="animate-spin" />
     ) : (

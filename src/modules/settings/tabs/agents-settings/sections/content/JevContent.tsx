@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { JEV_SCOPES, useJevSwitches } from '@/shared/hooks/useJevSwitches';
@@ -116,8 +117,16 @@ export default function JevContent() {
         {unknown ? (
           // The press a control with no position can honour: ask again. Without it a persistent read
           // failure left every row dead until Settings was closed and reopened.
-          <Button variant="outline" size="sm" onClick={() => void refresh()}>
-            {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void refresh()}
+            aria-label={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+            title={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <RefreshCw aria-hidden="true" />
+            <span className="finger:hidden">{t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}</span>
           </Button>
         ) : (
           <SettingsToggle

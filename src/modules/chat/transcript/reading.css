@@ -1,0 +1,80 @@
+/* THE TALK, READ: what a chat's transcript looks like around its markdown (`ChatMessagesPane`, scoped by `chat-talk`).
+ *
+ * A reply is not a card. It is a mark in its model's colour and then its words, on the page's own ground, starting on the
+ * edge the line under it starts on. The shapes a reply's markdown becomes (a table, a callout, a list under a lead-in, the
+ * `**Label:** value` lines, a verdict, a diff) keep their fold, their marks and their words, and lose their boxes: a shape
+ * is its heading line, a hairline, and what it holds. Tone stays where it means something (a caution, a verdict), as the
+ * ink of the heading line and never as a wash. The one thing that keeps an edge is a thing with an inside of its own: a
+ * live widget, an embedded page, a DocSpace page, a diagram, and code between its two rules.
+ *
+ * Every rule reads a marker the drawing already carries (`data-shape`, `data-shape-header`, `data-shape-body`,
+ * `data-reply-mark`, `data-code-fence`); none changes the DOM. */
+
+/* ---------- whose reply it is ----------
+ * The loop at a reply's head wears its model's material: Opus the tube's amber, Haiku the wire's cyan, Sonnet the plasma's
+ * violet, and every other model the chrome of Mercury. The name is the mark's title and its label for a reader; it is not written out. */
+[data-reply-mark] {
+  /* A box wherever it stands: left as a span in a plain line (over a turn's work while the turn runs) it has no width or height
+     and draws as its two side borders alone, a sliver. */
+  display: block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ink-muted);
+  border-radius: 50%;
+}
+[data-reply-mark='tube'] { border-color: var(--tube); }
+[data-reply-mark='wire'] { border-color: var(--wire); }
+[data-reply-mark='plasma'] { border-color: var(--plasma); }
+
+/* ---------- a shape, without its box ---------- */
+.chat-talk [data-shape]:not([data-shape='section'], [data-shape='widget'], [data-shape='docspace'], [data-shape='embed'], [data-shape='diagram'], [data-shape-fullscreen]) {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.chat-talk [data-shape]:not([data-shape='section'], [data-shape='widget'], [data-shape='docspace'], [data-shape='embed'], [data-shape='diagram'], [data-shape-fullscreen]) > * > [data-shape-header] {
+  padding-inline: 0;
+  background: none;
+}
+.chat-talk [data-shape]:not([data-shape='section'], [data-shape='widget'], [data-shape='docspace'], [data-shape='embed'], [data-shape='diagram'], [data-shape-fullscreen]) > * > [data-shape-header] [data-shape-title] {
+  font-weight: 500;
+}
+.chat-talk [data-shape]:not([data-shape='section'], [data-shape='widget'], [data-shape='docspace'], [data-shape='embed'], [data-shape='diagram'], [data-shape-fullscreen]) [data-shape-body]:not([data-shape='widget'] *, [data-shape='docspace'] *, [data-shape='embed'] *, [data-shape='diagram'] *) {
+  padding-inline: 0;
+  border-top-color: var(--border);
+}
+/* A callout's sentence is the callout: its strip loses the wash and keeps its mark and its ink. */
+.chat-talk [data-shape='callout'] [data-shape-body] > .vv-banner {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+/* ---------- code, between two rules ---------- */
+.chat-talk [data-code-fence] {
+  border-width: 1px 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.chat-talk [data-code-fence] > :first-child { padding-inline: 0; }
+.chat-talk [data-code-fence] pre { padding-inline: 0 !important; background: none !important; }
+
+/* ---------- the quiet of the parts ----------
+ * A shape's own icon is the quiet ink unless the shape carries a tone; a table's head row and a fact's label are their
+ * weight, not a wash or the accent. */
+.chat-talk [data-shape-header]:not([data-tone]) [data-shape-icon] { color: var(--ink-muted); }
+.chat-talk [data-shape='table'] :is(thead, thead tr, th) { background: none; }
+.chat-talk [data-shape='facts'] dt { color: var(--ink-muted); font-weight: 500; }
+
+/* ---------- a run of work ----------
+ * The rows of a run stand close together, each on its hairline, whatever room the turn keeps between the things it says:
+ * a list, not a stack of cards. The line of a finished run stands on a hairline of its own. */
+.chat-work > :not([data-chat-work-line]) + :not([data-chat-work-line]),
+.chat-work [data-chat-work-rows] > * + * { margin-top: 0; }
+.chat-work [data-chat-work-line] { border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+/* A turn that opens with work wears its mark on that work's line, so the first row's own head stands down. */
+.chat-work [data-reply-head] { display: none; }

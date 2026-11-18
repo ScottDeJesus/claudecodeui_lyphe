@@ -22,14 +22,19 @@ type SheetProps = {
   width?: string;
   /** Any CSS length: the line the scrim and the panel stand below, from the viewport's top. Default `'0px'`, the whole viewport. A sheet that must clear something drawn at the page's top (a head, a face) passes that thing's foot; what stands above the line stays live, and Tab never walks from it into what the scrim covers. */
   top?: string;
+  /** The edge the panel is pinned to and slides in from: `right` (the default), or `left` for a sheet that holds what a page keeps on its left (the station's "Where things stand"). */
+  side?: 'left' | 'right';
+  /** The body without its padding, for content that pads its own rows edge to edge (a list of rows, a rail). */
+  flush?: boolean;
   children: React.ReactNode;
 };
 
 /**
- * Verve's `Sheet` (`_ds_bundle.js`, components/overlays/Sheet.jsx): a panel pinned to the right edge
- * over a scrim, for a detail that belongs beside the screen rather than over it. Used by the cerberus
+ * Verve's `Sheet` (`_ds_bundle.js`, components/overlays/Sheet.jsx): a panel pinned to the right edge (or, given
+ * `side: 'left'`, the left) over a scrim, for a detail that belongs beside the screen rather than over it. Used by the cerberus
  * module's CheckSheet, which hands it the `width` and the `top` its caller asks for (the station's check
- * stage keeps the sheet off her face with them).
+ * stage keeps the sheet off the companion's face with them), and by the station's "Where things stand", pinned left and
+ * `flush`, its rows padding themselves.
  *
  * `top` is the line the scrim and the panel stand below: the root is `fixed` with its sides and foot at 0
  * and its top there, and both are absolute inside it. A sheet that must clear something at the page's top
@@ -50,7 +55,7 @@ type SheetProps = {
  * Paint is `.vv-sheet*` in verve/panels.css, motion included; there is no exit animation, as with
  * Dialog — the panel is unmounted the moment `open` goes false.
  */
-export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(600px, 100%)', top = FULL_VIEWPORT_TOP, children }: SheetProps) {
+export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(600px, 100%)', top = FULL_VIEWPORT_TOP, side = 'right', flush = false, children }: SheetProps) {
   const { t } = useTranslation('common');
   const hostWindow = useHostWindow();
   const panelRef = React.useRef<HTMLDivElement | null>(null);
@@ -131,7 +136,8 @@ export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="vv-sheet__panel absolute inset-y-0 right-0 flex max-w-full flex-col"
+        data-side={side}
+        className={`vv-sheet__panel absolute inset-y-0 flex max-w-full flex-col ${side === 'left' ? 'left-0' : 'right-0'}`}
         style={{ width }}
       >
         <div className="vv-sheet__head flex items-center justify-between gap-3">
@@ -151,7 +157,7 @@ export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(
             ✕
           </button>
         </div>
-        <div className="vv-sheet__body min-h-0 flex-1 overflow-y-auto">{children}</div>
+        <div data-flush={flush ? '' : undefined} className="vv-sheet__body min-h-0 flex-1 overflow-y-auto">{children}</div>
         {footer ? <div className="vv-sheet__foot flex justify-end gap-2.5">{footer}</div> : null}
       </div>
     </div>,

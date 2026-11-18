@@ -224,7 +224,6 @@
       "label": "{{time}} elapsed",
       "startingNow": "Starting now"
     },
-    "stop": "停止",
     "controls": {
       "stopGeneration": "Stop Generation",
       "pressEscToStop": "Press Esc anytime to stop"

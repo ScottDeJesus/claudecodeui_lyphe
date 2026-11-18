@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import { RefreshCw } from 'lucide-react';
+import { CircleArrowUp, RefreshCw, RotateCw } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -153,9 +153,16 @@ export function ClaudeUpdatesSettingsTab() {
         </h3>
         <div className="flex h-40 flex-col items-center justify-center gap-3">
           <Spinner label={t('updates.loading', { defaultValue: 'Reading the update report…' })} />
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-            {t('updates.tryAgain', { defaultValue: 'Try again' })}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            aria-label={t('updates.tryAgain', { defaultValue: 'Try again' })}
+            title={t('updates.tryAgain', { defaultValue: 'Try again' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5 finger:mr-0" />
+            <span className="finger:hidden">{t('updates.tryAgain', { defaultValue: 'Try again' })}</span>
           </Button>
         </div>
         {/* The press's own answer: a read that fails here says so instead of spinning. */}
@@ -180,13 +187,21 @@ export function ClaudeUpdatesSettingsTab() {
             {checkedLine(report.checkedAt, report.nextCheckAt, t)}
           </p>
         </div>
-        <Button variant="outline" size="sm" disabled={report.checking} onClick={onCheckNow}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={report.checking}
+          onClick={onCheckNow}
+          aria-label={t('updates.checkNow', { defaultValue: 'Check now' })}
+          title={t('updates.checkNow', { defaultValue: 'Check now' })}
+          className="finger:h-11 finger:w-11 finger:px-0"
+        >
           {report.checking ? (
             <Spinner size={14} />
           ) : (
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5 finger:mr-0" />
           )}
-          {t('updates.checkNow', { defaultValue: 'Check now' })}
+          <span className="finger:hidden">{t('updates.checkNow', { defaultValue: 'Check now' })}</span>
         </Button>
       </header>
 
@@ -215,10 +230,15 @@ export function ClaudeUpdatesSettingsTab() {
 
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Button disabled={updatable.length === 0 || jobActive} onClick={onUpdateAndRestart}>
-            {jobActive
+          <Button disabled={updatable.length === 0 || jobActive} onClick={onUpdateAndRestart} aria-label={jobActive
               ? t('updates.actions.updating', { defaultValue: 'Updating…' })
-              : t('updates.actions.updateAndRestart', { defaultValue: 'Update and restart' })}
+              : t('updates.actions.updateAndRestart', { defaultValue: 'Update and restart' })} title={jobActive
+              ? t('updates.actions.updating', { defaultValue: 'Updating…' })
+              : t('updates.actions.updateAndRestart', { defaultValue: 'Update and restart' })} className="finger:h-11 finger:w-11 finger:px-0">
+            <CircleArrowUp aria-hidden="true" />
+            <span className="finger:hidden">{jobActive
+              ? t('updates.actions.updating', { defaultValue: 'Updating…' })
+              : t('updates.actions.updateAndRestart', { defaultValue: 'Update and restart' })}</span>
           </Button>
           {/* Only where this process can hand itself over: nowhere else is there a restart to offer. */}
           {report.supervised && (
@@ -226,8 +246,12 @@ export function ClaudeUpdatesSettingsTab() {
               variant="outline"
               disabled={!canPressRestart(report.job)}
               onClick={onRestartServer}
+              aria-label={t('updates.actions.restartServer', { defaultValue: 'Restart server' })}
+              title={t('updates.actions.restartServer', { defaultValue: 'Restart server' })}
+              className="finger:h-11 finger:w-11 finger:px-0"
             >
-              {t('updates.actions.restartServer', { defaultValue: 'Restart server' })}
+              <RotateCw aria-hidden="true" />
+              <span className="finger:hidden">{t('updates.actions.restartServer', { defaultValue: 'Restart server' })}</span>
             </Button>
           )}
         </div>

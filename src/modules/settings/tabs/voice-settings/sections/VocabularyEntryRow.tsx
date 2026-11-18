@@ -1,4 +1,4 @@
-import { Trash2, X } from 'lucide-react';
+import { Check, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -191,6 +191,7 @@ export function VocabularyEntryRow({ entry, saving, onChange, onDelete, draft, r
             aria-label={t('voiceSettings.vocabulary.delete', { defaultValue: 'Delete {{word}}', word: name })}
             data-vocabulary-delete=""
             onClick={() => setConfirmingDelete(true)}
+            className="finger:h-11 finger:w-11 finger:px-0"
           >
             <Trash2 aria-hidden="true" />
           </Button>
@@ -231,8 +232,17 @@ export function VocabularyEntryRow({ entry, saving, onChange, onDelete, draft, r
             onChange={(event) => setFormText(event.target.value)}
             className="min-w-0 flex-1 basis-48"
           />
-          <Button type="submit" size="sm" busy={saving} disabled={formText.trim() === ''}>
-            {t('voiceSettings.vocabulary.addForm', { defaultValue: 'Add' })}
+          <Button
+            type="submit"
+            size="sm"
+            busy={saving}
+            disabled={formText.trim() === ''}
+            aria-label={t('voiceSettings.vocabulary.addForm', { defaultValue: 'Add' })}
+            title={t('voiceSettings.vocabulary.addForm', { defaultValue: 'Add' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <Plus aria-hidden="true" />
+            <span className="finger:hidden">{t('voiceSettings.vocabulary.addForm', { defaultValue: 'Add' })}</span>
           </Button>
         </form>
       </div>
@@ -247,11 +257,29 @@ export function VocabularyEntryRow({ entry, saving, onChange, onDelete, draft, r
       {draft && (
         <div className="flex flex-wrap items-center gap-2">
           {/* Never `disabled`: leaving the spelling field commits it a moment before this press lands, so a refusal here is read at the press. */}
-          <Button size="sm" busy={saving || entry.spelling === ''} data-vocabulary-save-word="" onClick={saveDraft}>
-            {t('voiceSettings.vocabulary.saveWord', { defaultValue: 'Add word' })}
+          <Button
+            size="sm"
+            busy={saving || entry.spelling === ''}
+            data-vocabulary-save-word=""
+            onClick={saveDraft}
+            aria-label={t('voiceSettings.vocabulary.saveWord', { defaultValue: 'Add word' })}
+            title={t('voiceSettings.vocabulary.saveWord', { defaultValue: 'Add word' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <Check aria-hidden="true" />
+            <span className="finger:hidden">{t('voiceSettings.vocabulary.saveWord', { defaultValue: 'Add word' })}</span>
           </Button>
-          <Button variant="ghost" size="sm" busy={saving} onClick={draft.onCancel}>
-            {t('voiceSettings.gemini.cancel', { defaultValue: 'Cancel' })}
+          <Button
+            variant="ghost"
+            size="sm"
+            busy={saving}
+            onClick={draft.onCancel}
+            aria-label={t('voiceSettings.gemini.cancel', { defaultValue: 'Cancel' })}
+            title={t('voiceSettings.gemini.cancel', { defaultValue: 'Cancel' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <X aria-hidden="true" />
+            <span className="finger:hidden">{t('voiceSettings.gemini.cancel', { defaultValue: 'Cancel' })}</span>
           </Button>
         </div>
       )}

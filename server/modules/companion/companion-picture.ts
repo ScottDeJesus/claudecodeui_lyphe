@@ -64,6 +64,7 @@ export async function buildPicture(account: CompanionAccount): Promise<Companion
   const models = await modelOptions();
   const { store, session } = account;
   const { focus, draft, pending, walk, floor } = store.readState();
+  const log = store.readLog(PICTURE_LOG_ROWS);
   return {
     settings: readCompanionSettings(account.userId),
     models,
@@ -75,7 +76,9 @@ export async function buildPicture(account: CompanionAccount): Promise<Companion
     pending: pending === null ? null : withoutPin(pending),
     walk,
     notes: store.listNotes(),
-    log: store.readLog(PICTURE_LOG_ROWS),
+    log,
+    // The work of the turns those lines hold: every call that stands at or after the oldest of them (all of them, with no line).
+    work: store.listWork(log[0]?.id ?? 0),
     floor,
     face: faceService.faceOf(account.userId),
   };

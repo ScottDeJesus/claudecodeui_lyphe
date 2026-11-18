@@ -81,7 +81,7 @@ export function shownPath(filePath: string): string {
 
 /** The refusal that names a file the deny rule withholds and says its diff is never read. */
 export function withheldSentence(filePath: string): string {
-  return `${shownPath(filePath)} is withheld: its name or place marks it as a secret, so its diff is never read, by her or by a reader. Tell him it is his to open.`;
+  return `${shownPath(filePath)} is withheld: its name or place marks it as a secret, so its diff is never read, by you or by a reader. Tell him it is his to open.`;
 }
 
 /** One file as a status line: `<state> <path>`, ` · staged` when it is, and ` · withheld` when its diff would not be read. */

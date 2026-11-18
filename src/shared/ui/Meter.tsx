@@ -22,8 +22,11 @@ type MeterProps = {
    * `ring` is the glanceable form for a rail or a header: a thick ring, 28px across, whose arc fills clockwise from 12
    * o'clock to `percent` and whose middle holds `label` (a word or two: "wk"). It draws no figure and no `sub` — the
    * caller's tooltip says the words — so `ariaLabel` is what names it, and `value` still feeds `aria-valuetext`.
+   * `dial` is the one measure shown large: an open arc of 240 degrees with the figure and its percent sign in the middle as one thing,
+   * `label` under it in the arc's opening and `sub` under that, wrapped and never cut. `value` feeds `aria-valuetext` and is not drawn.
+   * Its side is `--vv-dial` (132px unless the caller sets it), so a row of several can step them down together.
    */
-  variant?: 'stacked' | 'inline' | 'ring';
+  variant?: 'stacked' | 'inline' | 'ring' | 'dial';
   /**
    * The ceiling, in percent, as a tick on the track — drawn only when given, so every meter that
    * is not a usage window's is exactly the bar it was. The raw figure is kept for the words and
@@ -39,8 +42,9 @@ type MeterProps = {
 };
 
 /**
- * A labelled horizontal bar with its figure and a line of context under it — or, as `variant="ring"`, a small ring.
- * Used by the accounts module (Phase 13) for the usage windows on the signed-in account (the bars in its panel, and the
+ * A labelled horizontal bar with its figure and a line of context under it — or, as `variant="ring"`, a small ring, or as
+ * `variant="dial"`, one large dial.
+ * Used by the accounts module (Phase 13) for the usage windows on the signed-in account (the dials in its panel, and the
  * ring at the foot of the project-workspace rail), by the file manager for an upload in flight, by
  * TaskMaster's task card for its subtask progress, and by the companion module's face card in Settings for the frames made
  * so far of each look of hers being made; all of them need the same treatment of a figure nobody has yet.
@@ -49,6 +53,10 @@ type MeterProps = {
  * tone is a token swap), and names no colour of its own: with no container it falls back to the meter's own accent, or
  * to the warn amber when `tone="warn"`. The arc sweeps and the colour eases when the figure or the tone changes, and
  * stands still under `prefers-reduced-motion`.
+ *
+ * THE DIAL is the account panel's reading of a usage window (`UsageMeters`): the number and its percent sign centred, no "used". Its arc
+ * takes its colour as the ring's does, and a warn dial carries the `▲` on its label. The ceiling tick and the projected end's mark are
+ * drawn on it too, across the arc and just outside it.
  *
  * The fill scales with `transform`, never `width`, so the bar animates without laying the
  * row out again on every frame. An unknown percent draws no fill at all and shows an
@@ -142,6 +150,50 @@ export function Meter({ percent, tone = 'accent', label, ariaLabel, value, sub, 
           )}
         </svg>
         <span className="vv-meter__ring-label">{label}</span>
+      </div>
+    );
+  }
+
+  // The dial: an arc of 240 degrees, open at the foot, with eleven divisions outside it. The arc starts at 150 degrees (a circle's own
+  // start being 3 o'clock) and both circles share a path length of 360, so a dash of 2.4 per percent is the whole sweep.
+  if (variant === 'dial') {
+    const point = (at: number, radius: number) => {
+      const angle = ((150 + 2.4 * at) * Math.PI) / 180;
+      return { x: 60 + radius * Math.cos(angle), y: 60 + radius * Math.sin(angle) };
+    };
+    return (
+      <div className={cn('vv-meter vv-meter--dial', tone === 'warn' && 'vv-meter--warn')} {...aria}>
+        <span className="vv-meter__dial">
+          <svg viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+            {Array.from({ length: 11 }, (_, index) => {
+              const from = point(index * 10, 51);
+              const to = point(index * 10, index % 5 === 0 ? 56 : 54);
+              return <line key={index} className="vv-meter__dial-division" x1={from.x} y1={from.y} x2={to.x} y2={to.y} />;
+            })}
+            <circle className="vv-meter__dial-track" cx="60" cy="60" r="46" pathLength={360} strokeDasharray="240 360" transform="rotate(150 60 60)" />
+            {known && (
+              <circle
+                className="vv-meter__dial-arc"
+                cx="60"
+                cy="60"
+                r="46"
+                pathLength={360}
+                strokeDasharray={`${2.4 * clamped} 360`}
+                transform="rotate(150 60 60)"
+              />
+            )}
+            {tick !== null && (
+              <line data-meter-tick={String(tickAt)} className="vv-meter__dial-tick" x1={point(tick, 42.5).x} y1={point(tick, 42.5).y} x2={point(tick, 49.5).x} y2={point(tick, 49.5).y} />
+            )}
+            {mark !== null && <circle data-meter-mark={String(markAt)} className="vv-meter__dial-mark" cx={point(mark, 57).x} cy={point(mark, 57).y} r="2.2" />}
+          </svg>
+          <span className="vv-meter__dial-read" aria-hidden="true">
+            <span className="vv-meter__dial-figure">{known ? clamped : '—'}</span>
+            {known && <span className="vv-meter__dial-unit">%</span>}
+          </span>
+        </span>
+        <span className="vv-meter__dial-label">{label}</span>
+        {sub && <span className="vv-meter__sub">{sub}</span>}
       </div>
     );
   }

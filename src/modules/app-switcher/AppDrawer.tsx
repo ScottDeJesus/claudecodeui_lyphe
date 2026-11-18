@@ -50,7 +50,8 @@ type RemoveRefusal = {
  * what can I pick (the rows, in the registry file's own order), and — pinned below the scroll — how
  * do I add one and which appearance am I in.
  *
- * Rendered by AppSwitcherFab only.
+ * Mounted once by the project-workspace module's `WorkspaceFrame`, through the barrel as `AppSwitcherDrawer`: the floating button that
+ * used to open it is gone, and the sessions home's menu opens it now.
  */
 export function AppDrawer() {
   const { t } = useTranslation();
@@ -176,7 +177,7 @@ export function AppDrawer() {
                   isActive={nextSide === 'left'}
                   aria-pressed={nextSide === 'left'}
                   onClick={() => handleChooseSide('left')}
-                  className="min-h-[34px] rounded-full px-3.5 py-1.5 text-[12.5px]"
+                  className="min-h-[34px] px-3.5 py-1.5 text-[12.5px]"
                 >
                   {t('applications.left')}
                 </Pill>
@@ -184,7 +185,7 @@ export function AppDrawer() {
                   isActive={nextSide === 'right'}
                   aria-pressed={nextSide === 'right'}
                   onClick={() => handleChooseSide('right')}
-                  className="min-h-[34px] rounded-full px-3.5 py-1.5 text-[12.5px]"
+                  className="min-h-[34px] px-3.5 py-1.5 text-[12.5px]"
                 >
                   {t('applications.right')}
                 </Pill>

@@ -3,7 +3,7 @@ import type { CompanionActionKind } from '@/shared/companion-types';
 /**
  * The words of the action waiting for his word, each a locale key with its English: one place, so the action's two drawings
  * say the same thing. Used by this module's CompanionActionCard (the whole card: its sentence, the title over his lines, its
- * times and lapse) and CompanionActionLine (the card in one line: its sentence and lapse, on the station's phone).
+ * times and lapse).
  */
 
 /** A locale key and its English, for the words that change with the action. */

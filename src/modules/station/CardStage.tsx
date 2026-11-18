@@ -10,7 +10,7 @@ import { StageGone } from '@/modules/station/stageStates';
 import type { RoadmapEpic, RoadmapFeature, RoadmapPicture } from '@/shared/roadmap-types';
 import type { StationFocus } from '@/shared/station-types';
 import type { DispatcherArcGroup, DispatcherPlan, RoadmapDotState } from '@/shared/types';
-import { Card, CardContent, Spinner } from '@/shared/ui';
+import { Spinner } from '@/shared/ui';
 
 /** A feature (plan) or an epic (arc) on the stage, by name. */
 type CardFocus = Extract<StationFocus, { kind: 'card' }>;
@@ -87,16 +87,15 @@ export function CardStageView({ focus, found, onPutAway, onWriteGoal, onSelectFe
       );
     case 'feature':
       return (
-        <Card data-station-card="feature" className="min-w-0">
-          <CardContent className="p-4 lg:p-5">
-            <FeatureFacts feature={found.feature} picture={found.picture} onWriteGoal={onWriteGoal} cases={found.cases} />
-          </CardContent>
-        </Card>
+        // On the panel's own ground: the roadmap's facts are the panel's body, with no box of their own.
+        <div data-station-card="feature" className="min-w-0">
+          <FeatureFacts feature={found.feature} picture={found.picture} onWriteGoal={onWriteGoal} cases={found.cases} />
+        </div>
       );
     case 'epic':
       return (
-        <Card data-station-card="epic" role="region" aria-labelledby={headingId} className="min-w-0">
-          <div className="flex min-w-0 flex-col gap-3 px-4 py-3.5">
+        <div data-station-card="epic" role="region" aria-labelledby={headingId} className="min-w-0">
+          <div className="flex min-w-0 flex-col gap-3">
             <EpicPanel
               epic={found.epic}
               n={found.n}
@@ -105,7 +104,7 @@ export function CardStageView({ focus, found, onPutAway, onWriteGoal, onSelectFe
               onSelect={(selection) => { if (selection.kind === 'feature') onSelectFeature(selection.name); }}
             />
           </div>
-        </Card>
+        </div>
       );
     case 'gone':
       return <StageGone focus={focus} />;

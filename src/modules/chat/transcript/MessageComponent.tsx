@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { AudioLinesIcon, GitBranchIcon, PencilIcon } from 'lucide-react';
 
 import { MARKDOWN_CARDS_CLASS } from '@/shared/constants';
-import { LLMProviderLogo } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,Project } from '@/shared/types';
 import { formatUsageLimitText, stripProposedPlanEnvelope } from '@/modules/chat/utils/chatFormatting';
 import { ToolRenderer, ToolErrorDisplay, SubagentPanel, shouldHideToolResult } from '@/modules/chat/tools';
 import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
+import { replyMaterialOf } from '@/modules/chat/transcript/replyMark';
 import ThinkingRow from '@/modules/chat/transcript/ThinkingRow';
 import ChatMessageImages from '@/modules/chat/transcript/ChatMessageImages';
 import { shapeKey } from '@/modules/chat/transcript/shapes/collapseState';
@@ -268,19 +268,13 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
         /* Claude/Error/Tool messages on the left */
         <div className="w-full">
           {!isGrouped && (
-            /* One mark and one caption, whoever is speaking.
-               A model's turn is marked by the mark of the agent that answered, through the shared
-               `LLMProviderLogo` the sidebar also draws — asked here for the Claude MASCOT
-               (`claudeMark="mascot"`), the coding tool's own pixel figure, rather than the
-               starburst it defaults to: this mark says WHO answered, and who answered is Claude
-               Code working in this conversation. The sidebar, settings, onboarding and accounts
-               keep the starburst, because there the mark names the provider a session or an
-               account is opened on. A plain disc said nothing a reader could not already read in
-               the caption. Error and tool turns keep that disc: they are STATES, not speakers,
-               and no provider owns them. An error turn is amber rather than red — nothing
-               here is destructive, something went wrong — and it says so in the word beside
-               the dot, so the state survives a screen with no colour at all. */
-            <div className="mb-2.5 flex items-center gap-2.5">
+            /* One mark at the head of a turn, whoever is speaking. A model's turn is marked by a loop in the colour of the model
+               that wrote it (`data-reply-mark`, coloured in `reading.css`): the colour says who answered, and the name is the
+               mark's title, never spelled out beside it. Error and tool turns keep a plain disc and their word: they are STATES,
+               not speakers. An error turn is amber rather than red — nothing here is destructive, something went wrong — and it
+               says so in the word beside the dot, so the state survives a screen with no colour at all. */
+            // `data-reply-head`: a turn that opens with work wears its mark on that work's line instead (`WorkFold`), and this one stands down.
+            <div data-reply-head="" className="mb-2.5 flex items-center gap-2.5">
               {message.type === 'error' || message.type === 'tool' ? (
                 <span
                   aria-hidden="true"
@@ -289,11 +283,22 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
                   }`}
                 />
               ) : (
-                <LLMProviderLogo provider={provider} claudeMark="mascot" className="h-5 w-5 flex-none" />
+                // Whose reply it is: a loop in the colour of the model that wrote it. The model is not spelled out; its name is
+                // the mark's title and its label for a reader.
+                <span
+                  role="img"
+                  data-reply-mark={replyMaterialOf(message.model ?? '')}
+                  aria-label={t('messageTypes.writtenBy', { defaultValue: 'Written by {{model}}', model: speakerName })}
+                  title={speakerName}
+                />
               )}
-              <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">
-                {shouldShowResponseTime || !messageTime.isValid ? speakerName : `${speakerName} · ${formattedTime}`}
-              </span>
+              {(message.type === 'error' || message.type === 'tool' || !(shouldShowResponseTime || !messageTime.isValid)) && (
+                <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">
+                  {message.type === 'error' || message.type === 'tool'
+                    ? (shouldShowResponseTime || !messageTime.isValid ? speakerName : `${speakerName} · ${formattedTime}`)
+                    : formattedTime}
+                </span>
+              )}
             </div>
           )}
 

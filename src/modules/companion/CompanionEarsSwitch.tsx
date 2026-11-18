@@ -42,18 +42,18 @@ const keepFromSwitch = (event: MouseEvent) => event.preventDefault();
  */
 export function CompanionEarsSwitch({ ears, name }: CompanionEarsSwitchProps) {
   const { t } = useTranslation();
-  const label = t('companion.ears.label', { defaultValue: 'Listen for her name on this device' });
+  const label = t('companion.ears.label', { defaultValue: 'Listen for the wake word on this device' });
   const Glyph = ears.on ? Ear : EarOff;
   // Every state's words, so a state added to `CompanionEarsState` without any fails to compile. `off` has none.
   const stateWords: Record<CompanionEarsState, string | null> = {
     off: null,
     waiting: t('companion.ears.waiting', { name, defaultValue: 'Listening for {{name}}' }),
-    readying: t('companion.ears.readying', { defaultValue: 'Getting her ears ready' }),
-    'needs-touch': t('companion.ears.needsTouch', { defaultValue: 'Touch the page to let her listen' }),
-    elsewhere: t('companion.ears.elsewhere', { defaultValue: 'She listens on the page you last talked to her from' }),
+    readying: t('companion.ears.readying', { defaultValue: 'Getting ready to listen' }),
+    'needs-touch': t('companion.ears.needsTouch', { defaultValue: 'Touch the page to start listening' }),
+    elsewhere: t('companion.ears.elsewhere', { defaultValue: 'Listening on the page you last talked from' }),
     hearing: t('companion.ears.hearing', { defaultValue: 'Listening' }),
     // The hook always gives its sentence; the fallback only keeps an `unavailable` from standing wordless.
-    unavailable: ears.reason ?? t('companion.ears.unavailable', { defaultValue: 'She can\'t listen on this page' }),
+    unavailable: ears.reason ?? t('companion.ears.unavailable', { defaultValue: 'Can\'t listen on this page' }),
   };
   const words = ears.on ? stateWords[ears.state] : null;
   const unavailable = ears.state === 'unavailable';

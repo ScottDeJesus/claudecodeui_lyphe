@@ -52,7 +52,7 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   // Framed, the header is the row line every tool row shares; unframed (a result
   // continuing its call), it stays a slim line. Either way it sticks while open.
   const header = framed
-    ? cn(TOOL_ROW_HEADER, 'group-data-[state=open]/section:sticky group-data-[state=open]/section:top-0 group-data-[state=open]/section:z-10 group-data-[state=open]/section:bg-muted')
+    ? cn(TOOL_ROW_HEADER, 'group-data-[state=open]/section:sticky group-data-[state=open]/section:top-0 group-data-[state=open]/section:z-10 group-data-[state=open]/section:bg-background')
     : 'flex items-center gap-1.5 py-0.5 text-xs group-data-[state=open]/section:sticky group-data-[state=open]/section:top-0 group-data-[state=open]/section:z-10 group-data-[state=open]/section:-mx-1 group-data-[state=open]/section:bg-background group-data-[state=open]/section:px-1';
 
   const lead = (

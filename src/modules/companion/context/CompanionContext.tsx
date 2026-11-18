@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { CompanionVoiceClockContext } from '@/modules/companion/context/CompanionVoiceClockContext';
+import type { CompanionVoiceClock } from '@/modules/companion/context/CompanionVoiceClockContext';
 import { useCompanionFab } from '@/modules/companion/hooks/useCompanionFab';
 import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
 import { useEars } from '@/modules/companion/hooks/useEars';
@@ -96,6 +98,11 @@ type CompanionContextValue = {
    */
   voice: CompanionVoice;
   /**
+   * Says the newest answer again on this page, from its first sentence: the station's speaker press, for a reader who was out of the
+   * room. Nothing while the voice's switch is off, while a turn runs, or while something is already sounding.
+   */
+  sayAgain: () => void;
+  /**
    * This page's ears: `on` / `setOn` the per-device switch (`companion-ears` in localStorage, off by default), `state` what they are doing
    * (the switch row draws it), and `reason` the sentence when they cannot listen. Her name opens the same ONE press as `talk` (the page that
    * holds the floor listens, and only when the switch is on, the page has been touched and it has a microphone); read by `CompanionControls`
@@ -128,6 +135,8 @@ type CompanionContextValue = {
   level: () => number;
   /** The page player's `progress()`: the sounding sentence's seconds elapsed and, once its body has ended, its length — what picks the vowel of her mouth. Stable for the page's life. */
   progress: PcmPlayer['progress'];
+  /** The page player's `analyser()`: the tap her face's ear reads while she speaks (loudness, bands, pitch, onsets). Stable for the page's life. */
+  analyser: PcmPlayer['analyser'];
   /** The timed mouth shapes the page has heard for a sentence (`[]` for none yet): what her face's exact mouth looks up at the audio's place. Stable for the page's life. */
   mouth: CompanionFaceVoice['mouth'];
 };
@@ -486,14 +495,24 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     () => ({
       picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, takeFloor, sendText, saveSettings, editDraft, sendDraft,
       clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear, talk,
-      voice: speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
-      progress: speech.progress, mouth: speech.mouth,
+      voice: speech.voice, sayAgain: speech.again, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
+      progress: speech.progress, analyser: speech.analyser, mouth: speech.mouth,
     }),
     [
       picture, readFailure, reread, open, clientId, setOpen, takeFloor, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear,
-      talk, speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress, speech.mouth,
+      talk, speech.voice, speech.again, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress, speech.analyser, speech.mouth,
     ],
   );
 
-  return <CompanionContext.Provider value={value}>{children}</CompanionContext.Provider>;
+  // The voice as the words' clock, on a context of its own: the reply reads it where no provider stands too (a fixture's drawing).
+  const voiceClock = useMemo<CompanionVoiceClock>(
+    () => ({ active: speech.active, cut: speech.voice.cut, progress: speech.progress }),
+    [speech.active, speech.voice.cut, speech.progress],
+  );
+
+  return (
+    <CompanionContext.Provider value={value}>
+      <CompanionVoiceClockContext.Provider value={voiceClock}>{children}</CompanionVoiceClockContext.Provider>
+    </CompanionContext.Provider>
+  );
 }

@@ -10,8 +10,7 @@ import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/ty
  *
  * The chat's pinned rows (`src/modules/chat/transcript/PinnedSubagents.tsx`) keep an agent in view
  * while it runs and after it finishes, until the reader dismisses it. They are drawn in the strip
- * above the chat box when the desktop chat gutters are not showing and in the gutter's Subagents
- * widget while they are. They used to take their agents from the transcript rows the page had
+ * above the chat box. They used to take their agents from the transcript rows the page had
  * loaded, and a page loads history from the tail, twenty rows at a time — so an agent launched
  * early in a long turn left the rows as soon as the main thread had done twenty rows of work
  * since, which is the exact moment it needs pinning (measured 2026-09-10: a planner still running,
@@ -25,18 +24,16 @@ import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/ty
 
 /**
  * Mirrors `RUNNING_BELIEVED_FOR_MS` in the chat's pinned rows (`PinnedSubagents.tsx`), drawn in the
- * strip above the chat box when the desktop chat gutters are not showing and in the gutter's
- * Subagents widget while they are: a "running" row older than this is not believed.
+ * strip above the chat box: a "running" row older than this is not believed.
  *
- * Read by the sidebar's purple dot too (`hasRunningSubagent`, and the candidate window in
+ * Read by the sidebar's subagent mark too (`runningSubagentModels`, and the candidate window in
  * `session-subagent-runs.service.ts`), so the three answers to "is an agent still out there" are
  * one window rather than three.
  */
 export const RUNNING_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
 /**
  * Mirrors `FINISHED_SHOWN_FOR_MS` in the chat's pinned rows (`PinnedSubagents.tsx`), drawn in the
- * strip above the chat box when the desktop chat gutters are not showing and in the gutter's
- * Subagents widget while they are: how long a finished agent stays offered.
+ * strip above the chat box: how long a finished agent stays offered.
  */
 const FINISHED_SHOWN_FOR_MS = 2 * 60 * 60 * 1000;
 /** A bound on the payload, newest first; a fan-out larger than this has scrolled out of any strip. */
@@ -204,15 +201,20 @@ function isRunningContainer(message: NormalizedMessage): boolean {
 }
 
 /**
- * Whether this conversation has a subagent running RIGHT NOW — the question the sidebar's purple
- * dot asks, and the answer the chat's pinned strip draws its own purple disc from.
+ * The model of every subagent this conversation has running RIGHT NOW, one entry for each, in the order the strip pins them:
+ * the model the agent's own transcript names (`subagent.model`), or `''` for one whose model is not recorded yet. Empty when it
+ * has none running: the question the sidebar's subagent mark asks, and the answer the chat's pinned strip draws its own from.
  *
  * Asked through `collectSessionAgents` deliberately, rather than by re-walking the messages: the
  * containers it offers and the four-hour launch window it applies to an unfinished one ARE the
- * strip's selection, so the dot can never light on an agent the strip would not pin.
+ * strip's selection, so a mark can never light on an agent the strip would not pin.
+ *
+ * Consumed by `session-subagent-runs.service.ts`, for the running-sessions route's `subagentSessionIds` and `subagentModels`.
  */
-export function hasRunningSubagent(messages: NormalizedMessage[], now: number = Date.now()): boolean {
-  return collectSessionAgents(messages, now).some(isRunningContainer);
+export function runningSubagentModels(messages: NormalizedMessage[], now: number = Date.now()): string[] {
+  return collectSessionAgents(messages, now)
+    .filter(isRunningContainer)
+    .map((message) => (typeof message.subagent?.model === 'string' ? message.subagent.model : ''));
 }
 
 /**

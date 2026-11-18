@@ -29,7 +29,7 @@ export function HealItemRow({ item, onOpen }: { item: HealItem; onOpen: (item: H
         // The press never outgrows its row (`min-w-0 max-w-full`): a session's file name is 42 mono characters, wider than a
         // phone's column, and a press that kept its width ran past the edge and made a narrow host pan sideways. The file
         // name gives way with an ellipsis and the line number never does, since the line is the part a reader came for.
-        <Button variant="ghost" size="sm" className="h-7 min-w-0 max-w-full px-2 font-mono text-xs" onClick={() => onOpen(item)} title={item.transcript}>
+        <Button variant="outline" size="sm" className="h-7 min-w-0 max-w-full px-2 font-mono text-xs" onClick={() => onOpen(item)} title={item.transcript}>
           <ExternalLinkIcon aria-hidden="true" />
           <span className="flex min-w-0">
             <span className="min-w-0 truncate">{transcriptRef(item.transcript, null)}</span>

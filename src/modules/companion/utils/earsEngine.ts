@@ -10,6 +10,7 @@
 // eslint-disable-next-line import/default
 import earsWorkletUrl from '@/modules/companion/utils/earsCapture.worklet.ts?worker&url';
 import type { EarsFromWorker, EarsToWorker } from '@/modules/companion/utils/earsProtocol';
+import { publishListeningTap } from '@/modules/companion/utils/listeningTap';
 
 /** The ears' plumbing on the page: one worker for as long as the caller keeps the engine (its models loaded once), and a capture attached and detached as arming comes and goes. Used by `useEars`. */
 export type EarsEngine = {
@@ -37,7 +38,7 @@ export type EarsEngine = {
 };
 
 /** What `attach` built, so `detach` can take it apart. */
-type Capture = { source: MediaStreamAudioSourceNode; node: AudioWorkletNode };
+type Capture = { source: MediaStreamAudioSourceNode; node: AudioWorkletNode; tap: AnalyserNode };
 
 /**
  * Used by `useEars` (the page's ears) and the engine's showing; `onMessage` hears every message the worker sends, `ready` and
@@ -110,7 +111,7 @@ export function createEarsEngine(input: {
     // A worker that never started (its script or one of its imports did not load) is a failure the page must hear of in words.
     started.onerror = (event) => {
       if (worker !== started) return;
-      const sentence = `Her ears could not start (${event.message || 'the worker failed to load'}).`;
+      const sentence = `The ears could not start (${event.message || 'the worker failed to load'}).`;
       discardWorker(sentence);
       onMessage({ kind: 'failed', sentence });
     };
@@ -125,6 +126,7 @@ export function createEarsEngine(input: {
     capture.source.disconnect();
     capture.node.disconnect();
     capture.node.port.close();
+    publishListeningTap(null, capture.tap);
     capture = null;
   };
 
@@ -150,7 +152,7 @@ export function createEarsEngine(input: {
 
     async attach(stream) {
       const frames = framesForCapture;
-      if (frames === null) throw new Error('Her ears are not armed: there is no frames channel to capture into.');
+      if (frames === null) throw new Error('The ears are not armed: there is no frames channel to capture into.');
       takeCaptureApart();
       const attachedAt = undone;
       try {
@@ -168,7 +170,15 @@ export function createEarsEngine(input: {
       framesForCapture = null;
       const source = context.createMediaStreamSource(stream);
       source.connect(node);
-      capture = { source, node };
+      // Her face listens on a branch of the same stream: an analyser with no output, so nothing of the microphone is ever played.
+      const tap = context.createAnalyser();
+      tap.fftSize = 2048;
+      tap.smoothingTimeConstant = 0;
+      tap.minDecibels = -100;
+      tap.maxDecibels = -10;
+      source.connect(tap);
+      capture = { source, node, tap };
+      publishListeningTap(tap);
       // A context made before the page's first touch is suspended; it plays on at the touch, and nothing here waits for it.
       if (context.state === 'suspended') context.resume().catch((error: unknown) => console.warn('[ears] the audio context would not resume', error));
     },
@@ -179,7 +189,7 @@ export function createEarsEngine(input: {
       framesForCapture = null;
       // An arm still loading is abandoned: the worker finishes it and then runs the `disarm` below, which undoes it. Its caller is told
       // so, and `arming` is freed, so the next `arm()` posts an arm of its own instead of sharing one that is about to be undone.
-      failArm('Her ears were disarmed before they were ready.');
+      failArm('The ears were disarmed before they were ready.');
       send({ kind: 'disarm' });
     },
 
@@ -193,7 +203,7 @@ export function createEarsEngine(input: {
       takeCaptureApart();
       framesForCapture?.close();
       framesForCapture = null;
-      failArm('Her ears were ended before they were ready.');
+      failArm('The ears were ended before they were ready.');
       worker?.terminate();
       worker = null;
       unanswered = 0;

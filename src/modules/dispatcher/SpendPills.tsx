@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useCountUp } from '@/modules/dispatcher/hooks/useCountUp';
 import { cachePercent, humanizeTokens, moneyText } from '@/shared/spend';
 import { Badge, LLMProviderLogo } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 import type { SpendParts } from '@/shared/types';
 
 /** Which figure a pill carries — its `data-spend-pill` handle and the tail of its count key. */
@@ -46,8 +47,11 @@ function CountingFigure({ value, words, countKey }: { value: number; words: Figu
  * then its `suffix`, a qualifier of the figure that is STATED, never counted (the `in` pill's
  * `(94% cache)`): it is decided off the target figures, so it is its final width from frame one.
  */
-function Pill({ half, mark, value, words, countKey, title, suffix }: {
+function Pill({ half, mark, value, words, countKey, title, suffix, tone = 'neutral', className }: {
   half: PillHalf;
+  /** The pill's tone: neutral for every figure but tokens in, which wears info so it is the colour of its column in a task's rows. */
+  tone?: 'neutral' | 'info';
+  className?: string;
   mark: ReactNode;
   value: number;
   words: FigureWords;
@@ -56,7 +60,7 @@ function Pill({ half, mark, value, words, countKey, title, suffix }: {
   suffix?: ReactNode;
 }) {
   return (
-    <Badge as="span" tone="neutral" className="min-w-0 gap-1" title={title} data-spend-pill={half}>
+    <Badge as="span" tone={tone} className={cn('min-w-0 gap-1', className)} title={title} data-spend-pill={half}>
       {mark}
       <span className="tabular-nums">
         {countKey === undefined
@@ -117,8 +121,10 @@ function PaidMark({ vendor, className }: { vendor: string | null; className: str
  * and from where they stood on every change (`useCountUp`), keyed `<countKey>:<half>`. A phase's or a
  * stage's figure is stated, because a card of fourteen phases counting at once is noise, not news.
  *
- * Every pill carries a mark and a word (design doctrine §6) and is `tone="neutral"`: a spend is a
- * fact, not a verdict. Every element is phrasing content, because a phase row draws its pills inside
+ * Every pill carries a mark and a word (design doctrine §6). A spend is a fact, not a verdict, so the
+ * colours say WHICH figure and never how it went: tokens in wear the info tone and tokens out the
+ * strong ink, the inks of their columns in a task's rows (`SpendColumns`), so a colour means the same
+ * figure on the card's total and in the rows under it; every other pill is neutral. Every element is phrasing content, because a phase row draws its pills inside
  * its fold's trigger button. The row states its own face (`font-sans`), so a pill reads the same in
  * a stage line's mono as in a header.
  *
@@ -132,8 +138,8 @@ function PaidMark({ vendor, className }: { vendor: string | null; className: str
  * rows name two vendors, and it draws the figure alone with a plain dollar sign (`$4.49`). There is
  * no constant to fall back to: a wrong vendor on a figure is a false bill.
  *
- * Used by `PlanPhaseRow` (each phase and each stage line), `PlanCard` (the card's total) and
- * `DispatchArcDeck` (the arc's books).
+ * Used by `PlanCard` (the card's total) and `DispatchArcDeck` (the arc's books). A task's row and its
+ * runs' lines set the same decision in columns instead (`SpendColumns`).
  */
 export function SpendPills({ parts, vendor, countKey, children }: { parts: SpendParts; vendor: string | null; countKey?: string; children?: ReactNode }) {
   const { t } = useTranslation();
@@ -165,6 +171,7 @@ export function SpendPills({ parts, vendor, countKey, children }: { parts: Spend
         <>
           <Pill
             half="in"
+            tone="info"
             mark={<ArrowDown className={icon} aria-hidden="true" />}
             value={tokens.in}
             words={(value) => t('dispatcher.pill.in', { n: count(value, tokens.in) })}
@@ -174,6 +181,7 @@ export function SpendPills({ parts, vendor, countKey, children }: { parts: Spend
           />
           <Pill
             half="out"
+            className="text-[var(--ink-strong)]"
             mark={<ArrowUp className={icon} aria-hidden="true" />}
             value={tokens.out}
             words={(value) => t('dispatcher.pill.out', { n: count(value, tokens.out) })}

@@ -117,11 +117,11 @@ export function StatusFlow({
         // `--flow-nodes` is how many columns the row counts its minimum width in: a class cannot hold a node count, so the count rides in as a property.
         style={{ gridTemplateColumns: `repeat(${nodes.length}, minmax(0, 1fr))`, '--flow-nodes': nodes.length } as CSSProperties}
       >
-        {/* The track: a base line across the row, and the accent filled over it to the share done —
+        {/* The track: a base line across the row, and the positive tone (done is green) filled over it to the share done —
             a meter under the nodes, moving on the entry curve when a phase lands. */}
         <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 overflow-hidden rounded-full bg-border">
           <span
-            className="absolute inset-0 origin-left bg-primary motion-safe:transition-transform motion-safe:duration-move motion-safe:ease-enter"
+            className="absolute inset-0 origin-left bg-[var(--pos-dot)] motion-safe:transition-transform motion-safe:duration-move motion-safe:ease-enter"
             style={{ transform: `scaleX(${Math.min(doneCount, nodes.length) / nodes.length})` }}
           />
         </span>

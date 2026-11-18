@@ -1,4 +1,4 @@
-import { Gem } from 'lucide-react';
+import { Gem, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -114,8 +114,16 @@ export default function RunnerGeminiBudgetRow() {
       {unknown ? (
         // An amount the row does not have cannot be edited: the slot holds the one act that can be honoured,
         // ask again.
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRetry}
+          aria-label={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          title={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          className="finger:h-11 finger:w-11 finger:px-0"
+        >
+          <RefreshCw aria-hidden="true" />
+          <span className="finger:hidden">{t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}</span>
         </Button>
       ) : (
         // `aria-busy` while a write is in flight. The input is never `disabled`: Chromium blurs a control the

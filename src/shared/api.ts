@@ -897,6 +897,8 @@ export const api = {
     // Sends the draft as it stands. Answers `{ outcome: 'started' | 'folded' }`; a refused send is a 409 carrying the reason.
     sendDraft: (mode: 'turn' | 'steer') => post('/api/companion/draft/send', { mode }, companionOptions()),
     dismissNote: (id: number) => del(`/api/companion/notes/${id}`, undefined, companionOptions()),
+    // What one tool call of a turn was given and what it answered (`CompanionWorkBody`), read when the call is opened in the log; 404 for one no longer kept.
+    work: (id: number) => get(`/api/companion/work/${id}`, companionOptions()),
     // His keep on a card: `pin` sets it pinned or not (a pinned card survives her Clear and she cannot take it down). Answers 204, or a 404
     // `COMPANION_NOTE_NOT_FOUND` for a card that is no longer on his panel; the `companion_note_pinned` frame carries it to every page.
     notes: {
@@ -945,12 +947,8 @@ export const api = {
     // sentence as `reason` when the bank cannot be read (still a 200), and the id of her DocSpace page. `clear` is his act in Settings: it retires
     // every memory and answers `{ forgotten }`; a door that stops it is a 502 `COMPANION_MEMORY_UNREACHABLE` carrying the sentence, and some may
     // have been forgotten before it, so a caller reads again either way. The retires run one by one, so it gets the same ceiling as `clear`.
-    // `lines` is the same reading with each memory as a line (`CompanionMemoryLines`: kind, title, whether he said or typed it, the moment and his first words),
-    // for the station's "What I'm keeping" corner, which reads it at mount, on each `companion_memory` frame and on reconnect. It is still a 200
-    // when the bank cannot be read (`count: null` with the sentence as `reason`); a refusal of the route itself carries the app's envelope.
     memory: {
       read: () => get('/api/companion/memory'),
-      lines: () => get('/api/companion/memory/lines'),
       clear: () => del('/api/companion/memory', undefined, { timeoutMs: 90_000 }),
     },
     // Her face: the portrait her pages draw, made once from a photo and played from memory. Like her memory it is the account's and no
@@ -984,11 +982,6 @@ export const api = {
     // The station's provider reads it at mount, on every `station_sessions_changed` hint and on reconnect.
     station: {
       sessions: () => get('/api/companion/station/sessions', companionOptions()),
-      // `landed` is what landed this week, the strip's line: 200 `{ landed: StationLanded[] }`, newest first, at most 300 of the account's
-      // last seven days (`[]` for none), or a 503 `{ error }` carrying the sentence when the history cannot be read. It is the account's, not
-      // a page's, so it names no `x-companion-client`. The station's landed provider reads it at mount and on reconnect, and folds each
-      // `station_landed` frame in between.
-      landed: () => get('/api/companion/station/landed'),
       // `needs` is everything waiting on his word, in his order: 200 `{ needs: StationNeed[], faults: StationNeed['kind'][] }`, `faults` naming
       // the kinds a reader could not read (left out of `needs`, said by the rail), or a 503 `{ error }` carrying the sentence when the read failed
       // whole. The station's needs provider reads it at mount and on each of its five other events (`StationNeedsContext`). It names this page like
@@ -1091,6 +1084,16 @@ export const api = {
   followups: {
     list: (appSessionId: string) => get(`/api/followups?session=${encodeURIComponent(appSessionId)}`),
     setState: (id: number, state: 'open' | 'done') => patch(`/api/followups/${id}`, { state }),
+  },
+
+  // The session panel's lane: what one chat has put on its panel, keyed on the chat's app session id. `list` answers the chat's
+  // versions without their bodies, oldest first (the newest is what the panel shows); `version` answers one whole; `picture`
+  // answers the bytes of a version's picture file, which need the auth header and so are fetched as a blob, never named in a
+  // bare `src`. The person only reads here: a panel is changed by its chat's own `panel` command.
+  sessionPanel: {
+    list: (appSessionId: string) => get(`/api/session-panel?session=${encodeURIComponent(appSessionId)}`),
+    version: (id: number) => get(`/api/session-panel/versions/${id}`),
+    picture: (id: number) => get(`/api/session-panel/versions/${id}/picture`, { timeoutMs: NO_REQUEST_TIMEOUT }),
   },
 
   // The tool-set lane (MAN-8490): which of the box's named MCP sets one chat has on.

@@ -8,6 +8,7 @@ import type { CompanionHouse } from '../house.js';
 import { THINKING_ACTIVITY } from '../session/companion-turns.js';
 
 import type { CompanionToolDeps } from './companion-tools.js';
+import { recordWork } from './work-record.js';
 
 /**
  * The helpers the harness hands every tool file (`CompanionToolDeps`), so each tool behaves the same way
@@ -22,6 +23,8 @@ import type { CompanionToolDeps } from './companion-tools.js';
  *     and to nobody while no page holds the floor;
  *   - `refuse`: a refusal is `isError` text that says what to do next, never a throw;
  *   - `sendDraft`: the one door the draft goes out by (`companion-send.ts`), built on the two helpers above;
+ *   - `recordWork`: a call's record in the store (`work-record.ts`), bound to this account's store and to the turn in flight
+ *     (`turnId`, which the session knows; a caller with no session hands none, and the call is recorded under no turn);
  *   - `inLastTurn`: whether her last turn runs, which `buildCompanionTools` reads to open only `recall` and `remember` then. It
  *     comes from the session (`companion-account.ts` binds it), and a caller with no session to ask (a probe) hands none: it is false.
  *
@@ -59,9 +62,12 @@ export function createToolDeps(input: {
   activity: ActivityHolder;
   /** Whether her last turn runs; absent answers false, so a caller with no session (a probe) builds her tools as they always were. */
   inLastTurn?: () => boolean;
+  /** The turn in flight, or `null` for none; absent answers `null`. Read as each call begins, for its record. */
+  turnId?: () => string | null;
 }): CompanionToolDeps {
   const { userId, store, runtime, house, activity } = input;
   const inLastTurn = input.inLastTurn ?? (() => false);
+  const turnId = input.turnId ?? (() => null);
   // The activities of the tools still running, oldest first: what the status line goes back to when the one standing ends.
   const running: CompanionActivity[] = [];
   const setFocus = (chat: CompanionSessionRef): void => {
@@ -80,6 +86,7 @@ export function createToolDeps(input: {
     openOnFloor,
     inLastTurn,
     sendDraft: createDraftSender({ userId, store, runtime, setFocus, openOnFloor }),
+    recordWork: (tool, args, run) => recordWork(store, turnId(), tool, args, run),
     async withActivity(phase, chat, files, run) {
       const mine: CompanionActivity = { phase, session: chat, files, walk: phase === 'walking' ? placeOf(store.readState().walk) : null };
       running.push(mine);

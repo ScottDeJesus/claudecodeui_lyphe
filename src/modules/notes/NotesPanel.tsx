@@ -9,8 +9,7 @@ import { Badge, ScrollArea } from '@/shared/ui';
  * The Notes tab's pane: the header the Roadmap tab's In flight face and the Memory pane wear, and under it the wall.
  *
  * Used by `src/modules/project-workspace` (`WorkspaceMain`), which mounts it as the Notes tab's
- * pane — the tab's first home; the second is the chat gutter's Notes widget, which draws the same
- * list through `NotesWidgetBody`.
+ * pane.
  *
  * THE COUNT IS THE LIST'S, DRAWN BESIDE ITS NAME. A badge at zero is not drawn: the list's own
  * empty state says "nothing" in words, and a "0" over it would say it a second time in a shape that

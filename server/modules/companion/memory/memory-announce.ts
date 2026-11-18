@@ -5,9 +5,9 @@ import type { CompanionFrame } from '@/shared/companion-types.js';
  * THE HINT THAT HER MEMORY CHANGED. Every write of her bank (`remember`, `forget` and `clearMemory`, `memory-verbs.ts`) runs inside
  * `onBank` in this process, and each one that changed the bank, or may have (a write the door did not answer is still being worked by
  * the door), calls `announceMemoryChanged` once; a refusal that changed nothing sends none. The frame carries nothing,
- * `{ kind: 'companion_memory' }`: a page that shows her memory reads it again through `GET /api/companion/memory/lines`. Nothing
+ * `{ kind: 'companion_memory' }`: no page follows it since the station's memory corner was removed. Nothing
  * else sends it and nothing polls for it, so a bank that changes behind this process's back (the docstore's own CLI, another
- * process) is not announced; the corner re-reads when it mounts and when the socket reconnects.
+ * process) is not announced.
  *
  * TO EVERY OPEN SOCKET, NOT ONE ACCOUNT'S. Her bank is one package for both accounts, so a memory kept through one account moves the
  * corner on every page of the other too, and the frame is the house's `followups_changed` fan-out: serialised once, a socket that is

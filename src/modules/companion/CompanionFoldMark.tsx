@@ -13,7 +13,7 @@ export function CompanionFoldMark({ children, ...hooks }: { children: ReactNode 
   return (
     <span
       {...hooks}
-      className="shrink-0 whitespace-nowrap rounded-full bg-accent-soft px-1.5 text-xs font-medium uppercase leading-4 tracking-[0.14em] text-accent-ink motion-safe:animate-mark-in"
+      className="shrink-0 whitespace-nowrap rounded bg-accent-soft px-1.5 text-xs font-medium uppercase leading-4 tracking-[0.14em] text-accent-ink motion-safe:animate-mark-in"
     >
       {children}
     </span>

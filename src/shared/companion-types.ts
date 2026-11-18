@@ -158,6 +158,36 @@ export type CompanionLogEntry = {
 };
 
 /**
+ * One call Kaylee made of one of the companion's tools, as the log draws it among the lines: the work of a turn, shown the way a chat
+ * shows a session's. `id` is the store's row id, growing with every call. `turnId` is the turn the call was made in. `afterLogId` is
+ * the id of the newest log line when the call began, so the call stands after that line in the log's order (0 for a call made
+ * before any line). `tool` is the tool's own name (`read_session`) and `about` what the call concerned, in a few words taken
+ * from what the tool was given (a chat's name, a card, a scope), or `null` for none. `at` is when it began and `endedAt` when it
+ * answered, `null` while it runs (or for a call a restart cut off); `failed` says the tool refused or failed. What the tool was
+ * given and what it answered are not here: a page reads them when a call is opened (`CompanionWorkBody`). Listed in the picture for the
+ * lines its log holds, and carried by `companion_work` when a call begins and again when it ends.
+ */
+export type CompanionWorkEntry = {
+  id: number;
+  turnId: string | null;
+  afterLogId: number;
+  tool: string;
+  about: string | null;
+  at: string;
+  endedAt: string | null;
+  failed: boolean;
+};
+
+/**
+ * What one call was given and what it answered, read when the call is opened (`GET /api/companion/work/:id`). `input` is the
+ * tool's arguments as the tool took them and `result` its answer as text, `cut` when the answer was longer than the store keeps
+ * and only its head is here; `result` is `null` for a call that has not answered. `kept` is false for a call of the companion's
+ * own memory (`recall`, `remember`, `forget`): CloudCLI stores none of that memory, so neither part is kept and both
+ * are `null`.
+ */
+export type CompanionWorkBody = { kept: boolean; input: Record<string, unknown> | null; result: string | null; cut: boolean };
+
+/**
  * What a card is, by `kind`: a plain `note`, a `list`, a `diff`, a DocSpace `plan` page, or a DocSpace `page`. Stored with
  * the card (`CompanionNote.kind`), so a card she put up before kinds existed reads as a `note`. The center's inline cards and
  * the stage draw a card's glyph and word by it.
@@ -334,8 +364,8 @@ export type CompanionFaceBlink = { half: number; closed: number };
  * Every frame of a face and where each sits: the file a bake writes (`manifest.json` in the face's folder) and a page plays.
  * The frames are cut `frameSize` pixels square and packed onto `sheets` (at most 8 × 8 cells each); `largerTiers` are the same
  * frames again at larger sizes, smallest first, packed the same way, so `frames[n]` says which sheet, column and row frame `n`
- * is on in EVERY tier. A page draws the smallest tier whose `frameSize` covers the pixels it is drawn at (`useFaceAtlas`), so a
- * phone's small head never fetches the large sheets. A manifest with no `largerTiers` (a face made before they existed) has the one
+ * is on in EVERY tier. (The page no longer draws these frames — her face is the Astrolabe instrument — but the server still bakes
+ * and serves them.) A manifest with no `largerTiers` (a face made before they existed) has the one
  * tier. Everything else is an index into `frames`: each mood has its
  * seven mouths and its half-closed and closed blink, `blinks` are the same blink for her listening face, each gaze and each
  * turned pose, `brows` are each mood's closed face with her brows lifted, `gaze` and `poses` are the neutral face looking or turned, `states`
@@ -394,6 +424,8 @@ export type CompanionPicture = {
   walk: CompanionWalk | null;
   notes: CompanionNote[];
   log: CompanionLogEntry[];
+  /** The tool calls of the turns `log` holds, oldest first: each stands in the log after its `afterLogId` line. */
+  work: CompanionWorkEntry[];
   floor: string | null;
   face: CompanionFace;
 };
@@ -401,7 +433,8 @@ export type CompanionPicture = {
 /**
  * Every frame the gateway socket carries to a page about her, told apart by `kind`; each is sent to
  * every open socket of the account. `companion_log` is a whole new log line and `companion_sentence`
- * one sentence of her turn as it is said; `companion_turn` marks a turn `started` or `ended` (the
+ * one sentence of her turn as it is said; `companion_work` is one tool call of a turn, sent as it begins and again as it ends
+ * (the same `id`, so a page keeps the newer); `companion_turn` marks a turn `started` or `ended` (the
  * `outcome` and `error` are set on `ended` only, `null` otherwise); `companion_activity`,
  * `companion_focus`, `companion_draft`, `companion_pending`, `companion_walk` and `companion_process` each
  * carry the new value of the matching picture field (`null` clears the focus, draft, pending action or
@@ -424,6 +457,7 @@ export type CompanionPicture = {
 export type CompanionFrame =
   | { kind: 'companion_log'; entry: CompanionLogEntry }
   | { kind: 'companion_sentence'; entry: CompanionLogEntry }
+  | { kind: 'companion_work'; entry: CompanionWorkEntry }
   | { kind: 'companion_turn'; turnId: string; state: 'started' | 'ended'; outcome: CompanionTurnOutcome | null; error: string | null }
   | { kind: 'companion_activity'; activity: CompanionActivity }
   | { kind: 'companion_focus'; focus: CompanionSessionRef | null }
@@ -446,27 +480,3 @@ export type CompanionFrame =
 /** Her memory as Settings reads it: how many memories it holds (null when the bank cannot be read, `reason` saying why) and the DocSpace page that shows it. */
 export type CompanionMemoryReading = { count: number | null; pageId: string; reason: string | null };
 
-/**
- * One memory of her own bank as the station's memory view draws it: its `token` (the docstore row that holds it), `title`, `kind`,
- * the channel its first quote came by (`via`: `'spoken'` for a talk press's transcript, `'typed'` for a line he typed on her panel,
- * `null` when the memory quotes no one), when it was said or typed (`saidAt`, ISO, `null` when the row records none; the field keeps
- * its name for both channels), the `account` that said it (`null` when it records none) and a `quote` of its words (`null` when it
- * holds none). `via` is the channel the body's first quote line names (`He said (…)` or `He typed (…)`), the one fact the view needs to
- * say "said" or "typed" and never "said" of a typed line. Carried by `CompanionMemoryLines.lines`.
- */
-export type CompanionMemoryLine = {
-  token: string;
-  title: string;
-  kind: string;
-  via: 'spoken' | 'typed' | null;
-  saidAt: string | null;
-  account: string | null;
-  quote: string | null;
-};
-
-/**
- * Her memory read as lines: `count` how many memories the bank holds (`null` when it cannot be read, `reason` saying why, as in
- * `CompanionMemoryReading`), `pageId` the DocSpace page that shows it whole, and `lines` the memories the view draws, newest first.
- * Read again when `companion_memory` is heard.
- */
-export type CompanionMemoryLines = { count: number | null; pageId: string; reason: string | null; lines: CompanionMemoryLine[] };

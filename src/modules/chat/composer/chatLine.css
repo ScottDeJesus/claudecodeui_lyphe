@@ -1,0 +1,134 @@
+/* THE LINE THE READER TYPES IN, THE CHAT'S CORE BESIDE IT, AND THE TALK OVER THEM (`ChatComposer`, `ChatCore`, `CoreRings`, `ChatMessagesPane`).
+ *
+ * ONE LEFT EDGE. The talk starts where the line starts. In a column with room for it, a strip at the column's start is the
+ * core's: the core stands in it, level with the line's middle however tall the line grows, and the talk above gives up the
+ * same strip, so a reply's first word and the line's first letter are on one edge. In a column with no room (a phone, a chat
+ * squeezed between its gutters, the floating panel) there is no strip: the core is the first thing in the line's own row.
+ *
+ * The measure is the chat's own column (`chat-column`, a query container on `ChatInterface`'s root), never the window: the
+ * chat stands in panels of every width.
+ *
+ * HOW WIDE THE WORDS RUN is `--chat-measure`: 54.25rem (868 px) unless the page that mounts the chat sets it wider (a desk's
+ * `ChatDesk`). The talk, the line and everything that stands over the line take the one measure. */
+.chat-column { container: chat / inline-size; }
+.chat-line { position: relative; display: flex; align-items: center; gap: 12px; }
+/* In the line's own row the core keeps the air its outer hairline needs from the column's edge. */
+.chat-line__core { position: relative; margin: 0 2px 0 8px; }
+/* The rail of turns stands only where the strip does. */
+.chat-line__rail { display: none; }
+
+/* The strip: the core's 56 px and 12 px of air, inside the 1rem the column already keeps at its start. */
+@container chat (min-width: 44rem) {
+  .chat-column:not([data-chat-core-apart]) .chat-composer-shell { padding-left: calc(1rem + 68px); }
+  .chat-column:not([data-chat-core-apart]) .chat-line__core { position: absolute; right: 100%; top: 50%; margin: 0 12px 0 0; transform: translateY(-50%); }
+  /* The rail of turns: over the core and its two hairlines, on its middle, growing up from it. */
+  .chat-column:not([data-chat-core-apart]) .chat-line__rail { position: absolute; right: 100%; bottom: calc(50% + 48px); display: flex; width: 56px; margin-right: 12px; }
+  /* The talk's own words are as wide as the line (the chat's measure), past the strip and the column's 1rem at each side. */
+  .chat-column:not([data-chat-core-apart]) .chat-talk { max-width: calc(var(--chat-measure, 54.25rem) + 68px + 2rem); padding-left: calc(1rem + 68px); }
+}
+
+/* THE CORE APART FROM THE LINE (`data-chat-core-apart`, set by `ChatInterface` where the page keeps the core a place of its own: a
+ * desk's side column). No strip for the core, at any width. The rail of turns keeps a narrow one, 28 px, at the line's start: it
+ * stands on the line's foot and grows up from it, and the talk gives up the same 28 px so the two still share one left edge. */
+.chat-column[data-chat-core-apart] .chat-composer-shell { padding-left: calc(1rem + 28px); }
+.chat-column[data-chat-core-apart] .chat-line__rail { position: absolute; right: 100%; bottom: 0; display: flex; width: 28px; }
+.chat-column[data-chat-core-apart] .chat-talk { max-width: calc(var(--chat-measure, 54.25rem) + 28px + 2rem); padding-left: calc(1rem + 28px); }
+
+/* ---------- the core in its dock, and risen into its disc ----------
+ * The dock keeps the core's place beside the line. Everything the core is made of hangs on one point at the dock's middle
+ * (`chat-inst__lift`), so carrying that point carries the core, its two hairlines and its presses together: `ChatCore` moves it to
+ * the middle of the disc while the settings are open, on the instrument's own lock spring. */
+.chat-inst { z-index: 1; }
+.chat-inst[data-chat-core-dock='open'] { z-index: 40; }
+.chat-inst__lift {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transition: transform var(--duration-lock) var(--ease-lock);
+}
+.chat-inst__lift > * { position: absolute; top: 0; left: 0; }
+/* The disc under the rings: the page's own ground with the one floating shadow, growing out of the core. */
+.chat-inst__ground {
+  width: var(--chat-inst-disc, 56px);
+  height: var(--chat-inst-disc, 56px);
+  border-radius: 50%;
+  background: var(--canvas);
+  box-shadow: var(--shadow-overlay);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.2);
+  transition: opacity var(--duration-fade) ease, transform var(--duration-lock) var(--ease-lock);
+}
+.chat-inst[data-chat-core-dock='open'] .chat-inst__ground { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%); }
+.chat-inst__rings { transform: translate(-50%, -50%); animation: chat-inst-rings var(--duration-fade) ease both; }
+@keyframes chat-inst-rings { from { opacity: 0; } }
+/* The core with its hairlines. In the disc it is drawn larger (`ChatCore` gives it the square), and grows into that size as it arrives. */
+.chat-inst__heart { width: 0; height: 0; }
+.chat-inst[data-chat-core-dock='open'] .chat-inst__heart { animation: chat-inst-heart var(--duration-lock) var(--ease-lock) both; }
+@keyframes chat-inst-heart { from { transform: scale(0.64); } }
+/* In a place of its own the core is already the size it has in its disc: nothing to grow into. */
+.chat-inst[data-chat-core-apart][data-chat-core-dock='open'] .chat-inst__heart { animation: none; }
+.chat-inst__press { position: absolute; top: 0; left: 0; transform: translate(-50%, -50%); transition: transform var(--dur-quick) var(--ease-enter); }
+.chat-inst__press:hover { transform: translate(-50%, -50%) scale(1.04); }
+/* No grow under a finger: a tap leaves `:hover` standing until the next tap elsewhere, and the core would stay grown. */
+@media (hover: none) and (pointer: coarse) {
+  .chat-inst__press:hover { transform: translate(-50%, -50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-inst__lift, .chat-inst__ground { transition-duration: var(--duration-fade); transition-timing-function: ease; }
+  .chat-inst__rings, .chat-inst[data-chat-core-dock='open'] .chat-inst__heart { animation: none; }
+}
+
+/* ---------- the rings ----------
+ * A ring's ink is its chat's material: the chrome of Mercury, the tube's amber, the wire's cyan, the plasma's violet. The model ring
+ * wears it whole and the effort ring a paler cut of it, so the two read as one instrument and still tell apart. */
+.chat-inst { --core-ink: var(--ink-strong); }
+.chat-inst[data-chat-core-material='tube'] { --core-ink: var(--tube); }
+.chat-inst[data-chat-core-material='wire'] { --core-ink: var(--wire); }
+.chat-inst[data-chat-core-material='plasma'] { --core-ink: var(--plasma); }
+.core-rings { position: relative; }
+.core-rings__drawing { display: block; overflow: visible; pointer-events: none; touch-action: none; }
+.core-rings .core-ring,
+.core-rings .core-ring:focus-visible { outline: none; cursor: grab; }
+.core-rings .core-ring[data-ring-held] { cursor: grabbing; }
+.core-ring__turn { transition: transform var(--duration-lock) var(--ease-lock); }
+.core-ring__turn--held { transition: none; }
+.core-ring__band { fill: none; stroke: transparent; stroke-width: 26px; pointer-events: stroke; }
+.core-ring__track { fill: none; stroke: var(--border-strong); stroke-width: 1px; opacity: 0.55; pointer-events: none; }
+.core-ring__lit { fill: none; stroke: var(--core-ink); stroke-width: 2px; pointer-events: none; transition: stroke-dasharray var(--dur-move) var(--ease-enter), stroke var(--dur-move) ease; }
+.core-ring[data-chat-ring='effort'] .core-ring__lit { stroke: color-mix(in oklab, var(--core-ink) 55%, var(--ink-strong)); }
+.core-ring__mark { stroke: var(--ink-muted); stroke-width: 1px; pointer-events: none; }
+.core-ring__mark--at { stroke: var(--ink-strong); stroke-width: 1.5px; }
+.core-ring__stop { fill: transparent; pointer-events: all; }
+/* A ring under the pointer shows its line whole; a ring that holds the keys shows the band it is taken hold of by. */
+.core-ring:hover .core-ring__track,
+.core-ring:focus-visible .core-ring__track { opacity: 1; }
+.core-ring:focus-visible .core-ring__band { stroke: color-mix(in oklab, var(--ink-strong) 9%, transparent); }
+/* The name of the stop at twelve, on a plate of the page's ground set on the ring itself: the ring's pointer and its reading at once.
+ * It takes no press, so the ring under it can still be taken hold of. */
+.core-rings__plate {
+  position: absolute;
+  left: 50%;
+  max-width: 50%;
+  overflow: hidden;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.core-rings__plate[data-turning] { border-color: var(--core-ink); color: var(--ink-strong); }
+@media (prefers-reduced-motion: reduce) {
+  .core-ring__turn { transition-duration: var(--duration-fade); transition-timing-function: ease; }
+}

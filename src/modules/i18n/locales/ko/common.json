@@ -345,23 +345,8 @@
     "expand": "펼치기"
   },
   "gutters": {
-    "runner": {
-      "title": "실행"
-    },
-    "roadmap": {
-      "title": "로드맵"
-    },
-    "memory": {
-      "title": "메모리",
-      "pending": "검토 대기 중",
-      "recent": "최근 기록됨",
-      "recentEmpty": "아직 기록된 것이 없습니다",
-      "pendingEmpty": "대기 중인 항목 없음"
-    },
     "subagents": {
       "title": "서브에이전트",
-      "empty": "이 대화에 서브에이전트가 없습니다",
-      "clearCompleted": "완료된 항목 지우기",
       "back": "서브에이전트로 돌아가기",
       "loading": "트랜스크립트 불러오는 중…",
       "notFound": "디스크에 아직 트랜스크립트가 없습니다",
@@ -371,32 +356,12 @@
       "openRow": "{{name}}의 트랜스크립트 읽기"
     },
     "embed": {
-      "title": "임베드",
-      "empty": "이 대화에는 아직 임베드가 없습니다",
-      "placeholder": "임베드할 주소…",
-      "address": "임베드할 주소",
-      "pick": "표시할 임베드",
-      "choose": "페이지 선택…",
-      "custom": "주소 입력…",
-      "open": "새 탭에서 페이지 열기",
-      "rejected": "http:// 또는 https:// 주소가 아닙니다",
       "plainHttpBlocked": "이 페이지는 암호화되지 않은 http로 제공되며, 이 앱이 https로 열려 있는 동안 브라우저는 http 페이지를 앱 안에 표시하지 않습니다. 열기 링크로 별도 탭에서 확인하세요."
     },
-    "notes": {
-      "title": "메모"
-    },
-    "accounts": {
-      "title": "계정"
-    },
-    "open": "{{name}} 열기",
-    "collapse": "접기",
-    "dragHint": "양쪽 중 한쪽으로 드래그",
     "pin": {
       "label": "이 세션",
       "title": "열어 둔 채팅에서 생성됨"
-    },
-    "fullscreen": "전체 화면",
-    "exitFullscreen": "전체 화면 종료"
+    }
   },
   "applications": {
     "fabLabelMenu": "메뉴 열기",

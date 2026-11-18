@@ -76,6 +76,9 @@ export function useIsLookingAtSession(isActive: boolean): boolean {
  * THE STATION SPEAKS FOR THE PAGE WHILE IT COVERS THIS ONE. Both pages are one tab on one socket, so they are one record: while the station is
  * on screen it states what it shows (`useStationPresence`) and this report is silent, whatever event wakes it. The press back to the workspace
  * restates the chat at once (`onShowingChange`); the station says nothing on its way out, so nothing lands after the restatement to take it back.
+ *
+ * THE SESSIONS HOME SPEAKS FOR NOTHING. While it covers this page the report says the chat is out of sight, once, and then lets the record lapse as a hidden tab
+ * does; the press back restates the chat at once (`onShowingChange`).
  */
 export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseSessionPresenceInput): void {
   // Only the frame stream is read from the context here; sending stays with the caller's
@@ -104,14 +107,16 @@ export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseS
       sendRef.current({
         type: 'chat.presence',
         sessionId,
-        visible: isVisible(hostDocument),
+        // Under the sessions home the chat is drawn and out of sight: said as a hidden tab says it, so a reply that lands meanwhile is one he has not read.
+        visible: isVisible(hostDocument) && !stationDoors.homeShowing(),
         clientId: companionClientId(),
         focused: isFocused(hostDocument),
       });
     };
 
     announce();
-    // The station leaving the screen hands the page back to this chat; its coming says nothing here, its own report replaces this one.
+    // The station leaving the screen hands the page back to this chat; its coming says nothing here, its own report replaces this one. The sessions home
+    // coming and going is said both ways: it has no report of its own.
     const unsubscribeShowing = stationDoors.onShowingChange(announce);
     hostDocument.addEventListener('visibilitychange', announce);
     // Moving the keyboard between windows changes which page speaks for his screen, and no heartbeat is owed to say so.
@@ -129,7 +134,7 @@ export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseS
     // expiry) costs nothing, and a heartbeat armed on a window that closes would die with it.
     const heartbeat = window.setInterval(() => {
       // A hidden tab lets its record lapse rather than restating "not visible" every 30 s.
-      if (isVisible(hostDocument)) announce();
+      if (isVisible(hostDocument) && !stationDoors.homeShowing()) announce();
     }, HEARTBEAT_MS);
 
     return () => {

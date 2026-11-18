@@ -77,8 +77,8 @@ function holdsItem(roadmap: Roadmap, item: RoadmapTreeSelection): boolean {
  * `data-roadmap-face` marks the root in viewport fit and `data-roadmap-widget` in column fit;
  * `data-roadmap-header` (the roadmap's name) marks the picker row in viewport fit only.
  *
- * Used by `RoadmapTab`, in viewport fit, as its Roadmap face (so also by `RoadmapWidgetFullscreenBody`, which
- * draws the tab), and by `RoadmapWidgetBody`, in column fit, as the chat gutter's Roadmap widget.
+ * Used by `RoadmapTab`, in viewport fit, as its Roadmap face. Nothing draws it in column fit since the chat's
+ * widget column was removed.
  */
 export function RoadmapTreeFace({ fit, openCard, foot }: RoadmapTreeFaceProps) {
   const { t } = useTranslation();

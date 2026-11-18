@@ -136,7 +136,7 @@ export function docspaceStudioUrl(pageId: string, blockId: string): string {
  * `&block=<id>` when a block is named (`blockId` null opens the page itself). Both ids are percent-encoded, for the same
  * belt-and-braces reason `docspaceStudioUrl` states.
  *
- * Read by `docspaceStudioUrl` (a block, from the transcript), by the companion module's Settings ("Open her memory", the
+ * Read by `docspaceStudioUrl` (a block, from the transcript), by the companion module's Settings ("Open the memory", the
  * memory page) and by the station module's page stage, memory corner ("Open the full page") and note stage (a page card's "Open in DocSpace").
  */
 export function docSpacePageUrl(pageId: string, blockId: string | null): string {

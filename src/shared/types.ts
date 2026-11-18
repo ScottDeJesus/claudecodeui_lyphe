@@ -7,6 +7,7 @@ import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, Read
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 import type { CompanionLogEntry, CompanionMouthPiece, CompanionSessionRef } from '@/shared/companion-types';
+import type { RoadmapEpic, RoadmapFeature, RoadmapMilestone } from '@/shared/roadmap-types';
 import type { StationAskKind, StationNeed } from '@/shared/station-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
@@ -1156,23 +1157,85 @@ export type CompanionSoundProgress = { turnId: string; index: number; elapsed: n
  * in seconds of the sentence; `[]` for none yet). The face looks a shape up at `progress().elapsed` on each animation frame, so a piece
  * that lands mid-sentence takes over at the next one. All three are functions, never props that change, so a level sixty times a second
  * never redraws React. Null where a face hears no voice (Settings' preview). Handed by the companion module's CompanionFace to
- * CompanionAvatar and on to CompanionPortrait.
+ * CompanionAvatar, whose instrument reads `analyser()` for her voice and `progress()` for the word she is on (it draws no mouth).
  */
 export type CompanionFaceVoice = {
   level: () => number;
   progress: () => CompanionSoundProgress | null;
   mouth: (turnId: string, index: number) => readonly CompanionMouthPiece[];
+  /** The analyser her face's ear reads while she speaks (the player's own tap), or null before the page has a graph. */
+  analyser: () => AnalyserNode | null;
 };
 
 /**
  * The sentences her face reads from her log: `playing` the one this page's player is sounding (its mood, text and sounds), `newest` the
  * newest of hers in the running turn, read only by a page that plays no voice, and `turnRunning` whether a turn is under way. Derived by
- * the companion module's `useFaceSentences`; handed through CompanionAvatar to CompanionPortrait.
+ * the companion module's `useFaceSentences`; handed to CompanionAvatar, which plates the word she is saying on the dial's ring.
  */
 export type CompanionFaceSentences = { playing: CompanionLogEntry | null; newest: CompanionLogEntry | null; turnRunning: boolean };
 
 /** Where the anchor she looks at lies from her disc's centre, in screen pixels (`dx` rightward, `dy` downward). Her face turns toward it. */
 export type CompanionFaceLook = { dx: number; dy: number };
+
+// ---------------------------
+
+//----------------- HER FACE: THE ASTROLABE INSTRUMENT ------------
+
+/**
+ * The material a core is drawn in, and the mood it carries (the Astrolabe design system's personas): `mercury`, polished chrome
+ * beside the warm amber accent (the default); `tube`, amber vacuum-tube glass, for slow and reflective sessions; `wire`, a cyan
+ * wireframe, for fast debugging; `plasma`, a violet charge held in dark glass. Stored per user as the `companionMaterial` preference
+ * (the companion module's `useCompanionMaterial`) and read by its face and its Settings card; a chat's own core wears the one its model
+ * maps to (the chat module's `replyMaterialOf`).
+ */
+export type CompanionMaterial = 'mercury' | 'tube' | 'wire' | 'plasma';
+
+/**
+ * One frame of what a voice is doing, as the companion module's ear (`astrolabeEar.ts`) hears it from an AnalyserNode: loudness (`rms`)
+ * and three bands, each normalised 0..1 against the voice itself; `f0` in Hz (0 while unvoiced) with its `voicing` confidence; and
+ * `onsets`, a running count of the hard consonants heard, with `onsetAmp` the strength of the latest. Her face's instrument reads one
+ * per animation frame.
+ */
+export type AstrolabeVoiceFrame = { rms: number; low: number; mid: number; high: number; f0: number; voicing: number; onsets: number; onsetAmp: number };
+
+/**
+ * How much of the instrument her face draws, chosen by the companion module's CompanionAvatar from the square it fills: `disc` (the
+ * button: the raymarched WebGL core inside the loop), `core` (the same with more room and its echoes) or `dial` (the station's portrait: the
+ * core inside the armillary rings, the bezel and the reticle). `body` is never chosen by size: it is the raymarched core alone,
+ * filling its square, for a core that wears rings of its own (a chat's).
+ */
+export type AstrolabeTier = 'disc' | 'core' | 'dial' | 'body';
+
+/**
+ * What her face's instrument draws one frame from, as CompanionAvatar builds it from her presence: the instrument's own `state` (her
+ * fourteen presence words fold into these six: the body has a form for each), what her voice is doing (`voice`, null while nothing sounds), where she looks
+ * (`azimuth`, degrees counter-clockwise from the right; null lets the pointer drift), the reticle's words (`label`), the walk she is on
+ * (`walk`), whether her process failed (`failed`, the loop in the warn colour) or sleeps (`asleep`, dimmed and slowed), the word she
+ * is saying (`word`, plated on the middle ring) and the `material` she is drawn in.
+ */
+export type AstrolabeFrameInput = {
+  state: 'idle' | 'thinking' | 'reading' | 'writing' | 'speaking' | 'listening';
+  voice: AstrolabeVoiceFrame | null;
+  azimuth: number | null;
+  label: string | null;
+  walk: { at: number; total: number } | null;
+  failed: boolean;
+  asleep: boolean;
+  word: string | null;
+  material: CompanionMaterial;
+  /** How hard it is driven, 0 to 1 (a chat's effort): it stirs the surface and widens the glow. Absent is 0, at rest. */
+  drive?: number;
+};
+
+/**
+ * Her face's instrument, as the companion module's `astrolabeInstrument.ts` builds it for CompanionAvatar: `frame` once per animation
+ * frame, `resize` when the square changes, and `destroy` on unmount, which releases its WebGL context.
+ */
+export type AstrolabeInstrument = {
+  frame: (dt: number, input: AstrolabeFrameInput) => void;
+  resize: (size: number) => void;
+  destroy: () => void;
+};
 
 // ---------------------------
 
@@ -3001,6 +3064,21 @@ export type Followup = {
 /** The frame the server sends to every open socket after a chat's followups moved. It names the chat by its APP session id under `appSessionId` (never `sessionId`, which would raise the chat's unread mark); the widget re-reads when the id is its own chat's. */
 export type FollowupsChangedEvent = { kind: 'followups_changed'; appSessionId: string; at: number };
 
+/** Sent to every open socket after a chat's panel changed: a thing shown, a new version of it, or the panel cleared. It names the chat by its APP session id under `appSessionId` (never `sessionId`, which would raise the chat's unread mark), and nothing else: a panel of that chat reads its versions again. */
+export type SessionPanelChangedEvent = { kind: 'session_panel_changed'; appSessionId: string; at: number };
+
+//----------------- SESSION PANEL ------------
+// The session panel's wire shapes, read by `src/modules/session-panel/` and mirrored field-for-field from
+// `server/shared/types.ts` § SESSION PANEL. A change to either shape belongs in both files at once.
+/** The four kinds of thing a chat can put on its panel: a `diagram` (mermaid source), a `picture` (an http(s) address, or an image file on this box), a `page` (an http(s) address drawn in a frame) and a `widget` (an HTML body run in the sandboxed widget frame, a page the chat wrote itself). */
+export type SessionPanelKind = 'diagram' | 'picture' | 'page' | 'widget';
+/** One version of what a chat's panel shows, without its body: its never-reused `id` (what the transcript's mark points at), the `version` number a reader sees (from 1 for each chat, starting again after a clear), its `kind`, its `title` and when it was shown. The list a panel reads is these, oldest first; the newest is what the panel shows. */
+export type SessionPanelVersionHead = { id: number; version: number; kind: SessionPanelKind; title: string; createdAt: string };
+/** One version whole: its head and its `body` (mermaid source, an address, a path of a picture on this box, or an HTML body, by `kind`). `pictureIsFile` is true for a picture kept as a file on this box, which a reader's browser gets from the panel's own door and never by its path. */
+export type SessionPanelVersion = SessionPanelVersionHead & { body: string; pictureIsFile: boolean };
+/** What `panel show` and `panel update` carry before the service judges them: `kind` and `title` may be left out of an update, which keeps the ones showing. */
+export type SessionPanelInput = { kind: SessionPanelKind | null; title: string | null; body: string };
+
 // ---------------------------
 
 //----------------- CERBERUS STATUS VOCABULARY ------------
@@ -3799,58 +3877,9 @@ export type UniverseActivityRow = {
 export type UniverseDigest = { edits: number; execs: number; at: number };
 
 // ---------------------------
-//----------------- CHAT GUTTERS ------------
-// The desktop chat's side gutters: optional widgets beside the transcript, each draggable between
-// the four slots. The placement is a setting the client owns (it never reaches the server), so
-// these types describe a stored shape rather than a wire one.
-
-/** Which side of the transcript a widget sits on. Each side is ONE stack: a widget is dropped into
- *  a place in it, and the rest close up or make room — there is no fixed number of berths. */
-export type GutterSide = 'left' | 'right';
-
-/** The widgets a chat gutter can hold: the dispatcher's plan cards, in the operator's own order, the
- *  roadmap the Roadmap tab shows at a column's width, the memory-intake rows the session proposed, the
- *  subagents it has pinned, the embed — a live page the chat named, or the reader typed in — the
- *  account's notes, the open chat's own next steps and known gaps (`followups`), and the Claude accounts panel
- *  — the usage windows, both balances, every account's figures and the switch (`accounts`). These are the ids
- *  the DOM carries as `data-widget`, and the keys `useGutterPlacements` stores its records under. */
-export type GutterWidgetId = 'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes' | 'followups' | 'accounts';
-
-/** One widget's place in its side's stack and whether it is expanded. `order` is the sort key within
- *  the side, dense from 0 after every move; a collapsed widget is still placed — it draws as a tab
- *  where it stands, which is what makes `open` a separate fact from the place rather than a value of
- *  it. */
-export type GutterWidgetPlacement = { side: GutterSide; order: number; open: boolean };
-
-/** Every widget's placement for ONE chat. A record rather than a pair of fields because a widget is
- *  addressed by its own id everywhere else in this feature, and a widget added later costs one member
- *  here rather than a second parallel field. `UserPreferences.chatGutters` holds a fallback of this
- *  shape plus one per session — see `useGutterPlacements`, which owns the stored shape. */
-export type ChatGutterPlacements = Record<GutterWidgetId, GutterWidgetPlacement>;
-
-// ---------------------------
 //----------------- SUBAGENT TRANSCRIPTS ------------
 /** What one subagent transcript read answers, mirrored byte-for-byte from the server's `server/shared/types.ts`. `found` is `false` when the session, provider, file or launch cannot be resolved — then `activity` is empty, `total` is 0, `inFlight` is `false` and `finishedAt` is `null`, and "not found" is a 200 carrying this shape, never an HTTP error. `activity` is the LAST 1000 entries (the server's `SUBAGENT_TRANSCRIPT_LIMIT`), each truncated, and `total` is the untruncated count. */
 export type SubagentTranscriptResult = { found: boolean; activity: SubagentActivity[]; total: number; inFlight: boolean; finishedAt: string | null };
-
-// ---------------------------
-//----------------- CHAT SUBAGENT WIDGET ------------
-/** What the chat publishes for its Subagents widget: the session the rows belong to, the chat's own CLI session id (`null` until the provider has reported one), against which the widget anchors the lane's launches by their `launched_by` stamp, the agent container rows of the history the chat has loaded, the launcher-soul ids that same history anchored, and the chat's resolver from a model id to the name a person calls it (`null` for an id its catalog does not carry), so the widget's rows name a model exactly as the chat's own do. Scoped by `sessionId`, which the widget checks before drawing anything — rows tagged with another chat are refused, not shown. */
-export type ChatSubagentSource = { sessionId: string; cliSessionId: string | null; agentMessages: ChatMessage[]; soulLaunchIds: string[]; resolveModelLabel: (modelId: string) => string | null };
-
-// ---------------------------
-//----------------- CHAT EMBED WIDGET ------------
-/**
- * What the chat publishes for its Embed widget: the session the addresses belong to, and every
- * embed fence that session's loaded history declares, oldest first.
- *
- * Scoped by `sessionId` exactly as `ChatSubagentSource` is, and checked the same way — a list tagged
- * with another chat is refused rather than shown, which is what stops the widget carrying one
- * conversation's dashboards into the next. The targets are `EmbedUrlRef`s, the SAME shape
- * `classifyWidgetBody` produces for the inline card, because the widget and the card must never
- * disagree about what an address, a title or a height is.
- */
-export type ChatEmbedSource = { sessionId: string; targets: EmbedUrlRef[] };
 
 /** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), a launcher soul addressed by its launch id, or a board's Metis addressed by the session id the board minted. Its third consumer is the kanban module's `KanbanMetisPanel.tsx`, which opens a fleet row into the same view rather than a copy of it. */
 export type SubagentTranscriptTarget = { kind: 'agent' | 'soul' | 'metis'; id: string };
@@ -4099,6 +4128,97 @@ export type RoadmapDotState = 'shipped' | 'inFlight' | 'designing' | 'proposed' 
 export type RoadmapTreeSelection = { kind: 'roadmap' } | { kind: 'milestone' | 'epic' | 'feature'; name: string };
 
 // ---------------------------
+//----------------- SESSIONS HALO: what the halo and its painter share ------------
+
+/**
+ * One chat as a slot on the halo, the simple chat list drawn as a hoop round the companion's core: the chat's `id` and `title`, the
+ * folder it stands in (`folder` its id and `folderName` its name, both null for a chat in none), where it stands (`asleep` with no
+ * live session host, `idle` awake and still, `working` while its turn runs, `waiting` while it waits on the reader), whether a reply
+ * is `unread`, and its `helpers`: one entry for each subagent still at work, the material of its model (`SubagentDot`). Laid out
+ * by the sidebar module's `SessionsHalo` and drawn by its `haloPainter`.
+ */
+export type SessionsHaloSlot = {
+  id: string;
+  title: string;
+  folder: string | null;
+  folderName: string | null;
+  state: 'asleep' | 'idle' | 'working' | 'waiting';
+  unread: boolean;
+  helpers: readonly SubagentDot[];
+};
+
+/**
+ * One subagent still at work, as the dot a chat draws for it: the material its model wears (`modelMaterialOf`: Opus the tube,
+ * Haiku the wire, Sonnet the plasma, any other model Mercury), or null for an agent whose model is not known. Made by the sidebar
+ * module's `subagentDots`; drawn by its `SessionTile` and its `haloPainter`.
+ */
+export type SubagentDot = CompanionMaterial | null;
+
+// ---------------------------
+//----------------- ROADMAP STACK: what the roadmap's stack, its painter and its face share ------------
+
+/**
+ * One feature as a wall on its milestone's ring, laid out once by the roadmap module's `layoutStack` and read by the
+ * stack's painter (`utils/stackPainter`), its canvas (`stack/RoadmapStack`) and its face (`RoadmapStackFace`). `at` and
+ * `width` are its place and its room round the ring, in radians. `frame` is how tall it stands, as a share of a full wall:
+ * how far along its path the feature is. `fill` is how much of that frame is built, the share of its tasks done. `tone` is
+ * what it says in colour beside its form: `danger` when it is blocked (by its own, its epic's or its milestone's reason)
+ * or stalled, `warn` when it waits on the operator. `unseen` is a feature that shipped since the operator last looked.
+ * `attention` orders what asks for him: 3 a word he owes, 2 shipped unseen, 1 stalled, 0 nothing.
+ */
+export type RoadmapStackWall = {
+  feature: RoadmapFeature;
+  epic: RoadmapEpic;
+  at: number;
+  width: number;
+  frame: number;
+  fill: number;
+  tone: 'danger' | 'warn' | null;
+  unseen: boolean;
+  attention: 0 | 1 | 2 | 3;
+};
+
+/** One epic as its thread on the floor of its milestone's ring: the arc it runs (`from` to `to`, radians) over its own walls. */
+export type RoadmapStackEpic = { epic: RoadmapEpic; from: number; to: number; walls: RoadmapStackWall[] };
+
+/**
+ * One milestone as a ring of the stack: its 1-based place on the roadmap, its epics' threads, and every wall in ring order.
+ * `span` is how much of the ring its walls take, in radians: a reached milestone fills its ring, and one that is not keeps
+ * its walls to a readable width and leaves the rest of the rim bare.
+ */
+export type RoadmapStackTier = {
+  milestone: RoadmapMilestone;
+  n: number;
+  epics: RoadmapStackEpic[];
+  walls: RoadmapStackWall[];
+  span: number;
+};
+
+/** What a press on the stack asks its face to open: a feature's card or an epic's, by the item's name. */
+export type RoadmapStackTarget = { kind: 'feature' | 'epic'; name: string };
+
+/**
+ * What the stack's owner can ask of it: bring a feature's wall to the front, on whichever ring it stands. Handed out
+ * by `stack/RoadmapStack` and held by `RoadmapStackFace`, for a feature's row pressed in an epic's card.
+ */
+export type RoadmapStackHandle = { face: (name: string) => void };
+
+/**
+ * What the stack's painter reports after each frame, so the canvas can say it in words: the ring in front (`tier`, an index
+ * into the tiers), the wall that faces the pointer there, and the ring the operator is pointing at or has chosen with a
+ * first tap (`shown`, -1 for none). `readingTop` is where the words go, in the canvas's own pixels, under the stack. `grown` is how far up it stands, 0
+ * resting as its small circle to 1 standing; a stack with no rest is always 1.
+ */
+export type RoadmapStackFrame = { tier: number; facing: RoadmapStackWall | null; shown: number; readingTop: number; grown: number };
+
+/**
+ * Where the roadmap's stack rests as one small circle, in the pixels of the box it is drawn in: its middle and its radius. Given by the page that keeps the
+ * stack small until it is pressed (project-workspace's sessions home, through the roadmap module's `RoadmapCircle`), handed down `stack/StackOf` and
+ * `stack/RoadmapStack` to the painter (`utils/stackPainter`).
+ */
+export type RoadmapStackRest = { cx: number; cy: number; radius: number };
+
+// ---------------------------
 //----------------- CLAUDE API KEYS: the door's picture of who pays for a plan run ------------
 
 /** One payer's wall, as `claude-api status --json` draws it: `kind` is the wall's class — `usage` and `credit` wait for a timed lift, `spend`, `rate` and `refused` stop launches until the wall clears — `until` is the epoch second it lifts, or `null` when no timed lift is promised, and `detail` is the door's own sentence, drawn as data. */
@@ -4162,35 +4282,24 @@ export type ClaudeApiCardView = {
 export type StationTier = 'wide' | 'laptop' | 'narrow';
 
 /**
- * How the station's shell arranges its regions: `wide` (four columns), `laptop` (three), `compact` (one column under her head,
- * one switch between its sections) or `phone` (her head as the top row, the section in the middle, a bottom bar of the sections
- * round the talk control, for the thumb). Computed by `StationShell` from the window's `tier`, `useStation().phone` and his
- * `compact` switch: compact below 1024 px (the tier `narrow`) and wherever his switch is on. Drawn by `StationShellView`, which
- * draws the bar in every arrangement but the phone's.
+ * How the station's shell arranges its regions: `wide` and `laptop` (the scene: the companion or the stage in the center, a rim
+ * on either side that opens only while something in it is true, the dock across the foot; a laptop's rims are narrower),
+ * `compact` (one column under the companion's head, one switch between its sections) or `phone` (the head as the top row, the
+ * section in the middle, a bottom bar of the sections round the talk control, for the thumb). Computed by `StationShell` from the
+ * window's `tier`, `useStation().phone` and your `compact` switch: compact below 1024 px (the tier `narrow`) and wherever the
+ * switch is on. Drawn by `StationShellView`, which draws the bar in every arrangement but the phone's.
  */
 export type StationArrangement = 'wide' | 'laptop' | 'compact' | 'phone';
 
 /**
- * The bar's "Compact" switch: whether his switch is on (the station pref `compact`, per device) and its press. `StationShell`
- * reads it and hands it through `StationShellView` to `StationBar`, or null where it would change nothing (below 1024 px,
- * where compact is the only arrangement), and the bar then draws none.
+ * Every place the station remembers a scroll position for: its regions and the `stage`. The key of the station's scroll
+ * memory, written when a region scrolls and put back when the page reloads or the layout moves a region. The names of the
+ * regions removed with the old station stay, so a stored record still reads.
  */
-export type StationCompactSwitch = { on: boolean; onChange: (on: boolean) => void };
+export type StationRegion = 'strip' | 'live' | 'sessions' | 'corner' | 'head' | 'conversation' | 'dock' | 'talk' | 'needs' | 'stage';
 
 /**
- * The named places of the station's layout that a region fills: `strip`, `sessions`, `corner`, `head`, `conversation`, `dock`,
- * `talk` and `needs`. A slot nothing fills draws nothing. Keys the layout's slot map and the fixtures' slices.
- */
-export type StationSlot = 'strip' | 'sessions' | 'corner' | 'head' | 'conversation' | 'dock' | 'talk' | 'needs';
-
-/**
- * Every place the station remembers a scroll position for: the slots and the `stage`. The key of the station's scroll
- * memory, written when a region scrolls and put back when the page reloads or the layout moves a region.
- */
-export type StationRegion = StationSlot | 'stage';
-
-/**
- * The station's own preferences, remembered per window by `useStationPref`: `stripCollapsed` (the strip is folded),
+ * The station's own preferences, as a stored record may still hold them (nothing reads them since the old regions were removed): `stripCollapsed` (the strip is folded),
  * `cornerOpen` (the corner is open), `compact` (his switch for the one-column arrangement), `asleepOpen` (the left rail's fold
  * of his asleep chats is open), `completeOpen` (its fold of the roadmap's complete epics is open), `compactSection` (the
  * section the one-column arrangement shows, a `StationCompactSection`), `compactSectionAside` (the section he was in when the
@@ -4203,8 +4312,7 @@ export type StationPrefKey =
 /**
  * How her column draws her, held per device by the station pref `herView` and chosen by the toggle in her head: `portrait` (the
  * default: her face, large and undisced, over the words of her latest answer alone) or `chat` (her face in its disc over her
- * whole conversation with him). Read by her head (`StationHeadView`, which draws the face only in `chat`) and her conversation
- * (`StationConversation`, which draws the portrait in `portrait`), and by the station's memory when it reads a stored record.
+ * whole conversation with him). Read only by the station's memory, when it reads a stored record.
  */
 export type StationHerView = 'portrait' | 'chat';
 
@@ -4230,14 +4338,6 @@ export type StationRegionProps = { tier: StationTier; density: StationDensity };
 export type StationDensity = 'full' | 'compact';
 
 /**
- * Her head drawn as the phone's top row, the bar and her head in one: what the phone's arrangement (`StationPhoneView`) hands the
- * head's region, and `StationHeadView` draws from. `sideways`: the phone on its side, her face at 32 px in a 40 px row (44 px
- * upright). `trail`: what stands after her words and before her menu, the arrangement's own (the count of what needs him and, on
- * its side, the strip's line). `onBackToCloudcli`: "CloudCLI" in her menu, the shell's way back in the same window.
- */
-export type StationHeadRow = { sideways: boolean; trail: ReactNode; onBackToCloudcli: () => void };
-
-/**
  * One word or line the station draws: its locale `key` and its `english`, the `defaultValue` it is drawn with when the locale holds
  * none. The station's tables of words (the rail's fault lines, its item's status words, the ask's wells, `STATION_NEED_KINDS`)
  * are made of these, so each is drawn as `t(words.key, words.english)`.
@@ -4250,12 +4350,3 @@ export type LocaleWords = { key: string; english: string };
  * `STATION_NEED_KINDS`, which gives each its glyph, its word, its tone and its one act.
  */
 export type StationNeedKind = Exclude<StationNeed['kind'], 'ask'> | StationAskKind;
-
-/**
- * Her mark on the station's left rail, while her activity names one of his chats (she is reading it, drafting for it or walking
- * it): that chat's `sessionId`, her `initial` (her name's first letter, as her disc draws it) and the `words` that say what she
- * is doing there ("Kaylee is reading Bugfixes"). Built by the rail's region (`WhereThingsStand`) from her activity, drawn by its
- * sessions section (`SessionRows`) on the chat's row, and on the asleep fold's head while that fold hides the row; the
- * fixtures (`fake/sessions.ts`) hold one for the `walkthrough` picture.
- */
-export type StationHerMark = { sessionId: string; initial: string; words: string };

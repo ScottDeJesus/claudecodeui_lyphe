@@ -12,7 +12,8 @@ import type { ReactNode } from 'react';
  * The fallback is deliberately plain: it renders when the app has already proven it can throw,
  * so it depends on no context, no theme, no i18n and no design token — just markup and a
  * reload. (The Reload button takes the box's accent from `--accent-fixed` but carries the
- * default green as its fallback, so it still has a fill when no stylesheet supplied the token.)
+ * default accent, the day amber, as its fallback, so it still has a fill when no stylesheet
+ * supplied the token.)
  * The boot watchdog in index.html still stands behind it, for the crashes React never
  * gets to see.
  *
@@ -75,7 +76,7 @@ export default function AppErrorBoundary({ children }: { children: ReactNode }) 
                 border: 0,
                 borderRadius: 8,
                 padding: '8px 16px',
-                background: 'var(--accent-fixed, #2fa876)',
+                background: 'var(--accent-fixed, #964800)',
                 color: '#fff',
                 fontSize: 13,
                 fontWeight: 600,

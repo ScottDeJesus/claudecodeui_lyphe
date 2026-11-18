@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CheckSheet, NeedCard, useCerberusNeedOf } from '@/modules/cerberus';
-import { useStation, useStationPref } from '@/modules/station/context/StationContext';
+import { useStation } from '@/modules/station/context/StationContext';
 import { stationArrangementOf } from '@/modules/station/stationArrangement';
+import { StageOpen } from '@/modules/station/StageOpen';
 import { StageGone } from '@/modules/station/stageStates';
 import type { CerberusNeed } from '@/shared/cerberus-types';
 import type { StationFocus } from '@/shared/station-types';
@@ -27,7 +28,7 @@ type CheckFound = { kind: 'loading' } | { kind: 'unread' } | { kind: 'needs'; ne
  * edge covers the rail and the stage and stops short of her column (it begins at 708 px at most, and the sheet at 760 px at the
  * narrowest wide window, 1360 px). On a laptop the stage stands in her column under her face, so the sheet takes the right
  * rail's own 296 px. In compact and on a phone her head is the page's top and the sheet takes the screen, so it stands below her
- * head: `top` is the foot of her head's box, which the arrangement writes (`useStationHeadFoot`). The `0px` after it is the
+ * head: `top` is the foot of her head's box, which no arrangement writes since the old station's layouts were removed. The `0px` after it is the
  * sheet's own top, which a read of the property before its first write would otherwise turn into `auto`.
  */
 const CHECK_SHEET_PLACE: Readonly<Record<StationArrangement, { width?: string; top?: string }>> = {
@@ -73,11 +74,9 @@ type CheckStageViewProps = {
 export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStageViewProps) {
   const { t } = useTranslation();
 
+  // The way to the check's own sheet: the panel's Open, at its foot.
   const openCheck = (target: CerberusSheetTarget) => (
-    <Button variant="outline" size="sm" data-station-check-open="" className="self-start finger:h-11" onClick={() => onOpenSheet(target)}>
-      <PanelRight aria-hidden="true" />
-      {t('station.needs.check.open', 'Open the check')}
-    </Button>
+    <StageOpen name={t('station.needs.check.open', 'Open the check')} icon={PanelRight} data-station-check-open="" onOpen={() => onOpenSheet(target)} />
   );
 
   switch (found.kind) {
@@ -99,8 +98,8 @@ export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStag
             <Button variant="outline" size="sm" data-station-check-retry="" className="finger:h-11" onClick={onRetry}>
               {t('station.needs.retry', 'Try again')}
             </Button>
-            {target !== null && openCheck(target)}
           </div>
+          {target !== null && openCheck(target)}
         </div>
       );
     }
@@ -139,9 +138,8 @@ export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStag
  */
 export function CheckStage({ focus }: { focus: CheckFocus }) {
   const { tier, phone } = useStation();
-  // His Compact switch, which decides the arrangement above 1024 px; the shell reads the same pref.
-  const [compactOn] = useStationPref('compact', false);
-  const place = CHECK_SHEET_PLACE[stationArrangementOf(tier, phone, compactOn)];
+  // The arrangement as the shell picks it: the window's alone, since the scene has no Compact switch.
+  const place = CHECK_SHEET_PLACE[stationArrangementOf(tier, phone, false)];
   const { need, unreachable, retry } = useCerberusNeedOf(focus.node, focus.key);
   // The check the sheet is open on, null while it is shut. State, because the sheet is drawn from it and it opens on a press of the card or of "Open the check".
   const [sheet, setSheet] = useState<CerberusSheetTarget | null>(null);

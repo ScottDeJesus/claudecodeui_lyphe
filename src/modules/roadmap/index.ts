@@ -4,31 +4,11 @@ export { RoadmapFeed } from '@/modules/roadmap/RoadmapFeed';
 // The Roadmap tab's pane: the roadmap as a tree from its goal, and the live cards of what is in flight.
 // Lazy (defined once, in `lazyRoadmapTab`): the pane is its tab's whole tree and loads on the tab's first open, so
 // importing this barrel for the feed never pulls the tree, its panel or the In flight panel into the first page
-// load. (The widget below is eager: the chat gutter draws it open from the first paint, and its pieces come with
-// it; only its full-screen body below reaches the pane, through the same lazy door.) Its consumer is
-// src/modules/project-workspace (`WorkspaceMain`, as the `runner` tab's pane).
+// load. Its consumer is src/modules/project-workspace (`WorkspaceMain`, as the `runner` tab's pane).
 export { RoadmapTab } from '@/modules/roadmap/lazyRoadmapTab';
-// The Roadmap widget's body: the tab's own roadmap face (the tree and its panel), in its column fit, with the
-// way to the whole roadmap at its foot. Its consumer is src/modules/chat-gutters (`ChatGutterLayout`, as the
-// Roadmap widget's body).
-export { RoadmapWidgetBody } from '@/modules/roadmap/RoadmapWidgetBody';
-// The same widget at full screen: the tab itself (both faces behind the one switch), drawn in the card that has the
-// viewport. Its consumer is src/modules/chat-gutters (`ChatGutterLayout`, as the Roadmap widget's full-screen body).
-export { RoadmapWidgetFullscreenBody } from '@/modules/roadmap/RoadmapWidgetFullscreenBody';
-// The roadmap lane's read side: the picture and the ONE roadmap on screen. Its consumers are
-// src/modules/chat-gutters (`ChatGutterLayout`, which reads the selected roadmap's standing for the widget's badge) and
-// src/modules/station (`CardStage`, which names a card by its title in the picture, and the left rail's region, which draws
-// the roadmap he selected).
+// The roadmap lane's read side: the picture and the ONE roadmap on screen. Its consumer is
+// src/modules/station (`CardStage`, which names a card by its title in the picture).
 export { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
-// A feature's step in the roadmap's own words ("being designed", "waiting on you: Accept", "shipped Oct 27"), read off the
-// live picture. Its consumer is src/modules/station (`RoadmapRows`, the left rail's feature rows), which says each feature's
-// step exactly as the Roadmap tab says it.
-export { useStepPhrase } from '@/modules/roadmap/hooks/useStepPhrase';
-// A feature's dot as the tree paints it: its state (`dotStateOf`, blocked by the nearest reason above it) and the panel's own
-// drawing of that state (`PanelDot`). Their consumer is src/modules/station (`RoadmapRows`), so a feature's dot on the rail and
-// on the tree never disagree.
-export { dotStateOf } from '@/modules/roadmap/utils/treeLayout';
-export { PanelDot } from '@/modules/roadmap/panel/PanelRows';
 // The roadmap's own facts of a feature (the feature dialog's body) and of an epic (the tree's epic panel), the
 // existing drawings and never a second one. Their consumer is src/modules/station (`CardStage`), which draws them on
 // the stage for a feature or an epic the dispatcher no longer holds.
@@ -42,3 +22,9 @@ export type { RoadmapCardFacts } from '@/modules/roadmap/hooks/useRoadmapCard';
 // feature, a feature's empty goal) open the roadmap's own dialogs under it. Its consumer is src/modules/station
 // (`CardStage`, around the stage's roadmap facts).
 export { RoadmapDialogHost } from '@/modules/roadmap/RoadmapDialogHost';
+// The roadmap as one small circle that stands up as the whole stack when pressed, for a page that is not the roadmap's: project-workspace's sessions
+// home (`WorkspaceHome`) draws it at its head, and the station's scene (`StationShell`) over the companion's column while a thing is on the panel.
+export { RoadmapCircle } from '@/modules/roadmap/RoadmapCircle';
+// The same roadmap already standing as the whole stack, for a page with the room for it: the station's scene (`StationShell`) draws it over the companion
+// while nothing is on the panel, and the circle above in its place while something is.
+export { RoadmapStanding } from '@/modules/roadmap/RoadmapStanding';

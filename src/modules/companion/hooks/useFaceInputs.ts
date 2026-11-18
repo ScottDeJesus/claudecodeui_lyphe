@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import type { CompanionLogEntry, CompanionPicture } from '@/shared/companion-types';
-import type { CompanionFaceLook, CompanionFaceSentences, CompanionVoice } from '@/shared/types';
+import type { CompanionFaceSentences, CompanionVoice } from '@/shared/types';
 
 type FaceSentencesArgs = {
   /** Her picture: the log her sentences are read from, the running turn's id and the floor. Null until the first read. */
@@ -10,19 +10,6 @@ type FaceSentencesArgs = {
   voice: CompanionVoice;
   /** This page's name for her, to know whether it holds the floor and so plays her voice. */
   clientId: string;
-};
-
-type FaceLookArgs = {
-  /** The rect of the anchor the disc is drawing a look at, null when none is drawn: none holds, or a drag is in hand or set the look aside. */
-  anchor: DOMRect | null;
-  /** Her rest's box: where she stands at home, which the disc reports. Null before the kit has placed her. */
-  rest: DOMRect | null;
-  /** Where she is drawn while the look holds, the disc's top-left; null when no look is drawn. */
-  target: { left: number; top: number } | null;
-  /** The disc's side as she is drawn now: her target's centre is half of it in from the target's corner. */
-  size: number;
-  /** She has landed at the look drawn: her glide ended (or, under reduced motion, there was none). Read only with an anchor. */
-  landed: boolean;
 };
 
 const NO_LOG: CompanionLogEntry[] = [];
@@ -37,7 +24,7 @@ function newestOfHers(log: CompanionLogEntry[], matches: (entry: CompanionLogEnt
 }
 
 /**
- * Used by this module's CompanionFace, which is her face bound to the provider wherever it is drawn (the button, the station):
+ * Used by this module's CompanionFace, which is her face bound to the provider wherever it is drawn (the sessions home, the station):
  * the sentences her face reads, derived from the picture and the page's voice.
  *
  * `playing` is the log entry matching the turn and index of the sentence this page's player is sounding (`voice.speaking`): its mood
@@ -62,20 +49,4 @@ export function useFaceSentences({ picture, voice, clientId }: FaceSentencesArgs
   );
   const turnRunning = turnId !== null;
   return useMemo(() => ({ playing, newest, turnRunning }), [playing, newest, turnRunning]);
-}
-
-/**
- * Used by this module's CompanionFab, whose disc is the one face that looks at things: where the anchor lies from her, for
- * CompanionFace's `look`. It is the anchor's centre less her own, in whole pixels, and it has two phases. While she glides to the
- * anchor, hers is her REST centre: she turns toward where she is going. Once she has landed, hers is her TARGET centre: she faces
- * the thing beside her.
- */
-export function useFaceLook({ anchor, rest, target, size, landed }: FaceLookArgs): CompanionFaceLook | null {
-  return useMemo(() => {
-    if (anchor === null || target === null || rest === null) return null;
-    const from = landed
-      ? { x: target.left + size / 2, y: target.top + size / 2 }
-      : { x: rest.x + rest.width / 2, y: rest.y + rest.height / 2 };
-    return { dx: Math.round(anchor.left + anchor.width / 2 - from.x), dy: Math.round(anchor.top + anchor.height / 2 - from.y) };
-  }, [anchor, target, rest, size, landed]);
 }

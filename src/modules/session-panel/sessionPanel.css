@@ -1,0 +1,8 @@
+/* The chat and its panel, one in front (`SessionPanelLayout`). The chat is always the second child and is never unmounted: the
+ * panel is a place the reader switches to, from the chat's head or from a mark in the talk, and it then stands in the chat's
+ * place at every width. */
+.session-panel-layout { display: flex; height: 100%; min-width: 0; min-height: 0; }
+.session-panel-chat { flex: 1; min-width: 0; min-height: 0; height: 100%; }
+.session-panel { display: none; }
+.session-panel-layout[data-view='panel'] > .session-panel { display: flex; flex: 1; }
+.session-panel-layout[data-view='panel'] > .session-panel-chat { display: none; }

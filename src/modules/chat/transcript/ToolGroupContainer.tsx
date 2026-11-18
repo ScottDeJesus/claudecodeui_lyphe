@@ -140,7 +140,7 @@ function ToolGroupContainer({
         >
           <ToolRowIcon icon={config.icon} className={iconClass} />
           <span className={TOOL_ROW_LABEL}>{label}</span>
-          <span className="flex-shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+          <span className="flex-shrink-0 rounded bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
             x{group.messages.length}
           </span>
           {groupDiffStats && <DiffStatsBadge stats={groupDiffStats} className="flex-shrink-0" />}

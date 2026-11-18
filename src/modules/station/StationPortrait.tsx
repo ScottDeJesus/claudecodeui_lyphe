@@ -6,6 +6,7 @@ import { useDrawnSquare } from '@/modules/station/hooks/useDrawnSquare';
 import type { CompanionLogEntry, CompanionPicture } from '@/shared/companion-types';
 import type { CompanionSentenceRef, StationDensity } from '@/shared/types';
 import { Banner, ScrollArea } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /** What her words area holds: the dots while she answers, her harness's line for a turn that broke, her latest answer, or the empty state. */
 type PortraitState = 'thinking' | 'broke' | 'reply' | 'empty';
@@ -44,6 +45,83 @@ type StationPortraitViewProps = {
   face: (px: number) => ReactNode;
 };
 
+/** What her words say now, from her picture: the one reading the portrait's root and her words' pane share. */
+function portraitStateOf(picture: CompanionPicture): PortraitState {
+  const { log, turnId } = picture;
+  const reply = latestTurnOf(log);
+  const newest = log[log.length - 1];
+  // She is thinking only while something is working toward an answer: her turn is running with none of its sentences landed (the
+  // log's own rule for its waiting row), or she is waking for his line. His line alone is not enough: a turn that ended with no
+  // sentence (Stop before her first) leaves his line newest and nothing coming, and dots there would breathe forever.
+  const working = (turnId !== null && reply?.turnId !== turnId) || (newest?.role === 'operator' && picture.process.state === 'waking');
+  return working ? 'thinking' : newest?.role === 'system' ? 'broke' : reply !== null ? 'reply' : 'empty';
+}
+
+type StationPortraitWordsProps = {
+  picture: CompanionPicture;
+  name: string;
+  speaking: CompanionSentenceRef | null;
+  /** How the words lie in their pane: centred under the companion's face (the portrait, and the column on the scene), or from the start beside the core. */
+  align?: 'center' | 'start';
+  /** The pane's own box in its caller's layout (its share of a column, a cap on its height). */
+  className?: string;
+  /** Before the first hello, say nothing: the scene's, where the box to type in already says what to do. Absent, the log's own words stand. */
+  quietEmpty?: boolean;
+};
+
+/**
+ * HER LATEST ANSWER'S WORDS, alone, in a pane that scrolls inside itself: her latest turn's sentences as one paragraph
+ * (`CompanionReply`, the log's own: the sentence she is speaking on its band, each sound a small mark), the breathing dots at its
+ * end while she is still answering, and the pane follows the end as the answer grows until he scrolls up. While something is working
+ * toward her answer her words are the dots alone; a turn that broke is her harness's line in a warn `Banner`; before her first
+ * hello, the log's own words for what she is for. Earlier turns are not drawn; his own lines are not either.
+ *
+ * `data-station-portrait-words` marks the pane's log. Used by `StationPortraitView` (under the face, in the compact and phone
+ * arrangements) and by `StationKayleeView` (the companion's line on the scene, beside or under the core).
+ */
+export function StationPortraitWords({ picture, name, speaking, align = 'center', className, quietEmpty = false }: StationPortraitWordsProps) {
+  const { t } = useTranslation();
+  const { log, turnId } = picture;
+  const reply = latestTurnOf(log);
+  const newest = log[log.length - 1];
+  const state = portraitStateOf(picture);
+  const answered = state === 'reply' ? reply : null;
+  const lastSentence = answered?.sentences[answered.sentences.length - 1];
+  // A sentence growing, one landing, a turn starting or ending all change what stands at the end of her words.
+  const contentKey = `${state}:${answered?.sentences.length ?? 0}:${lastSentence?.text.length ?? 0}:${turnId ?? ''}`;
+  const { scrollerRef } = useFollowNewest(contentKey, true);
+
+  return (
+    // Keyed by the answer it holds, so a new answer starts at its own beginning and follows its end afresh.
+    <ScrollArea key={answered?.turnId ?? state} ref={scrollerRef} className={cn('min-h-0', className)}>
+      <div
+        role="log"
+        tabIndex={0}
+        data-station-portrait-words=""
+        aria-label={t('station.portrait.label', { name, defaultValue: '{{name}}\'s latest answer' })}
+        className={cn('focus-visible:-outline-offset-2', align === 'center' ? 'px-4 pb-4 pt-1 text-center' : 'pb-1 text-left')}
+      >
+        <div className={cn(align === 'center' && 'mx-auto max-w-xl')}>
+          <CompanionAttachmentStrip log={log} pinned={state === 'thinking'} />
+          {state === 'thinking' && <CompanionReply sentences={[]} turnId={null} answering speaking={null} name={name} className="text-base" />}
+          {state === 'broke' && <div className="text-left"><Banner tone="warn">{newest.text}</Banner></div>}
+          {answered !== null && (
+            <CompanionReply
+              sentences={answered.sentences}
+              turnId={answered.turnId}
+              answering={turnId !== null && answered.turnId === turnId}
+              speaking={speaking}
+              name={name}
+              className="text-base"
+            />
+          )}
+          {state === 'empty' && !quietEmpty && <p className="text-sm leading-relaxed text-muted-foreground">{t('companion.log.emptyMessage', { name })}</p>}
+        </div>
+      </div>
+    </ScrollArea>
+  );
+}
+
 /**
  * HER PORTRAIT, her column's `conversation` slot while her view is `portrait` (`StationConversation` hands it the picture): her face
  * front and center, undisced, and under it the words of her latest answer alone, as they stream and as she speaks them.
@@ -71,57 +149,17 @@ type StationPortraitViewProps = {
  * `.verify/kaylee-station-shots.mjs` draws it on `fake/portrait.ts`'s pictures.
  */
 export function StationPortraitView({ picture, name, speaking, face }: StationPortraitViewProps) {
-  const { t } = useTranslation();
   const [setFaceNode, drawnPx] = useDrawnSquare(FACE_FALLBACK_PX);
-  const { log, turnId } = picture;
-  const reply = latestTurnOf(log);
-  const newest = log[log.length - 1];
-  // She is thinking only while something is working toward an answer: her turn is running with none of its sentences landed (the
-  // log's own rule for its waiting row), or she is waking for his line. His line alone is not enough: a turn that ended with no
-  // sentence (Stop before her first) leaves his line newest and nothing coming, and dots there would breathe forever.
-  const working = (turnId !== null && reply?.turnId !== turnId) || (newest?.role === 'operator' && picture.process.state === 'waking');
-  const state: PortraitState = working ? 'thinking' : newest?.role === 'system' ? 'broke' : reply !== null ? 'reply' : 'empty';
-  const answered = state === 'reply' ? reply : null;
-  const lastSentence = answered?.sentences[answered.sentences.length - 1];
-  // A sentence growing, one landing, a turn starting or ending all change what stands at the end of her words.
-  const contentKey = `${state}:${answered?.sentences.length ?? 0}:${lastSentence?.text.length ?? 0}:${turnId ?? ''}`;
-  const { scrollerRef } = useFollowNewest(contentKey, true);
 
   return (
-    <div data-station-portrait={state} className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+    <div data-station-portrait={portraitStateOf(picture)} className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
       {/* A query container of its own, so the square is read off this part's sides (cqw, cqh), never off her whole column's. */}
       <div className="flex min-h-0 flex-[2_1_0%] items-center justify-center p-3 [container-type:size]">
         <div ref={setFaceNode} data-station-portrait-face="" className="relative size-[min(100cqw,100cqh,32rem)] shrink-0">
           {face(drawnPx)}
         </div>
       </div>
-      {/* Keyed by the answer it holds, so a new answer starts at its own beginning and follows its end afresh. */}
-      <ScrollArea key={answered?.turnId ?? state} ref={scrollerRef} className="min-h-0 flex-[1_1_0%]">
-        <div
-          role="log"
-          tabIndex={0}
-          data-station-portrait-words=""
-          aria-label={t('station.portrait.label', { name, defaultValue: '{{name}}\'s latest answer' })}
-          className="px-4 pb-4 pt-1 text-center focus-visible:-outline-offset-2"
-        >
-          <div className="mx-auto max-w-xl">
-            <CompanionAttachmentStrip log={log} pinned={state === 'thinking'} />
-            {state === 'thinking' && <CompanionReply sentences={[]} turnId={null} answering speaking={null} name={name} className="text-base" />}
-            {state === 'broke' && <div className="text-left"><Banner tone="warn">{newest.text}</Banner></div>}
-            {answered !== null && (
-              <CompanionReply
-                sentences={answered.sentences}
-                turnId={answered.turnId}
-                answering={turnId !== null && answered.turnId === turnId}
-                speaking={speaking}
-                name={name}
-                className="text-base"
-              />
-            )}
-            {state === 'empty' && <p className="text-sm leading-relaxed text-muted-foreground">{t('companion.log.emptyMessage', { name })}</p>}
-          </div>
-        </div>
-      </ScrollArea>
+      <StationPortraitWords picture={picture} name={name} speaking={speaking} className="flex-[1_1_0%]" />
     </div>
   );
 }

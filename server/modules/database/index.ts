@@ -118,8 +118,12 @@ export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candi
 // Used by the followups module; `sessions.db.ts` moves a merged chat's items itself.
 export { followupsDb } from '@/modules/database/repositories/followups.db.js';
 export type { FollowupKind, FollowupRow } from '@/modules/database/repositories/followups.db.js';
-// The companion's own tables: Kaylee's per-account state, exchange (the newest 400 rows), note cards and record of the
-// actions she prepared for his word, as rows — snake_case columns, JSON columns as text. Used by the companion module's
+// The session panel's own table: what one chat has put on its panel, a row for each version, keyed on the chat's app session id.
+// Used by the session-panel module; `sessions.db.ts` moves a merged chat's versions itself.
+export { sessionPanelDb } from '@/modules/database/repositories/session-panel.db.js';
+export type { SessionPanelHeadRow, SessionPanelKind, SessionPanelRow } from '@/modules/database/repositories/session-panel.db.js';
+// The companion's own tables: Kaylee's per-account state, exchange (the newest 400 rows), note cards, record of the
+// actions she prepared for his word and the tool calls of the companion's turns, as rows — snake_case columns, JSON columns as text. Used by the companion module's
 // store, which maps them to the wire contract.
 export { companionDb } from '@/modules/database/repositories/companion.db.js';
 export type {
@@ -138,6 +142,10 @@ export type {
   CompanionActionOutcome,
   CompanionActionRow,
 } from '@/modules/database/repositories/companion-actions.db.js';
+export type {
+  CompanionWorkBodyRow,
+  CompanionWorkHeadRow,
+} from '@/modules/database/repositories/companion-work.db.js';
 // Every brief Kaylee has relayed into a chat, keyed on the chat so it survives her Clear. Used by the companion
 // module to record a send and by Providers to mark the matching user messages "Through Kaylee" in history.
 export { relayedSendsDb } from '@/modules/database/repositories/relayed-sends.db.js';
@@ -149,11 +157,8 @@ export type { NoteRow } from '@/modules/database/repositories/notes.db.js';
 export { notificationChannelEndpointsDb } from '@/modules/database/repositories/notification-channel-endpoints.js';
 export { notificationPreferencesDb } from '@/modules/database/repositories/notification-preferences.js';
 // notificationHistoryDb: what the house told each account — every row of the last seven days and, past that, the newest 300 — written
-// and read by the notifications module's history service (`startNotificationHistory`, `listNotificationHistory`,
-// `listNotificationHistorySince`). NOTIFICATION_HISTORY_WINDOW_MS: those seven days; handed on by the notifications module's barrel
-// to the companion's strip read, the one reader of the week.
+// and read by the notifications module's history service (`startNotificationHistory`, `listNotificationHistory`).
 export {
-  NOTIFICATION_HISTORY_WINDOW_MS,
   notificationHistoryDb,
 } from '@/modules/database/repositories/notification-history.db.js';
 export type { NotificationHistoryInput, NotificationHistoryRow } from '@/modules/database/repositories/notification-history.db.js';

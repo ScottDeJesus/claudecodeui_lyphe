@@ -1,5 +1,6 @@
 import { getConnection } from '@/modules/database/connection.js';
 import { followupsDb } from '@/modules/database/repositories/followups.db.js';
+import { sessionPanelDb } from '@/modules/database/repositories/session-panel.db.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
 import { announceSessionArchiveChanged, announceSessionsDeleted } from '@/modules/database/repositories/session-deletion.js';
 import { SESSION_UNREAD_SQL } from '@/modules/database/repositories/session-user-state.db.js';
@@ -270,6 +271,8 @@ export const sessionsDb = {
         input.forkedFromSessionId,
       );
       followupsDb.moveToSession(input.providerSessionId, input.sessionId);
+      // Its panel's versions follow it for the same reason.
+      sessionPanelDb.moveToSession(input.providerSessionId, input.sessionId);
       db.prepare('DELETE FROM sessions WHERE session_id = ? AND session_id <> ?')
         .run(input.providerSessionId, input.sessionId);
     })();
@@ -304,6 +307,8 @@ export const sessionsDb = {
       if (duplicate) {
         // The chat's followups follow it onto the surviving row; the cascade would drop them with the duplicate.
         followupsDb.moveToSession(duplicate.session_id, sessionId);
+        // Its panel's versions follow it for the same reason.
+        sessionPanelDb.moveToSession(duplicate.session_id, sessionId);
         db.prepare('DELETE FROM sessions WHERE session_id = ?').run(duplicate.session_id);
         // A name travels with its mark: a name a person gave the duplicate replaces an app row's name
         // he did not give. Every right-hand side reads the row as it was before this UPDATE, so the
@@ -364,6 +369,8 @@ export const sessionsDb = {
     db.transaction(() => {
       // Moved first, then the row is deleted: the cascade would otherwise take the replaced row's followups.
       followupsDb.moveToSession(input.providerSessionId, sessionId);
+      // Its panel's versions follow it for the same reason.
+      sessionPanelDb.moveToSession(input.providerSessionId, sessionId);
       db.prepare('DELETE FROM sessions WHERE session_id = ? AND session_id <> ?')
         .run(input.providerSessionId, sessionId);
       db.prepare(

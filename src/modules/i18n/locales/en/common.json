@@ -33,6 +33,15 @@
     "notes": "Notes",
     "cerberus": "Cerberus"
   },
+  "chatHead": {
+    "chat": "Chat"
+  },
+  "home": {
+    "title": "Home",
+    "keywords": "home sessions chats folders pinned",
+    "station": "Open {{name}}'s station",
+    "places": "Other screens"
+  },
   "rail": {
     "label": "Views",
     "settings": "Settings",
@@ -680,7 +689,7 @@
       "noBoard": "No board",
       "autonomy": "Autonomy",
       "deepseekFlash": "DeepSeek Flash",
-      "deepseekFlashTooltip": "Puts this board's Metis, and every runner she starts, on DeepSeek Flash.",
+      "deepseekFlashTooltip": "Puts this board's Metis, and every runner Metis starts, on DeepSeek Flash.",
       "newBoard": "New board",
       "rename": "Rename",
       "archive": "Archive",
@@ -948,7 +957,14 @@
     "faces": {
       "label": "Roadmap view",
       "path": "Roadmap",
+      "stack": "Stack",
       "inFlight": "In flight"
+    },
+    "stack": {
+      "label": "Roadmap stack",
+      "value": "{{feature}}, {{epic}}, milestone {{n}}: {{milestone}}",
+      "back": "Back",
+      "open": "Open the roadmap: {{title}}"
     },
     "loading": "Reading the roadmap…",
     "kind": {
@@ -1245,9 +1261,6 @@
       "remove": "{{title}} deleted",
       "promote": "{{title}} sent to design"
     },
-    "widget": {
-      "open": "Open the roadmap"
-    },
     "tree": {
       "label": "The roadmap as a tree: its goal, milestones, epics and features",
       "goal": "Goal",
@@ -1346,6 +1359,18 @@
     },
     "rounds_one": "{{count}} round",
     "rounds": "{{count}} rounds",
+    "round": "Round {{n}}",
+    "run": {
+      "build": "build",
+      "fix": "fix",
+      "review": "review",
+      "running": "running"
+    },
+    "columns": {
+      "in": "in",
+      "cache": "cache",
+      "out": "out"
+    },
     "pill": {
       "paid": "${{usd}}",
       "paidTitle": "${{usd}} billed by {{vendor}}",
@@ -1778,23 +1803,8 @@
     "refused": "Not started"
   },
   "gutters": {
-    "runner": {
-      "title": "Runs"
-    },
-    "roadmap": {
-      "title": "Roadmap"
-    },
-    "memory": {
-      "title": "Memory",
-      "pending": "Waiting for review",
-      "recent": "Recently filed",
-      "recentEmpty": "Nothing filed yet",
-      "pendingEmpty": "Nothing waiting"
-    },
     "subagents": {
       "title": "Subagents",
-      "empty": "No subagents in this chat",
-      "clearCompleted": "Clear completed",
       "back": "Back to subagents",
       "loading": "Loading transcript…",
       "notFound": "No transcript on disk yet",
@@ -1804,35 +1814,34 @@
       "openRow": "Read {{name}}'s transcript"
     },
     "embed": {
-      "title": "Embed",
-      "empty": "Nothing embedded in this chat yet",
-      "placeholder": "Address to embed…",
-      "address": "Address to embed",
-      "pick": "Which embed to show",
-      "choose": "Choose a page…",
-      "custom": "Type an address…",
-      "open": "Open the page in a new tab",
-      "rejected": "That is not an http:// or https:// address",
       "plainHttpBlocked": "This page is plain http, and a browser will not draw a plain-http page inside this app while it is open over https. Use the Open link to see it in its own tab."
     },
-    "notes": {
-      "title": "Notes"
-    },
-    "accounts": {
-      "title": "Accounts"
-    },
-    "followups": {
-      "title": "Next steps"
-    },
-    "open": "Open {{name}}",
-    "collapse": "Collapse",
-    "dragHint": "Drag to either side",
     "pin": {
       "label": "This session",
       "title": "Created by the chat you have open"
+    }
+  },
+  "sessionPanel": {
+    "name": "Panel",
+    "named": "Panel · {{title}}",
+    "version": "{{kind}} · V{{n}} / {{of}}",
+    "v": "V{{n}}",
+    "versions": "{{title}}, its versions",
+    "latest": "Latest",
+    "kind": {
+      "diagram": "Diagram",
+      "picture": "Picture",
+      "page": "Page",
+      "widget": "Its own page"
     },
-    "fullscreen": "Fullscreen",
-    "exitFullscreen": "Leave fullscreen"
+    "mark": "On the panel · V{{n}} · {{title}}",
+    "switchWithOpen_one": "Panel, {{count}} follow-up open",
+    "switchWithOpen": "Panel, {{count}} follow-ups open",
+    "openPage": "Open the page",
+    "enlarge": "Enlarge {{title}}",
+    "reading": "Reading the panel",
+    "pictureGone": "This picture is no longer where the session showed it from.",
+    "versionGone": "This version is no longer on the panel."
   },
   "followups": {
     "group": {
@@ -3768,9 +3777,9 @@
       "resize": "Resize {{name}}'s panel"
     },
     "status": {
-      "asleep": "Asleep · your next message wakes her",
+      "asleep": "Asleep · wakes on your next message",
       "waking": "Waking up",
-      "failed": "Stopped · your next message starts her again",
+      "failed": "Stopped · starts again on your next message",
       "idle": "Idle",
       "thinking": "Thinking",
       "readingSession": "Reading <subject/>",
@@ -3810,18 +3819,18 @@
     },
     "focus": "Focus",
     "model": "Model",
-    "modelRefused": "Her model wasn't changed",
+    "modelRefused": "The model wasn't changed",
     "live": "Live",
-    "liveHint": "On: she hears the house's alerts and speaks up without being asked.",
+    "liveHint": "On: hears the house's alerts and speaks up without being asked.",
     "liveOnRefused": "Live wasn't turned on",
     "liveOffRefused": "Live wasn't turned off",
     "stop": "Stop",
     "stopHint": "Stop {{name}}'s answer",
-    "stopRefused": "Her answer didn't stop",
+    "stopRefused": "The answer didn't stop",
     "clear": "Clear",
     "clearLabel": "Clear {{name}}'s conversation",
     "clearTitle": "Clear {{name}}'s conversation?",
-    "clearMessage": "She forgets this conversation, her unpinned cards, the draft and the walkthrough, and starts fresh. Your pinned cards stay, and so does what she keeps in her memory; briefs she already sent stay in their chats.",
+    "clearMessage": "Forgets this conversation, the unpinned cards, the draft and the walkthrough, and starts fresh. Your pinned cards stay, and so does what is kept in memory; briefs already sent stay in their chats.",
     "clearConfirm": "Clear the conversation",
     "clearRefused": "{{name}}'s conversation wasn't cleared",
     "cancel": "Cancel",
@@ -3836,7 +3845,20 @@
       "nothingHeard": "Nothing heard",
       "newest": "Newest",
       "emptyTitle": "Nothing said yet",
-      "emptyMessage": "Type to {{name}} below. She keeps track of every chat you're running, drafts what to tell one, and sends only on your word."
+      "emptyMessage": "Type to {{name}} below. {{name}} keeps track of every chat you're running, drafts what to tell one, and sends only on your word."
+    },
+    "work": {
+      "label": "Work",
+      "failed": "{{count}} failed",
+      "failedOne": "Failed",
+      "stopped": "Stopped",
+      "running": "Running",
+      "reading": "Opening…",
+      "gone": "No longer kept.",
+      "unread": "Couldn't open this.",
+      "notKept": "{{name}}'s memory is not stored here.",
+      "noAnswer": "No answer.",
+      "cut": "The rest of the answer was not kept."
     },
     "attachments": {
       "strip": "You attached"
@@ -3884,7 +3906,7 @@
       "clearConfirm": "Clear the draft",
       "clearRefused": "The draft wasn't cleared",
       "theirsChanged": "{{name}} changed the draft while you were editing.",
-      "useTheirs": "Use hers",
+      "useTheirs": "Use {{name}}’s",
       "sendRefused": "Not sent: {{reason}}",
       "sendRefusedPlain": "Not sent. Try again.",
       "saveRefused": "Your edit wasn't saved: {{reason}}",
@@ -3892,7 +3914,6 @@
     },
     "action": {
       "waiting": "Waiting for your word",
-      "waitingShort": "Waiting",
       "verb": {
         "queue": "Queue <target/>",
         "hide": "Hide <target/>",
@@ -3955,13 +3976,13 @@
       "label": "Voice on this device"
     },
     "ears": {
-      "label": "Listen for her name on this device",
+      "label": "Listen for the wake word on this device",
       "waiting": "Listening for {{name}}",
-      "readying": "Getting her ears ready",
-      "needsTouch": "Touch the page to let her listen",
-      "elsewhere": "She listens on the page you last talked to her from",
+      "readying": "Getting ready to listen",
+      "needsTouch": "Touch the page to start listening",
+      "elsewhere": "Listening on the page you last talked from",
       "hearing": "Listening",
-      "unavailable": "She can't listen on this page"
+      "unavailable": "Can't listen on this page"
     },
     "door": {
       "label": "{{name}}"
@@ -3987,10 +4008,17 @@
       "openCard": "Open {{kind}} {{title}} on the stage"
     },
     "head": {
-      "controls": "Her controls",
-      "menu": "Her controls and CloudCLI",
-      "showChat": "Show chat",
-      "showPortrait": "Show portrait"
+      "controls": "Controls"
+    },
+    "kaylee": {
+      "home": "Home",
+      "again": "Say it again",
+      "earsOn": "{{name}} is listening for the name",
+      "earsOff": "Listen for the name",
+      "running_one": "{{count}} running",
+      "running_other": "{{count}} running",
+      "waiting_one": "{{count}} waiting on you",
+      "waiting_other": "{{count}} waiting on you"
     },
     "talk": {
       "orPress": "or press",
@@ -4007,36 +4035,17 @@
       "page": "Page"
     },
     "bar": {
-      "title": "Kaylee <accent>Station</accent>",
-      "back": "CloudCLI",
-      "backLabel": "Back to CloudCLI"
-    },
-    "compact": {
-      "switch": "Compact",
-      "switchLabel": "Section",
-      "section": {
-        "conversation": "Conversation",
-        "needs": "Needs you",
-        "where": "Where things stand",
-        "stage": "Stage"
-      },
-      "needsPressUnread": "Open Needs you",
-      "needsPress_zero": "Nothing needs you: open Needs you",
-      "needsPress_one": "1 needs you: open Needs you",
-      "needsPress_other": "{{count}} need you: open Needs you"
-    },
-    "phone": {
-      "bar": "Sections",
-      "needsPress": "Needs you · {{count}}",
-      "stagePress": "Stage: {{label}}"
+      "back": "CloudCLI"
     },
     "stage": {
-      "name": "Stage",
+      "name": "Panel",
       "back": "Back",
-      "clear": "Clear the stage",
+      "clear": "Clear the panel",
+      "placedBy": "{{name}} put this on the panel",
+      "open": "Open",
       "empty": {
-        "title": "Nothing on the stage",
-        "message": "Press anything, or ask her to show you something."
+        "title": "Nothing on the panel",
+        "message": "Press anything, or ask to see something."
       }
     },
     "card": {
@@ -4047,41 +4056,15 @@
       "block": "One block of a page in DocSpace",
       "open": "Open in DocSpace"
     },
-    "rail": {
-      "name": "Where things stand"
-    },
     "sessions": {
-      "heading": "Sessions",
       "state": {
         "working": "Working",
         "waiting": "Waiting on you",
         "idle": "Idle",
         "asleep": "Asleep"
       },
-      "asleep": "Asleep · {{count}}",
       "reading": "Reading your sessions…",
-      "retry": "Try again",
-      "none": {
-        "title": "No sessions yet",
-        "message": "A chat you start in CloudCLI stands here, with what it is doing."
-      },
-      "nothingRunning": {
-        "title": "Nothing is running",
-        "message_one": "One chat is asleep. A message wakes it.",
-        "message_other": "{{count}} chats are asleep. A message wakes any of them."
-      },
-      "her": {
-        "reading": "{{name}} is reading {{chat}}",
-        "drafting": "{{name}} is drafting for {{chat}}",
-        "walking": "{{name}} is walking {{chat}}"
-      }
-    },
-    "roadmap": {
-      "eyebrow": "Roadmap",
-      "reading": "Reading the roadmap…",
-      "none": "No roadmap yet. Make one on the Roadmap tab, and its open epics stand here.",
-      "noneOpen": "Nothing is open on this roadmap.",
-      "complete": "Complete · {{count}}"
+      "retry": "Try again"
     },
     "chat": {
       "moved": "last moved {{when}}",
@@ -4090,12 +4073,13 @@
         "yesterday": "yesterday {{clock}}",
         "day": "{{date}} {{clock}}"
       },
+      "reply": "Its latest reply",
       "open": "Open the chat",
       "say": "Say “What is {{name}} doing?”"
     },
     "cards": {
-      "reading": "Reading her cards…",
-      "readFailed": "Her cards could not be read just now.",
+      "reading": "Reading the cards…",
+      "readFailed": "The cards could not be read just now.",
       "retry": "Try again",
       "pin": "Pin",
       "unpin": "Unpin",
@@ -4112,8 +4096,8 @@
       "walk": {
         "refused": "The walkthrough did not move",
         "endRefused": "The walkthrough did not end",
-        "reading": "Reading her walkthrough…",
-        "readFailed": "Her walkthrough could not be read just now.",
+        "reading": "Reading the walkthrough…",
+        "readFailed": "The walkthrough could not be read just now.",
         "label": "The walkthrough of {{name}}",
         "place": "Item {{at}} of {{total}}",
         "notBegun": "Not begun",
@@ -4130,7 +4114,7 @@
         "end": "End the walkthrough"
       },
       "shelf": {
-        "label": "Her cards",
+        "label": "Cards",
         "pinnedWord": ", pinned",
         "more": "+{{count}} more in the conversation"
       }
@@ -4145,14 +4129,9 @@
       "walk": "The walkthrough ended"
     },
     "needs": {
-      "title": "What needs you",
-      "reading": "Reading what needs you…",
-      "empty": "Nothing needs you.",
       "retry": "Try again",
       "fault": {
-        "plans": "Couldn’t read the Accepts and design questions just now",
         "ask": "Couldn’t read the permissions just now",
-        "followups": "Couldn’t read the follow-ups just now",
         "check": "Couldn’t read the checks just now"
       },
       "kind": {
@@ -4170,25 +4149,6 @@
         "allow": "Allow…",
         "open": "Open"
       },
-      "status": {
-        "failing": "Failing",
-        "denied": "Refused"
-      },
-      "facts": {
-        "epic_one": "Epic · {{count}} feature",
-        "epic_other": "Epic · {{count}} features",
-        "feature": "Feature",
-        "questions": "{{count}} to answer",
-        "more": "{{count}} more waiting",
-        "open": "{{count}} open"
-      },
-      "where": "{{node}} · since {{time}}",
-      "when": {
-        "today": "{{clock}}",
-        "yesterday": "yesterday {{clock}}",
-        "day": "{{date}} {{clock}}"
-      },
-      "onStage": "On the stage",
       "openChat": "Open the chat",
       "ask": {
         "looking": "Looking for the ask…",
@@ -4222,74 +4182,9 @@
         "card": "{{label}} in Cerberus"
       }
     },
-    "strip": {
-      "name": "Since you last looked",
-      "timeline": "This week’s landings, oldest first",
-      "kind": {
-        "shipped": "Shipped",
-        "epic": "Epic complete",
-        "landed": "Landed",
-        "recovered": "Recovered"
-      },
-      "when": {
-        "today": "{{clock}}",
-        "yesterday": "yesterday {{clock}}",
-        "day": "{{day}}"
-      },
-      "by": "by {{chat}}",
-      "byHouse": "by the house",
-      "new": "New",
-      "newCount": "{{count}} new",
-      "seenLabel_one": "{{count}} new since you last looked: mark it seen",
-      "seenLabel_other": "{{count}} new since you last looked: mark them seen",
-      "rule": "You last looked",
-      "nothingNew": "Nothing new since you last looked",
-      "nothingNewShort": "Nothing new",
-      "quiet": "Nothing has landed this week",
-      "loading": "Reading what landed…",
-      "failed": "Couldn’t read what landed",
-      "failedShort": "Couldn’t read",
-      "retry": "Try again",
-      "retryLabel": "Try again: {{failure}}",
-      "expand": "Show the whole week",
-      "collapse": "Show only the newest"
-    },
     "dock": {
       "label": "{{name}}’s draft",
-      "empty": "When she drafts a brief for a session, it waits here for your Send."
-    },
-    "memory": {
-      "title": "What I'm keeping",
-      "toggle_one": "What I'm keeping, {{count}} memory",
-      "toggle_other": "What I'm keeping, {{count}} memories",
-      "toggleUnknown": "What I'm keeping, how many can't be read",
-      "kind": {
-        "rule": "rule",
-        "gotcha": "gotcha",
-        "landmine": "landmine",
-        "manual": "name"
-      },
-      "when": {
-        "today": "today {{clock}}",
-        "yesterday": "yesterday {{clock}}"
-      },
-      "channel": {
-        "spoken": "said",
-        "typed": "typed"
-      },
-      "youSaid": "You said",
-      "youTyped": "You typed",
-      "quoted": "“{{quote}}”",
-      "noWords": "No words of yours are kept with this one.",
-      "reading": "Reading her memory…",
-      "unreadable": "Her memory can't be read just now",
-      "retry": "Try again",
-      "empty": {
-        "title": "Nothing kept yet",
-        "message": "What she keeps of what you say shows here."
-      },
-      "page": "Open the full page",
-      "pageLabel": "Open the full page: her memory in DocSpace, in a new tab"
+      "empty": "When {{name}} drafts a brief for a session, it waits here for your Send."
     }
   }
 }

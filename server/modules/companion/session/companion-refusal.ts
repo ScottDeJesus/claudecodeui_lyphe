@@ -19,11 +19,11 @@ import type { CompanionSessionDeps, HeldSession } from './companion-session-type
  */
 
 /** What her panel says when a held conversation is not resumed because its shape is not today's and there is no thread of it to hand over. */
-const SHAPE_CHANGED_LINE = 'Her tools, her prompt or her model provider changed, so she starts fresh; she keeps her memory.';
+const SHAPE_CHANGED_LINE = 'The tools, the prompt or the model provider changed, so the conversation starts fresh; the memory is kept.';
 /** The same refusal when the summarizer wrote a handover of the thread for her first message. */
-const SHAPE_CHANGED_HANDOVER_LINE = 'Her tools, her prompt or her model provider changed, so she starts fresh with a handover of what you were discussing; she keeps her memory.';
+const SHAPE_CHANGED_HANDOVER_LINE = 'The tools, the prompt or the model provider changed, so the conversation starts fresh with a handover of what you were discussing; the memory is kept.';
 /** The same refusal when a handover was tried and could not be written: the cause is in the journal. */
-const HANDOVER_FAILED_LINE = 'Her tools, her prompt or her model provider changed, so she starts fresh, and the handover of what you were discussing could not be written; she keeps her memory.';
+const HANDOVER_FAILED_LINE = 'The tools, the prompt or the model provider changed, so the conversation starts fresh, and the handover of what you were discussing could not be written; the memory is kept.';
 
 /** What `createRefusal` answers; the session holds one. */
 type Refusal = {

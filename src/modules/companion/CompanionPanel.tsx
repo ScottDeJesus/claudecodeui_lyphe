@@ -235,7 +235,7 @@ export function CompanionPanelView({
           <Spinner size={28} label={t('companion.panel.loading', { name })} />
         </div>
       ) : (
-        <CompanionLog entries={picture.log} name={name} turnId={picture.turnId} visible={open} speaking={voice?.speaking} />
+        <CompanionLog entries={picture.log} work={picture.work} name={name} turnId={picture.turnId} visible={open} speaking={voice?.speaking} />
       )}
 
       {docked && (

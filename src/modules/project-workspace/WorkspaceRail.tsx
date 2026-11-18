@@ -1,5 +1,5 @@
-import { Settings } from 'lucide-react';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { House, Settings } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AccountRailButton, UsageRings } from '@/modules/accounts';
@@ -9,7 +9,9 @@ import { useProjectSidebarState } from '@/modules/project-workspace/context/Proj
 import { useRailBadges } from '@/modules/project-workspace/hooks/useRailBadges';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import RailButton from '@/modules/project-workspace/RailButton';
+import { openHome } from '@/shared/cloudcliDoors';
 import { PAGE_ANCHOR } from '@/shared/constants';
+import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { AppTab, DockPress, SidebarListState, WorkspaceView, WorkspaceViewGroup } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
@@ -24,10 +26,10 @@ function RailHairline({ className }: { className?: string }) {
 /**
  * THE VIEWS RAIL: the house's views as one column of glyphs down the sidebar's left edge, one of them lit.
  *
- * A `<nav>` of buttons, not a tablist, because two of its buttons are not views: Settings opens a dialog and the
- * account a panel. The lit view says so with `aria-current="page"`.
+ * A `<nav>` of buttons, not a tablist, because three of its buttons are not views: Home opens the sessions home over this page, Settings opens a dialog
+ * and the account a panel. The lit view says so with `aria-current="page"`.
  *
- * TOP TO BOTTOM: the app switcher's disc, a hairline, then the views in their runs — `chat`, `tools`, `plans`, `house`,
+ * TOP TO BOTTOM: the app switcher's disc, a hairline, Home, then the views in their runs — `chat`, `tools`, `plans`, `house`,
  * `plugins` — with a hairline between each pair of runs that are drawn, and at the foot the usage ring (the
  * week's: a status, not a button, always in its place), the Inbox, Settings and the account. The runs scroll
  * in a region of their own, so in a window too short for the rail the disc and the foot stay put. The region spans
@@ -64,6 +66,7 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
   const { activeTab, setActiveTab, setSidebarOpen, sidebarSharedProps } = useProjectSidebarState();
   const { views } = useWorkspaceViews();
   const badges = useRailBadges();
+  const doors = useStationDoors();
   // The rail — which is also the phone's drawer navigation, one tree — draws only the views the person has not hidden from
   // the navigation. A hidden view is still in `views` (the palette reaches it, the pane draws), so this is the one place
   // the choice takes effect, and every read below is of this list: no hidden view can reach a run, the foot or the reveal.
@@ -84,21 +87,6 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
     });
     return () => cancelAnimationFrame(frame);
   }, [activeTab, litPresent]);
-
-  // Whether the Chat button stands whole in the scroll region. State because the switcher's disc, seated in this rail,
-  // draws no dot while the Chat badge says a reply waits — and in a window too short for the rail the region scrolls
-  // and the reveal of a lit view far down can take Chat out of it, leaving the reply unsigned. Watched only while a
-  // reply waits, by an observer rooted at the region, so nothing polls and no scroll listener runs.
-  const [chatInView, setChatInView] = useState(true);
-  const chatBadged = badges.chat !== undefined;
-  useEffect(() => {
-    const region = scrollRef.current;
-    const chatButton = region?.querySelector('[data-view-id="chat"]');
-    if (!chatBadged || !region || !chatButton) return undefined;
-    const watch = new IntersectionObserver(([entry]) => setChatInView(entry.intersectionRatio >= 0.9), { root: region, threshold: [0.9] });
-    watch.observe(chatButton);
-    return () => watch.disconnect();
-  }, [chatBadged]);
 
   // A press on a phone chooses a pane the drawer is covering, so the drawer gets out of the way. Docked, it closes nothing.
   const press = (id: AppTab) => {
@@ -137,9 +125,13 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
       aria-label={t('rail.label')}
       className="relative z-50 flex h-full w-12 flex-none flex-col items-center bg-background pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pt-2"
     >
-      <div className="grid size-11 flex-none place-items-center md:size-10">
-        <AppSwitcherDock unreadBadgeHidden={chatBadged && !chatInView} pressOverride={pressOverride} />
-      </div>
+      {/* The rail's top cell stands only while it has something to offer: the way back to a collapsed chat list. The applications'
+          disc that used to sit here is gone from this app; its acts are the sessions home's menu's. */}
+      {pressOverride !== null && (
+        <div className="grid size-11 flex-none place-items-center md:size-10">
+          <AppSwitcherDock pressOverride={pressOverride} />
+        </div>
+      )}
       <div
         ref={scrollRef}
         className="scrollbar-hide mt-1 flex min-h-0 w-full flex-1 scroll-py-1.5 flex-col items-center overflow-y-auto overflow-x-hidden overscroll-contain"
@@ -149,9 +141,18 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
         <div aria-hidden="true" className="pointer-events-none relative z-30 -mt-px mb-1 flex h-px w-full flex-none justify-center bg-background">
           <RailHairline />
         </div>
-        {runs.map((run, index) => (
+        {/* The way to the sessions home, first and apart: not a view of this page but the page over it (`openHome`). On a phone the drawer steps aside for it. */}
+        <RailButton
+          label={t('home.title')}
+          icon={House}
+          onPress={() => {
+            if (isMobile) setSidebarOpen(false);
+            openHome(doors.navigate);
+          }}
+        />
+        {runs.map((run) => (
           <Fragment key={run[0].group}>
-            {index > 0 && <RailHairline className="my-1" />}
+            <RailHairline className="my-1" />
             {run.map(viewButton)}
           </Fragment>
         ))}

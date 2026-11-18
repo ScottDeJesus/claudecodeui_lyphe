@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { DoorClosed, Edit2, FolderInput, Loader2, MoreHorizontal, Pin, PinOff, Smile, Trash2 } from 'lucide-react';
+import { DoorClosed, Edit2, FolderInput, MoreHorizontal, Pin, PinOff, Smile, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
-import { ActionMenu, Tooltip } from '@/shared/ui';
+import { ActionMenu, SignalLoop, Tooltip } from '@/shared/ui';
 import { PAGE_ANCHOR } from '@/shared/constants';
 import { usePageAnchor } from '@/shared/context/PageAnchorsContext';
 import { cn } from '@/shared/utils';
@@ -222,7 +222,7 @@ export default function SidebarSimpleListRow({
             data-no-drag
             className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground"
           >
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <SignalLoop state="thinking" size={13} />
           </span>
         </Tooltip>
       )}
@@ -237,7 +237,7 @@ export default function SidebarSimpleListRow({
             className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
           >
             {/* The pinned strip's own running mark, in its own ink. */}
-            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
+            <SignalLoop state="working" signal="secondary" size={12} />
           </span>
         </Tooltip>
       )}

@@ -237,7 +237,6 @@
       "label": "{{time}} transcurridos",
       "startingNow": "Empezando ahora"
     },
-    "stop": "Detener",
     "controls": {
       "stopGeneration": "Detener generación",
       "pressEscToStop": "Pulsa Esc en cualquier momento para detener"

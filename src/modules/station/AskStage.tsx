@@ -1,16 +1,17 @@
-import { ArrowUpRight, CheckCheck } from 'lucide-react';
+import { CheckCheck } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AskAnswers } from '@/modules/station/AskAnswers';
 import { useStationNeeds } from '@/modules/station/context/StationNeedsContext';
+import { StageOpen } from '@/modules/station/StageOpen';
 import { StageGone } from '@/modules/station/stageStates';
 import { useOpenChatInCloudcli } from '@/modules/station/hooks/useOpenChatInCloudcli';
 import { api, refusalSentence } from '@/shared/api';
 import { STATION_NEED_KINDS } from '@/shared/constants';
 import type { StationAskKind, StationFocus, StationNeed } from '@/shared/station-types';
 import type { LocaleWords } from '@/shared/types';
-import { Button, Card, Spinner } from '@/shared/ui';
+import { Button, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /** A chat's waiting ask on the stage. */
@@ -65,7 +66,8 @@ type AskStageViewProps = {
  * then the answers (`AskAnswers`): a permission's Allow, Deny and Always allow with the rule it keeps; a question's options and
  * his own words; a plan's Approve and Send back. Where the rail's press sends the keyboard is the answers' group, never a
  * button: labelled by the ask's kind and described by the well, so what a press would approve is read on arrival, and a second
- * Enter from the rail approves nothing. A refused answer is said under them in the warn ink with its ▲; "Open the chat" last.
+ * Enter from the rail approves nothing. A refused answer is said under them in the warn ink with its ▲; "Open" (the chat) stands
+ * at the panel's foot (`StageOpen`).
  *
  * Answered from here: "Answered" with the server's sentence of what it did. Unread (the chats' asks could not be read just
  * now): the rail's own fault line, "▲ Couldn’t read the permissions just now", with Try again and "Open the chat" — never
@@ -82,13 +84,8 @@ export function AskStageView({ focus, found, answering, refusal, onAnswer, onRer
   const kindId = useId();
   const whatId = useId();
 
-  const openChat = (quiet: boolean) => (
-    // A 44 px catch under a finger below 768 px, as every answer above it.
-    <Button variant={quiet ? 'ghost' : 'outline'} size="sm" data-station-ask-open="" className="self-start finger:h-11" onClick={onOpenChat}>
-      {t('station.needs.openChat', 'Open the chat')}
-      <ArrowUpRight aria-hidden="true" />
-    </Button>
-  );
+  // The way to the chat the ask waits in: the panel's Open, at its foot, in every state that has a chat to open.
+  const openChat = <StageOpen name={t('station.needs.openChat', 'Open the chat')} data-station-ask-open="" onOpen={onOpenChat} />;
 
   switch (found.kind) {
     case 'loading':
@@ -101,22 +98,21 @@ export function AskStageView({ focus, found, answering, refusal, onAnswer, onRer
       return (
         <div data-station-ask="gone" className="flex min-w-0 flex-col gap-3">
           <StageGone focus={focus} />
-          {openChat(false)}
+          {openChat}
         </div>
       );
     case 'answered':
       return (
         <div data-station-ask="answered" className="flex min-w-0 flex-col gap-3">
-          <Card data-tone="positive" className="flex min-w-0 items-start gap-3 p-4">
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-tone-soft text-tone-ink">
-              <CheckCheck aria-hidden="true" className="size-4" />
-            </span>
+          {/* On the panel's own ground: the mark and the word in the positive ink, the server's sentence under them. */}
+          <div data-tone="positive" className="flex min-w-0 items-start gap-2.5">
+            <CheckCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-tone-ink" />
             <div role="status" className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">{t('station.needs.ask.answered', 'Answered')}</p>
+              <p className="text-sm font-medium text-tone-ink">{t('station.needs.ask.answered', 'Answered')}</p>
               <p className="mt-0.5 break-words text-sm text-muted-foreground">{found.told}</p>
             </div>
-          </Card>
-          {openChat(false)}
+          </div>
+          {openChat}
         </div>
       );
     case 'unread':
@@ -130,8 +126,8 @@ export function AskStageView({ focus, found, answering, refusal, onAnswer, onRer
             <Button variant="outline" size="sm" data-station-ask-retry="" className="finger:h-11" onClick={onReread}>
               {t('station.needs.retry', 'Try again')}
             </Button>
-            {openChat(true)}
           </div>
+          {openChat}
         </div>
       );
     case 'waiting':
@@ -173,7 +169,8 @@ export function AskStageView({ focus, found, answering, refusal, onAnswer, onRer
           tabIndex={0}
           data-station-ask-what=""
           className={cn(
-            'scrollbar-thin max-h-[50dvh] min-h-0 overflow-y-auto overscroll-contain whitespace-pre-wrap rounded-md border border-border bg-background px-3 py-2.5 leading-relaxed text-foreground [overflow-wrap:anywhere]',
+            // Between two rules, as code reads in a chat: no box of its own inside the panel.
+            'scrollbar-thin max-h-[50dvh] min-h-0 overflow-y-auto overscroll-contain whitespace-pre-wrap border-y border-border py-2.5 leading-relaxed text-foreground [overflow-wrap:anywhere]',
             // A command in mono, as it runs; a question's or a plan's prose in the body face, as it reads.
             need.ask === 'permission' ? 'font-mono text-[13px]' : 'text-sm',
           )}
@@ -191,7 +188,7 @@ export function AskStageView({ focus, found, answering, refusal, onAnswer, onRer
         </p>
       )}
 
-      {openChat(true)}
+      {openChat}
     </div>
   );
 }

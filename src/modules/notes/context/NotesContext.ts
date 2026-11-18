@@ -100,8 +100,7 @@ export const NotesContext = createStableContext<NotesValue | null>(import.meta.h
 export const NoteDraftsContext = createStableContext<NoteDraftsValue | null>(import.meta.hot, 'NoteDraftsContext', null);
 
 /**
- * The list and its verbs. Read by the module's own `NotesList`, `NoteCard` and `NotesPanel`, and —
- * through the module's barrel — by `src/modules/chat-gutters`, which draws the widget's count.
+ * The list and its verbs. Read by the module's own `NotesList`, `NoteCard` and `NotesPanel`.
  */
 export function useNotes(): NotesValue {
   const value = useContext(NotesContext);

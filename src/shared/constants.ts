@@ -306,12 +306,11 @@ export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
 
 /**
  * The space between two lane cards, whether they stand side by side on the wall of the Roadmap tab's
- * In flight face or one under another in the Runs widget. Both homes read this one value,
- * so the widget's list keeps the face's card spacing.
+ * In flight face.
  *
- * Used by `LANE_WALL_GRID` below and by the runner-tab module's `RunnerWidgetBody` (its list of cards).
+ * Used by `LANE_WALL_GRID` below.
  */
-export const LANE_CARD_GAP = 'gap-4';
+const LANE_CARD_GAP = 'gap-4';
 
 /**
  * The wall of the Roadmap tab's In flight face: an auto-fill grid of lane cards, each column at least 22rem wide (or the
@@ -436,7 +435,7 @@ export const RAIL_BUTTON_UNLIT = 'text-muted-foreground hover:bg-secondary hover
  * Used with `RAIL_BUTTON_BASE` by the project-workspace module's RailButton (the view on screen) and by the companion
  * module's door (CompanionDock.tsx's CompanionDoorView, her panel open); and on its own by the companion module's
  * dock cell (CompanionDockView: her disc seated, her panel open). So a lit door, a lit seat and a lit view are one look.
- * The station module's left rail lights a row in it too (`RailRow`: the session, epic or feature on the stage, as
+ * The station module's left rail lit a row in it too (removed with the old station: the session, epic or feature on the stage, as
  * `aria-current`), its bar drawn inside the row's left edge, where a fold's clipping body cannot cut it: a lit thing is
  * one look on every rail.
  */
@@ -503,13 +502,13 @@ export const ROADMAP_EPIC_WORD_KEYS: Record<RoadmapEpicWord, string> = {
 
 /**
  * How each feature dot is painted, by its state: a Verve token for the fill and one for the stroke, put on
- * through `style`. Green shipped, amber in flight, the garnish designing (orange in light, gold in dark),
+ * through `style`. Green shipped (the theme's positive tone, never the accent: the accent is what waits on a word), amber in flight, the garnish designing (orange in light, gold in dark),
  * teal proposed, red blocked, and an idea hollow (the surface inside a faint ring). Used by the roadmap
  * module's tree, `tree/TreeEpicNode`, for each feature's dot under its epic's title, and by its panel,
  * `panel/PanelRows`'s `PanelDot`, for each row's dot and the feature's State fact.
  */
 export const ROADMAP_DOT_PAINT: Record<RoadmapDotState, { fill: string; stroke: string }> = {
-  shipped: { fill: 'var(--accent)', stroke: 'var(--accent)' },
+  shipped: { fill: 'var(--pos-dot)', stroke: 'var(--pos-dot)' },
   inFlight: { fill: 'var(--warn-dot)', stroke: 'var(--warn-dot)' },
   designing: { fill: 'var(--garnish)', stroke: 'var(--garnish)' },
   proposed: { fill: 'var(--info-dot)', stroke: 'var(--info-dot)' },
@@ -531,8 +530,8 @@ export const RUNNER_LANDING_PARAM = 'runner';
 /**
  * The query parameter a landing names a roadmap in (`?roadmap=<name>`): the Roadmap tab's Roadmap face
  * on that roadmap. Taken, held and stripped under the very rule `RUNNER_LANDING_PARAM` follows. Used by
- * the project-workspace module's `useRunnerLanding`, which reads it, and the roadmap module's chat-gutter
- * widget (`RoadmapWidgetBody`), which writes it from a surface that has no Roadmap tab above it.
+ * the project-workspace module's `useRunnerLanding`, which reads it. Nothing in the app writes it since the chat's
+ * widget column was removed; a link that carries it still lands.
  */
 export const ROADMAP_LANDING_PARAM = 'roadmap';
 
@@ -700,7 +699,7 @@ export const STATION_FOCUS_GLYPHS: Record<StationFocusKind, { icon: LucideIcon; 
  * together (MAN-578); `warn` whether it wears the warn tone — an Accept and a red check, what stands waiting on him, amber and
  * never red (MAN-577); and `act` the one act its item offers. "Queue…", "Answer…" and "Allow…" carry the ellipsis that says more
  * comes: the press brings the whole onto the stage, where the owner's own form fires it. "Open" opens at once, because opening is
- * harmless. Each word is its locale key with its English. Read by the station's `NeedItem` (the rail's item) and `AskStage`
+ * harmless. Each word is its locale key with its English. Read by the station's `AskStage`
  * (an ask's kind, said over what it would do).
  */
 export const STATION_NEED_KINDS: Readonly<Record<StationNeedKind, { icon: LucideIcon; word: LocaleWords; warn: boolean; act: LocaleWords }>> = {
@@ -768,24 +767,23 @@ export const OUT_OF_REACH = { inert: '', 'aria-hidden': true } as unknown as HTM
 /** The router path Kaylee Station is shown at, under the basename. A page at it draws the station over the held workspace; deep-linking to it opens the station. */
 export const STATION_PATH = '/station';
 
+/**
+ * The router path the sessions home is shown at, under the basename: his chats laid out by folder, with Kaylee's core docked at the foot. A page at it draws
+ * the home over the held workspace, as the station's path does the station. Read by `src/App.tsx` (the route), project-workspace's `useHeldWorkspace` (which page
+ * is on screen) and `shared/cloudcliDoors.ts` (`openHome`).
+ */
+export const SESSIONS_HOME_PATH = '/home';
+
+/**
+ * Where the roadmap's small circle rests on the sessions home, in the page's own pixels: its middle and its radius, at a desk and on a phone.
+ * Read by project-workspace's `WorkspaceHome` (which draws the circle there) and the station's `StationShell` (which draws the circle at the
+ * same place on a phone, and has the stack arrive from it at a desk), so the roadmap does not move between the two pages.
+ */
+export const ROADMAP_CIRCLE_AT_DESK = { cx: 66, cy: 78, radius: 33 } as const;
+export const ROADMAP_CIRCLE_ON_PHONE = { cx: 42, cy: 51, radius: 27 } as const;
+
 // ---------------------------
 
-//----------------- THE STATION PHONE'S SIDEWAYS CATCH ------------
-
-/**
- * A press of Kaylee Station's phone top row on its side, where the row is 40 px: drawn 40 px tall, its catch grown over and under
- * it by a transparent `::before`, so a finger still has 44 px (the touch law's own way to grow a press without moving its
- * neighbours, INV-10275). The `::before` stands on the press's padding box and reaches 4 px past it: worn by two borderless ghost
- * presses, her menu's trigger (the station's `HeadRow`) and the count of what needs him (`StationPhoneView`), whose catch is 48 px.
- */
-export const STATION_SIDEWAYS_CATCH = "relative h-10 before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']";
-
-/**
- * A press of the strip's count form (the phone's 40 px top row on its side) that keeps its own drawn size: its catch grown 8 px past
- * its padding box by a transparent `::before`, so its 32 px pill or 36 px outlined box (a 1.5 px border inside it) catches 44 px
- * and more. Worn by the strip's "<n> new" chip (`SinceYouLastLooked`) and its Try again (`StripLines`).
- */
-export const STATION_COUNT_FORM_CATCH = "relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']";
 
 // ---------------------------
 

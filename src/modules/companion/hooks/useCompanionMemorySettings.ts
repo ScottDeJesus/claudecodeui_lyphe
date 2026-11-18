@@ -13,11 +13,11 @@ function isReading(body: unknown): body is CompanionMemoryReading {
 }
 
 /**
- * Used by this module's CompanionMemorySettings, which draws Settings > Voice > Companion's "Her memory" card from what it returns.
+ * Used by this module's CompanionMemorySettings, which draws Settings > Voice > Companion's "Memory" card from what it returns.
  *
  * The card's own read and clear of her memory bank: `GET /api/companion/memory` when the section opens, `DELETE` when he confirms Clear,
  * and the `GET` again after it. EVENTS, NOT A WATCHDOG: nothing here polls it or re-reads on a timer. The `companion_memory` frame the
- * server sends after each write of her bank is followed by the station's corner (`useMemoryLines`), not by this card: its count is as
+ * server sends after each write of the bank is not followed by this card: its count is as
  * old as the last open or clear, which is the truth of a card he looks at and acts on.
  *
  * The read after a clear happens whether the clear went through or was refused: a clear that stopped part way (the docstore door
@@ -53,7 +53,7 @@ export function useCompanionMemorySettings(name: string) {
       const response = await api.companion.memory.read();
       if (!response.ok) throw new Error((await refusalSentence(response)) ?? `Request failed (${response.status})`);
       const body: unknown = await response.json();
-      if (!isReading(body)) throw new Error('The answer was not a reading of her memory.');
+      if (!isReading(body)) throw new Error('The answer was not a reading of the memory.');
       next = body;
     } catch (error) {
       console.warn('[Companion] Could not read her memory:', error);

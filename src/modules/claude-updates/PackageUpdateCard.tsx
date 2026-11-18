@@ -118,12 +118,21 @@ export function PackageUpdateCard({
             size="sm"
             disabled={jobActive}
             onClick={() => onRollback({ targets: { [pkg.key]: rollbackFrom } })}
-          >
-            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-            {t('updates.card.rollBack', {
+            aria-label={t('updates.card.rollBack', {
               version: rollbackFrom,
               defaultValue: 'Roll back to {{version}}',
             })}
+            title={t('updates.card.rollBack', {
+              version: rollbackFrom,
+              defaultValue: 'Roll back to {{version}}',
+            })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5 finger:mr-0" />
+            <span className="finger:hidden">{t('updates.card.rollBack', {
+              version: rollbackFrom,
+              defaultValue: 'Roll back to {{version}}',
+            })}</span>
           </Button>
         )}
 

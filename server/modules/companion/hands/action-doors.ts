@@ -143,8 +143,8 @@ async function clearHerMemory(deps: CompanionToolDeps, press: RelayedPress): Pro
   const via = fired?.via === 'typed' ? 'typed' : 'spoken';
   const cleared = await clearMemory({ kind: 'word', account: accountName(deps.userId), line: { id: press.press, at: press.saidAt, via, text: press.words } });
   if (!cleared.ok) return refused(cleared.sentence);
-  if (cleared.forgotten === 0) return { outcome: 'already', said: 'Her memory was already empty.' };
-  return { outcome: 'took', said: `She forgot ${thingsOf(cleared.forgotten)}. The docstore's history keeps them.` };
+  if (cleared.forgotten === 0) return { outcome: 'already', said: 'The memory was already empty.' };
+  return { outcome: 'took', said: `Forgot ${thingsOf(cleared.forgotten)}. The docstore's history keeps them.` };
 }
 
 /**

@@ -11,7 +11,7 @@ import type { CompanionPendingAction } from '@/shared/companion-types';
  * one painted frame (3, 4, 3). The stamp is therefore also read against the clock in the render that brings it. A stamp that is not
  * a time is never past, as in the hook: the action is still his to fire or withdraw until the server says otherwise.
  *
- * Used by `useNeedsCount` (compact's button and the phone's bar) and `WhatNeedsYouView` (the rail's head), which hand the answer to `needsCountOf`.
+ * Used by `useNeedsCount` and `StationShell`, which hand the answer to `needsCountOf`.
  */
 export function useLivePending(pending: CompanionPendingAction | null): CompanionPendingAction | null {
   const lapsed = useActionLapse(pending?.expiresAt ?? null);

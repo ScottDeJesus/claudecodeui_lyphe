@@ -1,237 +1,115 @@
-import type { ReactNode } from 'react';
+import '@/modules/station/stationScene.css';
 
-import { useStation, useStationPref } from '@/modules/station/context/StationContext';
-import { StationBar } from '@/modules/station/StationBar';
-import { StationCompact } from '@/modules/station/StationCompact';
+import { useCallback, useEffect, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { CompanionActionCard, useCompanion } from '@/modules/companion';
+import { RoadmapCircle, RoadmapStanding } from '@/modules/roadmap';
+import { useStation } from '@/modules/station/context/StationContext';
+import { useLivePending } from '@/modules/station/hooks/useLivePending';
+import { StationArrival } from '@/modules/station/StationArrival';
 import { stationArrangementOf } from '@/modules/station/stationArrangement';
-import { StationPhone } from '@/modules/station/StationPhone';
+import { StationDock } from '@/modules/station/StationDock';
+import { StationKaylee } from '@/modules/station/StationKaylee';
+import type { StationKayleeForm } from '@/modules/station/StationKaylee';
 import { StationStage } from '@/modules/station/StationStage';
-import { STATION_REGIONS } from '@/modules/station/stationRegions';
-import { backToCloudcli } from '@/shared/cloudcliDoors';
+import { StationTalk } from '@/modules/station/StationTalk';
+import { openHome } from '@/shared/cloudcliDoors';
+import { ROADMAP_CIRCLE_AT_DESK, ROADMAP_CIRCLE_ON_PHONE } from '@/shared/constants';
+import { useIsPageHeld } from '@/shared/context/HeldPageContext';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
-import type { StationArrangement, StationCompactSwitch, StationDensity, StationSlot } from '@/shared/types';
-import { cn, isDrawn } from '@/shared/utils';
+import type { RoadmapStackRest, StationArrangement } from '@/shared/types';
+import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 
-/** What the layout holds in each slot: a region, drawn. A slot left out (or null) draws nothing. */
-type StationSlots = Partial<Record<StationSlot, ReactNode>>;
+/** The companion's column beside the panel, in px, where the screen has room for two columns: the panel keeps the rest, about two thirds. */
+const KAYLEE_COLUMN: Record<'wide' | 'laptop', number> = { wide: 420, laptop: 340 };
 
-/** The slots the body stacks; `strip` is the bar's. */
-type BodySlot = Exclude<StationSlot, 'strip'>;
+/** Where the roadmap's circle rests while a thing is on the panel: the middle of the companion's column, over the halo. */
+const CIRCLE_TOP = 66;
+const CIRCLE_RADIUS = 33;
+
+/** Where the roadmap's circle rests on a phone, at the head's start: the sessions home's own place for it, so it does not move between the two. */
+const CIRCLE_ON_PHONE: RoadmapStackRest = ROADMAP_CIRCLE_ON_PHONE;
+
+/** The halo's width in px, by where it stands: beside the lines, over them in the companion's column, and on a phone. */
+const HALO_BESIDE = 300;
+const HALO_ON_PHONE = 264;
+
+/** What the scene is made of, each a drawn piece, so the layout stays a pure view. */
+type StationScenePieces = {
+  /** The stage, drawn: `StationStage` on the page, `StationStageView` on a fixture. */
+  stage: ReactNode;
+  /** The companion on the scene (`StationKaylee` on the page), in the form and at the halo's width the layout asks for. */
+  kaylee: (form: StationKayleeForm, haloWidth: number) => ReactNode;
+  /** The roadmap standing over the companion while nothing is on the panel (`RoadmapStanding` on the page). */
+  road: ReactNode;
+  /** The roadmap as its small circle, drawn at the rest it is handed (`RoadmapCircle` on the page). */
+  circle: (rest: RoadmapStackRest) => ReactNode;
+  /** The action the companion holds for your word, as its card on its arrival; nothing while none stands. */
+  action: ReactNode;
+  /** The draft the companion holds for your Send, on its arrival (`StationDock` on the page). */
+  draft: ReactNode;
+  /** The one box: the field, the plus that attaches, the talk press and send (`StationTalk`'s `box`). */
+  talk: ReactNode;
+};
 
 type StationShellViewProps = {
   /**
-   * The arrangement: `wide` (≥ 1360 px), `laptop` (1024–1359 px), `compact` (below 1024 px, and wherever his switch is on) or
-   * `phone` (a phone, upright or on its side).
+   * The arrangement: `wide` (≥ 1360 px) and `laptop` (1024–1359 px), two columns while a thing is on the panel; `compact` (below
+   * 1024 px) and `phone` (a phone, upright or on its side), one column always.
    */
   arrangement: StationArrangement;
-  /** Each slot's region, drawn for the window's tier and the arrangement's density. The columns draw them here; compact draws its own. */
-  slots: StationSlots;
-  /** The stage, drawn: `StationStage` on the page, `StationStageView` on a fixture. Compact's Stage section holds its own. */
-  stage: ReactNode;
-  /** Compact, drawn (`StationCompact` on the page, `StationCompactView` on a fixture): the body while `arrangement` is `compact`. */
-  compact: ReactNode;
+  /** A phone on its side: too short for the halo over the lines, so they stand side by side. */
+  sideways: boolean;
   /**
-   * The phone's arrangement, drawn (`StationPhone` on the page, `StationPhoneView` on a fixture): the whole frame while `arrangement`
-   * is `phone`, its top row the bar.
+   * Whether the stage holds a thing (the station's focus is set): the panel then has the screen and the companion stands beside or
+   * over it; with nothing staged the screen is the roadmap and the companion.
    */
-  phone: ReactNode;
-  /** The bar's "Compact" switch, or null where it changes nothing (below 1024 px): the bar then draws none. */
-  compactSwitch: StationCompactSwitch | null;
-  /** The bar's "CloudCLI", the way back to the workspace. */
-  onBackToCloudcli: () => void;
-};
-
-/** The floor of the conversation slot while it draws her portrait (11rem, `StationPortraitView`'s `data-station-portrait`): beats the 3.5rem floor of her log, and is read off what is drawn. */
-const PORTRAIT_FLOOR = '[&:has([data-station-portrait])]:min-h-44';
-
-/**
- * How each slot stands in its column. The lists take the room (sessions, the conversation, needs) and scroll inside
- * themselves; the rest are their own height.
- *
- * HER COLUMN'S ONE BUDGET (wide and laptop, read off `data-station-column=her`): his act first, then the focus, then her newest
- * line; the record gives way first. Her head and the talk control hold their height (`shrink-0`), and so does the dock's head
- * line — its target with Steer's state, its sends with Clear, a refused send's sentence — which is the dock's floor: the property
- * `--station-dock-floor`, whose one writer is the dock's `useDockFloor` (the card's own floor, its field counted at nothing, with
- * the dock's padding), and 8rem until it has written it. The dock never stands under it (it shrinks by nothing). As the column
- * runs short, what gives way, in order:
- *   1. THE DOCK'S FIELD, down to nothing (below a line of words it steps aside whole, `useFieldRoom`): the dock grows to its words
- *      (10000, to its content and no further, and never past its
- *      own cap, `DOCK_CAP` in `StationDock`: 45% of the column wide, 40% on a laptop) only into the room the others' bases leave,
- *      her conversation's share among them; past that the brief scrolls inside its field;
- *   2. HER CONVERSATION (10000), from its share of 30% of the column down to its 3.5rem floor (her panel's own rule): the record,
- *      which scrolls and keeps her newest line in sight. In the portrait view the slot holds her portrait over her latest answer and its
- *      floor is 11rem, read off what the slot draws (`PORTRAIT_FLOOR`, `:has`), never a mode: a face about 100 px over two lines of her
- *      words, where 3.5rem left a laptop's column (the stage beside her at its 55%) a 50 px face and half a line;
- *   3. ON A LAPTOP, THE STAGE beside her (1), down to what the others leave it (`LAPTOP_STAGE_BESIDE_HER`).
- * While the dock's own field holds the focus its basis takes the field's 88 px back (to its words at most), so the brief he types
- * in stands open: her conversation gives way for it, then the stage.
- *
- * The corner is the rail's foot whatever stands above it (`mt-auto`, its hairline its own), so it never rises to the
- * rail's head while the sessions are not drawn; under the sessions, which take the room, the margin is nothing.
- */
-const SLOT_BOX: Record<BodySlot, string> = {
-  sessions: 'min-h-0 flex-1',
-  corner: 'mt-auto shrink-0 border-t border-border',
-  head: 'shrink-0',
-  conversation: cn('min-h-14 flex-1 [[data-station-column=her]_&]:flex-[1_10000_30%]', PORTRAIT_FLOOR),
-  dock: cn(
-    'min-h-0 flex-[0_1_auto]',
-    '[[data-station-column=her]_&]:max-h-max [[data-station-column=her]_&]:flex-[10000_0_var(--station-dock-floor,8rem)]',
-    '[[data-station-column=her]_&]:has-[textarea:focus]:basis-[calc(var(--station-dock-floor,8rem)+88px)]',
-  ),
-  talk: 'shrink-0',
-  needs: 'min-h-0 flex-1',
+  staged: boolean;
+  /** The scene's pieces. */
+  scene: StationScenePieces;
 };
 
 /**
- * THE STAGE IN HER COLUMN ON A LAPTOP, between her head and her conversation, below her face (cards never cover it): its own
- * height up to 55% of the column, and the last of the column to give way, by its weight alone (1, against her conversation's
- * 10000), so the thing he pressed stays readable with a draft docked under it. It gives way down to what her head, her
- * conversation's floor, the dock's head line and the talk control leave it, and nothing of theirs is estimated: whatever height
- * those take (a refusal's lines, the brief opened under his focus, a 1024 px column's taller talk control), his act stays in
- * the frame. Below its own head the stage is clipped to its cell (`overflow-hidden`), never drawn over the pieces under it: a
- * squeezed head or foot spilling onto her conversation or the dock's head line stood over their words and took their presses.
- * Nothing of the stage reaches past it (its acts are buttons, its tooltips portal out, its body and shelf scroll inside).
- */
-const LAPTOP_STAGE_BESIDE_HER = 'max-h-[55%] min-h-0 flex-[0_1_auto] overflow-hidden';
-
-/**
- * Her column as a query container, `her`, of its own height and width (its grid cell's: nothing it holds sizes it): her head
- * draws her face over her words while the column is at least 62rem tall and takes its compact form while it is under 47rem
- * (StationHead), and the talk control stacks while it is under 24rem across (StationTalk).
- */
-const HER_CONTAINER = '[container-name:her] [container-type:size]';
-
-/** The left rail, top to bottom: the sessions over the memory corner. */
-const LEFT: readonly BodySlot[] = ['sessions', 'corner'];
-/** Her column, top to bottom. On a laptop the stage stands between `head` and `conversation`, never over her face. */
-const HER: readonly BodySlot[] = ['head', 'conversation', 'dock', 'talk'];
-/** The body's grid per arrangement, its areas named, its one row the body's whole height (columns scroll inside); compact is one column. */
-const BODY: Record<StationArrangement, string> = {
-  wide: "grid grid-cols-[256px_360px_minmax(0,1fr)_296px] grid-rows-[minmax(0,1fr)] [grid-template-areas:'left_her_stage_right']",
-  laptop: "grid grid-cols-[256px_minmax(0,1fr)_296px] grid-rows-[minmax(0,1fr)] [grid-template-areas:'left_her_right']",
-  compact: 'flex flex-col',
-  phone: 'flex flex-col',
-};
-
-/** One piece of a column: a drawn slot, or the stage. */
-type Piece = { key: string; node: ReactNode; box: string; slot: BodySlot | null };
-
-/** The drawn slots of a list, in its order, as pieces. A slot with no region is left out: it draws nothing. */
-function piecesOf(names: readonly BodySlot[], slots: StationSlots): Piece[] {
-  return names.filter((name) => isDrawn(slots[name])).map((name) => ({ key: name, node: slots[name], box: SLOT_BOX[name], slot: name }));
-}
-
-/** One column: its pieces stacked top to bottom, a hairline between each two. */
-function Column({ name, pieces, className }: { name: string; pieces: Piece[]; className?: string }) {
-  return (
-    <div data-station-column={name} className={cn('flex min-h-0 min-w-0 flex-col', className)}>
-      {pieces.map((piece, at) => (
-        <div
-          key={piece.key}
-          data-station-slot={piece.slot ?? undefined}
-          data-station-stage-cell={piece.slot === null ? '' : undefined}
-          className={cn('flex min-w-0 flex-col', piece.box, at > 0 && 'border-t border-border')}
-        >
-          {piece.node}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * THE STATION'S LAYOUT: a bar over a body, the body arranged by the arrangement.
+ * THE STATION'S LAYOUT: the companion, the panel, the roadmap and the box to type in. Nothing else, at every width.
  *
  * THE ROOT IS THE WORKSPACE FRAME'S OWN BOX (`WorkspaceFrame`): `pwa-status-clear fixed inset-0`, its bottom riding
- * `--keyboard-height`, so in the home-screen app it clears the status bar and the notch and its foot lifts over the
- * on-screen keyboard; the body pads by `--safe-area-inset-bottom`, clearing the home indicator (on a phone its bottom bar
- * pads itself, so the bar's ground runs under the indicator). The page never scrolls as a document: its regions scroll
- * inside it. Sheets, dialogs and menus the station opens never take `pwa-status-clear`: an overlay covers the whole screen
- * and pads its own content.
+ * `--keyboard-height`, so in the home-screen app it clears the status bar and the notch and its foot lifts over the on-screen
+ * keyboard; the body pads by `--safe-area-inset-bottom`, clearing the home indicator. The page never scrolls as a document: its
+ * parts scroll inside it. Sheets, dialogs and menus the station opens never take `pwa-status-clear`: an overlay covers the whole
+ * screen and pads its own content.
  *
- * - WIDE (≥ 1360 px): four columns under the bar — the left rail (256 px: sessions over the corner), her column (360 px:
- *   head, conversation, dock, talk), the stage (the rest, the widest column: 448 px at 1360, 528 at 1440, 1008 at 1920, so a
- *   card reads at its own measure), the right rail (296 px: needs). The rails stand at the laptop's widths.
- * - LAPTOP (1024–1359 px): three columns (256 px, the rest, 296 px), the stage inside her column between her head and
- *   her conversation, up to 55% of it and the last of the column to give way, so it never stands over her face (the whole
- *   column while none of her regions is drawn: there is nothing yet to leave room for).
- * - COMPACT (below 1024 px, and at any width while his switch is on): one column — her head in view, the strip's line, one
- *   switch, a section (`compact`, the caller's `StationCompactView`); the strip is a row of its own there, never the bar's.
- *   Under 1024 px it is the arrangement of every window that is not a phone's; above it, his switch (the bar's "Compact")
- *   chooses it.
- * - PHONE (a phone, upright or on its side): the station made for the thumb (`phone`, the caller's `StationPhoneView`), the
- *   whole frame: her head as its top row, which is the bar there (no `StationBar` is drawn), the strip's line, the section, and
- *   a bottom bar of the sections round the talk control, which pads itself by the home indicator's inset.
+ * - AT REST (nothing on the panel): the roadmap stands in the room over the companion (`road`), the whole stack already up; under it
+ *   the companion, the halo at the start with the lines beside it, on the measure the box under it shares. The stage's cell keeps
+ *   only the shelf of the companion's cards between the two, while the shelf has any. ON A PHONE there is no room for the stack
+ *   and the halo both, so the roadmap is its small circle at the head's start, as on the sessions home (a tap stands it over the
+ *   screen), and the companion has the middle: the halo over the lines, or beside them with the phone on its side.
+ * - WITH A THING ON THE PANEL, WIDE AND LAPTOP: two columns. The companion's own at the start (the halo, the name, the lines under
+ *   it), the roadmap over it as its small circle (`circle`); the panel takes the rest, a surface of its own, arriving on the lock
+ *   spring.
+ * - WITH A THING ON THE PANEL, ONE COLUMN (below 1024 px, and a phone): the companion is a mark at the head, the core alone with
+ *   the lines beside it, and the panel has the screen under it. The roadmap is not drawn.
+ * - AT THE FOOT, on the box's measure: what the companion holds out for your word (the action waiting on your yes, then the draft
+ *   waiting on your Send), each row opening to its piece's height as it arrives and closing as it settles; then the one box.
  *
- * A slot with no region draws nothing, and an empty stage folds away on a laptop wherever her column holds a region of its
- * own, all but her cards' shelf while it has cards; with none it stays, so a frame with nothing in it still says why. Each is
- * a data condition — what is drawn — never a mode. Hairlines part the columns and the pieces inside a column; the regions
- * paint themselves.
+ * The companion's cell and the stage's cell are the same two boxes in every case: only their places on the grid change
+ * (`stationScene.css`, keyed on `data-station-scene` and `data-station-arrangement`), so neither is re-parented and each keeps its
+ * state across the change.
  *
- * A change of arrangement re-parents what moves (the stage between wide and laptop, everything into compact's sections), so a
- * region keeps its state in the station's context or its scroll memory, never only in itself.
+ * The way out is the companion's core, pressed (the sessions home), or Escape.
  *
- * A pure view: `StationShell` below binds it to the station, and `.verify/kaylee-station-shots.mjs` draws it on the
- * fixtures' pictures (`station-fake.ts`) at 1440×900, 1366×768, 1280×800 and 1024×768 (and, for her column's room alone, an iPad
- * Pro 11 on its side at 1194×834 and a short 1024×600 window), in compact at 1280×600 and 1080×1920 with his switch on, and in
- * the phone's arrangement as the home-screen app at 390×844, 360×780, 390×664 and, on its side, 844×390.
+ * A pure view: `StationShell` below binds it to the station.
  */
-export function StationShellView({ arrangement, slots, stage, compact, phone, compactSwitch, onBackToCloudcli }: StationShellViewProps) {
-  // An empty stage gives way to her own regions in her column on a laptop. While her cards'
-  // shelf stands on it (she has cards), the shelf stays and only the empty stage's words give way, so a pinned card is one
-  // press away there too, the cell standing at the shelf's own height, and the shelf drops its own hairline for the one the next
-  // piece draws. All three are read off what is drawn (`:has`), a data condition and never a mode.
-  const stageCell = (regionsBeside: boolean, box: string): Piece => ({
-    key: 'stage',
-    node: stage,
-    slot: null,
-    box: cn(
-      box,
-      regionsBeside && '[&:has([data-station-stage=empty]):not(:has([data-station-shelf]))]:hidden [&_[data-station-stage-empty-message]]:hidden',
-      regionsBeside && '[&:has([data-station-stage=empty])_[data-station-shelf]]:border-b-0',
-    ),
-  });
-
-  let body: ReactNode;
-  if (arrangement === 'compact') {
-    body = compact;
-  } else if (arrangement === 'phone') {
-    body = phone;
-  } else {
-    // Keyed, so a change between wide and laptop keeps the rails where they are: unkeyed, laptop's right rail lands at
-    // the index wide's stage held and is rebuilt.
-    const left = <Column key="left" name="left" className="border-r border-border [grid-area:left]" pieces={piecesOf(LEFT, slots)} />;
-    const right = <Column key="right" name="right" className="border-l border-border [grid-area:right]" pieces={piecesOf(['needs'], slots)} />;
-    if (arrangement === 'wide') {
-      body = (
-        <>
-          {left}
-          <Column key="her" name="her" className={cn('border-r border-border [grid-area:her]', HER_CONTAINER)} pieces={piecesOf(HER, slots)} />
-          <div key="stage" data-station-column="stage" className="flex min-h-0 min-w-0 flex-col [grid-area:stage]">{stage}</div>
-          {right}
-        </>
-      );
-    } else {
-      const head = piecesOf(['head'], slots);
-      const below = piecesOf(HER.slice(1), slots);
-      // Beside her own regions the stage takes up to 55% of her column and leaves her conversation the rest; with none
-      // of hers drawn there is nothing to leave room for, and the stage takes the column.
-      const herDrawn = head.length + below.length > 0;
-      body = (
-        <>
-          {left}
-          <Column
-            key="her"
-            name="her"
-            className={cn('[grid-area:her]', HER_CONTAINER)}
-            pieces={[...head, stageCell(herDrawn, herDrawn ? LAPTOP_STAGE_BESIDE_HER : 'min-h-0 flex-1'), ...below]}
-          />
-          {right}
-        </>
-      );
-    }
-  }
+export function StationShellView({ arrangement, sideways, staged, scene }: StationShellViewProps) {
+  const twoColumns = arrangement === 'wide' || arrangement === 'laptop';
+  const phone = arrangement === 'phone';
+  const column = twoColumns ? KAYLEE_COLUMN[arrangement] : 0;
+  const form: StationKayleeForm = staged ? (twoColumns ? 'under' : 'mark') : phone && !sideways ? 'under' : 'beside';
+  const haloWidth = form === 'beside' ? (phone ? HALO_ON_PHONE : HALO_BESIDE) : twoColumns ? Math.min(column - 40, 380) : HALO_ON_PHONE;
+  // The roadmap's small circle: over the companion's column beside the panel, and at a phone's head while the panel is empty.
+  const circle = staged ? (twoColumns ? { cx: column / 2, cy: CIRCLE_TOP, radius: CIRCLE_RADIUS } : null) : phone ? CIRCLE_ON_PHONE : null;
 
   return (
     <div
@@ -240,56 +118,119 @@ export function StationShellView({ arrangement, slots, stage, compact, phone, co
       className="pwa-status-clear fixed inset-0 flex flex-col bg-background"
       style={{ bottom: 'var(--keyboard-height, 0px)' }}
     >
-      {arrangement !== 'phone' && (
-        <StationBar strip={arrangement === 'compact' ? null : slots.strip} compactSwitch={compactSwitch} onBackToCloudcli={onBackToCloudcli} />
-      )}
-      <main data-station-body="" className={cn('min-h-0 flex-1', arrangement !== 'phone' && 'pb-[var(--safe-area-inset-bottom)]', BODY[arrangement])}>
-        {body}
+      <main data-station-body="" className="flex min-h-0 flex-1 flex-col pb-[var(--safe-area-inset-bottom)]">
+        <div data-station-scene={staged ? 'staged' : 'rest'} className="relative flex min-h-0 flex-1 flex-col">
+          <div data-station-scene-grid="" className="grid min-h-0 flex-1" style={{ '--kaylee-col': `${column}px` } as CSSProperties}>
+            {!staged && !phone && <div data-station-road="" className="min-h-0 min-w-0">{scene.road}</div>}
+            <div data-station-kaylee-cell="" className="flex min-h-0 min-w-0 flex-col">{scene.kaylee(form, haloWidth)}</div>
+            <div data-station-stage-cell="" className="flex min-h-0 min-w-0 flex-col">{scene.stage}</div>
+          </div>
+          <div data-station-foot="" className="mx-auto w-full max-w-[720px] shrink-0">
+            <div data-station-held="" data-station-slot="action" className="px-3">{scene.action}</div>
+            <div data-station-held="" data-station-slot="dock">{scene.draft}</div>
+            <div data-station-slot="talk">{scene.talk}</div>
+          </div>
+          {circle !== null && scene.circle(circle)}
+        </div>
       </main>
     </div>
   );
 }
 
 /**
- * The station on the page: what `StationRoute` renders inside the station's provider. It reads the tier, his Compact switch,
- * the registered regions and the way back, and hands them, with the live stage, to `StationShellView`.
+ * The action the companion holds for your word, on the scene: its own card (`CompanionActionCard`, as its panel draws it: the
+ * act and its target, when it lapses, the × that withdraws it), arriving from the foot and settling away when it is taken,
+ * withdrawn or lapsed (`useLivePending`, the deadline the card draws by).
+ */
+function StationHeldAction() {
+  const { t } = useTranslation();
+  const { picture, cancelAction } = useCompanion();
+  const pending = useLivePending(picture?.pending ?? null);
+  const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
+  return (
+    <StationArrival when={pending !== null} from="dock" className="pb-2">
+      {pending !== null && <CompanionActionCard key={pending.id} pending={pending} name={name} onWithdraw={() => cancelAction(pending.id)} />}
+    </StationArrival>
+  );
+}
+
+/**
+ * The station on the page: what `StationRoute` renders inside the station's provider. It reads the tier and the stage's focus and
+ * hands them, with the scene's live pieces, to `StationShellView`.
  *
  * THE ARRANGEMENT is `phone` first, on a phone (`useStation().phone`: a window under 768 px wide, or a touch window under 500 px
- * tall); else compact below 1024 px (the tier `narrow`: a tablet, the second monitor, a small window) and wherever his switch is
- * on; else the tier's. It follows `resize` and the pointer query's `change` (the context reads both) and his switch, never a
- * timer. His switch is the station pref `compact`, per device, and is drawn from 1024 px up: below, compact is the only
- * arrangement a non-phone has and a switch would change nothing.
+ * tall); else compact below 1024 px (the tier `narrow`: a tablet, the second monitor, a small window); else the tier's. It follows
+ * `resize` and the pointer query's `change` (the context reads both), never a timer. There is no Compact switch, so a stored one
+ * is not read.
  *
- * EVERY REGION'S DENSITY is `compact` in the one-column arrangements (compact's and the phone's) and `full` in the columns,
- * handed to each region with the tier.
+ * ESCAPE is the way back: it puts away what is on the panel, and with nothing there goes to the sessions home. It stands down for
+ * anything open in front (a sheet, a menu, a dialog, the roadmap's stack stood up, a card on it), for a press another listener has
+ * taken, for a key typed into a field, and while the station is held under another page.
+ *
+ * A LETTER TYPED WITH NOTHING IN FOCUS goes to the box: the field takes the focus on the key's way down, so the letter lands in it.
  */
 export function StationShell() {
-  const { tier, phone } = useStation();
+  const { tier, phone, sideways, focus, setFocus } = useStation();
   const doors = useStationDoors();
-  const [compactOn, setCompactOn] = useStationPref('compact', false);
-  const arrangement = stationArrangementOf(tier, phone, compactOn);
-  const compactSwitch: StationCompactSwitch | null = tier === 'narrow' ? null : { on: compactOn, onChange: setCompactOn };
-  const density: StationDensity = arrangement === 'compact' || arrangement === 'phone' ? 'compact' : 'full';
-  // The way back, bound here for the bar (a pure view drawn by this pure layout) and for the phone's top row, her menu: to the workspace as it stood when the station came forward.
-  const onBackToCloudcli = () => backToCloudcli(doors.navigate, doors.workspacePath());
+  const hostWindow = useHostWindow();
+  const isPageHeld = useIsPageHeld();
+  const arrangement = stationArrangementOf(tier, phone, false);
+  const staged = focus !== null;
+  // How many times the reader has come from the sessions home by Kaylee's core there: the stack arrives from the home's circle each time.
+  // Asked once as the station mounts (a first visit, its chunk loaded after the press) and again each time it comes back on screen.
+  const [arrivals, setArrivals] = useState(0);
+  useEffect(() => {
+    const arrive = () => {
+      if (doors.showing() && doors.takeRoadmapTravel('station')) setArrivals((count) => count + 1);
+    };
+    arrive();
+    return doors.onShowingChange(arrive);
+  }, [doors]);
+  // The way home. With the stack standing (nothing on the panel, and not a phone, which has only the circle), the roadmap goes with the reader.
+  const goHome = useCallback(() => {
+    if (!staged && arrangement !== 'phone') doors.markRoadmapTravel('home');
+    openHome(doors.navigate);
+  }, [staged, arrangement, doors]);
 
-  // Each slot with a registered region, drawn for this tier at the arrangement's density; a slot with none is left out, so it
-  // draws nothing.
-  const slots: StationSlots = {};
-  for (const slot of Object.keys(STATION_REGIONS) as StationSlot[]) {
-    const Region = STATION_REGIONS[slot];
-    if (Region !== undefined) slots[slot] = <Region tier={tier} density={density} />;
-  }
-  const stage = <StationStage />;
+  useEffect(() => {
+    const hostDocument = hostWindow.document;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || isPageHeld() || !doors.showing() || otherOverlayHoldsEscape(hostDocument)) return;
+      if (event.key === 'Escape') {
+        // A key typed into a field is the field's: `closest` is asked of the node itself, whichever window made it.
+        const field = (event.target as Element | null)?.closest?.('input, textarea, select, [contenteditable="true"]') ?? null;
+        if (field !== null) return;
+        event.preventDefault();
+        if (staged) setFocus(null);
+        else goHome();
+        return;
+      }
+      // One printable character, unmodified, with the focus on nothing: it is meant for the companion.
+      const nothingFocused = hostDocument.activeElement === null || hostDocument.activeElement === hostDocument.body;
+      if (!nothingFocused || event.key.length !== 1 || event.key === ' ' || event.ctrlKey || event.metaKey || event.altKey) return;
+      hostDocument.querySelector<HTMLElement>('[data-station-shell] [data-companion-composer-field]')?.focus();
+    };
+    // On the window's capture, as the panels that own the key listen: asked before any of them has closed, so what is open in front
+    // is still there to be seen. It stops nothing: the key goes on to whoever owns it.
+    hostWindow.addEventListener('keydown', onKeyDown, true);
+    return () => hostWindow.removeEventListener('keydown', onKeyDown, true);
+  }, [staged, hostWindow, isPageHeld, doors, setFocus, goHome]);
+
   return (
     <StationShellView
       arrangement={arrangement}
-      slots={slots}
-      stage={stage}
-      compact={arrangement === 'compact' ? <StationCompact slots={slots} stage={stage} tier={tier} /> : null}
-      phone={arrangement === 'phone' ? <StationPhone slots={slots} stage={stage} onBackToCloudcli={onBackToCloudcli} /> : null}
-      compactSwitch={compactSwitch}
-      onBackToCloudcli={onBackToCloudcli}
+      sideways={sideways}
+      staged={staged}
+      scene={{
+        stage: <StationStage />,
+        kaylee: (form, haloWidth) => <StationKaylee form={form} haloWidth={haloWidth} onHome={goHome} />,
+        road: <RoadmapStanding arriveFrom={ROADMAP_CIRCLE_AT_DESK} arrivals={arrivals} />,
+        circle: (rest) => <RoadmapCircle rest={rest} />,
+        action: <StationHeldAction />,
+        // The held form at every width: the draft stands over the box, never in a section of its own.
+        draft: <StationDock tier={tier} density="full" />,
+        talk: <StationTalk tier={tier} density="full" part="box" />,
+      }}
     />
   );
 }

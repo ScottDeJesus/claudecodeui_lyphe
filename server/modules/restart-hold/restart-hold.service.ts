@@ -93,8 +93,8 @@ function joinOrLeave(connections: Set<object>, connection: object, active: boole
 }
 
 function restatePanelReasons(): void {
-  setStanding('press', pressConnections.size > 0 ? { why: 'his press is open on her panel', yields: false } : null);
-  setStanding('voice', voiceConnections.size > 0 ? { why: 'her voice is playing on her panel', yields: false } : null);
+  setStanding('press', pressConnections.size > 0 ? { why: "his press is open on Kaylee's panel", yields: false } : null);
+  setStanding('voice', voiceConnections.size > 0 ? { why: "Kaylee's voice is playing on the panel", yields: false } : null);
 }
 
 /** Consumed by `server/index.ts`, `modules/companion` and `modules/websocket`; the module's one surface. */

@@ -34,6 +34,8 @@ type ActionMenuProps = {
   size?: ButtonSize;
   className?: string;
   triggerClassName?: string;
+  /** Classes for the trigger's word alone, for a caller that hides it where the icon is enough (`finger:hidden`: Settings' "Add MCP Server"). */
+  labelClassName?: string;
   menuClassName?: string;
   disabled?: boolean;
   iconOnly?: boolean;
@@ -76,6 +78,7 @@ export function ActionMenu({
   size = 'sm',
   className,
   triggerClassName,
+  labelClassName,
   menuClassName,
   disabled,
   iconOnly = false,
@@ -370,7 +373,7 @@ export function ActionMenu({
         {TriggerIcon && <TriggerIcon className="h-4 w-4" />}
         {!iconOnly && (
           <>
-            <span>{label}</span>
+            <span className={labelClassName}>{label}</span>
             <ChevronDown className={cn('h-4 w-4 transition-transform', isOpen && 'rotate-180')} />
           </>
         )}

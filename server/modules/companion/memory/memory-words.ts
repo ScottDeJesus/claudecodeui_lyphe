@@ -63,7 +63,7 @@ const ABSENT_REFUSAL = 'That is not a line of his. Give his whole line exactly a
 const JUDGMENT: Record<Exclude<KeptWhy, 'asked'>, string> = {
   ruling: 'a standing ruling or preference of his',
   name: 'a name he gives something',
-  stale: 'something he told her is stale',
+  stale: 'something he said is stale',
   brief: 'how he likes a brief written',
 };
 
@@ -116,8 +116,8 @@ export function quoteLine(account: string, line: HisLine): string {
 export function memoryBody(input: { account: string; lines: HisLine[]; why: KeptWhy; context: string | null }): string {
   const quotes = input.lines.map((line) => quoteLine(input.account, line));
   const context = input.context === null ? '' : folded(input.context);
-  const reason = input.why === 'asked' ? 'Kept because he asked.' : `Kept on her own judgment: ${JUDGMENT[input.why]}.`;
-  return [...quotes, ...(context === '' ? [] : [`Context, in her words: ${context}`]), reason].join('\n');
+  const reason = input.why === 'asked' ? 'Kept because he asked.' : `Kept on the companion's own judgment: ${JUDGMENT[input.why]}.`;
+  return [...quotes, ...(context === '' ? [] : [`Context, in the companion's words: ${context}`]), reason].join('\n');
 }
 
 /**
@@ -131,7 +131,7 @@ const QUOTE_LINE = /^He (said|typed) \((.*?), (\S+?)\): “(.*)”$/;
  * Every quote of a body, in order: the one parse of the `He said (…): “…”` and `He typed (…): “…”` lines that `firstQuote` and `quotesAlike`
  * read. A line that is not a quote (the context, the reason) is passed over. `via` is the channel the verb names (`said` is `spoken`,
  * `typed` is `typed`); `text` is as the body holds it. Consumed by `memory-verbs.ts` (recall reads the first quote's `via` and `at` for
- * `said <when>` or `typed <when>`) and by `bank-lines.ts`.
+ * `said <when>` or `typed <when>`).
  */
 export function quotesOf(body: string): Array<{ account: string; at: string; via: HisLine['via']; text: string }> {
   const quotes: Array<{ account: string; at: string; via: HisLine['via']; text: string }> = [];

@@ -74,7 +74,7 @@ export function KanbanBoardDialog({ mode, initialName, onClose, onConfirm }: Kan
         )}
 
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>{t('kanban.board.cancel')}</Button>
+          <Button variant="outline" onClick={onClose}>{t('kanban.board.cancel')}</Button>
           <Button
             variant={archiving ? 'destructive' : 'default'}
             // An empty name is refused by the server too; refusing it here is the same verdict one

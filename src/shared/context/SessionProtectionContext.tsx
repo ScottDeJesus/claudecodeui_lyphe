@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from 'react';
 
 import { createStableContext } from '@/shared/context/stableContext';
+import { SubagentModelsContext } from '@/shared/context/subagentModelsContext';
 import {
   useSessionProtection,
 } from '@/shared/hooks/useSessionProtection';
@@ -40,6 +41,11 @@ type RunningSessionsApiPayload = {
      */
     subagentSessionIds?: unknown;
     /**
+     * For each of those conversations, the model of every agent it has running (`''` for one whose model is not recorded yet).
+     * Absent from a server older than the field, and then every such conversation simply has no models named.
+     */
+    subagentModels?: unknown;
+    /**
      * Conversations with a question or permission prompt waiting, whether or not they carry a live
      * run. Beside `sessions` for the same reason: a prompt outlives the turn that raised it, and a
      * row can only light if this list reaches the sessions the registry has forgotten.
@@ -57,6 +63,21 @@ type SessionProtectionActions = {
 
 const NO_RUNNING_SESSIONS: readonly RunningSessionListItem[] = [];
 const NO_SESSION_IDS: readonly string[] = [];
+
+/**
+ * The running-sessions payload's `subagentModels` as sorted `[sessionId, models]` pairs, with anything that is not a session id
+ * holding a list of strings left out. Sorted by id so that an order the server is free to change is not read as a change.
+ */
+const parseSubagentModels = (value: unknown): [string, string[]][] => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return [];
+  }
+  return Object.entries(value)
+    .filter((entry): entry is [string, unknown[]] => entry[0].length > 0 && Array.isArray(entry[1]))
+    .map(([sessionId, models]): [string, string[]] => [sessionId, models.filter((model): model is string => typeof model === 'string')])
+    .filter(([, models]) => models.length > 0)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+};
 
 /** How long a read of the running list that has not settled blocks the next poll tick: the api's 30 s request ceiling (`REQUEST_TIMEOUT_MS`) and a tick. */
 const RUNNING_READ_GUARD_MS = 35_000;
@@ -145,6 +166,9 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
   // usually NOT among them: a backgrounded agent outlives the turn that launched it, so the chat
   // holding one has no run left to hang anything on.
   const [subagentSessionIds, setSubagentSessionIds] = useState<readonly string[]>(NO_SESSION_IDS);
+  // The models of the agents each of those sessions has running, held as the JSON of its sorted pairs: a string is equal to the
+  // last poll's exactly when nothing changed, so the map built from it below keeps its identity through a poll that moved nothing.
+  const [subagentModelsKey, setSubagentModelsKey] = useState('[]');
   // Answered by the server's own approval map rather than read off the runs below, and that is the
   // whole point of it: a question outlives the turn that asked it, so the chat it waits in is
   // usually NOT among the runs — a backgrounded agent's completion wakes the CLI for a continuation
@@ -213,6 +237,8 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
       setSubagentSessionIds((previous) => (
         sessionIdListsMatch(previous, subagents) ? previous : subagents
       ));
+
+      setSubagentModelsKey(JSON.stringify(parseSubagentModels(payload.data?.subagentModels)));
 
       const awaiting = (Array.isArray(payload.data?.awaitingInputSessionIds)
         ? payload.data.awaitingInputSessionIds
@@ -289,6 +315,10 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
 
   const busySessionIds = useSessionIdSet(processingSessions.keys());
   const subagentRunningSessionIds = useSessionIdSet(subagentSessionIds);
+  const subagentModels = useMemo<ReadonlyMap<string, readonly string[]>>(
+    () => new Map(JSON.parse(subagentModelsKey) as [string, string[]][]),
+    [subagentModelsKey],
+  );
   // Both sources, because they answer different halves of the same question: the run-scoped flag
   // covers a question asked inside a live turn, the list covers one still waiting after the turn
   // that asked it ended. A runtime that answers only per-session keeps working through the first.
@@ -302,11 +332,13 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
       <BusySessionIdsContext.Provider value={busySessionIds}>
         <RunningSessionsContext.Provider value={runningSessions}>
           <SubagentRunningSessionIdsContext.Provider value={subagentRunningSessionIds}>
-            <AwaitingInputSessionIdsContext.Provider value={awaitingInputSessionIdSet}>
-              <SessionProtectionStateContext.Provider value={processingSessions}>
-                {children}
-              </SessionProtectionStateContext.Provider>
-            </AwaitingInputSessionIdsContext.Provider>
+            <SubagentModelsContext.Provider value={subagentModels}>
+              <AwaitingInputSessionIdsContext.Provider value={awaitingInputSessionIdSet}>
+                <SessionProtectionStateContext.Provider value={processingSessions}>
+                  {children}
+                </SessionProtectionStateContext.Provider>
+              </AwaitingInputSessionIdsContext.Provider>
+            </SubagentModelsContext.Provider>
           </SubagentRunningSessionIdsContext.Provider>
         </RunningSessionsContext.Provider>
       </BusySessionIdsContext.Provider>

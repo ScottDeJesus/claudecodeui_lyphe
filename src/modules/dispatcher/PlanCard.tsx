@@ -117,7 +117,7 @@ function queueClause(hold: string): string {
  * live plan walking beside a probe must never be pressed. `data-card-description` marks the lead's
  * description line, the arc deck's too, and `data-plan-queue-hold` and `data-plan-pace-hold` the two lines above.
  *
- * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab), for the plans no arc holds, by
+ * Used by `RunnerPanel` (runner-tab), for the plans no arc holds, by
  * `DispatchArcDeck`, for each plan of an arc, and by the station module's `CardStage`, for the feature on
  * Kaylee Station's stage, its ask on it.
  */

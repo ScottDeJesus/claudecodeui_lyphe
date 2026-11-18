@@ -87,7 +87,7 @@ export function UpdateJobPanel({ job }: { job: ClaudeUpdateJob }) {
         </ol>
 
         {job.logTail.length > 0 && (
-          <Collapsible className="rounded-lg border border-border/60">
+          <Collapsible className="border-y border-border">
             <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60">
               <span className="inline-flex items-center gap-1.5">
                 <ScrollText className="h-3.5 w-3.5" />

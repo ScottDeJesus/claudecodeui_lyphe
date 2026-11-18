@@ -26,7 +26,7 @@ export function AutoInstallRow({ autoInstall, onChange }: AutoInstallRowProps) {
   const label = t('updates.autoInstall.label', { defaultValue: 'Install updates automatically' });
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <div className="overflow-hidden border-y border-border">
       <SettingRow
         icon={<Download className="h-4 w-4" />}
         label={label}

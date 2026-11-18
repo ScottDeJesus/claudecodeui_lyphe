@@ -185,6 +185,8 @@ export { SettingsSection } from '@/shared/ui/SettingsSection';
 export { Sheet } from '@/shared/ui/Sheet';
 export { Shimmer } from '@/shared/ui/Shimmer';
 export { Spinner } from '@/shared/ui/Spinner';
+// Astrolabe's loop in small: an agent at work, for the chat's status line and the sidebar's running marks.
+export { SignalLoop } from '@/shared/ui/SignalLoop';
 // Six photos of a cube stitched into one sphere you drag and zoom, with RegionImage's outlines and numbered badges laid on
 // it by yaw and pitch. The affected-areas module's pano screen draws a pano's six views with it; the viewer loads on first use.
 export { SphereView } from '@/shared/ui/SphereView';

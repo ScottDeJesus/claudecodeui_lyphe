@@ -223,7 +223,7 @@ function RuleCard({ rule, review, projectName }: { rule: HealRule; review: RuleR
               <CheckIcon aria-hidden="true" />
               {t('memory.actions.file', { defaultValue: 'file it' })}
             </Button>
-            <Button size="sm" variant="ghost" className="finger:h-11" disabled={review.isBusy(candidate)} aria-describedby={describedBy}
+            <Button size="sm" variant="outline" className="finger:h-11" disabled={review.isBusy(candidate)} aria-describedby={describedBy}
               title={t('memory.actions.discardTitle', { defaultValue: 'discard — nothing is written' })} onClick={() => review.onReview(candidate, false)} data-heal-rule-discard>
               <XIcon aria-hidden="true" />
               {t('memory.actions.discard', { defaultValue: 'discard' })}

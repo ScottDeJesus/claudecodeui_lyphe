@@ -32,7 +32,7 @@ export default function GitConfigurationStep({
         <div>
           <label htmlFor="gitName" className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
             <User className="h-4 w-4" />
-            Git Name <span className="text-red-500">*</span>
+            Git Name <span className="text-[var(--danger-ink)]">*</span>
           </label>
           <input
             type="text"
@@ -50,7 +50,7 @@ export default function GitConfigurationStep({
         <div>
           <label htmlFor="gitEmail" className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
             <Mail className="h-4 w-4" />
-            Git Email <span className="text-red-500">*</span>
+            Git Email <span className="text-[var(--danger-ink)]">*</span>
           </label>
           <input
             type="email"

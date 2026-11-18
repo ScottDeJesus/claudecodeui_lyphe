@@ -202,7 +202,7 @@ export const SubagentPanel = memo(({
             <span
               role="img"
               aria-label="running"
-              className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-emerald-400"
+              className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-[var(--pos-dot)]"
             />
           )}
           {status === 'running' && <span aria-hidden className="subagent-row__running-word text-[10px] text-muted-foreground/70">running</span>}
@@ -221,7 +221,8 @@ export const SubagentPanel = memo(({
                 .flatMap((part, index) => (index === 0 ? [part] : [<span key={`sep-${index}`}> · </span>, part]))}
             </span>
           )}
-          {status !== 'running' && (
+          {/* A row says how it came out only when that is not ordinary: an agent that simply finished says nothing. */}
+          {status !== 'running' && status !== 'completed' && (
             <Badge tone={ENDED_BADGE[status].tone} className="vv-badge--compact">{ENDED_BADGE[status].label}</Badge>
           )}
         </span>

@@ -121,7 +121,7 @@ export function StageShelfView({ notes, focus, onOpen }: StageShelfViewProps) {
       <ScrollArea ref={rowRef} orientation="horizontal" onWheel={turnSideways}>
         <div className="flex w-max items-center gap-2 px-3 py-2 lg:px-4">
           <span id={labelId} className="shrink-0 pr-1 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            {t('station.cards.shelf.label', { defaultValue: 'Her cards' })}
+            {t('station.cards.shelf.label', { defaultValue: 'Cards' })}
           </span>
           {pinned.map(chip)}
           {pinned.length > 0 && newest.length > 0 && <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />}

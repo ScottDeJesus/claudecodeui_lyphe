@@ -56,7 +56,7 @@ export default function NotificationsSettingsTab({
       </div>
 
       {isDesktop ? (
-        <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="space-y-4 border-y border-border p-4">
           <h4 className="font-medium text-foreground">
             {t('notifications.desktop.title', { defaultValue: 'Notify this desktop app' })}
           </h4>
@@ -78,30 +78,37 @@ export default function NotificationsSettingsTab({
                       onEnableDesktopNotifications?.();
                     }
                   }}
+                  aria-label={desktopNotifications?.enabled
+                    ? t('notifications.desktop.disable', { defaultValue: 'Disable desktop notifications' })
+                    : t('notifications.desktop.enable', { defaultValue: 'Enable desktop notifications' })}
+                  title={desktopNotifications?.enabled
+                    ? t('notifications.desktop.disable', { defaultValue: 'Disable desktop notifications' })
+                    : t('notifications.desktop.enable', { defaultValue: 'Enable desktop notifications' })}
+                  className="finger:h-11 finger:w-11 finger:px-0"
                 >
                   {desktopNotifications?.enabled ? (
                     <BellOff className="h-4 w-4" />
                   ) : (
                     <BellRing className="h-4 w-4" />
                   )}
-                  {desktopNotifications?.enabled
+                  <span className="finger:hidden">{desktopNotifications?.enabled
                     ? t('notifications.desktop.disable', { defaultValue: 'Disable desktop notifications' })
-                    : t('notifications.desktop.enable', { defaultValue: 'Enable desktop notifications' })}
+                    : t('notifications.desktop.enable', { defaultValue: 'Enable desktop notifications' })}</span>
                 </Button>
                 {desktopNotifications?.enabled && (
-                  <span className="text-sm text-green-600 dark:text-green-400">
+                  <span className="text-sm text-[var(--pos-ink)]">
                     {t('notifications.desktop.enabled', { defaultValue: 'Desktop notifications are enabled' })}
                   </span>
                 )}
               </div>
               {desktopNotifications?.lastError && (
-                <p className="text-sm text-red-600 dark:text-red-400">{desktopNotifications.lastError}</p>
+                <p className="text-sm text-[var(--danger-ink)]">{desktopNotifications.lastError}</p>
               )}
             </div>
           )}
         </div>
       ) : (
-        <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="space-y-4 border-y border-border p-4">
           <h4 className="font-medium text-foreground">{t('notifications.webPush.title')}</h4>
           {!pushSupported ? (
             <p className="text-sm text-muted-foreground">{t('notifications.webPush.unsupported')}</p>
@@ -121,6 +128,17 @@ export default function NotificationsSettingsTab({
                     onEnablePush();
                   }
                 }}
+                aria-label={isPushLoading
+                  ? t('notifications.webPush.loading')
+                  : isPushSubscribed
+                    ? t('notifications.webPush.disable')
+                    : t('notifications.webPush.enable')}
+                title={isPushLoading
+                  ? t('notifications.webPush.loading')
+                  : isPushSubscribed
+                    ? t('notifications.webPush.disable')
+                    : t('notifications.webPush.enable')}
+                className="finger:h-11 finger:w-11 finger:px-0"
               >
                 {isPushLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -129,14 +147,14 @@ export default function NotificationsSettingsTab({
                 ) : (
                   <BellRing className="h-4 w-4" />
                 )}
-                {isPushLoading
+                <span className="finger:hidden">{isPushLoading
                   ? t('notifications.webPush.loading')
                   : isPushSubscribed
                     ? t('notifications.webPush.disable')
-                    : t('notifications.webPush.enable')}
+                    : t('notifications.webPush.enable')}</span>
               </Button>
               {isPushSubscribed && (
-                <span className="text-sm text-green-600 dark:text-green-400">
+                <span className="text-sm text-[var(--pos-ink)]">
                   {t('notifications.webPush.enabled')}
                 </span>
               )}
@@ -147,7 +165,7 @@ export default function NotificationsSettingsTab({
 
       <NtfySettingsCard />
 
-      <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+      <div className="space-y-4 border-y border-border p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -189,13 +207,16 @@ export default function NotificationsSettingsTab({
           onClick={() => {
             void playChatCompletionSound({ force: true });
           }}
+          aria-label={t('notifications.sound.test', { defaultValue: 'Test sound' })}
+          title={t('notifications.sound.test', { defaultValue: 'Test sound' })}
+          className="finger:h-11 finger:w-11 finger:px-0"
         >
           <Play className="h-4 w-4" />
-          {t('notifications.sound.test', { defaultValue: 'Test sound' })}
+          <span className="finger:hidden">{t('notifications.sound.test', { defaultValue: 'Test sound' })}</span>
         </Button>
       </div>
 
-      <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+      <div className="space-y-4 border-y border-border p-4">
         <h4 className="font-medium text-foreground">{t('notifications.events.title')}</h4>
         <div className="space-y-3">
           <label className="flex items-center gap-2 text-sm text-foreground">

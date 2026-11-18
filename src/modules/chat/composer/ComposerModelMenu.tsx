@@ -43,6 +43,11 @@ type ComposerModelMenuProps = {
   onSelectPermissionMode?: (mode: PermissionMode) => void;
   /** The open chat's tool sets; with no view read, no section and no count. Compared by identity (`memo`), so it must hold still between reads. */
   toolsets?: SessionToolsetsState;
+  /**
+   * The model and the effort are set somewhere else on this surface (the rings round the chat's core), so this menu draws neither
+   * section and its pill names what is left: the tool sets, and below `sm` the edit mode. With nothing left it draws nothing.
+   */
+  modelSetElsewhere?: boolean;
 };
 
 /**
@@ -61,6 +66,9 @@ type ComposerModelMenuProps = {
  * both fit. Nothing merges on desktop: two decisions get two chips wherever there is room.
  * Given `toolsets`, the last group is the chat's tool sets (ComposerToolsetSection), under a rule and
  * across both columns, and the pill counts the sets that are on wherever the composer's row has room.
+ *
+ * In the chat's settings row the model and the effort are the rings round the chat's core (`modelSetElsewhere`): the menu is then
+ * the tool sets, and below `sm` the edit mode, under a pill that says "Tool sets".
  */
 function ComposerModelMenu({
   effort,
@@ -75,6 +83,7 @@ function ComposerModelMenu({
   permissionModes,
   onSelectPermissionMode,
   toolsets,
+  modelSetElsewhere = false,
 }: ComposerModelMenuProps) {
   const { t } = useTranslation('chat');
   // The menu is portalled into the window the composer is drawn in, not the opener's body.
@@ -103,12 +112,12 @@ function ComposerModelMenu({
   // the user gave it.
   const modelLabel = selectedModelOption?.label || resolveModelLabel(modelOptions, model, modelLabelsById) || model;
 
-  const hasEffortSection = resolvedEffortOptions.length > 0;
-  const hasModelSection = modelOptions.length > 0 || modelsLoading;
+  const hasEffortSection = !modelSetElsewhere && resolvedEffortOptions.length > 0;
+  const hasModelSection = !modelSetElsewhere && (modelOptions.length > 0 || modelsLoading);
   const hasPermissionSection = Boolean(
     permissionMode && permissionModes && permissionModes.length > 0 && onSelectPermissionMode,
   );
-  if (!hasEffortSection && !hasModelSection && !hasPermissionSection) {
+  if (!hasEffortSection && !hasModelSection && !hasPermissionSection && !(modelSetElsewhere && toolsets?.view)) {
     return null;
   }
 
@@ -123,14 +132,17 @@ function ComposerModelMenu({
     ? toolsetView.sets.filter((set) => set.on).length + toolsetView.strays.length
     : 0;
 
-  const pillLabel = hasModelSection ? modelLabel : effortLabel;
+  const toolsetsWord = t('composer.toolsets.pill', { defaultValue: 'Tool sets' });
+  const pillLabel = modelSetElsewhere ? toolsetsWord : hasModelSection ? modelLabel : effortLabel;
   // The mark on the pill is colour and fill; the words it replaced live on here, so the
   // current mode is still readable by anyone hovering, or on a screen reader. The count of sets on
   // joins them, the one way to read it where the pill has no room for it. The label keeps its
   // "Select model" start: the probe harness's MODEL_CHIP matches on it.
-  const menuLabel = hasPermissionSection && permissionMode
-    ? `${t('composer.setupMenu', { defaultValue: 'Select model, reasoning effort and how edits happen' })} — ${permissionLabel(permissionMode)}`
-    : t('composer.modelMenu', { defaultValue: 'Select model and reasoning effort' });
+  const setupLabel = modelSetElsewhere
+    ? `${toolsetsWord} · ${permissionHeading}`
+    : t('composer.setupMenu', { defaultValue: 'Select model, reasoning effort and how edits happen' });
+  const plainLabel = modelSetElsewhere ? toolsetsWord : t('composer.modelMenu', { defaultValue: 'Select model and reasoning effort' });
+  const menuLabel = hasPermissionSection && permissionMode ? `${setupLabel} — ${permissionLabel(permissionMode)}` : plainLabel;
   const toolsetsOnLabel = t('composer.toolsets.onLabel', { count: toolsetsOn, defaultValue_one: '{{count}} tool set on', defaultValue_other: '{{count}} tool sets on' });
   const ariaLabel = toolsetsOn > 0 ? `${menuLabel} · ${toolsetsOnLabel}` : menuLabel;
 
@@ -282,7 +294,7 @@ function ComposerModelMenu({
 
           {toolsets?.view && (
             <>
-              <ComposerMenuSeparator />
+              {(hasModelSection || hasEffortSection || hasPermissionSection) && <ComposerMenuSeparator />}
               <ComposerToolsetSection toolsets={toolsets} />
             </>
           )}

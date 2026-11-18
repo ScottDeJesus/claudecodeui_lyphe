@@ -6,8 +6,8 @@ import { sessionHistoryCache } from '@/modules/providers/services/session-histor
 import {
   RUNNING_BELIEVED_FOR_MS,
   hasFreshSubagentSidechains,
-  hasRunningSubagent,
   readHistoryCompanionStamp,
+  runningSubagentModels,
 } from '@/modules/providers/services/session-agents.service.js';
 import type { LLMProvider } from '@/shared/types.js';
 
@@ -33,7 +33,7 @@ import type { LLMProvider } from '@/shared/types.js';
  * Nothing client-side can answer either: the chat a dot belongs to is usually not open, so its
  * transcript is not loaded anywhere. So the server answers.
  *
- * The sidechain reading's rule is `hasRunningSubagent`'s, which is the pinned strip's: same
+ * The sidechain reading's rule is `runningSubagentModels`', which is the pinned strip's: same
  * container selection, same four-hour window. The two readings part in one place — the strip times
  * a row from `subagent.resume.at ?? message.timestamp`, this one from the launch — so a resume more
  * than four hours after its launch leaves the strip's row pinned while this answer stays dark.
@@ -45,6 +45,10 @@ import type { LLMProvider } from '@/shared/types.js';
  * history reads use, keyed on the same subagent stamp, so a session the reader has open is parsed
  * once for both. The dispatched reading costs a directory listing bounded by the launcher's own
  * recency window and a few small files per live launch, and rides the same cached pass.
+ *
+ * WHAT EACH RUNNING AGENT IS MADE OF rides the same pass: `listSubagentRunningModels` answers, for each such conversation, the
+ * model of every agent it has out (`''` for one that has not named its model yet), so the sessions board can draw a dot for
+ * each in its model's colour. A chain that is between stages is one agent of no model; a chain with a soul out is that soul.
  */
 
 /** A ceiling on one pass, in sessions. Twice the busiest four hours this box has recorded. */
@@ -114,13 +118,13 @@ function candidateSessions(now: number): Candidate[] {
 }
 
 /**
- * Whether one conversation holds a running agent, read through the history cache.
+ * The models of the agents one conversation has running, read through the history cache: empty when it has none.
  *
  * `transcriptPath: null` is not a case here — the candidate set is built from rows that carry one —
  * but a transcript that has since been deleted is: the cache answers null for it and the session is
  * simply not a hit.
  */
-async function sessionHasRunningSubagent(candidate: Candidate, now: number): Promise<boolean> {
+async function sessionRunningSubagentModels(candidate: Candidate, now: number): Promise<string[]> {
   const providerSessions = providerRegistry.resolveProvider(candidate.provider).sessions;
   const providerSessionId = candidate.providerSessionId ?? candidate.sessionId;
 
@@ -139,7 +143,7 @@ async function sessionHasRunningSubagent(candidate: Candidate, now: number): Pro
     readCompanionStamp: () => readHistoryCompanionStamp(candidate.sessionId, candidate.transcriptPath, providerSessionId),
   });
 
-  return fullHistory ? hasRunningSubagent(fullHistory.messages, now) : false;
+  return fullHistory ? runningSubagentModels(fullHistory.messages, now) : [];
 }
 
 /**
@@ -171,23 +175,24 @@ async function needsTranscriptRead(candidate: Candidate, now: number): Promise<b
   }
 }
 
-/** The conversations whose own transcript shows an agent still out. */
-async function collectSidechainRunningSessionIds(now: number): Promise<string[]> {
+/** The conversations whose own transcript shows an agent still out, each with the models of the agents it has out. */
+async function collectSidechainRunning(now: number): Promise<Map<string, string[]>> {
   const candidates = candidateSessions(now);
   // The cheap narrowing runs together — it is all directory reads — and the parses behind it run
   // one at a time: they are CPU-bound, and a box with a dozen live agents should parse a dozen
   // transcripts in sequence rather than hold a dozen normalized histories in memory at once.
   const wanted = await Promise.all(candidates.map((candidate) => needsTranscriptRead(candidate, now)));
 
-  const running: string[] = [];
+  const running = new Map<string, string[]>();
   for (let index = 0; index < candidates.length; index += 1) {
     if (!wanted[index]) {
       continue;
     }
     const candidate = candidates[index];
     try {
-      if (await sessionHasRunningSubagent(candidate, now)) {
-        running.push(candidate.sessionId);
+      const models = await sessionRunningSubagentModels(candidate, now);
+      if (models.length > 0) {
+        running.set(candidate.sessionId, models);
       }
     } catch (error) {
       // One unreadable conversation never takes the endpoint down with it: the dot is missing for
@@ -210,61 +215,89 @@ function appSessionIdForCliSession(cliSessionId: string): string | null {
   return sessionsDb.getSessionById(appSessionId) ? appSessionId : null;
 }
 
-/** The conversations that launched a soul or a chain which is still out, in the app's own ids. */
-function collectDispatchedRunningSessionIds(now: number): string[] {
-  const running = new Set<string>();
+/**
+ * The conversations that launched a soul or a chain which is still out, in the app's own ids, each with the models of what it has
+ * out: one entry for each running soul, and one of no model (`''`) for a chain between stages, where the walker is out and no
+ * soul is. A chain with a soul out adds nothing of its own: that soul is already counted.
+ */
+function collectDispatchedRunning(now: number): Map<string, string[]> {
+  const souls = new Map<string, string[]>();
+  const chains = new Set<string>();
   for (const launcher of listRunningLaunchers(now / 1000)) {
     const appSessionId = appSessionIdForCliSession(launcher.cliSessionId);
-    if (appSessionId !== null) {
-      running.add(appSessionId);
-    }
+    if (appSessionId === null) continue;
+    if (launcher.reason === 'chain') chains.add(appSessionId);
+    else souls.set(appSessionId, [...(souls.get(appSessionId) ?? []), launcher.model]);
   }
-  return [...running];
+  for (const appSessionId of chains) {
+    if (!souls.has(appSessionId)) souls.set(appSessionId, ['']);
+  }
+  return souls;
 }
 
-async function collectRunningSessionIds(now: number): Promise<string[]> {
-  const running = new Set(await collectSidechainRunningSessionIds(now));
+/** Every conversation with an agent out, with the models of all it has out: its own transcript's agents first, then what it dispatched. */
+async function collectRunning(now: number): Promise<Map<string, string[]>> {
+  const running = await collectSidechainRunning(now);
   try {
-    for (const appSessionId of collectDispatchedRunningSessionIds(now)) {
-      running.add(appSessionId);
+    for (const [appSessionId, models] of collectDispatchedRunning(now)) {
+      running.set(appSessionId, [...(running.get(appSessionId) ?? []), ...models]);
     }
   } catch (error) {
     // The launcher's records are the second source, not the first: a fault reading them costs the
     // dispatched dots this pass, never the sidechain dots the pass already holds.
     console.error('[SubagentRuns] Could not read the dispatched souls and chains:', error);
   }
-  return [...running].sort();
+  return running;
 }
 
 let cachedAt = 0;
-let cachedIds: readonly string[] = [];
-let inFlight: Promise<readonly string[]> | null = null;
+let cached: ReadonlyMap<string, readonly string[]> = new Map();
+let inFlight: Promise<ReadonlyMap<string, readonly string[]>> | null = null;
 
-/**
- * The ids of the conversations with an agent running right now — a sidechain `Agent` or a
- * dispatched soul or chain — cached briefly and never computed twice at once (`inFlight`): the
- * endpoint is polled by every open tab.
- *
- * Every caller gets its own array: the cached one is shared state, and a caller that sorted or
- * spliced it in place would be editing the answer the next poll reads.
- */
-export async function listSubagentRunningSessionIds(now: number = Date.now()): Promise<string[]> {
+/** The one pass behind both answers below, cached briefly and never computed twice at once (`inFlight`): the endpoint is polled by every open tab. */
+async function runningNow(now: number): Promise<ReadonlyMap<string, readonly string[]>> {
   if (now - cachedAt < ANSWER_TTL_MS) {
-    return [...cachedIds];
+    return cached;
   }
   if (inFlight) {
-    return [...await inFlight];
+    return inFlight;
   }
 
-  inFlight = collectRunningSessionIds(now)
-    .then((ids) => {
-      cachedIds = ids;
+  inFlight = collectRunning(now)
+    .then((running) => {
+      cached = running;
       cachedAt = Date.now();
-      return ids;
+      return running;
     })
     .finally(() => {
       inFlight = null;
     });
 
-  return [...await inFlight];
+  return inFlight;
+}
+
+/**
+ * The ids of the conversations with an agent running right now — a sidechain `Agent` or a
+ * dispatched soul or chain — sorted.
+ *
+ * Every caller gets its own array: the cached answer is shared state, and a caller that sorted or
+ * spliced it in place would be editing the answer the next poll reads.
+ */
+export async function listSubagentRunningSessionIds(now: number = Date.now()): Promise<string[]> {
+  return [...(await runningNow(now)).keys()].sort();
+}
+
+/**
+ * For each of those conversations, the model of every agent it has running (`''` for one whose model is not recorded): the same
+ * pass as `listSubagentRunningSessionIds`, so the two never disagree about which conversations have one. A fresh object and fresh
+ * arrays for every caller, for the same reason.
+ *
+ * Consumed by the running-sessions route (`provider.routes.ts`) as `subagentModels`.
+ */
+export async function listSubagentRunningModels(now: number = Date.now()): Promise<Record<string, string[]>> {
+  const models: Record<string, string[]> = {};
+  for (const [sessionId, held] of await runningNow(now)) {
+    models[sessionId] = [...held];
+  }
+  return models;
 }

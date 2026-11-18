@@ -7,7 +7,7 @@ import { providerModelsService } from '@/modules/providers/services/provider-mod
 import { providerTokenUsageService } from '@/modules/providers/services/provider-token-usage.service.js';
 import { providerSkillsService } from '@/modules/providers/services/skills.service.js';
 import { sessionConversationsSearchService } from '@/modules/providers/services/session-conversations-search.service.js';
-import { listSubagentRunningSessionIds } from '@/modules/providers/services/session-subagent-runs.service.js';
+import { listSubagentRunningModels, listSubagentRunningSessionIds } from '@/modules/providers/services/session-subagent-runs.service.js';
 import { sessionsService, type RunningSessionListItem } from '@/modules/providers/services/sessions.service.js';
 import { simpleListService } from '@/modules/providers/services/simple-list.service.js';
 import { sessionUserStateRoutes } from '@/modules/providers/session-user-state.routes.js';
@@ -749,6 +749,11 @@ type RunningSessionsPayload = {
   sessions: RunningSessionListItem[];
   /** Conversations with an agent still running, whether or not they carry a live run. */
   subagentSessionIds: string[];
+  /**
+   * For each of those conversations, the model of every agent it has running, `''` for one whose model is not recorded yet: what
+   * the sessions board draws a dot for, in the model's colour. The same conversations as `subagentSessionIds`, from the same pass.
+   */
+  subagentModels: Record<string, string[]>;
   /** Conversations with a question or permission prompt waiting, whether or not they carry a live run. */
   awaitingInputSessionIds: string[];
 };
@@ -758,8 +763,9 @@ router.get(
   asyncHandler(async (_req: Request, res: Response) => {
     const sessions = sessionsService.listRunningSessions();
     const subagentSessionIds = await listSubagentRunningSessionIds();
+    const subagentModels = await listSubagentRunningModels();
     const awaitingInputSessionIds = sessionsService.listAwaitingInputSessionIds();
-    const payload: RunningSessionsPayload = { sessions, subagentSessionIds, awaitingInputSessionIds };
+    const payload: RunningSessionsPayload = { sessions, subagentSessionIds, subagentModels, awaitingInputSessionIds };
     res.json(createApiSuccessResponse(payload));
   }),
 );

@@ -11,35 +11,29 @@ type DeepseekPeakHoursProps = {
 };
 
 /**
- * Which DeepSeek rate is being billed right now, and when the peak windows are, on the reader's
- * own clock. Used by `AccountPanelBody`, directly under the balance: the money and the price of
- * spending it are one question, asked in one place.
+ * Which DeepSeek rate is being billed right now, on one line under the balance: the money and the price of spending it are one
+ * question, asked in one place. Used by `AccountPanelBody`.
  *
  * Green off-peak, amber at peak — the same two tones the composer's Flash chip wears while it is
- * on, off the same rule (`deepseekPeakHours.ts`), so the panel and the chip can never disagree.
+ * on, off the same rule (`deepseekPeakHours.ts`), so the panel and the chip can never disagree. When the rate changes and which hours
+ * are full price, on the reader's own clock, are the line's hover and its words for a reader that asks.
  */
 export function DeepseekPeakHours({ now }: DeepseekPeakHoursProps) {
   const { peak, changesAt } = deepseekPeakStatus(now);
   const changes = deepseekRateChangeInWords(now, changesAt);
+  const words = [
+    peak ? `Full price until ${changes}.` : `Half price until ${changes}.`,
+    `Full-price hours: ${deepseekPeakWindowsInWords(now).join(', ')}.`,
+    'Weekends are always half price.',
+  ].join(' ');
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline gap-2">
-        <span className="text-[13px] font-medium text-foreground">DeepSeek rate</span>
-        <Badge as="span" tone={peak ? 'warn' : 'positive'} className="ml-auto">
-          {peak ? 'Peak — full price' : 'Off-peak — half price'}
-        </Badge>
-      </div>
-      <span className="text-xs leading-relaxed text-muted-foreground">
-        {peak ? `Full price until ${changes}.` : `Half price until ${changes}.`}
-      </span>
-      <div className="flex flex-col text-xs leading-relaxed text-muted-foreground">
-        <span>Full-price hours:</span>
-        {deepseekPeakWindowsInWords(now).map((window) => (
-          <span key={window} className="tabular-nums">{window}</span>
-        ))}
-        <span>Weekends are always half price.</span>
-      </div>
+    <div data-balance="deepseek-rate" title={words} className="flex min-h-7 items-center gap-2">
+      <span className="text-[13px] text-foreground">DeepSeek rate</span>
+      <Badge as="span" tone={peak ? 'warn' : 'positive'} className="ml-auto">
+        {peak ? 'Peak · full price' : 'Off-peak · half price'}
+      </Badge>
+      <span className="sr-only">{words}</span>
     </div>
   );
 }

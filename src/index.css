@@ -190,7 +190,7 @@
      `max()` against `--pwa-notch-safe-pad`, the padding the sheet already wants: a layer declares
      it inline — `class="… pwa-notch-safe [--pwa-notch-safe-pad:1.5rem]"`. Absent, it is 0px and
      the padding is the inset alone, which is what every box that carries no padding of its own
-     wants: the three full-bleed layers (`Lightbox`, `ShapeFrame`, `GutterWidgetFrame`) and the
+     wants: the two full-bleed layers (`Lightbox`, `ShapeFrame`) and the
      two dialog panels (Settings, ProviderLoginModal). */
   body.pwa-mode .pwa-notch-safe {
     padding-top: max(var(--safe-area-inset-top), var(--pwa-notch-safe-pad, 0px));
@@ -554,22 +554,6 @@
     animation: chat-loading-appear 150ms ease-out 150ms both;
   }
 
-  .chat-activity-enter {
-    animation: chat-activity-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    transform-origin: bottom center;
-    will-change: transform, opacity, filter;
-  }
-
-  .chat-activity-exit {
-    animation: chat-activity-exit 220ms cubic-bezier(0.4, 0, 1, 1) both;
-    transform-origin: bottom center;
-    will-change: transform, opacity, filter;
-  }
-
-  .chat-activity-tab {
-    clip-path: inset(-8px -8px 0 -8px);
-  }
-
   /* Never render-skipped and never contained. `content-visibility: auto` is out because a row
      reports a stand-in height until the browser draws it, and the transcript's settle loop, its
      fill check and LazyMessageRow's measured heights all read row geometry on a row's first
@@ -687,7 +671,12 @@
     /* Only disable hover states for interactive elements, not containers.
        Never on a Verve-painted element (`vv-*`): `inherit` copies the PARENT's paint, not the
        element's own resting paint, so a tapped accent button or the DockableFab turned into a pale
-       disc in the page's colours until the next tap elsewhere. */
+       disc in the page's colours until the next tap elsewhere.
+       THE TRANSFORM IS NOT INHERITED, for the same reason: `transform: inherit` threw away the element's own resting
+       transform, so a press that is placed by one (`-translate-x-1/2`, the chat core's `translate(-50%, -50%)`) jumped
+       half its size the moment it was hovered. Under a mouse on a touch-first device that put it out from under the
+       pointer, it lost the hover, came back, and flickered (the cores and the account ring round them). Only a hover's
+       grow is undone, through Tailwind's own scale variables, so the resting place stands. */
     button:not([class*="vv-"]):hover,
     [role="button"]:not([class*="vv-"]):hover,
     .cursor-pointer:not([class*="vv-"]):hover,
@@ -699,7 +688,8 @@
       background-color: inherit !important;
       color: inherit !important;
       opacity: inherit !important;
-      transform: inherit !important;
+      --tw-scale-x: 1 !important;
+      --tw-scale-y: 1 !important;
     }
     
     /* Force buttons to be immediately clickable */
@@ -932,37 +922,6 @@
     animation: settings-fade-in 150ms ease-out;
   }
 
-  @keyframes chat-activity-enter {
-    0% {
-      opacity: 0;
-      filter: blur(3px);
-      transform: translateY(18px) scaleY(0.92);
-    }
-    65% {
-      opacity: 1;
-      filter: blur(0);
-      transform: translateY(-2px) scaleY(1.01);
-    }
-    100% {
-      opacity: 1;
-      filter: blur(0);
-      transform: translateY(0) scaleY(1);
-    }
-  }
-
-  @keyframes chat-activity-exit {
-    0% {
-      opacity: 1;
-      filter: blur(0);
-      transform: translateY(0) scaleY(1);
-    }
-    100% {
-      opacity: 0;
-      filter: blur(2px);
-      transform: translateY(14px) scaleY(0.96);
-    }
-  }
-
   /* One dot's hop, as the Lottie file keys it (frames of a 110-frame loop at 60fps): a
      1px dip at 2.8%, the top of the hop and the darkest grey at 13.9%, a small overshoot
      below rest at 22.9%, back at rest and pale by 29.8%, then still for the rest of the loop. */
@@ -995,6 +954,37 @@
   @keyframes chat-loading-appear {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+
+  /* A word of the companion's sentence as it lands (CompanionSentence). `--i` is its place in the sentence and `--said` how many
+     words of the sentence have been said so far, which CompanionReply moves on the sentence: the word comes in as the count passes
+     it, where it will stand. Until the count is first set, nothing of the sentence is seen. */
+  .companion-word {
+    opacity: clamp(0, calc((var(--said, 0) - var(--i)) * 0.9), 1);
+  }
+
+  /* The answering dots wait for the words still coming in. */
+  [data-companion-arriving] [data-companion-speaking] {
+    opacity: 0;
+  }
+
+  /* A sentence still coming in wears no band while it is spoken: its words arriving are the mark, and a band would run on ahead
+     of them over words not yet seen. Settled (a replay, or a voice that starts late), the band is back. */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-companion-arriving-sentence]:not([data-companion-settled]) {
+      background-color: transparent !important;
+      box-shadow: none !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .companion-word {
+      opacity: 1;
+    }
+
+    [data-companion-arriving] [data-companion-speaking] {
+      opacity: 1;
+    }
   }
 
   /* Search result highlight flash */

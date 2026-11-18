@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { StationProvider, useStation } from '@/modules/station/context/StationContext';
-import { StationLandedProvider } from '@/modules/station/context/StationLandedContext';
 import { StationNeedsProvider } from '@/modules/station/context/StationNeedsContext';
 import { StationSessionsProvider } from '@/modules/station/context/StationSessionsContext';
 import { useCardsTakeStage } from '@/modules/station/hooks/useCardsTakeStage';
@@ -18,7 +17,7 @@ import { HeldPage } from '@/shared/ui';
 /**
  * Where her `open` lands while the station is the page on screen: the workspace's host (`CompanionHost`) hands her every order to the station first
  * (`openOnStage`), and this registers the answer. It puts what she opened on the stage — a chat, a card, a page or a check, named by the label her door
- * resolved — and the workspace's navigation is not used. It stands INSIDE `StationProvider` because the stage is the station's. Draws nothing.
+ * resolved, as the companion's own placing (the stage marks it) — and the workspace's navigation is not used. It stands INSIDE `StationProvider` because the stage is the station's. Draws nothing.
  */
 function StageOpensForHer() {
   const { setFocus } = useStation();
@@ -29,16 +28,16 @@ function StageOpensForHer() {
       switch (target.kind) {
         // A server a moment older than this page sends no label: the thing's own id names it until it is drawn.
         case 'chat':
-          setFocus({ kind: 'chat', sessionId: target.sessionId, label: label || target.sessionId });
+          setFocus({ kind: 'chat', sessionId: target.sessionId, label: label || target.sessionId }, 'companion');
           return;
         case 'card':
-          setFocus({ kind: 'card', plan: target.plan, label: label || target.plan });
+          setFocus({ kind: 'card', plan: target.plan, label: label || target.plan }, 'companion');
           return;
         case 'page':
-          setFocus({ kind: 'page', pageId: target.pageId, blockId: target.blockId, label: label || target.pageId });
+          setFocus({ kind: 'page', pageId: target.pageId, blockId: target.blockId, label: label || target.pageId }, 'companion');
           return;
         case 'check':
-          setFocus({ kind: 'check', node: target.node, key: target.key, label: label || target.key });
+          setFocus({ kind: 'check', node: target.node, key: target.key, label: label || target.key }, 'companion');
           return;
       }
     };
@@ -93,10 +92,9 @@ function StationHome() {
  * client name or second chat host exists. And it wears the app's own theme: nothing here holds a colour over his choice.
  *
  * What it mounts, outermost first: `StationProvider` (the focus, the back-stack, the tier, the memory); `StationSessionsProvider` (his chats, read at
- * mount and kept on the shell's hint, so the rail, the chat's stage and her draft's Steer all draw the same rows); `StationLandedProvider` (the
- * week's landings and his last look: the strip draws them, and the look-aways that write the look are heard while the station is on screen);
- * `StationNeedsProvider` (everything that needs him, read at mount and kept on six events: the rail draws its items, the stages say when theirs is gone,
- * and the compact and phone plans read its count); and, inside them, `StageOpensForHer` (her orders to open), `StationWhileShowing` (her floor, her voice's
+ * mount and kept on the shell's hint, so the count by her name, the chat's stage and her draft's Steer all read the same rows);
+ * `StationNeedsProvider` (everything that needs him, read at mount and kept on six events: the stages say when theirs is gone, and the count by
+ * her name reads it); and, inside them, `StageOpensForHer` (her orders to open), `StationWhileShowing` (her floor, her voice's
  * unlock, the title and the presence, each only while the station is on screen) and `StationHome` (her new cards and walk taking the stage, and the layout).
  * The phone's frame (`pwa-mode` on html and body, `--keyboard-height`) is the workspace's, which never leaves.
  *
@@ -106,15 +104,13 @@ export function StationRoute() {
   return (
     <StationProvider>
       <StationSessionsProvider>
-        <StationLandedProvider>
-          <StationNeedsProvider>
-            <StageOpensForHer />
-            <StationWhileShowing />
-            <HeldStation>
-              <StationHome />
-            </HeldStation>
-          </StationNeedsProvider>
-        </StationLandedProvider>
+        <StationNeedsProvider>
+          <StageOpensForHer />
+          <StationWhileShowing />
+          <HeldStation>
+            <StationHome />
+          </HeldStation>
+        </StationNeedsProvider>
       </StationSessionsProvider>
     </StationProvider>
   );

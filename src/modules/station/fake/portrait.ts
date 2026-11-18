@@ -1,19 +1,19 @@
+import { createElement } from 'react';
 import type { ComponentProps } from 'react';
 
+import { CompanionAvatar } from '@/modules/companion';
 import { CONVERSATION_STATES, HER_PICTURES, he, house, KANBAN, picture, she, WAITING_SPEAKING } from '@/modules/station/fake/conversation';
-import { avatarOf, portraitHead, presenceOf } from '@/modules/station/fake/head';
 import { StationPortraitView } from '@/modules/station/StationPortrait';
 import type { CompanionPicture } from '@/shared/companion-types';
-import type { CompanionPresence, CompanionSentenceRef } from '@/shared/types';
+import type { CompanionPresence, CompanionPresenceState, CompanionSentenceRef } from '@/shared/types';
 
 /*
- * HER PORTRAIT'S FIXTURES, for `station-fake.ts`'s pictures only: her column in the portrait view, her head (`fake/head.ts`'s
- * `portraitHead`: no face, the toggle reading "Show chat") and her portrait (`StationPortraitView`) drawn from one picture each.
- * Nothing in the app imports this file.
+ * THE PORTRAIT'S FIXTURES, for `station-fake.ts`'s pictures only: the portrait (`StationPortraitView`) drawn from one picture
+ * each, in the conversation's place. Nothing in the app imports this file.
  *
- * A portrait is two slots at once, so `PORTRAIT_STATES` holds a drawing per slot (`head`, `conversation`) under the same name, and
- * `.verify/kaylee-station-shots.mjs` (`lib/station-portrait.mjs`) draws a name by putting both in their slots' places over `home`.
- * The names carry `portrait-`, so none meets a presence of her head's or a state of her conversation's.
+ * `PORTRAIT_STATES.conversation` holds a drawing under each name, which `.verify/kaylee-station-shots.mjs`
+ * (`lib/station-portrait.mjs`) draws in the conversation's place over `home`. The names carry `portrait-`, so none meets a
+ * state of the conversation's.
  *
  * - `portrait-reply`: `home`'s picture at rest, her newest turn's one sentence under her face, Idle.
  * - `portrait-speaking`: `waiting`'s picture while she speaks the last of her read-back (marked), Speaking.
@@ -24,7 +24,19 @@ import type { CompanionPresence, CompanionSentenceRef } from '@/shared/types';
  * - `portrait-broke`: his line, then her harness's line for the turn that broke, in the banner where her words would be.
  */
 
-/** A picture, the presence her face and head draw it at, and the sentence her voice is sounding (none unless named). */
+/** A presence: its word, and what it concerns. */
+const presenceOf = (state: CompanionPresenceState, about: Partial<Omit<CompanionPresence, 'state'>> = {}): CompanionPresence => (
+  { state, session: null, files: null, walk: null, ...about });
+
+/**
+ * The face at a square, drawn on `presence`. A fixture cannot mount the bound face (`CompanionFace` reads the live provider), so
+ * it is drawn with no face id: the initial, the look of a box whose face is not made yet.
+ */
+const avatarOf = (her: CompanionPicture | null, presence: CompanionPresence) => (px: number) => createElement(CompanionAvatar, {
+  presence, voice: null, sentences: null, look: null, name: her?.settings.name ?? 'Kaylee', size: px,
+});
+
+/** A picture, the presence the face is drawn at, and the sentence the voice is sounding (none unless named). */
 type PortraitSource = { her: CompanionPicture; presence: CompanionPresence; speaking?: CompanionSentenceRef };
 
 /** An answer long enough to stand past her words' pane, the sentences of one turn. */
@@ -73,8 +85,7 @@ function byName<T>(make: (source: PortraitSource) => T): Record<PortraitName, T>
   return Object.fromEntries(Object.entries(SOURCES).map(([name, source]) => [name, make(source)])) as Record<PortraitName, T>;
 }
 
-/** Her column in the portrait view: her head's and her portrait's drawings under each state's name. */
+/** The portrait's drawings under each state's name, for the conversation's place. */
 export const PORTRAIT_STATES = {
-  head: byName(({ her, presence }) => portraitHead(her, presence)),
   conversation: byName(portraitDrawing),
 };

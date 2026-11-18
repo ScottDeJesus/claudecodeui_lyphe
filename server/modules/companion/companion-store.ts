@@ -1,5 +1,5 @@
 import { companionDb } from '@/modules/database/index.js';
-import type { CompanionLogRow, CompanionNoteRow, CompanionStateRow } from '@/modules/database/index.js';
+import type { CompanionLogRow, CompanionNoteRow, CompanionStateRow, CompanionWorkHeadRow } from '@/modules/database/index.js';
 import { sendToUser } from '@/modules/websocket/index.js';
 import type {
   CompanionAttachment,
@@ -14,6 +14,8 @@ import type {
   CompanionSessionRef,
   CompanionSound,
   CompanionWalk,
+  CompanionWorkBody,
+  CompanionWorkEntry,
 } from '@/shared/companion-types.js';
 import { isList, isRecord, isText, isWholeFrom } from '@/shared/document-fields.js';
 
@@ -48,6 +50,10 @@ import { isUnansweredList, type UnansweredMessage } from './companion-unanswered
  * HOW THE DRAFT LAST ENDED is the one thing here kept in memory and not in a column (`CompanionDraftEnd`, `companion-draft-end.ts`). A draft
  * comes down only through `endDraft`, which says how, so the send that finds none can tell his take-down from a send; a new draft (`setDraft`)
  * and Clear drop the record. A restart loses it, and that send is then refused plainly, as for a draft never written.
+ *
+ * THE WORK OF A TURN (`beginWork`, `endWork`): each call of a tool is a row of `companion_work`, sent as `companion_work` when it
+ * begins and again when it ends, so the log can show a turn's work the way a chat shows a session's. The frame and the picture
+ * carry the call without what it was given and what it answered; a page reads those when a call is opened (`readWorkBody`).
  *
  * Consumer: `companion.service.ts`, which makes one store per account and serves the conversation's
  * callbacks and her tools from it: the picture, the verbs behind the routes, the alert and focus feeds.
@@ -159,6 +165,17 @@ export type CompanionStore = {
    * the list; the files themselves stay in the upload store. A column that does not read as records is dropped with `readJsonColumn`'s one warning.
    */
   attachedFiles(): CompanionAttachment[];
+  /**
+   * `companion_work`: one call of a tool opens, placed after the newest log line. `kept` false is a call of the companion's memory:
+   * neither `input` nor, at its end, its answer is stored. Answers the call as the log lists it.
+   */
+  beginWork(call: { turnId: string | null; tool: string; about: string | null; kept: boolean; input: Record<string, unknown> }): CompanionWorkEntry;
+  /** `companion_work` again, with the call ended: whether it failed and what it answered (`cut` when only its head is kept). Nothing for a call already ended or no longer held. */
+  endWork(id: number, end: { failed: boolean; result: string; cut: boolean }): void;
+  /** The calls that stand at or after the log line `fromLogId`, oldest first. No frame. */
+  listWork(fromLogId: number): CompanionWorkEntry[];
+  /** What one call was given and what it answered, or `null` for a call this account does not hold. No frame. */
+  readWorkBody(id: number): CompanionWorkBody | null;
   /** `companion_note`. A card is a `note` about nothing unless it is given its `kind` and the `ref` it is about. */
   addNote(note: { title: string; text: string; kind?: CompanionNoteKind; ref?: CompanionNoteRef | null }): CompanionNote;
   listNotes(): CompanionNote[];
@@ -246,6 +263,17 @@ function toLogEntry(userId: number, row: CompanionLogRow): CompanionLogEntry {
     ...(attachments?.length ? { attachments } : {}),
   };
 }
+
+const toWorkEntry = (row: CompanionWorkHeadRow): CompanionWorkEntry => ({
+  id: row.id,
+  turnId: row.turn_id,
+  afterLogId: row.after_log_id,
+  tool: row.tool,
+  about: row.about,
+  at: row.started_at,
+  endedAt: row.ended_at,
+  failed: row.failed === 1,
+});
 
 /** Keyed by the contract's union, so a kind added to `CompanionNoteKind` without a word here is a compile error rather than a card read back as a `note`. */
 const NOTE_KINDS: Record<CompanionNoteKind, true> = { note: true, list: true, diff: true, plan: true, page: true };
@@ -378,6 +406,26 @@ export function createCompanionStore(userId: number): CompanionStore {
     readSentence(turnId, index) {
       const row = companionDb.readSentence(userId, turnId, index);
       return row === null ? null : toLogEntry(userId, row);
+    },
+
+    beginWork(call) {
+      const entry = toWorkEntry(companionDb.beginWork(userId, { turn_id: call.turnId, tool: call.tool, about: call.about, kept: call.kept, input_json: JSON.stringify(call.input) }));
+      send({ kind: 'companion_work', entry });
+      return entry;
+    },
+
+    endWork(id, end) {
+      const row = companionDb.endWork(userId, id, { failed: end.failed, result: end.result, result_cut: end.cut });
+      if (row !== null) send({ kind: 'companion_work', entry: toWorkEntry(row) });
+    },
+
+    listWork: (fromLogId) => companionDb.listWork(userId, fromLogId).map(toWorkEntry),
+
+    readWorkBody(id) {
+      const row = companionDb.readWorkBody(userId, id);
+      if (row === null) return null;
+      if (row.kept !== 1) return { kept: false, input: null, result: null, cut: false };
+      return { kept: true, input: readJsonColumn(userId, `companion_work.input_json (row ${id})`, row.input_json, isRecord), result: row.result, cut: row.result_cut === 1 };
     },
 
     addNote(input) {

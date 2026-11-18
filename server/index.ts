@@ -71,6 +71,7 @@ import { createKanbanModule } from './modules/kanban/index.js';
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
 import { createFollowupsModule } from './modules/followups/index.js';
+import { createSessionPanelModule } from './modules/session-panel/index.js';
 import { createNotesModule } from './modules/notes/index.js';
 import { createCerberusModule } from './modules/cerberus/index.js';
 import { createCompanionModule } from './modules/companion/index.js';
@@ -321,6 +322,14 @@ app.use('/api/followups', authenticateToken, followups.userRouter);
 // checks the chat's credential, and the chat is the one that credential names. The verbs are list, add
 // and done; `/api/followups` above still refuses that credential.
 app.use('/api/followups-cmd', followups.commandRouter);
+
+// The session panel's lane: the one place beside the talk a chat has to itself. The reader's door answers a chat's versions and
+// each one whole; every write sends one `session_panel_changed` naming the chat's app session id.
+const sessionPanel = createSessionPanelModule();
+app.use('/api/session-panel', authenticateToken, sessionPanel.userRouter);
+// The SAME lane's second door, for the `panel` command a chat's CLI runs and nothing else. NO `authenticateToken`: its own first
+// middleware checks the chat's credential, and `/api/session-panel` above still refuses that credential.
+app.use('/api/session-panel-cmd', sessionPanel.commandRouter);
 
 // The fleet's health (protected), mounted at this ONE address. Its gateway — where each node's
 // warden dials in — is a listener of its own on the tailnet, never a path on this server, so

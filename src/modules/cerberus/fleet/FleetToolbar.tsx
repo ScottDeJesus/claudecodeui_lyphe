@@ -64,10 +64,10 @@ export function FleetToolbar({ layout, groups, filter, query, folds, onLayout, o
       </div>
       {folds && (
         <div className="flex gap-0.5">
-          <Button variant="ghost" size="sm" onClick={onExpandAll}>
+          <Button variant="outline" size="sm" onClick={onExpandAll}>
             {t('cerberus.fleet.expandAll')}
           </Button>
-          <Button variant="ghost" size="sm" onClick={onCollapseAll}>
+          <Button variant="outline" size="sm" onClick={onCollapseAll}>
             {t('cerberus.fleet.collapseAll')}
           </Button>
         </div>

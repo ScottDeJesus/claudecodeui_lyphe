@@ -24,7 +24,7 @@ import type { DispatcherArc, DispatcherPlan } from '@/shared/types';
  * `pruneCardFolds` writes nothing when nothing was dropped, so a quiet lane costs no preference
  * write. See `src/shared/hooks/useCardFold.ts` for what a prune may and may not drop.
  *
- * Used by `RunnerPanel` and `RunnerWidgetBody`, the lane's two homes.
+ * Used by `RunnerPanel`, the lane's home.
  */
 export function useLaneFoldPrune(
   plans: readonly DispatcherPlan[],

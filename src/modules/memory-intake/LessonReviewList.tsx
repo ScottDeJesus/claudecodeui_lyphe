@@ -248,7 +248,7 @@ function LessonRow({ lesson, refusal, writing, busy, body, onOpen, onApprove, on
             <CheckIcon aria-hidden="true" />
             {t('memory.lessons.approve', { defaultValue: 'approve' })}
           </Button>
-          <Button size="sm" variant="ghost" disabled={busy} title={t('memory.lessons.rejectTitle', { defaultValue: 'reject — no session ever reads it' })} onClick={() => onReject(lesson.id)}>
+          <Button size="sm" variant="outline" disabled={busy} title={t('memory.lessons.rejectTitle', { defaultValue: 'reject — no session ever reads it' })} onClick={() => onReject(lesson.id)}>
             <XIcon aria-hidden="true" />
             {t('memory.lessons.reject', { defaultValue: 'reject' })}
           </Button>

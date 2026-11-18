@@ -49,7 +49,7 @@ function sentenceFor(sentence: string, cause: unknown): Error {
 }
 
 /**
- * Used by the station's rail (`WhatNeedsYou`), which draws the items, and by its three stages (`AskStage`, `FollowupsStage`,
+ * Used by the station's three stages (`AskStage`, `FollowupsStage`,
  * `CheckStage`), which say that the thing they were opened on is gone when the list no longer holds it. The count of what needs him
  * is not this list's length: it comes from the one rule (`needsCountOf`), through `useNeedsCount` below and in the rail's head.
  * Throws outside `StationNeedsProvider`, so a consumer placed wrong fails at once.
@@ -66,8 +66,7 @@ export function useStationNeeds(): StationNeedsContextValue {
  * server closes a lapsed row at its next prepare, take or cancel and leaves it in her picture until then, while the card and the
  * phone's line go at its deadline (`useActionLapse`, which `useLivePending` reads), so a lapsed action is counted out with them. `null` until the first read of
  * the items has landed (`needs` null, in flight or failed): the rail says so in its own words, and a 0 here would claim "nothing
- * waits". Used by the compact arrangement's wrapper (its "Needs you" button) and the phone's (its bar); the rail's head draws the
- * same rule over its own props (`WhatNeedsYouView`), so the three say one number. Throws outside `StationNeedsProvider` and outside
+ * waits". Used by the compact arrangement's wrapper (its "Needs you" button) and the phone's (its bar); every place says one number. Throws outside `StationNeedsProvider` and outside
  * her provider.
  */
 export function useNeedsCount(): number | null {

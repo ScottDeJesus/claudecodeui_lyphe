@@ -1,0 +1,37 @@
+/* THE CHAT'S SCREEN (`ChatDesk`). One column on a narrow screen: the head, then the chat. At a desk it is laid out as the station
+ * is with a thing on its panel: a column at the start with the roadmap's small circle at its top, the chat's core under it and the
+ * chat's follow-ups under that; and the chat beside it, a surface of its own, with its head as that surface's first line.
+ *
+ * ONE BLOCK, CENTRED. The column and the chat stand together in the middle of the window, never the column at the window's edge and
+ * the chat in the middle of what is left. The chat's words run to 1100 px there (`--chat-measure`), and the block is no wider than
+ * the column and that measure need.
+ *
+ * `--chat-side` is the column's width, set by `ChatDesk` from the window. `--chat-column` is the cap on the chat's own column and on
+ * its head's row: 868 px on a narrow screen (their fallback), none at a desk, where the surface is the cap. */
+.chat-desk { position: relative; display: flex; height: 100%; min-width: 0; min-height: 0; }
+.chat-desk__main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.chat-desk__body { flex: 1; min-height: 0; }
+
+.chat-desk[data-chat-desk='side'] {
+  --chat-measure: 68.75rem;
+  --chat-column: none;
+  width: 100%;
+  /* The column, then the surface: the measure, the rail's 28 px, 1rem at each side, the surface's two hairlines and its 16 px of air. */
+  max-width: calc(var(--chat-side) + 68.75rem + 28px + 2rem + 2px + 16px);
+  margin-inline: auto;
+}
+/* The surface, as the station's panel is cut: the same air, hairline, corner and ground. */
+.chat-desk[data-chat-desk='side'] > .chat-desk__main {
+  margin: 16px 16px 12px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+/* The column. The roadmap's circle lies over its top (66 px down, 33 px round: `ChatDesk` hands `RoadmapCircle` the place). Under it
+ * the core has a box as tall as its disc at its widest (280 px) and stands in that box's middle, so the disc opens clear of the
+ * circle above and of the follow-ups below, and nothing moves to make room for it. Only the follow-ups scroll. */
+.chat-desk__side { display: flex; flex: none; flex-direction: column; width: var(--chat-side); min-height: 0; padding-top: 116px; }
+.chat-desk__core { display: grid; flex: none; place-items: center; height: 280px; }
+.chat-desk__followups { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 24px 16px; scrollbar-width: thin; }

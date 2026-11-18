@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 
 import { DIFF_LINES, INBOX_LINES, KANBAN_REVIEW_ITEMS, NOTE_LINES, PAGE_LINES, PLAN_LINES, RUN_LINES, RUNS_LINES } from '@/modules/station/fake/cardLines';
-import { SESSIONS_FAKE } from '@/modules/station/fake/sessions';
+import { HOUSE_CHATS } from '@/modules/station/fake/sessions';
 import { WAITING_FEATURE } from '@/modules/station/fake/stage';
 import { NoteStageView } from '@/modules/station/NoteStage';
 import { StageShelfView } from '@/modules/station/StageShelf';
@@ -37,8 +37,8 @@ const ago = (minutes: number): string => new Date(NOW - minutes * 60_000).toISOS
 const NO_PRESS = () => {};
 
 /** The chat a picture's left rail draws by this name, so the walk and a card's ref name the rail's own chat. */
-function railChat(picture: keyof typeof SESSIONS_FAKE, name: string): StationSession {
-  const found = SESSIONS_FAKE[picture].props.sessions?.find((session) => session.name === name);
+function railChat(picture: keyof typeof HOUSE_CHATS, name: string): StationSession {
+  const found = HOUSE_CHATS[picture].find((session) => session.name === name);
   if (found === undefined) throw new Error(`fake/sessions.ts draws no chat "${name}" in its ${picture} picture`);
   return found;
 }
@@ -137,7 +137,7 @@ const GONE_FOCUS: Extract<StationFocus, { kind: 'note' }> = { kind: 'note', id: 
 /**
  * THE STAGE'S OWN SHOTS, each a stage and a shelf drawn over a picture in the stage's place (`.verify/kaylee-station-shots.mjs`,
  * by name): `picture`, the `focus` on the stage, its `view` and `props` (no view: the empty stage), whether Back is drawn, and the
- * shelf's drawing (null: no cards). Each is drawn beside her head, the picture's own (`fake/head.ts`).
+ * shelf's drawing (null: no cards).
  */
 export const CARDS_STAGE_FAKE = {
   'card-note': homeCard(RUN),

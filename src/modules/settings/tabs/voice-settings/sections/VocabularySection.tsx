@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -69,8 +69,16 @@ export function VocabularySection() {
                     <span aria-hidden="true">▲ </span>
                     {error}
                   </span>
-                  <Button variant="outline" size="sm" onClick={() => { void retry(); }}>
-                    {t('voiceSettings.gemini.retry', { defaultValue: 'Try again' })}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { void retry(); }}
+                    aria-label={t('voiceSettings.gemini.retry', { defaultValue: 'Try again' })}
+                    title={t('voiceSettings.gemini.retry', { defaultValue: 'Try again' })}
+                    className="finger:h-11 finger:w-11 finger:px-0"
+                  >
+                    <RefreshCw aria-hidden="true" />
+                    <span className="finger:hidden">{t('voiceSettings.gemini.retry', { defaultValue: 'Try again' })}</span>
                   </Button>
                 </>
               )}
@@ -104,9 +112,18 @@ export function VocabularySection() {
               )}
               {draft === null && (
                 <div className="p-4">
-                  <Button variant="outline" size="sm" busy={saving} data-vocabulary-add-row="" onClick={() => setDraft(NEW_WORD)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    busy={saving}
+                    data-vocabulary-add-row=""
+                    onClick={() => setDraft(NEW_WORD)}
+                    aria-label={t('voiceSettings.vocabulary.addRow', { defaultValue: 'Add a word' })}
+                    title={t('voiceSettings.vocabulary.addRow', { defaultValue: 'Add a word' })}
+                    className="finger:h-11 finger:w-11 finger:px-0"
+                  >
                     <Plus aria-hidden="true" />
-                    {t('voiceSettings.vocabulary.addRow', { defaultValue: 'Add a word' })}
+                    <span className="finger:hidden">{t('voiceSettings.vocabulary.addRow', { defaultValue: 'Add a word' })}</span>
                   </Button>
                 </div>
               )}

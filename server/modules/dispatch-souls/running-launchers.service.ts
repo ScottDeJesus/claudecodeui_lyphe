@@ -62,7 +62,15 @@ export type RunningLauncher = {
   reason: 'soul' | 'chain';
   /** The launch id (reason `soul`) or chain id (reason `chain`) that makes it true. */
   sourceId: string;
+  /**
+   * The model the soul runs on: the one its child announced on its log (`servedModel`), else the one its spec asked for, else `''`
+   * while neither says. Always `''` for a chain, which is a walker and not a model: its running stage is a soul of its own row.
+   */
+  model: string;
 };
+
+/** What each running soul's log announced as its model, kept across passes so a log is opened once per launch (`readLaunchFiles`). */
+const servedModelByLaunchId = new Map<string, string>();
 
 /** The `launched_by` stamp off a parsed spec, or `null` when the launch carries none. */
 function launchedBy(spec: unknown): string | null {
@@ -93,8 +101,10 @@ function listRunningSouls(
       const cliSessionId = launchedBy(spec);
       if (cliSessionId === null || hasLaunchReceipt(launchDir)) continue;
       if (isDispatcherWork(launchId, spec, dispatcherChainLaunchIds)) continue;
-      if (classifyLaunch(readLaunchFiles(launchDir, launchId), nowS, RUNNING_WINDOW_S)?.state === 'running') {
-        running.push({ cliSessionId, reason: 'soul', sourceId: launchId });
+      const files = readLaunchFiles(launchDir, launchId, servedModelByLaunchId);
+      if (classifyLaunch(files, nowS, RUNNING_WINDOW_S)?.state === 'running') {
+        const asked = spec !== null && typeof spec === 'object' ? (spec as { model?: unknown }).model : undefined;
+        running.push({ cliSessionId, reason: 'soul', sourceId: launchId, model: files.servedModel || (typeof asked === 'string' ? asked.trim() : '') });
       }
     } catch {
       // One unreadable launch is a launch not counted this pass — the next pass reads it again.
@@ -135,7 +145,7 @@ function listRunningChains(
         if (owner !== null) owners.add(owner);
       }
       for (const cliSessionId of owners) {
-        running.push({ cliSessionId, reason: 'chain', sourceId: chainId });
+        running.push({ cliSessionId, reason: 'chain', sourceId: chainId, model: '' });
       }
     } catch {
       // One unreadable chain is a chain not counted this pass — the next pass reads it again.

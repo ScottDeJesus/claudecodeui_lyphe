@@ -1,4 +1,4 @@
-import { KeyRound } from 'lucide-react';
+import { KeyRound, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -107,7 +107,7 @@ export default function ClaudeApiKeysContent() {
   // One row per slot, in slot order, whatever order the picture carries them in. After a failed read
   // there is no picture: both rows are drawn as unknown, with no field to overwrite anything.
   return (
-    <div className="divide-y divide-border rounded-xl border border-border bg-card">
+    <div className="divide-y divide-border border-y border-border">
       <SettingRow
         icon={<KeyRound className="h-4 w-4" />}
         label={(
@@ -119,8 +119,16 @@ export default function ClaudeApiKeysContent() {
         description={description}
       >
         {asking || unreadable ? (
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            aria-label={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+            title={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <RefreshCw aria-hidden="true" />
+            <span className="finger:hidden">{t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}</span>
           </Button>
         ) : null}
       </SettingRow>

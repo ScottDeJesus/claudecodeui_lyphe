@@ -56,8 +56,6 @@ export { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 export { landFocusInHome } from '@/modules/dispatcher/putAwayFocus';
 // The `Hidden · N` list at the foot of both homes: every plan the dispatcher holds hidden, each with its `Show`.
 export { HiddenPlans } from '@/modules/dispatcher/HiddenPlans';
-// The pin a plan wears when the open chat is the one that launched it, drawn by both homes.
-export { SessionPin } from '@/modules/dispatcher/SessionPin';
 // Every ask still waiting on the operator's word, one row per ask with the feature or epic it stands on and an
 // Answer that opens its card: the inbox module's Roadmap section. The asks are this module's vocabulary, so the
 // list is drawn here and the Inbox only mounts it.

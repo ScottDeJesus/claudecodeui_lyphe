@@ -64,7 +64,7 @@ export default function PrdEditorWorkspace({
           gutter untouched and this class, on the card, is 0 where the inset is 0. */}
       <div
         className={cn(
-          'pwa-notch-safe bg-white dark:bg-gray-900 shadow-2xl flex flex-col',
+          'pwa-notch-safe bg-background shadow-2xl flex flex-col',
           'w-full h-full md:rounded-lg md:shadow-2xl',
           isFullscreen
             ? 'md:w-full md:h-full md:rounded-none'
@@ -72,7 +72,7 @@ export default function PrdEditorWorkspace({
         )}
       >
         {loadError && (
-          <div className="border-b border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
+          <div className="border-b border-border bg-[var(--warn-soft)] px-4 py-3 text-sm text-[var(--warn-ink)]">
             {loadError}
           </div>
         )}

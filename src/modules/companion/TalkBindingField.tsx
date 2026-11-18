@@ -1,3 +1,4 @@
+import { Keyboard, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -53,7 +54,7 @@ export function TalkBindingField({ label, capturing, refusal, onBind, onClear, o
 
   const help = refusal === null ? (
     t('voiceSettings.companion.talkBinding.help', {
-      defaultValue: "Press it once to talk to her and again to send. A function key, a key held with Ctrl, Alt or Meta, or the mouse's middle, back or forward button.",
+      defaultValue: "Press it once to talk to the companion and again to send. A function key, a key held with Ctrl, Alt or Meta, or the mouse's middle, back or forward button.",
     })
   ) : (
     <span role="alert" data-tone="warn" className="font-medium text-tone-ink">
@@ -82,8 +83,9 @@ export function TalkBindingField({ label, capturing, refusal, onBind, onClear, o
               {t('voiceSettings.companion.talkBinding.capturing', { defaultValue: 'Press a key or mouse button… Escape cancels' })}
             </div>
             {/* A left press here is the way out, never a press offered as the binding: the capture passes it over. */}
-            <Button variant="ghost" size="sm" data-talk-binding-cancel="" onClick={onCancel}>
-              {t('voiceSettings.companion.talkBinding.cancel', { defaultValue: 'Cancel' })}
+            <Button variant="ghost" size="sm" data-talk-binding-cancel="" onClick={onCancel} aria-label={t('voiceSettings.companion.talkBinding.cancel', { defaultValue: 'Cancel' })} title={t('voiceSettings.companion.talkBinding.cancel', { defaultValue: 'Cancel' })} className="finger:h-11 finger:w-11 finger:px-0">
+              <X aria-hidden="true" />
+              <span className="finger:hidden">{t('voiceSettings.companion.talkBinding.cancel', { defaultValue: 'Cancel' })}</span>
             </Button>
           </>
         ) : (
@@ -106,8 +108,11 @@ export function TalkBindingField({ label, capturing, refusal, onBind, onClear, o
               size="sm"
               aria-label={t('voiceSettings.companion.talkBinding.bindLabel', { defaultValue: 'Bind the talk button' })}
               onClick={onBind}
+              title={t('voiceSettings.companion.talkBinding.bind', { defaultValue: 'Bind' })}
+              className="finger:h-11 finger:w-11 finger:px-0"
             >
-              {t('voiceSettings.companion.talkBinding.bind', { defaultValue: 'Bind' })}
+              <Keyboard aria-hidden="true" />
+              <span className="finger:hidden">{t('voiceSettings.companion.talkBinding.bind', { defaultValue: 'Bind' })}</span>
             </Button>
             {label !== null && (
               <Button
@@ -115,9 +120,11 @@ export function TalkBindingField({ label, capturing, refusal, onBind, onClear, o
                 size="sm"
                 aria-label={t('voiceSettings.companion.talkBinding.clearLabel', { defaultValue: 'Clear the talk button' })}
                 onClick={onClear}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground finger:h-11 finger:w-11 finger:px-0"
+                title={t('voiceSettings.companion.talkBinding.clear', { defaultValue: 'Clear' })}
               >
-                {t('voiceSettings.companion.talkBinding.clear', { defaultValue: 'Clear' })}
+                <X aria-hidden="true" />
+                <span className="finger:hidden">{t('voiceSettings.companion.talkBinding.clear', { defaultValue: 'Clear' })}</span>
               </Button>
             )}
           </>

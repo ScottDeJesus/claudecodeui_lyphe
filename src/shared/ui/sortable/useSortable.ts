@@ -69,8 +69,7 @@ export type SortableList = {
  * whose next reading is what redraws the keys), the order the drop made stays drawn until the store has
  * caught up (`useDropHold`). A synchronous `onReorder` is untouched.
  *
- * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab): the tab's wall and decks, and the widget's
- * column, reordering the lane's cards; and by `MilestonePanel` and `EpicPanel` (the roadmap tree's panel),
+ * Used by `RunnerPanel` (runner-tab): the tab's wall and decks, reordering the lane's cards; and by `MilestonePanel` and `EpicPanel` (the roadmap tree's panel),
  * which hand their list to `PanelRows`' `RowList`: a milestone's epics and an epic's features, as rows the
  * operator carries by their free surface.
  */

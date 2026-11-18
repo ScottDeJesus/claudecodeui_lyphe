@@ -129,7 +129,7 @@ function longLog(): CompanionLogEntry[] {
     rows.push(she(at - 5, `t-long-${turn}`, 2, 'Want me to read the question out?'));
     if (turn === 2) rows.push(house(at - 120, 'alert', 'Feature finished · Kanban lanes · claudecodeui_lyphe\nLane drag landed. Follow-ups it filed for him: keep the drop zone the full lane height.'));
     if (turn === 5) rows.push(house(at - 90, 'alert', 'Permission · Migration chat · shadow-connector\nWaiting on him: run `npm run migrate` in Bash.'));
-    if (turn === 6) rows.push(house(at - 60, 'system', 'Her conversation could not be resumed; she starts fresh.'));
+    if (turn === 6) rows.push(house(at - 60, 'system', 'The conversation could not be resumed; it starts fresh.'));
   }
   rows.push(he(60, 'and the migration chat?'));
   rows.push(she(55, 't-long-end', 0, 'Three of five tables are copied and checked.', [{ tag: 'short pause', at: 44 }]));
@@ -312,7 +312,7 @@ const FAILED_SENTENCE = "Kaylee couldn't start: the Claude login on this box has
 /** A picture: the defaults of an awake, idle companion with an empty panel, and whatever a state changes. */
 const picture = (change: Partial<CompanionPicture>): CompanionPicture => ({
   settings: FAKE_SETTINGS, models: MODELS, process: AWAKE, activity: IDLE, turnId: null, focus: null,
-  draft: null, pending: null, walk: null, notes: [], log: [], floor: 'fixture-page', face: NO_FACE, ...change,
+  draft: null, pending: null, walk: null, notes: [], log: [], work: [], floor: 'fixture-page', face: NO_FACE, ...change,
 });
 
 /** One state of the panel: her picture, whether the draft's target is working, and the page's open state. */

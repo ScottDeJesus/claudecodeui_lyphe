@@ -49,7 +49,20 @@ type AccountsValue = {
   refreshReadings: () => void;
   /** The same read, skipped when the readings were taken within the last few seconds. */
   refreshStaleReadings: () => void;
+  /** Where the account switcher stands open, as the point on the page it was opened from; null while it is shut. */
+  switcher: AccountSwitcherAnchor | null;
+  /** A press on an account ring or the rail's account button: opens the switcher from that point, or shuts it when it is open. */
+  toggleSwitcher: (at: AccountSwitcherAnchor) => void;
+  /** Shuts the switcher, and drops the refusal that stood in it. */
+  closeSwitcher: () => void;
 };
+
+/**
+ * The point the account switcher opens from, in the window's own px: the middle of the ring or button that was pressed, how far
+ * from that middle the switcher must stand to leave it in sight (`clear`), and whether it should stand to the side of the point
+ * rather than over or under it (`beside`: the rail's button, which has the page beside it and the rail above and below).
+ */
+export type AccountSwitcherAnchor = { x: number; y: number; clear: number; beside?: boolean };
 
 const AccountsContext = createStableContext<AccountsValue | null>(import.meta.hot, 'AccountsContext', null);
 
@@ -66,6 +79,10 @@ const AccountsContext = createStableContext<AccountsValue | null>(import.meta.ho
  * The sign-in windows live here, not in either home: both draw a Re-login button and a Set up row, and the window must
  * outlive the popover that was open when it was pressed. They draw on `document.body`, so where they are mounted
  * changes nothing on screen.
+ *
+ * WHETHER THE ACCOUNT SWITCHER IS OPEN IS HERE TOO, one fact for the whole workspace: every account ring (round a chat's core, round
+ * Kaylee's) and the rail's account button open the same switcher from wherever they stand (`toggleSwitcher`), and `AccountSwitcher`,
+ * mounted once beside the workspace, draws it.
  */
 export function AccountsProvider({ children }: { children: ReactNode }) {
   const { data: accounts, chooseAccount, setAuto, removeAccount, busy, error, clearError } = useClaudeAccounts();
@@ -131,7 +148,26 @@ export function AccountsProvider({ children }: { children: ReactNode }) {
   const onSetAuto = useCallback((on: boolean) => { void setAuto(on); }, [setAuto]);
   const onRemove = useCallback((slug: string) => { void removeAccount(slug); }, [removeAccount]);
 
+  // Where the account switcher stands open, or null while it is shut. Held here because the rings that open it stand on three pages
+  // and there is one switcher.
+  const [switcher, setSwitcher] = useState<AccountSwitcherAnchor | null>(null);
+  const closeSwitcher = useCallback(() => {
+    setSwitcher(null);
+    // A refusal describes one attempt, so it leaves with the switcher rather than greeting the next person who opens it.
+    clearError();
+  }, [clearError]);
+
   const signInOpen = loginOpen || setup !== null;
+  const toggleSwitcher = useCallback((at: AccountSwitcherAnchor) => {
+    if (switcher !== null) {
+      closeSwitcher();
+      return;
+    }
+    setSwitcher(at);
+    // D7: a reading is taken when the switcher opens, so what a person reads is what is true now.
+    refreshReadings();
+  }, [switcher, closeSwitcher, refreshReadings]);
+
   const value = useMemo<AccountsValue>(() => ({
     accounts,
     usage,
@@ -148,7 +184,10 @@ export function AccountsProvider({ children }: { children: ReactNode }) {
     onSetup: openSetup,
     refreshReadings,
     refreshStaleReadings,
-  }), [accounts, usage, balance, jevBalance, busy, error, signInOpen, clearError, onRelogin, onUse, onSetAuto, onRemove, openSetup, refreshReadings, refreshStaleReadings]);
+    switcher,
+    toggleSwitcher,
+    closeSwitcher,
+  }), [accounts, usage, balance, jevBalance, busy, error, signInOpen, clearError, onRelogin, onUse, onSetAuto, onRemove, openSetup, refreshReadings, refreshStaleReadings, switcher, toggleSwitcher, closeSwitcher]);
 
   return (
     <AccountsContext.Provider value={value}>
@@ -172,9 +211,9 @@ export function AccountsProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * The account panel's state and acts, from the provider above. Used by the accounts module's AccountRailButton
- * (the popover's trigger), AccountPanelBody (the body both homes draw) and AccountsWidgetBody (the gutter's
- * refresh). A loud error when nothing provides it: a panel drawn outside the workspace would otherwise draw an
+ * The account panel's state and acts, from the provider above. Used by the accounts module's AccountRailButton and
+ * AccountWeekRing (what opens the switcher), AccountPopover (the switcher) and AccountPanelBody (its body).
+ * A loud error when nothing provides it: a panel drawn outside the workspace would otherwise draw an
  * empty picture and read as "you have no accounts".
  */
 export function useAccountsContext(): AccountsValue {

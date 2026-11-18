@@ -21,8 +21,8 @@ import type { DispatcherQueueMove } from '@/shared/types';
  * toast is the dispatcher's own first line (`MOVED a.arc — 2 of 3`) in the operator's words, headed `Queue`
  * when it said nothing and `Queue not changed` over a refusal.
  *
- * Used by the runner-tab module, through this module's barrel: `useQueueLineSort` (In flight's queue list)
- * and `RunnerWidgetBody` (the gutter's column), where a drop of a queue deck is an order, not a preference.
+ * Used by the runner-tab module, through this module's barrel: `useQueueLineSort` (In flight's queue list),
+ * where a drop of a queue deck is an order, not a preference.
  */
 export function useEpicQueueVerbs(): { moveEpic(epic: string, move: DispatcherQueueMove): Promise<boolean> } {
   const { t } = useTranslation();

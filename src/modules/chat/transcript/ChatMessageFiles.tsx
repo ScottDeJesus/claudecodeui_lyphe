@@ -79,7 +79,7 @@ function ChatMessageFile({ file, size }: { file: ChatAttachment; size: ChatFileS
         disabled={!file.path || isDownloading}
         aria-label={`Download ${name}`}
         title={name}
-        className="relative flex h-7 max-w-40 shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-card px-2.5 text-xs font-medium text-foreground transition-colors before:absolute before:inset-0 before:content-[''] hover:bg-accent/60 disabled:cursor-default disabled:hover:bg-card finger:before:-inset-x-2 finger:before:-inset-y-[9px]"
+        className="relative flex h-7 max-w-40 shrink-0 items-center gap-1.5 rounded border border-border/50 bg-card px-2.5 text-xs font-medium text-foreground transition-colors before:absolute before:inset-0 before:content-[''] hover:bg-accent/60 disabled:cursor-default disabled:hover:bg-card finger:before:-inset-x-2 finger:before:-inset-y-[9px]"
       >
         {getFileIcon(file, cn('size-3.5 shrink-0 text-primary', isDownloading && 'animate-pulse'))}
         <span className="truncate">{name}</span>

@@ -1,0 +1,172 @@
+/* THE STATION AS A SCENE: the motion and the places of the wide and laptop arrangements (`StationShellView`), and the
+ * arrival motion of `StationArrival`. Astrolabe's principle: quiet until it's true. At rest the screen is the roadmap, the
+ * companion and the box to type in; the panel takes room only while a thing is on it, arrives on the lock spring, and settles
+ * away when it stops. Every rule here reads a data condition off what is drawn (the scene's `data-station-scene`, the stage's
+ * `data-station-stage`, a piece's `data-arrival`), never a mode. The springs and durations are the tokens' (`--ease-lock`, `--duration-settle` …). */
+
+/* ---------- arrival (StationArrival) ---------- */
+[data-arrival] { --ast-from: scale(0.96); }
+[data-arrival][data-from='rim-start'] { --ast-from: translateX(-20px); }
+[data-arrival][data-from='rim-end'] { --ast-from: translateX(20px); }
+[data-arrival][data-from='dock'] { --ast-from: translateY(16px); }
+[data-arrival][data-from='core'] { --ast-from: translateY(18px) scale(0.86); }
+[data-arrival='arriving'] { animation: ast-arrive var(--duration-lock) var(--ease-lock) both; }
+[data-arrival='arriving'][data-spring='lobe'] { animation-duration: var(--duration-lobe); animation-timing-function: var(--ease-lobe); }
+[data-arrival='settling'] { animation: ast-settle var(--duration-settle) var(--ease-settle) both; pointer-events: none; }
+
+/* ---------- the scene's grid: the roadmap over the companion, or the companion beside the panel ----------
+ * Two cells that never leave the tree (the companion's and the stage's), placed by what the stage holds and by the room there is.
+ * At rest one column: the roadmap takes the room, the shelf of the companion's cards (when it has any) and the companion stand
+ * under it. With a thing on the panel, two columns where there is room for them (wide and laptop): the companion's own
+ * (`--kaylee-col`, the shell's figure for the arrangement) and the panel. In one column (compact and the phone) the companion is
+ * a row at the head and the panel has the rest. */
+[data-station-scene-grid] {
+  grid-template: 'road' minmax(0, 1fr) 'stage' auto 'kaylee' auto / minmax(0, 1fr);
+}
+[data-station-scene='staged'] > [data-station-scene-grid] {
+  grid-template: 'kaylee stage' minmax(0, 1fr) / var(--kaylee-col) minmax(0, 1fr);
+}
+[data-station-arrangement='compact'] [data-station-scene='staged'] > [data-station-scene-grid],
+[data-station-arrangement='phone'] [data-station-scene='staged'] > [data-station-scene-grid] {
+  grid-template: 'kaylee' auto 'stage' minmax(0, 1fr) / minmax(0, 1fr);
+}
+/* A phone at rest has no roadmap standing: the companion has the room, under the head the roadmap's circle rests in. */
+[data-station-arrangement='phone'] [data-station-scene='rest'] > [data-station-scene-grid] {
+  grid-template: 'kaylee' minmax(0, 1fr) 'stage' auto / minmax(0, 1fr);
+}
+[data-station-road] { grid-area: road; }
+[data-station-kaylee-cell] { grid-area: kaylee; }
+[data-station-stage-cell] { grid-area: stage; }
+[data-station-arrangement='phone'] [data-station-scene='rest'] [data-station-kaylee-cell] { padding-top: 28px; }
+/* On its side the circle is beside the companion, not over it. */
+@media (max-height: 520px) {
+  [data-station-arrangement='phone'] [data-station-scene='rest'] [data-station-kaylee-cell] { padding-top: 0; padding-left: 72px; }
+}
+/* The companion's column leaves the roadmap's circle its place over the halo. */
+[data-station-arrangement='wide'] [data-station-scene='staged'] [data-station-kaylee-cell],
+[data-station-arrangement='laptop'] [data-station-scene='staged'] [data-station-kaylee-cell] { padding-top: 108px; }
+/* A window too short for the stack and the companion both (a tablet on its side, a small window): the roadmap gives way. */
+@media (max-height: 620px) {
+  [data-station-scene='rest'] [data-station-road] { display: none; }
+  [data-station-scene='rest'] > [data-station-scene-grid] { grid-template: 'stage' auto 'kaylee' minmax(0, 1fr) / minmax(0, 1fr); }
+  /* `safe`: what does not fit starts at the top and scrolls, never cut off above it. */
+  [data-station-scene='rest'] [data-station-kaylee-cell] { justify-content: safe center; overflow-y: auto; }
+}
+
+/* A phone on its side with a thing on the panel: too short for the companion over the panel, so the two stand side by side. */
+@media (max-height: 520px) {
+  [data-station-arrangement='compact'] [data-station-scene='staged'] > [data-station-scene-grid],
+  [data-station-arrangement='phone'] [data-station-scene='staged'] > [data-station-scene-grid] {
+    grid-template: 'kaylee stage' minmax(0, 1fr) / 280px minmax(0, 1fr);
+  }
+  [data-station-scene='staged'] [data-station-kaylee-cell] { overflow-y: auto; }
+}
+
+/* ---------- the panel: the one thing on the stage ----------
+ * At rest the stage's cell keeps only its shelf (the companion's cards), on the box's measure, and only while the shelf has
+ * cards. With a thing on it, it is the panel: a surface of its own, arriving on the spring, as does each new thing on it. */
+[data-station-scene='rest'] [data-station-stage-cell] { width: 100%; max-width: 720px; margin-inline: auto; }
+[data-station-scene='rest'] [data-station-stage-cell]:has(> [data-station-stage='empty']) [data-station-stage-empty-message] { display: none; }
+[data-station-scene='rest'] [data-station-stage-cell]:has(> [data-station-stage='empty']):not(:has([data-station-shelf])) { display: none; }
+[data-station-scene='staged'] [data-station-stage-cell] {
+  margin: 16px 16px 12px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  animation: ast-arrive var(--duration-lock) var(--ease-lock) both;
+}
+/* It arrives out of the companion's side of the screen: from the start beside the companion's column, down from the companion's
+ * mark in one column. */
+[data-station-scene='staged'] [data-station-stage-cell] { --ast-from: translateX(-28px); }
+[data-station-arrangement='compact'] [data-station-scene='staged'] [data-station-stage-cell],
+[data-station-arrangement='phone'] [data-station-scene='staged'] [data-station-stage-cell] { margin: 0 8px 8px; --ast-from: translateY(-22px); }
+@media (max-height: 520px) {
+  [data-station-arrangement='compact'] [data-station-scene='staged'] [data-station-stage-cell],
+  [data-station-arrangement='phone'] [data-station-scene='staged'] [data-station-stage-cell] { margin: 8px 8px 8px 0; }
+}
+[data-station-scene] [data-station-stage-body] { animation: ast-fade-in var(--duration-fade) ease both; }
+
+/* A feature's own card (the dispatcher's) on the panel: the panel is its frame, so it wears none of its own and stands on the
+ * panel's measure. What is inside it (its ask, its tasks) is the dispatcher's, unchanged. */
+[data-station-stage-body] [data-station-card='plan'] > .vv-card {
+  width: auto;
+  margin: -0.75rem;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* ---------- the companion's mark: round what the companion placed on the panel itself ----------
+ * Four corners that come in from a little outside the panel and lock on the lock spring, with the companion's name on the top
+ * edge; they hold, then let go. Drawn over the panel, taking no press. `StationStageView` draws it for a placing and removes it
+ * once it is spent; the motion's length here is the view's `MARK_MS`. */
+.station-mark { position: absolute; inset: 5px; z-index: 5; pointer-events: none; animation: station-mark-life 1900ms linear both; }
+.station-mark__corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 0 solid var(--accent);
+  animation: station-mark-lock var(--duration-lock) var(--ease-lock) both;
+}
+.station-mark__corner--ts { top: 0; left: 0; border-top-width: 2px; border-left-width: 2px; --mark-from: translate(-9px, -9px); }
+.station-mark__corner--te { top: 0; right: 0; border-top-width: 2px; border-right-width: 2px; --mark-from: translate(9px, -9px); }
+.station-mark__corner--bs { bottom: 0; left: 0; border-bottom-width: 2px; border-left-width: 2px; --mark-from: translate(-9px, 9px); }
+.station-mark__corner--be { right: 0; bottom: 0; border-right-width: 2px; border-bottom-width: 2px; --mark-from: translate(9px, 9px); }
+.station-mark__name {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  padding: 2px 7px;
+  background: var(--surface);
+  color: var(--accent-ink, var(--accent));
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+/* The core's pointer, turned to the panel while the mark stands: the instrument's own triangle, just outside the core. Its place
+ * and bearing are the view's (a rotation about the core's middle, then out along it); it lives as long as the mark does. */
+.station-turn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin: -5px 0 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid var(--accent);
+  transform-origin: 0 5px;
+  pointer-events: none;
+  animation: station-mark-life 1900ms linear both;
+}
+@keyframes station-mark-lock { from { transform: var(--mark-from); } }
+@keyframes station-mark-life { 0% { opacity: 0; } 8% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---------- the held rows: what the companion holds out for your word, over the box to type in ----------
+ * The held row opens to the held piece's height while it arrives and closes as it settles (a grid row from 0fr to 1fr), so
+ * the work above moves on the same spring the piece does and never jumps. */
+[data-station-held] {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-settle) var(--ease-settle);
+}
+[data-station-held]:has([data-arrival='arriving'], [data-arrival='live']) {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--duration-lock) var(--ease-lock);
+}
+[data-station-held] > * { min-height: 0; overflow: hidden; }
+/* Settled, the held piece's shadow may float past the row; it is clipped only while the row opens and closes. */
+[data-station-held] > [data-arrival='live'] { overflow: visible; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-arrival='arriving'], [data-arrival='arriving'][data-spring='lobe'] { animation: ast-fade-in var(--duration-fade) ease both; }
+  [data-arrival='settling'] { animation: ast-fade-out var(--duration-fade) ease both; }
+  [data-station-scene='staged'] [data-station-stage-cell] { animation: ast-fade-in var(--duration-fade) ease both; }
+  .station-mark__corner { animation: none; }
+  [data-station-held], [data-station-held]:has([data-arrival='arriving'], [data-arrival='live']) { transition: none; }
+}

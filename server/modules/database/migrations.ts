@@ -20,6 +20,7 @@ import {
 } from '@/modules/database/schema.js';
 import { COMPANION_SCHEMA_SQL } from '@/modules/database/companion-schema.js';
 import { FOLLOWUPS_SCHEMA_SQL } from '@/modules/database/followups-schema.js';
+import { SESSION_PANEL_SCHEMA_SQL } from '@/modules/database/session-panel-schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
 import { NOTES_CLIENT_KEY_INDEX_SQL, NOTES_SCHEMA_SQL } from '@/modules/database/notes-schema.js';
@@ -991,6 +992,9 @@ export const runMigrations = (db: Database) => {
     // cascade is what removes a deleted chat's items) and `users`, both of which exist by here.
     db.exec(FOLLOWUPS_SCHEMA_SQL);
     addFollowupsClosedForColumn(db);
+    // The session panel's table: what a chat has put on its panel, a row for each version. It references `sessions`
+    // and `users` as the followups table does, for the same cascade.
+    db.exec(SESSION_PANEL_SCHEMA_SQL);
     // The companion's tables: Kaylee's per-account state, exchange, cards and record of actions (each
     // cascading from `users`), and the briefs she has relayed into chats (cascading from `sessions`,
     // which exists by here with its `permission_mode` column).

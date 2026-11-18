@@ -19,11 +19,9 @@ import { getConnection } from '@/modules/database/connection.js';
  */
 
 /**
- * How long a kept row is never pruned: seven days, the week the station's strip "since you last looked" promises. Defined here, in
- * the layer that prunes, and reached through the notifications barrel by the one other reader of the week. Consumed by this
- * repository's `record` (the prune's cut) and by `station-landed.ts`, which reads the history over this window (`stationLanded`).
+ * How long a kept row is never pruned: seven days. Consumed by this repository's `record` (the prune's cut).
  */
-export const NOTIFICATION_HISTORY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const NOTIFICATION_HISTORY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * How many of an account's newest rows are kept whatever their age: `record` deletes a row only when it is older than the window
@@ -58,7 +56,7 @@ export const notificationHistoryDb = {
    * than seven days is never deleted, and past that age the newest 300 stay. With fewer than 301 rows the subselect is NULL and
    * nothing is deleted. With `replaceRepeat`, the account's rows of the same code, chat, plan, title and body are deleted first
    * (a missing chat or plan matches a missing one, `IS`), so the row inserted is the only one of its news and carries the time it
-   * was last told. Answers the id of the row inserted, so the caller can hand the row on as stored (`onHistoryKept`).
+   * was last told. Answers the id of the row inserted.
    */
   record(userId: number, row: NotificationHistoryInput, options: { replaceRepeat?: boolean } = {}): number {
     const db = getConnection();
@@ -95,16 +93,5 @@ export const notificationHistoryDb = {
     return getConnection()
       .prepare(`SELECT ${HISTORY_COLUMNS} FROM notification_history WHERE user_id = ? ORDER BY id DESC LIMIT ?`)
       .all(userId, bounded) as NotificationHistoryRow[];
-  },
-
-  /**
-   * EVERY row of the account at or after `sinceIso` (an ISO-8601 UTC stamp, compared as text), newest first — no row cap, because
-   * the history itself keeps every row of the last seven days whole (`record`). Consumed through the notifications module by
-   * `stationLanded`, which reads the strip's week from it.
-   */
-  listSince(userId: number, sinceIso: string): NotificationHistoryRow[] {
-    return getConnection()
-      .prepare(`SELECT ${HISTORY_COLUMNS} FROM notification_history WHERE user_id = ? AND at >= ? ORDER BY id DESC`)
-      .all(userId, sinceIso) as NotificationHistoryRow[];
   },
 };

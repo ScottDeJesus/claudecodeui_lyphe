@@ -13,10 +13,16 @@ import {
 import type { StationRecord } from '@/modules/station/stationMemory';
 import { createStableContext } from '@/shared/context/stableContext';
 import type { StationFocus } from '@/shared/station-types';
-import type { StationPrefKey, StationRegion, StationTier } from '@/shared/types';
+import type { StationRegion, StationTier } from '@/shared/types';
 
 /** The stage: the one focus on it and the focuses Back returns through, newest last. */
 type StageState = { focus: StationFocus | null; stack: StationFocus[] };
+
+/** Who put a thing on the stage, where it was not you: the companion, by a card or a walk of its own or by opening something for you. */
+type StationPlacer = 'companion';
+
+/** The thing the companion last placed (`focusKey`) and how many things it has placed on this page so far. */
+export type StationPlaced = { key: string; count: number };
 
 type StationContextValue = {
   /** The one thing on the stage, or null for an empty stage. */
@@ -27,11 +33,18 @@ type StationContextValue = {
    * Back, so it is the Back of the next, different thing staged. Staging that same thing again takes it off the stack, so a
    * Back never returns to what is already on the stage.
    */
-  setFocus: (next: StationFocus | null) => void;
+  setFocus: (next: StationFocus | null, by?: StationPlacer) => void;
+  /**
+   * What the companion last put on the stage itself (its card, its walk, a thing it opened), by the thing's key, with a count that
+   * moves each time it does: the stage draws the companion's mark round that thing for a moment, and the companion's core turns to
+   * it (`StationStage`, `StationKaylee`). Null until the companion has placed something on this page. A thing you put there
+   * yourself (a press on the shelf, Back, a row) never sets it. In memory only: a reload shows no mark.
+   */
+  placed: StationPlaced | null;
   /**
    * How many times `setFocus` has been handed the thing that already stands on the stage (it changes nothing there). A press on
    * what is already staged still asks to be shown it, and a focus that did not change cannot say so: the one-column station
-   * reads this count to select its Stage section (`useStationSection`). Counts calls, never time; a caller that only keeps the
+   * read this count to select its Stage section (that layout is removed; nothing reads it now). Counts calls, never time; a caller that only keeps the
    * stage current (her walk moving while it stands) does not call `setFocus` with what stands, so it never counts.
    */
   restaged: number;
@@ -54,14 +67,8 @@ type StationContextValue = {
   scrollMemory: (region: StationRegion) => (node: HTMLElement | null) => void;
 };
 
-/** The regions' preferences, which `useStationPref` reads and writes. Its own context: a preference changing never re-draws what only reads the focus. */
-type StationPrefs = {
-  prefs: Partial<Record<StationPrefKey, unknown>>;
-  setPref: (key: StationPrefKey, value: unknown) => void;
-};
-
 /**
- * What he has typed to her at the talk control and the files he has attached to it, with their setters. Its own context, as the prefs are: a
+ * What he has typed to her at the talk control and the files he has attached to it, with their setters. Its own context: a
  * keystroke or an attached file re-draws the box and never what only reads the focus.
  */
 type StationTalkText = {
@@ -72,7 +79,6 @@ type StationTalkText = {
 };
 
 const StationContext = createStableContext<StationContextValue | null>(import.meta.hot, 'StationContext', null);
-const StationPrefsContext = createStableContext<StationPrefs | null>(import.meta.hot, 'StationPrefsContext', null);
 const StationTalkTextContext = createStableContext<StationTalkText | null>(import.meta.hot, 'StationTalkTextContext', null);
 
 /**
@@ -84,22 +90,6 @@ export function useStation(): StationContextValue {
   const context = useContext(StationContext);
   if (!context) throw new Error('useStation must be used within a StationProvider');
   return context;
-}
-
-/**
- * One region's remembered preference: the stored value, else `initial`, and the setter that stores a new one on this device. The
- * eight keys (`StationPrefKey`) and their readers: `stripCollapsed` (`SinceYouLastLooked`), `cornerOpen` (`MemoryCorner`), `compact` (the
- * shell's switch, and `CheckStage`, which places its sheet by the arrangement), `asleepOpen` and `completeOpen` (`WhereThingsStand`),
- * `compactSection` and `compactSectionAside` (`useStationSection`), `herView` (`useHerView`: her head and her conversation).
- */
-export function useStationPref<T>(key: StationPrefKey, initial: T): [T, (next: T) => void] {
-  const context = useContext(StationPrefsContext);
-  if (!context) throw new Error('useStationPref must be used within a StationProvider');
-  const { prefs, setPref } = context;
-  // A stored value is whatever the region wrote under its own key, so it is read back as the type that region asked for.
-  const stored = prefs[key] as T | undefined;
-  const set = useCallback((next: T) => setPref(key, next), [key, setPref]);
-  return [stored === undefined ? initial : stored, set];
 }
 
 /**
@@ -147,8 +137,9 @@ export function StationProvider({ children }: { children: ReactNode }) {
   // The stage as React draws it. State, so a focus change re-draws the stage and every region that reads it; mirrored by
   // `stageRef` so two presses inside one event still see each other.
   const [stage, setStage] = useState<StageState>({ focus: initial.focus, stack: initial.stack });
-  // The regions' preferences. State, because a region draws from its preference and a change must re-draw it.
-  const [prefs, setPrefs] = useState<StationRecord['prefs']>(initial.prefs);
+  // The preferences the removed regions kept (a fold open, the compact switch). Nothing reads or changes them now; they are carried
+  // through as the record held them, so a stored record is written back whole.
+  const prefs = initial.prefs;
   // How many presses have been made on what already stood on the stage. State, because the one-column station's section must
   // answer each press; the stage itself does not change, so nothing else would re-draw it.
   const [restaged, setRestaged] = useState(0);
@@ -158,6 +149,8 @@ export function StationProvider({ children }: { children: ReactNode }) {
   // The files he has attached to those words and not sent: held beside them for the same reason (the Compact switch's new tree starts a new
   // box), and in memory only because a browser `File` cannot be stored.
   const [talkFiles, setTalkFiles] = useState<File[]>([]);
+  // What the companion last put on the stage itself. State, because the stage draws its mark from it and the core turns to it.
+  const [placed, setPlaced] = useState<StationPlaced | null>(null);
 
   // The stage as the last press left it: the truth `setFocus` and `back` decide from, so they never decide from a render
   // that predates the previous press.
@@ -178,7 +171,9 @@ export function StationProvider({ children }: { children: ReactNode }) {
     setStage(next);
   }, []);
 
-  const setFocus = useCallback((next: StationFocus | null) => {
+  const setFocus = useCallback((next: StationFocus | null, by?: StationPlacer) => {
+    // The companion's own placing is marked whether or not the thing already stood there: it has just pointed at it.
+    if (by === 'companion' && next !== null) setPlaced((held) => ({ key: focusKey(next), count: (held?.count ?? 0) + 1 }));
     const held = stageRef.current;
     const same = next === null ? held.focus === null : held.focus !== null && focusKey(held.focus) === focusKey(next);
     if (same) {
@@ -196,10 +191,6 @@ export function StationProvider({ children }: { children: ReactNode }) {
     commit({ focus: returned, stack: backableFrom(stack.slice(0, -1), returned) });
   }, [commit]);
 
-  const setPref = useCallback((key: StationPrefKey, value: unknown) => {
-    setPrefs((held) => (Object.is(held[key], value) ? held : { ...held, [key]: value }));
-  }, []);
-
   const scrollMemory = useCallback((region: StationRegion) => {
     const held = binders.current.get(region);
     if (held !== undefined) return held;
@@ -215,7 +206,7 @@ export function StationProvider({ children }: { children: ReactNode }) {
     return bind;
   }, []);
 
-  // The record is written when the focus or a preference changes.
+  // The record is written when the focus changes.
   useEffect(() => {
     latest.current = { focus: stage.focus, stack: stage.stack, prefs };
     writeStationRecord({ ...latest.current, scroll: scrollRef.current });
@@ -237,10 +228,9 @@ export function StationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<StationContextValue>(
-    () => ({ focus: stage.focus, setFocus, restaged, back, canGoBack: stage.stack.length > 0, tier, phone, sideways, scrollMemory }),
-    [stage, setFocus, restaged, back, tier, phone, sideways, scrollMemory],
+    () => ({ focus: stage.focus, setFocus, placed, restaged, back, canGoBack: stage.stack.length > 0, tier, phone, sideways, scrollMemory }),
+    [stage, setFocus, placed, restaged, back, tier, phone, sideways, scrollMemory],
   );
-  const prefsValue = useMemo<StationPrefs>(() => ({ prefs, setPref }), [prefs, setPref]);
   const talkTextValue = useMemo<StationTalkText>(
     () => ({ text: talkText, setText: setTalkText, files: talkFiles, setFiles: setTalkFiles }),
     [talkText, talkFiles],
@@ -248,9 +238,7 @@ export function StationProvider({ children }: { children: ReactNode }) {
 
   return (
     <StationContext.Provider value={value}>
-      <StationPrefsContext.Provider value={prefsValue}>
-        <StationTalkTextContext.Provider value={talkTextValue}>{children}</StationTalkTextContext.Provider>
-      </StationPrefsContext.Provider>
+      <StationTalkTextContext.Provider value={talkTextValue}>{children}</StationTalkTextContext.Provider>
     </StationContext.Provider>
   );
 }

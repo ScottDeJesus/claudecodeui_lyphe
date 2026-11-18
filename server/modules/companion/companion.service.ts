@@ -2,8 +2,8 @@ import { companionDb } from '@/modules/database/index.js';
 import { readDeepseekApiKey } from '@/modules/deepseek/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import { companionProviderOf } from '@/shared/companion-provider.js';
-import type { CompanionDraft, CompanionPicture, CompanionSessionRef, CompanionSettings } from '@/shared/companion-types.js';
-import type { StationAskAnswer, StationLanded, StationNeed } from '@/shared/station-types.js';
+import type { CompanionDraft, CompanionPicture, CompanionSessionRef, CompanionSettings, CompanionWorkBody } from '@/shared/companion-types.js';
+import type { StationAskAnswer, StationNeed } from '@/shared/station-types.js';
 import { AppError } from '@/shared/utils.js';
 
 import { prepareTypedAttachments } from './attachments/typed-attachments.js';
@@ -22,7 +22,6 @@ import { focusNewsEnvelope, readRunReply } from './feeds/focus-feed.js';
 import { withdrawStandingAction } from './hands/action-end.js';
 import type { CompanionHouse } from './house.js';
 import { answerStationAsk, stationNeeds, type StationAskOutcome } from './station/station-needs.js';
-import { stationLanded } from './station/station-landed.js';
 
 /**
  * Kaylee, per account. The service holds one `CompanionAccount` (her store, her live conversation, her activity)
@@ -55,8 +54,6 @@ import { stationLanded } from './station/station-landed.js';
  *     503: the HTTP drain comes after it, and a process woken then would have nothing left to end it. A turn in flight is let to
  *     finish first, at most `turnBoundMs` (`session/companion-restart.ts`), and the sentences it speaks meanwhile keep streaming;
  *   - `resendUnanswered` is the takeover: it lifts the hold of a session born beside a predecessor and says again what was never answered;
- *   - `landed` is the station strip's read: the account's landings of the last seven days. Like `stationNeeds` it hands the
- *     house to a station reader, so the route stays transport and the house stays private here;
  *   - `alert`, `runFailed`, `runCompleted` and `chatDeleted` are the verbs the house's feeds call (each is explained at its verb);
  *     `alert` and the focus push refuse once `stopAll` has run, for the reason a message does;
  *   - `stationNeeds` and `answerStationAsk` back the station's rail (`station/needs.routes.ts`): everything that needs him, read whole
@@ -78,15 +75,15 @@ const FAILED_RUN_MARK_MS = 30_000;
 
 /** The 409 of an edit when no draft is held, with what to do about it. */
 const noDraft = (): AppError =>
-  new AppError('There is no draft to edit; ask her to draft one first.', { code: 'COMPANION_NO_DRAFT', statusCode: 409 });
+  new AppError('There is no draft to edit; ask for one first.', { code: 'COMPANION_NO_DRAFT', statusCode: 409 });
 
 /** The 400 of a save of the DeepSeek model while the house holds no DeepSeek key: her process would fail to launch on it. */
 const noDeepseekKey = (): AppError =>
-  inputInvalid('model cannot be deepseek: DEEPSEEK_API_KEY is not set on this server, so she could not start on it.', 'model');
+  inputInvalid('model cannot be deepseek: DEEPSEEK_API_KEY is not set on this server, so the companion could not start on it.', 'model');
 
 /** The 503 of a message that arrives once the server has begun to stop: her process would be launched with nothing left to end it. */
 const stopping = (): AppError =>
-  new AppError('The server is shutting down, so she cannot take a message just now; send it again once it is back.', { code: 'COMPANION_STOPPING', statusCode: 503 });
+  new AppError('The server is shutting down, so no message can be taken just now; send it again once it is back.', { code: 'COMPANION_STOPPING', statusCode: 503 });
 
 function createCompanionService() {
   const accounts = new Map<number, CompanionAccount>();
@@ -168,12 +165,6 @@ function createCompanionService() {
     /** One chat's waiting ask answered as the page's own decision: `POST /api/companion/station/asks` (`station/station-needs.ts`), settled through the runtime. */
     answerStationAsk: (userId: number, answer: StationAskAnswer): Promise<StationAskOutcome> => answerStationAsk(userId, answer, attached().runtime),
 
-    /**
-     * What landed for the account in the last seven days, newest first (`station/station-landed.ts`): `GET /api/companion/station/landed`.
-     * Makes no account of hers and wakes nothing: it reads the history, and the house only to name the chat of a dispatcher landing.
-     */
-    landed: (userId: number): Promise<StationLanded[]> => stationLanded(userId, attached().house),
-
     /** The page `client` holds the floor from now on: she acts on it, and "open this chat" is sent to it alone. */
     takeFloor(userId: number, client: string): void {
       accountOf(userId).store.setFloor(client);
@@ -238,7 +229,7 @@ function createCompanionService() {
         await session.setModel(settings.model);
       } catch (error) {
         console.error(`[Companion] account ${userId}: her running process would not switch to ${settings.model}`, error);
-        store.appendLog({ role: 'system', text: `She could not switch to ${settings.model} while awake; she will use it the next time she wakes.` });
+        store.appendLog({ role: 'system', text: `The switch to ${settings.model} could not be made while awake; it is used from the next wake.` });
       }
       return settings;
     },
@@ -283,6 +274,9 @@ function createCompanionService() {
       account.store.setFloor(client);
       return account.sendDraft({ mode, text });
     },
+
+    /** What one tool call of a turn was given and what it answered, for the log's opened row; `null` for a call the account no longer holds. */
+    workBody: (userId: number, id: number): CompanionWorkBody | null => accountOf(userId).store.readWorkBody(id),
 
     /** Dismisses a note card. A note already gone (the other page dismissed it first) is not an error. His ×, pinned or not: it is his act. */
     dismissNote(userId: number, id: number): void {

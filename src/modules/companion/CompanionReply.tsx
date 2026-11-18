@@ -1,7 +1,8 @@
-import { Fragment } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionSentence } from '@/modules/companion/CompanionSentence';
+import { useWordsInTime } from '@/modules/companion/hooks/useWordsInTime';
 import type { CompanionLogEntry } from '@/shared/companion-types';
 import type { CompanionSentenceRef } from '@/shared/types';
 import { cn } from '@/shared/utils';
@@ -56,25 +57,51 @@ export function SpeakingDots({ label }: { label: string }) {
 }
 
 /**
- * Her turn as one paragraph: its sentences joined, each sound a small mark at its offset (CompanionSentence), the sentence her
- * voice is sounding on a band of the info tone (`SPEAKING_MARK`) and, while she is still answering, the breathing dots after
- * the last word. Only the sentence being spoken gets a wrapper: with none spoken the paragraph is its bare words, so its lines
- * never re-wrap under him as the mark moves.
+ * A turn as one paragraph: its sentences joined, each sound a small mark at its offset (CompanionSentence), the sentence the
+ * voice is sounding on a band of the info tone (`SPEAKING_MARK`) and, while the turn is still being answered, the breathing dots
+ * after the last word. Every sentence is a span of its own, bare unless it is the one being spoken, so the paragraph's lines
+ * never re-wrap as the mark moves and a sentence is the same element before, while and after it is said.
  *
- * Used by this module's CompanionLog (each of her turns, under its caption) and by the station's portrait view (her latest turn
- * alone, under her face), so the panel, the log and the portrait draw one paragraph.
+ * A SENTENCE THAT LANDS COMES IN A WORD AT A TIME, IN TIME WITH THE VOICE (`useWordsInTime` says how, and what it does on a page
+ * with no voice). The server sends an answer a whole sentence at a time; a sentence this paragraph has not drawn before is an
+ * arriving one for as long as the paragraph stands. What was already there when the paragraph was first drawn stands whole, so a
+ * transcript opened on old turns does not replay them; the one exception is the newest sentence of a turn still being answered,
+ * which has only just landed (the station's line is drawn afresh for each turn, with that sentence already in it). The words
+ * come in where they will stand, so nothing re-wraps and the pane's following of the end is unchanged.
+ *
+ * Used by this module's CompanionLog (each turn, under its caption) and by the station's portrait view (the latest turn
+ * alone), so the panel, the log and the station's line draw one paragraph.
  */
 export function CompanionReply({ sentences, turnId, answering, speaking, name, className }: CompanionReplyProps) {
   const { t } = useTranslation();
+  const rootRef = useRef<HTMLDivElement>(null);
+  // The sentences this paragraph has drawn, and those of them that landed while it stood.
+  const [arrivals, setArrivals] = useState<{ seen: ReadonlySet<number>; landed: ReadonlySet<number> }>(() => ({
+    seen: new Set((answering ? sentences.slice(0, -1) : sentences).map((sentence) => sentence.id)),
+    landed: new Set(),
+  }));
+  // State that follows a prop, set during the render the sentences arrive in: their words are cut before they are first painted.
+  const fresh = sentences.filter((sentence) => !arrivals.seen.has(sentence.id)).map((sentence) => sentence.id);
+  if (fresh.length > 0) setArrivals({ seen: new Set([...arrivals.seen, ...fresh]), landed: new Set([...arrivals.landed, ...fresh]) });
+  useWordsInTime(rootRef, [...arrivals.landed].join(' '));
   return (
-    <div className={cn('break-words text-sm leading-relaxed text-foreground', className)}>
+    <div ref={rootRef} className={cn('break-words text-sm leading-relaxed text-foreground', className)}>
       {sentences.map((sentence, index) => {
         const spoken = speaking !== null && turnId === speaking.turnId && sentence.index === speaking.index;
-        const words = <CompanionSentence text={sentence.text} sounds={sentence.sounds} />;
+        const arriving = arrivals.landed.has(sentence.id);
         return (
           <Fragment key={sentence.id}>
             {index > 0 && ' '}
-            {spoken ? <span data-companion-speaking-sentence="" data-tone="info" className={SPEAKING_MARK}>{words}</span> : words}
+            <span
+              data-companion-speaking-sentence={spoken ? '' : undefined}
+              data-tone={spoken ? 'info' : undefined}
+              data-companion-arriving-sentence={arriving ? sentence.id : undefined}
+              data-turn={arriving ? turnId ?? '' : undefined}
+              data-index={arriving ? sentence.index ?? '' : undefined}
+              className={spoken ? SPEAKING_MARK : undefined}
+            >
+              <CompanionSentence text={sentence.text} sounds={sentence.sounds} arriving={arriving} />
+            </span>
           </Fragment>
         );
       })}

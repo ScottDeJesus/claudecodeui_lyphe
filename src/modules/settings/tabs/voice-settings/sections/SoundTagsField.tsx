@@ -1,4 +1,4 @@
-import { RotateCcw, X } from 'lucide-react';
+import { Plus, RotateCcw, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -96,7 +96,7 @@ export function SoundTagsField({ tags, saving, onChange }: SoundTagsFieldProps) 
         ? t('voiceSettings.gemini.soundTagTaken', { defaultValue: '“{{tag}}” is on the list already.', tag })
         : null;
   const note = full
-    ? t('voiceSettings.gemini.soundTagsFull', { defaultValue: 'Thirty sounds is the most she takes: remove one to add another.' })
+    ? t('voiceSettings.gemini.soundTagsFull', { defaultValue: 'Thirty sounds is the most the list takes: remove one to add another.' })
     : tags.length === 1
       ? t('voiceSettings.gemini.soundTagsLast', { defaultValue: 'At least one sound stays on the list.' })
       : null;
@@ -126,13 +126,22 @@ export function SoundTagsField({ tags, saving, onChange }: SoundTagsFieldProps) 
       <SettingRow
         label={label}
         description={t('voiceSettings.gemini.soundTagsHelp', {
-          defaultValue: 'The sounds she may make, each voiced where she puts it. Any other bracket is dropped before she speaks.',
+          defaultValue: 'The sounds the companion may make, each voiced where it is written. Any other bracket is dropped before it is spoken.',
         })}
         className="pb-3"
       >
-        <Button variant="outline" size="sm" busy={saving} onClick={() => setConfirmingRestore(true)} data-gemini-sound-tags-restore="">
+        <Button
+          variant="outline"
+          size="sm"
+          busy={saving}
+          onClick={() => setConfirmingRestore(true)}
+          data-gemini-sound-tags-restore=""
+          aria-label={t('voiceSettings.gemini.soundTagsRestore', { defaultValue: "Restore Google's set" })}
+          title={t('voiceSettings.gemini.soundTagsRestore', { defaultValue: "Restore Google's set" })}
+          className="finger:h-11 finger:w-11 finger:px-0"
+        >
           <RotateCcw aria-hidden="true" />
-          {t('voiceSettings.gemini.soundTagsRestore', { defaultValue: "Restore Google's set" })}
+          <span className="finger:hidden">{t('voiceSettings.gemini.soundTagsRestore', { defaultValue: "Restore Google's set" })}</span>
         </Button>
       </SettingRow>
       <div className="flex flex-col gap-3 px-4 pb-4">
@@ -170,8 +179,17 @@ export function SoundTagsField({ tags, saving, onChange }: SoundTagsFieldProps) 
             onChange={(event) => setTyped(event.target.value)}
             className="min-w-0 flex-1 basis-48"
           />
-          <Button type="submit" size="sm" busy={saving} disabled={full || tag.length === 0 || problem !== null}>
-            {t('voiceSettings.gemini.soundTagAdd', { defaultValue: 'Add' })}
+          <Button
+            type="submit"
+            size="sm"
+            busy={saving}
+            disabled={full || tag.length === 0 || problem !== null}
+            aria-label={t('voiceSettings.gemini.soundTagAdd', { defaultValue: 'Add' })}
+            title={t('voiceSettings.gemini.soundTagAdd', { defaultValue: 'Add' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <Plus aria-hidden="true" />
+            <span className="finger:hidden">{t('voiceSettings.gemini.soundTagAdd', { defaultValue: 'Add' })}</span>
           </Button>
           {problem !== null ? (
             <p id={`${idBase}-sound-tag-line`} role="alert" data-tone="warn" className="basis-full text-xs font-medium text-tone-ink">
@@ -190,7 +208,7 @@ export function SoundTagsField({ tags, saving, onChange }: SoundTagsFieldProps) 
         wrapperClassName="z-[10000]"
         title={t('voiceSettings.gemini.soundTagsRestoreTitle', { defaultValue: "Restore Google's sound tags?" })}
         message={t('voiceSettings.gemini.soundTagsRestoreMessage', {
-          defaultValue: "Her list goes back to Google's ten. Sounds you added are dropped, and she stops making them.",
+          defaultValue: "The list goes back to Google's ten. Sounds you added are dropped and are no longer made.",
         })}
         actions={[
           { label: t('voiceSettings.gemini.cancel', { defaultValue: 'Cancel' }), variant: 'outline', onSelect: () => setConfirmingRestore(false) },

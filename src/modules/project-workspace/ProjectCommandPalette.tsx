@@ -9,9 +9,9 @@ import { useCompanion } from '@/modules/companion';
 import { selectGitRepository } from '@/modules/git-panel';
 import { useProjectCommandState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
-import { openStation } from '@/shared/cloudcliDoors';
+import { openHome, openStation } from '@/shared/cloudcliDoors';
 import { GIT_REPO_PATHS } from '@/shared/constants';
-import { useStationShowing } from '@/shared/context/StationLayerContext';
+import { useHomeShowing, useStationShowing } from '@/shared/context/StationLayerContext';
 import type { ChatDoor, PaletteGroup, PaletteNavRow } from '@/shared/types';
 
 /**
@@ -30,6 +30,8 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
   } = useProjectCommandState();
   const { views } = useWorkspaceViews();
   const stationShowing = useStationShowing();
+  const homeShowing = useHomeShowing();
+  const navigate = useNavigate();
 
   // The switcher's five acts, the list the radial draws too. They are the switcher's to define (which
   // pane is in front, what a Reload is), so this only forwards them to the palette's Applications group.
@@ -56,6 +58,8 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
   // render would defeat the memo().
   const navRows = useMemo<PaletteNavRow[]>(
     () => [
+      // The sessions home: not a view of this page but the page over it, so it leads the list (`openHome`, the rail's Home button's own door).
+      { key: 'home', label: t('home.title'), keywords: t('home.keywords'), run: () => openHome(navigate) },
       ...views.map((view) => ({
         key: view.id,
         label: view.label,
@@ -64,7 +68,7 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
       })),
       { key: 'settings', label: t('rail.settings'), keywords: 'open settings preferences', run: () => openSettings() },
     ],
-    [views, t, setActiveTab, openSettings],
+    [views, t, setActiveTab, openSettings, navigate],
   );
 
   // Kaylee's group: a row that opens her panel and a row that opens her station. Her name is the one he gave her, so it is
@@ -72,7 +76,6 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
   // picture, not her name). The station's door is `openStation`: the station comes forward over this page, in this tab, and the
   // workspace stays as it is under it; the same door her panel's head carries.
   const { picture, setOpen: setCompanionOpen } = useCompanion();
-  const navigate = useNavigate();
   const companionName = picture?.settings.name ?? t('companion.defaultName');
   const companionGroup = useMemo<PaletteGroup>(
     () => ({
@@ -97,9 +100,9 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
     [t, companionName, setCompanionOpen, navigate],
   );
 
-  // The station on screen covers this page, and Ctrl+K is heard on the whole document: with the palette drawn it would open on a page nobody sees and be
-  // open when he comes back. Not drawn, it hears nothing.
-  if (stationShowing) return null;
+  // The station or the sessions home on screen covers this page, and Ctrl+K is heard on the whole document: with the palette drawn it would open on a page
+  // nobody sees and be open when he comes back. Not drawn, it hears nothing.
+  if (stationShowing || homeShowing) return null;
 
   return (
     <CommandPalette

@@ -41,7 +41,7 @@ export default defineConfig(async ({ mode }) => {
     // precompressedAssets: the production client on :5184 (`vite preview`) — Brotli twins written at
     // build time, served with a year's cache on hashed assets.
     // budgetRelay.plugin: a saved `server/shared/gemini-budget-relay.ts` becomes the running rule without a restart.
-    // accentPalette: this box's accent colour from VITE_ACCENT; unset leaves the page green.
+    // accentPalette: this box's accent colour from VITE_ACCENT; unset leaves tokens.css's default accent (Astrolabe's amber).
     plugins: [react(), keepPageOnReconnect(), compressResponses(), precompressedAssets(), budgetRelay.plugin, accentPalette(env.VITE_ACCENT)],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)

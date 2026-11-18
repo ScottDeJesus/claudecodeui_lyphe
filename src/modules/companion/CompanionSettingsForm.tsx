@@ -134,9 +134,16 @@ export function CompanionSettingsForm({ settings, onSave }: CompanionSettingsFor
         <SettingRow label={t('voiceSettings.companion.operatorName')} description={description('operatorName')}>{input('operatorName')}</SettingRow>
         <div>
           <SettingRow label={t('voiceSettings.companion.register')} description={description('register')} className="pb-3">
-            <Button variant="outline" size="sm" onClick={() => setConfirmingRestore(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmingRestore(true)}
+              aria-label={t('voiceSettings.companion.restore')}
+              title={t('voiceSettings.companion.restore')}
+              className="finger:h-11 finger:w-11 finger:px-0"
+            >
               <RotateCcw aria-hidden="true" />
-              {t('voiceSettings.companion.restore')}
+              <span className="finger:hidden">{t('voiceSettings.companion.restore')}</span>
             </Button>
           </SettingRow>
           <div className="px-4 pb-4">

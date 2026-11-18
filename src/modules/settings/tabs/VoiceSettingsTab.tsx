@@ -11,16 +11,13 @@ import { HomeServerSection } from '@/modules/settings/tabs/voice-settings/sectio
 import { TranscriptCleanupSection } from '@/modules/settings/tabs/voice-settings/sections/TranscriptCleanupSection';
 import { VocabularySection } from '@/modules/settings/tabs/voice-settings/sections/VocabularySection';
 import { VoiceProviderPicker } from '@/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker';
-import { SettingRow, SettingsCard, SettingsSection } from '@/shared/ui';
-
-const inputClass =
-  'w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring';
+import { Input, SettingRow, SettingsCard, SettingsSection } from '@/shared/ui';
 
 function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block space-y-1">
       <span className="text-sm font-medium text-foreground">{label}</span>
-      <input className={inputClass} {...props} />
+      <Input {...props} />
     </label>
   );
 }

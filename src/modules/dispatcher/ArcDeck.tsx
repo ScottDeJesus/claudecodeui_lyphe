@@ -347,8 +347,7 @@ export function DispatchArcDeck({
  * where the queue ends — and a drop stops being an order the dispatcher runs — is seen, not guessed.
  *
  * Used by `RunnerPanel` (the tab home) twice — the queue's decks (`line`), then the other decks, both
- * above the plans of no arc — by `RunnerWidgetBody` (the gutter), once per arc item of its list
- * (`groups={[group]}`), and by the station module's `CardStage`, for the epic on Kaylee Station's stage
+ * above the plans of no arc — and by the station module's `CardStage`, for the epic on Kaylee Station's stage
  * (`groups={[group]}`, its one lock drawn once on the deck).
  */
 export function DispatchArcDecks({

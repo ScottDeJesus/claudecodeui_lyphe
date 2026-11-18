@@ -220,7 +220,7 @@ export function DrawerBody({ detail, writes }: DrawerBodyProps) {
         <div className="flex items-center gap-2">
           <span className="vv-field__label" id={bodyLabelId}>{t('kanban.drawer.body')}</span>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             className="ml-auto h-7 px-2"
             onClick={() => {

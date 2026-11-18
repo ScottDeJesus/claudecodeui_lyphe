@@ -1,4 +1,4 @@
-import type { ProviderModelOption } from '@/shared/types';
+import type { CompanionMaterial, ProviderModelOption } from '@/shared/types';
 
 /**
  * Catalog values that name a POLICY rather than a model — "use the recommended
@@ -155,14 +155,52 @@ export function resolveModelLabel(
   const deepseekLabel = deepseekLabelOf(modelId);
   if (deepseekLabel) return deepseekLabel;
 
-  const segments = new Set(tokensOf(modelId));
-  // Longest alias first, so a catalog carrying both `opus[1m]` and a bare `opus` names an id
-  // that carries `opus` and `1m` with the `[1m]` entry rather than the plain one. Then the same
-  // aliases with the `[1m]` suffix normalized away: a recorded id never carries the suffix — the
-  // SDK writes `claude-sonnet-5` — so a catalog offering ONLY `sonnet[1m]` would otherwise match
-  // no stored turn on that family at all.
-  const alias = aliasMatching(options, segments, (value) => value)
-    ?? aliasMatching(options, segments, (value) => value.replace(ONE_MILLION_SUFFIX, ''));
-
+  const alias = familyOption(options, modelId);
   return alias ? captionFor(alias, modelId) : null;
+}
+
+/**
+ * The catalog entry of the family an id belongs to, for an id the catalog does not list by value: the id is read as its
+ * dash-separated segments and matched against the options' aliases — segments, never substrings, because `opus` is inside
+ * `opusplan` and a substring match would hand back the wrong entry with no way to tell.
+ *
+ * Longest alias first, so a catalog carrying both `opus[1m]` and a bare `opus` gives an id that carries `opus` and `1m` the
+ * `[1m]` entry rather than the plain one. Then the same aliases with the `[1m]` suffix normalized away: a recorded id never
+ * carries the suffix — the SDK writes `claude-sonnet-5` — so a catalog offering ONLY `sonnet[1m]` would otherwise match no
+ * stored turn on that family at all.
+ */
+function familyOption(options: ProviderModelOption[], modelId: string): ProviderModelOption | null {
+  const segments = new Set(tokensOf(modelId));
+  return aliasMatching(options, segments, (value) => value)
+    ?? aliasMatching(options, segments, (value) => value.replace(ONE_MILLION_SUFFIX, ''));
+}
+
+/**
+ * The catalog entry a chat's model stands at: the entry of that very value, else the entry of the family a stored id belongs to
+ * (`claude-opus-5-5` stands at the catalog's `opus`). Null when the catalog carries neither, and for an id DeepSeek answers with,
+ * whose `flash` is not a catalog's `flash`.
+ *
+ * Used by chat's `ChatCore`, to put a stored chat's model on the stop of its family on the model ring instead of on a stop of its own.
+ */
+export function resolveModelOption(options: ProviderModelOption[], modelId: string | undefined | null): ProviderModelOption | null {
+  if (!modelId) return null;
+  const exact = options.find((option) => option.value === modelId);
+  if (exact) return exact;
+  if (deepseekLabelOf(modelId)) return null;
+  return familyOption(options, modelId);
+}
+
+/**
+ * The material a model wears, by the family its name carries: Opus the tube (amber), Haiku the wire (cyan), Sonnet the plasma
+ * (violet), and every other model Mercury (chrome). The app's one colour coding for models: a reply's mark, the chat's core and
+ * its model ring, and the dots a sessions-board tile draws for its subagents all ask here, so a model is one colour everywhere.
+ *
+ * Used by the chat module's `replyMaterialOf` and the sidebar module's `subagentDots`.
+ */
+export function modelMaterialOf(model: string): CompanionMaterial {
+  const name = model.toLowerCase();
+  if (name.includes('opus')) return 'tube';
+  if (name.includes('haiku')) return 'wire';
+  if (name.includes('sonnet')) return 'plasma';
+  return 'mercury';
 }

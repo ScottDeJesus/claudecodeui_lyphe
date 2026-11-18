@@ -52,8 +52,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * starts, in the faint ink that still reads as a mark (over 3:1 in both themes).
  */
 function TaskMark({ status }: { status: RoadmapTask['status'] }) {
-  if (status === 'done') return <Check aria-hidden="true" className="size-3.5 text-primary" strokeWidth={3} />;
-  if (status === 'running') return <span aria-hidden="true" className="size-2.5 rounded-full bg-primary motion-safe:animate-live-ring" />;
+  if (status === 'done') return <Check aria-hidden="true" className="size-3.5 text-[var(--pos-dot)]" strokeWidth={3} />;
+  if (status === 'running') return <span aria-hidden="true" className="size-2.5 rounded-full bg-[var(--info-dot)] motion-safe:animate-live-ring" />;
   return <span aria-hidden="true" className="size-2.5 rounded-full border-[1.5px] border-ink-faint" />;
 }
 
@@ -106,7 +106,7 @@ export function FeatureFacts({ feature, picture, onWriteGoal, cases }: FeatureFa
                 <li key={name} className="flex min-w-0 items-start gap-2 text-sm">
                   <span className="flex h-5 shrink-0 items-center">
                     {met
-                      ? <Check aria-hidden="true" className="size-3.5 text-primary" strokeWidth={3} />
+                      ? <Check aria-hidden="true" className="size-3.5 text-[var(--pos-dot)]" strokeWidth={3} />
                       : <Hourglass aria-hidden="true" className="size-3.5 text-muted-foreground" />}
                   </span>
                   <span className={cn('min-w-0 break-words', met ? 'text-muted-foreground' : 'text-foreground')}>
