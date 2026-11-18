@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { clockOf } from '@/modules/dispatcher/dispatcherState';
 import { phaseWord } from '@/modules/dispatcher/phaseWord';
-import { RUN_KIND_TONE, roundsOf, runKindOf, verdictTone } from '@/modules/dispatcher/runWords';
+import { RUN_KIND_TONE, roundsOf, runKindOf, verdictTones } from '@/modules/dispatcher/runWords';
 import { SPEND_COLUMNS, SpendColumns } from '@/modules/dispatcher/SpendColumns';
 import { spendParts } from '@/shared/spend';
 import { Badge, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/ui';
@@ -25,8 +25,10 @@ const RUN_EDGE = { build: 'border-[var(--info-dot)]', fix: 'border-[var(--warn-d
  * - what kind of run: a build is info, a fix is warn (it went round again), a review is plain; each
  *   run wears an edge down its left side in the same colour (`runWords`). A stage of another name is
  *   shown as it is written;
- * - how it came out: PASS is positive, FAIL is danger, and a run still out on a walking task reads
- *   "running" in info. A verdict is free text and is drawn as written;
+ * - how it came out: PASS is positive and FAIL is danger; a review whose verdict is a tally and says
+ *   neither is danger when a fix followed it and positive when it is the last review of a finished
+ *   task (`verdictTones`); a run still out on a walking task reads "running" in info. A verdict is
+ *   free text and is drawn as written;
  * - rounds: one round is plain, two or more is warn, and each round is headed where it starts, a
  *   later one in warn;
  * - what it spent: three columns under one heading (in, cache, out), right-aligned so every row
@@ -46,6 +48,7 @@ export function PlanPhaseRow({ phase, open = false }: { phase: DispatcherPhase; 
   const { t } = useTranslation();
   const word = phaseWord(phase);
   const rounds = roundsOf(phase.stages);
+  const tones = verdictTones(phase.stages, phase.status === 'done');
   const stageSpend = phase.stages.map((stage) => spendParts(stage.cost_usd, stage.tokens_in, stage.tokens_out, stage.tokens, stage.tokens_cache_read));
   // The heading names the three columns, so it stands only over rows that have them.
   const columned = stageSpend.some((parts) => parts.tokens?.kind === 'split');
@@ -115,7 +118,7 @@ export function PlanPhaseRow({ phase, open = false }: { phase: DispatcherPhase; 
                         : <Badge as="span" tone={RUN_KIND_TONE[kind]} className={cn(SMALL_BADGE, 'min-w-[3.25rem] text-center')} title={stage.name}>{t(`dispatcher.run.${kind}`)}</Badge>}
                       {stage.soul && <span className="min-w-0 break-all">{stage.soul}</span>}
                       {stage.verdict
-                        ? <Badge as="span" tone={verdictTone(stage.verdict)} className={cn(SMALL_BADGE, 'h-auto min-h-[18px] min-w-0 whitespace-pre-wrap break-words normal-case tracking-normal')} data-run-verdict>{stage.verdict}</Badge>
+                        ? <Badge as="span" tone={tones[index]} className={cn(SMALL_BADGE, 'h-auto min-h-[18px] min-w-0 whitespace-pre-wrap break-words normal-case tracking-normal')} data-run-verdict>{stage.verdict}</Badge>
                         : out && <Badge as="span" tone="info" className={SMALL_BADGE} data-run-verdict="running">{t('dispatcher.run.running')}</Badge>}
                     </span>
                     <SpendColumns parts={stageSpend[index]} vendor={stage.paid_vendor} />
