@@ -127,11 +127,11 @@ export function tidyNote(text: string | null): string | null {
  * `companion-closing.ts`, which gives each to the panel through its `say`.
  */
 export const CLOSING_LINES = {
-  begins: 'The conversation is nearly full, so Kaylee is writing a note to start fresh from; the memory is kept.',
-  noted: 'Kaylee starts fresh from that note; the memory is kept.',
-  handedOver: 'The note could not be finished, so Kaylee starts fresh from a handover of what you were discussing; the memory is kept.',
-  neither: 'The note could not be finished and the handover could not be written, so Kaylee starts fresh; the memory is kept.',
-  fullHandedOver: 'The conversation was full, so Kaylee starts fresh from a handover of what you were discussing; the memory is kept.',
-  fullNeither: 'The conversation was full and the handover could not be written, so Kaylee starts fresh; the memory is kept.',
-  fullAlone: 'The last message was too long for Kaylee to read, so it was dropped; Kaylee starts fresh; the memory is kept.',
+  begins: 'The conversation is nearly full, so a note to start fresh from is being written; the memory is kept.',
+  noted: 'The conversation starts fresh from that note; the memory is kept.',
+  handedOver: 'The note could not be finished, so the conversation starts fresh from a handover of what you were discussing; the memory is kept.',
+  neither: 'The note could not be finished and the handover could not be written, so the conversation starts fresh; the memory is kept.',
+  fullHandedOver: 'The conversation was full, so it starts fresh from a handover of what you were discussing; the memory is kept.',
+  fullNeither: 'The conversation was full and the handover could not be written, so it starts fresh; the memory is kept.',
+  fullAlone: 'The last message was too long to read, so it was dropped; the conversation starts fresh; the memory is kept.',
 } as const satisfies Record<string, string>;

@@ -73,7 +73,7 @@ export function readClientId(request: Request): string | null {
 /** The client id of a route that takes the floor, which has no meaning without one. Consumed by `companion.routes.ts` (`/messages`, `/floor`). */
 export function requireClientId(request: Request): string {
   const client = readClientId(request);
-  if (client === null) throw inputInvalid(`${COMPANION_CLIENT_HEADER} is required: it names the page Kaylee should act on.`, COMPANION_CLIENT_HEADER);
+  if (client === null) throw inputInvalid(`${COMPANION_CLIENT_HEADER} is required: it names the page to act on.`, COMPANION_CLIENT_HEADER);
   return client;
 }
 

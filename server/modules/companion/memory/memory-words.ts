@@ -116,8 +116,8 @@ export function quoteLine(account: string, line: HisLine): string {
 export function memoryBody(input: { account: string; lines: HisLine[]; why: KeptWhy; context: string | null }): string {
   const quotes = input.lines.map((line) => quoteLine(input.account, line));
   const context = input.context === null ? '' : folded(input.context);
-  const reason = input.why === 'asked' ? 'Kept because he asked.' : `Kept on Kaylee's own judgment: ${JUDGMENT[input.why]}.`;
-  return [...quotes, ...(context === '' ? [] : [`Context, in Kaylee's words: ${context}`]), reason].join('\n');
+  const reason = input.why === 'asked' ? 'Kept because he asked.' : `Kept on the companion's own judgment: ${JUDGMENT[input.why]}.`;
+  return [...quotes, ...(context === '' ? [] : [`Context, in the companion's words: ${context}`]), reason].join('\n');
 }
 
 /**

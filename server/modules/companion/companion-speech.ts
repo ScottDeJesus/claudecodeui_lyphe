@@ -63,7 +63,7 @@ const noSentence = (): AppError =>
   new AppError('There is no such sentence to say: it is unknown or too old to speak.', { code: 'COMPANION_NO_SENTENCE', statusCode: 404 });
 
 const notFloor = (): AppError =>
-  new AppError("Another page holds the floor, so Kaylee's voice plays there; this page shows the words only.", { code: 'COMPANION_NOT_FLOOR', statusCode: 409 });
+  new AppError('Another page holds the floor, so the voice plays there; this page shows the words only.', { code: 'COMPANION_NOT_FLOOR', statusCode: 409 });
 
 /**
  * Starts the synthesis of one sentence and puts its entry in the account's cache. The entry's `opened` settles with the
