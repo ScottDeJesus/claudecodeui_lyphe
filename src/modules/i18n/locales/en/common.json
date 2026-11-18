@@ -956,15 +956,16 @@
   "roadmap": {
     "faces": {
       "label": "Roadmap view",
-      "path": "Roadmap",
-      "stack": "Stack",
+      "stack": "Features",
       "inFlight": "In flight"
     },
     "stack": {
-      "label": "Roadmap stack",
-      "value": "{{feature}}, {{epic}}, milestone {{n}}: {{milestone}}",
+      "label": "Features",
       "back": "Back",
-      "open": "Open the roadmap: {{title}}"
+      "open": "Open the features: {{title}}",
+      "empty": "Nothing building, held or finished",
+      "dismiss": "Dismiss",
+      "review": "Review"
     },
     "loading": "Reading the roadmap…",
     "kind": {

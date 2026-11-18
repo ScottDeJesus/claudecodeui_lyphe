@@ -1,4 +1,4 @@
-import { Milestone, Route } from 'lucide-react';
+import { Route } from 'lucide-react';
 import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -45,45 +45,31 @@ function StackFaceBody() {
       <div data-roadmap-header={selected.name} className="shrink-0 px-4 pt-3 lg:px-6">
         <div className="w-64 max-w-full"><RoadmapPicker size="sm" /></div>
       </div>
-      {selected.milestones.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center p-6">
-          <div className="w-full max-w-md">
-            <EmptyState
-              icon={Milestone}
-              title={t('roadmap.empty.noPath')}
-              actionLabel={t('roadmap.menu.addMilestone')}
-              onAction={() => openDialog({ dialog: 'add', kind: 'milestone', parent: selected })}
-            />
-          </div>
-        </div>
-      ) : (
-        // Keyed by the roadmap: another roadmap is another stack, arriving on its own current milestone with no card open.
-        <div className="min-h-0 flex-1"><StackOf key={selected.name} roadmap={selected} /></div>
-      )}
+      {/* Keyed by the roadmap: another roadmap is another ring, with no card open. A roadmap with nothing to show is a ring with no wall. */}
+      <div className="min-h-0 flex-1"><StackOf key={selected.name} roadmap={selected} /></div>
     </>
   );
 }
 
 /**
- * THE ROADMAP AS A STACK, as a face of the Roadmap tab: the picker, then the roadmap on screen as rings (`StackOf`),
- * one per milestone, the current one standing open with a wall for every feature. One object is the way round the
- * roadmap, the measure of how far along it is, and the gauge of what asks for the operator; it is quiet until pressed,
- * and what a press opens is that feature's own card, in place (`StackCard`).
+ * THE RING, as a face of the Roadmap tab: the picker, then the roadmap on screen as one ring (`StackOf`), a wall for each
+ * feature that is finished and not yet dismissed, being built, or ready to be started. It is quiet until pressed: what
+ * faces the operator is said under it with its one press (Start, Dismiss), and a press on the wall opens that feature's
+ * own card, in place (`StackCard`).
  *
- * It keeps the states every roadmap surface has before there is something to draw (the picture still on its way, no
- * roadmap at all, a roadmap with no milestone yet), with the same words and the same presses as the tree's face.
+ * It keeps the states that come before there is something to draw (the picture still on its way, no roadmap at all), with
+ * the roadmap's own words.
  *
  * WHAT SHIPPED WHILE HE WAS AWAY STANDS OVER THE REST, in the positive colour, until he opens it: measured against the
- * roadmap's seen stamp as it stood when the visit began (`utils/seenStamp`, the one the celebrations move), and the
- * stamp moves on once every such feature has been opened.
+ * roadmap's seen stamp as it stood when the visit began (`utils/seenStamp`), and the stamp moves on once every such
+ * feature has been opened. Opened or not, it stays on the ring until its Dismiss.
  *
- * The roadmap's own dialogs open over it through `RoadmapDialogHost`: an epic's menu and its Add a feature, and the
- * empty states' New roadmap and Add a milestone. A feature dialog's Open its card goes to `openCard`, the tab's turn to
- * In flight, or to the `?runner=` landing where there is no tab.
+ * The roadmap's own dialogs open over it through `RoadmapDialogHost`: the empty state's New roadmap. A feature dialog's
+ * Open its card goes to `openCard`, the tab's turn to In flight, or to the `?runner=` landing where there is no tab.
  *
  * `data-roadmap-stack-face` marks its root; `data-roadmap-header` (the roadmap's name) its picker row.
  *
- * Used by `RoadmapTab`, as its Stack face.
+ * Used by `RoadmapTab`, as its Features face.
  */
 export function RoadmapStackFace({ openCard }: RoadmapStackFaceProps) {
   const reveal = useRevealCard();

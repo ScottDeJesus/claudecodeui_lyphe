@@ -1,16 +1,18 @@
 import type { Roadmap, RoadmapEpic, RoadmapFeature, RoadmapMilestone } from '@/shared/roadmap-types';
-import type { RoadmapStackEpic, RoadmapStackTier, RoadmapStackWall } from '@/shared/types';
+import type { RoadmapStackKind, RoadmapStackTier, RoadmapStackWall } from '@/shared/types';
 
-// THE ROADMAP AS A STACK, laid out. Each milestone is a ring; each of its features a wall on that ring, in the
-// order the roadmap keeps them, its epics' walls together with a gap between one epic and the next. Nothing
+// THE RING, laid out: ONE ring, holding only the features that are finished and not yet dismissed, the ones being
+// built, and the ones that can be started (held for their Start, cut and waiting on Accept, or still being cut).
+// Ideas, proposals, designs still being worked out, and everything set aside are not on it; nor are milestones or
+// epics. Each feature is a wall; the three kinds stand together, with a gap between one kind and the next. Nothing
 // here draws: `utils/stackPainter` does, from what this returns.
 
 const TAU = Math.PI * 2;
 
-/** The gap between one epic's walls and the next's, in walls' widths. */
-const EPIC_GAP = 0.4;
+/** The gap between one kind's walls and the next's, in walls' widths. */
+const KIND_GAP = 0.6;
 
-/** The widest a wall stands on a ring that is not yet reached, in radians: the rest of its rim stays bare, room for what is not thought of yet. */
+/** The widest a wall stands, in radians: a ring with few features keeps them to a readable width and leaves the rest of its rim bare. */
 const WIDEST_WALL = 0.5;
 
 /** How tall a wall stands for each word, as a share of a full wall: an idea is a mark on the floor, a build a full frame. */
@@ -24,9 +26,9 @@ function wallOf(
   feature: RoadmapFeature,
   epic: RoadmapEpic,
   milestone: RoadmapMilestone,
-  unit: number,
+  kind: RoadmapStackKind,
   unseen: boolean,
-): Omit<RoadmapStackWall, 'at' | 'width'> & { unit: number } {
+): Omit<RoadmapStackWall, 'at' | 'width'> {
   const shipped = feature.word === 'shipped';
   const done = feature.tasks.filter((task) => task.status === 'done').length;
   // The nearest reason: its own, its epic's or its milestone's. A shipped feature is never blocked.
@@ -37,7 +39,8 @@ function wallOf(
   return {
     feature,
     epic,
-    unit,
+    milestone,
+    kind,
     frame: shipped ? (fresh ? UNSEEN_RISE : 1) : FRAME_OF[feature.word],
     fill: shipped ? 1 : feature.word === 'in flight' && feature.tasks.length > 0 ? done / feature.tasks.length : 0,
     tone: blocked !== null || stalled ? 'danger' : owed ? 'warn' : null,
@@ -46,49 +49,48 @@ function wallOf(
   };
 }
 
-/**
- * The roadmap's milestones as the stack's rings. `unseen` names the features that shipped since the operator last
- * looked and that he has not opened since: their walls stand over the rest.
- *
- * A reached milestone fills its ring. One that is not keeps its walls to a readable width (`WIDEST_WALL`) and
- * leaves the rest of the rim bare. An epic with no feature yet still has a place on the ring, one wall wide, so
- * its thread is there to be pressed.
- *
- * Used by `RoadmapStackFace`, once per picture, for the stack it hands to `RoadmapStack`.
- */
-export function layoutStack(roadmap: Roadmap, unseen: ReadonlySet<string>): RoadmapStackTier[] {
-  return roadmap.milestones.map((milestone, index) => {
-    // Laid out first in walls' widths (`unit`), then scaled to the ring once the whole run is known.
-    let cursor = 0;
-    const epicRuns = milestone.epics.map((epic) => {
-      const from = cursor;
-      const walls = epic.features.map((feature) => {
-        const wall = wallOf(feature, epic, milestone, cursor + 0.5, unseen.has(feature.name));
-        cursor += 1;
-        return wall;
-      });
-      if (walls.length === 0) cursor += 1;
-      const run = { epic, from, to: cursor, walls };
-      cursor += EPIC_GAP;
-      return run;
-    });
-
-    const scale = cursor === 0 ? 0 : milestone.word === 'reached' ? TAU / cursor : Math.min(TAU / cursor, WIDEST_WALL);
-    const epics: RoadmapStackEpic[] = epicRuns.map((run) => ({
-      epic: run.epic,
-      from: run.from * scale,
-      to: run.to * scale,
-      walls: run.walls.map(({ unit, ...wall }) => ({ ...wall, at: unit * scale, width: scale })),
-    }));
-
-    return { milestone, n: index + 1, epics, walls: epics.flatMap((epic) => epic.walls), span: cursor * scale };
-  });
+/** Which of the ring's three kinds a feature is, or `null` for one the ring does not hold. `finished` says whether a shipped feature still stands (`utils/ringFinished`). */
+export function ringKindOf(feature: RoadmapFeature, finished: (feature: RoadmapFeature) => boolean): RoadmapStackKind | null {
+  if (feature.word === 'shipped') return finished(feature) ? 'finished' : null;
+  if (feature.word === 'in flight') return feature.step === 'queued' ? 'ready' : 'building';
+  // A design is on the ring once it is being cut: the cut landing is what makes it startable.
+  return feature.step === 'accept' || feature.step === 'cutting' ? 'ready' : null;
 }
 
-/** The ring a visit opens on: the roadmap's current milestone, else the first not yet reached, else the last. */
-export function arrivalTier(roadmap: Roadmap, tiers: readonly RoadmapStackTier[]): number {
-  const current = tiers.findIndex((tier) => tier.milestone.name === roadmap.current);
-  if (current >= 0) return current;
-  const open = tiers.findIndex((tier) => tier.milestone.word !== 'reached');
-  return open >= 0 ? open : Math.max(0, tiers.length - 1);
+/** The order the kinds stand in, round the ring: what is finished, then what is being built, then what can be started. */
+const KINDS: readonly RoadmapStackKind[] = ['finished', 'building', 'ready'];
+
+/**
+ * The roadmap's features as the one ring. `finished` says which shipped features still stand; `unseen` names the
+ * ones that shipped since the operator last looked and that he has not opened since: their walls stand over the rest.
+ *
+ * The walls keep a readable width (`WIDEST_WALL`) and leave the rest of the rim bare. A roadmap with nothing to
+ * show is a ring with no wall.
+ *
+ * Used by `stack/StackOf`, once per picture, for the ring it hands to `RoadmapStack`.
+ */
+export function layoutStack(roadmap: Roadmap, finished: (feature: RoadmapFeature) => boolean, unseen: ReadonlySet<string>): RoadmapStackTier[] {
+  const held = roadmap.milestones.flatMap((milestone) => milestone.epics.flatMap((epic) => epic.features.map((feature) => (
+    { feature, epic, milestone, kind: ringKindOf(feature, finished) }
+  ))));
+  // Laid out first in walls' widths, then scaled to the ring once the whole run is known.
+  let cursor = 0;
+  const placed: { wall: Omit<RoadmapStackWall, 'at' | 'width'>; unit: number }[] = [];
+  for (const kind of KINDS) {
+    const walls = held.filter((item) => item.kind === kind);
+    if (walls.length === 0) continue;
+    if (placed.length > 0) cursor += KIND_GAP;
+    for (const { feature, epic, milestone } of walls) {
+      placed.push({ wall: wallOf(feature, epic, milestone, kind, unseen.has(feature.name)), unit: cursor + 0.5 });
+      cursor += 1;
+    }
+  }
+  // The gap that closes the ring, between the last kind and the first.
+  const round = cursor + (placed.length > 0 ? KIND_GAP : 0);
+  const scale = round === 0 ? 0 : Math.min(TAU / round, WIDEST_WALL);
+  return [{
+    name: roadmap.name,
+    walls: placed.map(({ wall, unit }) => ({ ...wall, at: unit * scale, width: scale })),
+    span: cursor * scale,
+  }];
 }

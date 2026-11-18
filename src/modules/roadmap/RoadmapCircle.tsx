@@ -25,8 +25,8 @@ type RoadmapCircleProps = {
 
 /**
  * THE ROADMAP ON A PAGE THAT IS NOT THE ROADMAP'S: one small circle that takes little room until it is pressed. The circle is the roadmap on screen
- * (`useRoadmap`'s selected one) seen from above, an arc for each feature of the current milestone that is in flight, shipped or parked: what is being
- * built, what has finished since he last looked (in the positive colour), what is set aside. One press, or one tap, stands it up as the whole stack over
+ * (`useRoadmap`'s selected one) seen from above, an arc for each feature the ring holds: what is finished and not yet dismissed (in the positive colour
+ * until he has opened it), what is being built, and what is ready to be started. One press, or one tap, stands it up as the ring over
  * the page (`StackOf`), in the same drawing; the back arrow where the circle was, or Escape, lays it down again.
  *
  * IT LIES OVER ITS OWNER'S WHOLE BOX (`absolute inset-0`, so the owner is a positioned box) and takes no press but the circle's while it is small: the
@@ -35,7 +35,7 @@ type RoadmapCircleProps = {
  *
  * Nothing is drawn while there is nothing to draw: the picture still on its way, no roadmap, a roadmap with no milestone yet.
  *
- * The roadmap's dialogs (an epic's menu, its Add a feature, a feature's questions) open over the page through `RoadmapDialogHost`.
+ * The roadmap's dialogs (a feature's questions) open over the page through `RoadmapDialogHost`.
  *
  * Exported through the roadmap barrel for project-workspace's sessions home (`WorkspaceHome`), at its head's start side.
  */

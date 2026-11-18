@@ -5,10 +5,11 @@ import type { RoadmapStackFrame, RoadmapStackRest, RoadmapStackTarget, RoadmapSt
 // and reads no store: `stack/RoadmapStack` hands it the laid-out tiers (`utils/stackLayout`) and the pointer's
 // and keyboard's events, calls `frame` once per animation frame, and says in words what `frame` reports.
 //
-// THE FORM. Each milestone is a ring. The one in front stands open: every feature of it a wall on the rim, as
-// tall as it is far along its path and as solid as it is built, a storey for each task. What is reached lies
-// under it, closed into a band, a step lower each: the stack grows from the ground as features ship. What is to
-// come hangs over the middle on a mast, smaller and higher the further ahead. Down is done, up is next.
+// THE FORM. The roadmap is ONE ring (`utils/stackLayout`): a wall on its rim for each feature that is finished and
+// not yet dismissed, being built, or ready to be started, as tall as it is far along its path and as solid as it
+// is built, a storey for each task. Nothing lies under it or hangs over it, and its floor is bare. The painter
+// itself still lays out however many rings it is handed (one in front standing open, the earlier ones closed into
+// bands under it, the later ones hanging over the middle on a mast): the roadmap hands it one.
 //
 // STATE IS FORM, never colour alone: a design's frame is dashed, a build held for its Start is dotted, a paused
 // one wears two bars, a parked one is ruled across inside a whole edge, a running task's storey crawls. Colour
@@ -16,8 +17,8 @@ import type { RoadmapStackFrame, RoadmapStackRest, RoadmapStackTarget, RoadmapSt
 // what shipped while he was away, the danger colour for what is blocked or stalled.
 //
 // SMALL, AND STANDING. Where its owner gives it a place to rest (`setRest`), the stack is one small circle there
-// until it is stood up (`setStanding`): seen from straight above, holding only the features of the ring in front
-// that are in flight, shipped or parked, each an arc of the circle, sharing it evenly. Standing up is one move
+// until it is stood up (`setStanding`): seen from straight above, every feature of the ring in front an arc of
+// the circle, sharing it evenly. Standing up is one move
 // in an order (`view`): it grows and tips back while the arcs slide to their own places on the rim; as it tips the
 // arcs give way to the walls that were under them; last, everything the circle did not hold comes in — the
 // features not yet begun, the rings under and over, the floor. Laid down, the same in reverse.
@@ -27,9 +28,6 @@ const TAU = Math.PI * 2;
 /** How far each ring leans back, and how much of a wall's height shows at that lean: the eye is about 37 degrees up. */
 const TILT = 0.6;
 const RISE = 0.8;
-
-/** How far in from the rim the epics' threads lie on the floor of the ring in front, as a share of its radius. */
-const EPIC_RHO = 0.69;
 
 /** How wide an arc of the small circle is drawn across the rim, in pixels: half inside it, half outside. */
 const ARC_BAND = 10;
@@ -59,7 +57,6 @@ type Spark = { x: number; y: number; vx: number; vy: number; age: number; size: 
 /** What a point on the canvas lands on. */
 type Hit =
   | { on: 'wall'; wall: RoadmapStackWall }
-  | { on: 'epic'; name: string }
   | { on: 'tier'; tier: number }
   | { on: 'ring' };
 
@@ -141,10 +138,10 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
   const wallPaths = new Map<RoadmapStackWall, Path2D>();
 
   const turnOf = (tier: RoadmapStackTier): Turn => {
-    let turn = turns.get(tier.milestone.name);
+    let turn = turns.get(tier.name);
     if (!turn) {
       turn = { rot: -tier.span / 2, speed: 0, target: null };
-      turns.set(tier.milestone.name, turn);
+      turns.set(tier.name, turn);
     }
     return turn;
   };
@@ -217,11 +214,8 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     stance = { cx: lerp(rest.cx, full.cx, tipped), cy: lerp(rest.cy, full.cy, tipped), radius: lerp(rest.radius, full.radius, tipped), wall: full.wall, band: full.band, step: full.step };
   };
 
-  /** What the small circle holds of a ring: its features in flight, the ones shipped, and what is parked, set aside but in sight. */
-  const onCircle = (wall: RoadmapStackWall) => wall.feature.word === 'in flight' || wall.feature.word === 'shipped' || wall.feature.step === 'parked';
-
   /**
-   * Where the walls of the ring in front are drawn while the stack is not fully up. Small, the ones the circle holds share it
+   * Where the walls of the ring in front are drawn while the stack is not fully up. Small, they share the circle
    * evenly, in their own order, the one nearest the front keeping the foot; standing, each is where it belongs on the rim.
    */
   const spread = () => {
@@ -229,7 +223,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     const tier = tiers[front];
     if (!tier || grown >= 1) return;
     const rot = turnOf(tier).rot;
-    const held = tier.walls.filter(onCircle);
+    const held = tier.walls;
     const count = held.length;
     if (count === 0) return;
     let anchor = held.find((wall) => wall.feature.name === anchorName);
@@ -319,10 +313,6 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     if (rho > 0.84 && rho < 1.14) {
       const wall = tier.walls.find((item) => Math.abs(fold(angle - item.at)) <= item.width / 2);
       return wall ? { on: 'wall', wall } : { on: 'ring' };
-    }
-    if (rho > 0.6 && rho <= 0.84) {
-      const epic = tier.epics.find((item) => Math.abs(fold(angle - (item.from + item.to) / 2)) <= (item.to - item.from) / 2);
-      if (epic) return { on: 'epic', name: epic.epic.name };
     }
     return rho < 1.2 ? { on: 'ring' } : null;
   };
@@ -513,9 +503,15 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
       ctx.fill(band(built, to));
     }
     const waits = feature.step === 'queued' || feature.step === 'waiting' || feature.step === 'starting';
-    ctx.strokeStyle = paint(bad ? colors.danger : colors.body, (bad ? 0.95 : 0.5) * arcs);
+    // A word he owes (its Accept) is in the accent; a design still being cut is dashed, as its wall is.
+    const owed = wall.tone === 'warn';
+    if (owed) {
+      ctx.fillStyle = paint(colors.accent, 0.3 * arcs);
+      ctx.fill(whole);
+    }
+    ctx.strokeStyle = paint(bad ? colors.danger : owed ? colors.accent : colors.body, (bad || owed ? 0.95 : 0.5) * arcs);
     ctx.lineWidth = 1;
-    ctx.setLineDash(waits ? [1, 3] : []);
+    ctx.setLineDash(waits ? [1, 3] : feature.word === 'designing' ? [3, 3] : []);
     ctx.stroke(whole);
     ctx.setLineDash([]);
     if (feature.step === 'building' && fill < 0.995) {
@@ -547,66 +543,6 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     if (motion.flash > 0.01) {
       ctx.fillStyle = paint(colors.done, 0.7 * motion.flash * arcs);
       ctx.fill(whole);
-    }
-  };
-
-  /** The floor of the ring in front: a thread for each epic, lit as far as it has shipped, a knot for each feature, and its name. */
-  const drawFloor = (tier: RoadmapStackTier, place: Place) => {
-    const open = place.open * othersIn;
-    const facingEpic = facing && tier.walls.includes(facing) ? facing.epic.name : null;
-    const small = stance.radius < 190;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `500 ${small ? 9 : 10}px ${font}`;
-    for (const run of tier.epics) {
-      const isFacing = run.epic.name === facingEpic;
-      const from = run.from + 0.02;
-      const to = run.to - 0.02;
-      const shipped = run.walls.filter((wall) => wall.feature.word === 'shipped').length;
-      ctx.setLineDash([]);
-      ctx.strokeStyle = paint(colors.body, (isFacing ? 0.5 : 0.24) * open);
-      ctx.lineWidth = 1;
-      ctx.stroke(edgePath(tier, place, from, to, 0, EPIC_RHO));
-      if (shipped > 0) {
-        ctx.strokeStyle = paint(colors.ink, (isFacing ? 1 : 0.8) * open);
-        ctx.lineWidth = 2;
-        ctx.stroke(edgePath(tier, place, from, lerp(from, to, shipped / run.walls.length), 0, EPIC_RHO));
-      }
-      for (const wall of run.walls) {
-        const knot = pointOn(tier, place, wall.at, 0, EPIC_RHO);
-        const done = wall.feature.word === 'shipped';
-        ctx.beginPath();
-        ctx.arc(knot[0], knot[1], done ? 2 : 2.4, 0, TAU);
-        if (done) {
-          ctx.fillStyle = paint(colors.ink, (isFacing ? 1 : 0.75) * open);
-          ctx.fill();
-        } else {
-          ctx.fillStyle = paint(colors.ground, open);
-          ctx.fill();
-          ctx.strokeStyle = paint(wall.attention > 0 ? colors.accent : colors.body, (isFacing ? 0.9 : 0.5) * open);
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-      }
-      if (open > 0.35 && (!small || isFacing)) {
-        // The epic's name lies along its thread, on a patch of the ground so the thread does not run through it.
-        const middle = (run.from + run.to) / 2;
-        const at = pointOn(tier, place, middle, 0, EPIC_RHO);
-        const before = pointOn(tier, place, middle - 0.02, 0, EPIC_RHO);
-        const after = pointOn(tier, place, middle + 0.02, 0, EPIC_RHO);
-        let lie = Math.atan2(after[1] - before[1], after[0] - before[0]);
-        if (Math.cos(lie) < 0) lie += Math.PI;
-        const text = run.epic.title.toUpperCase();
-        const patch = ctx.measureText(text).width + 12;
-        ctx.save();
-        ctx.translate(at[0], at[1]);
-        ctx.rotate(lie);
-        ctx.fillStyle = paint(colors.ground, open);
-        ctx.fillRect(-patch / 2, -7, patch, 14);
-        ctx.fillStyle = paint(isFacing ? colors.ink : colors.muted, lerp(0.5, 1, (depthOf(tier, middle) + 1) / 2) * open);
-        ctx.fillText(text, 0, 0.5);
-        ctx.restore();
-      }
     }
   };
 
@@ -667,7 +603,6 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
       ctx.stroke(rim);
       ctx.setLineDash([]);
       for (const wall of half(tier, false)) drawWall(tier, place, wall, seconds);
-      if (place.open * othersIn > 0.03) drawFloor(tier, place);
       // The ring he is pointing at; one a finger chose waits, lit, for its second press.
       if (index === shown() && place.open < 0.5) {
         ctx.strokeStyle = paint(colors.ink, index === chosen && !still ? 0.72 + 0.28 * Math.sin(seconds * 5) : 0.9);
@@ -849,7 +784,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
      * that shipped while he was away, else whatever asks for him.
      */
     setTiers(next: RoadmapStackTier[], arrival: number) {
-      const frontName = tiers[front]?.milestone.name;
+      const frontName = tiers[front]?.name;
       tiers = next;
       for (const tier of tiers) {
         for (const wall of tier.walls) {
@@ -889,7 +824,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
         const first = fresh ?? asking;
         if (first) turnOf(tier).rot = -first.at;
       } else {
-        const kept = tiers.findIndex((tier) => tier.milestone.name === frontName);
+        const kept = tiers.findIndex((tier) => tier.name === frontName);
         front = kept >= 0 ? kept : clamp(front, 0, tiers.length - 1);
         // A wall added or taken away moves its neighbours: the ring settles on the one now nearest the front.
         if (!drag && turnOf(tiers[front]).target === null) settle(tiers[front]);
@@ -1013,7 +948,6 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
         return null;
       }
       chosen = -1;
-      if (hit.on === 'epic') return { kind: 'epic', name: hit.name };
       if (hit.on === 'wall') {
         const turn = turnOf(tier);
         if (hit.wall === facing && Math.abs(fold(hit.wall.at + turn.rot)) < 0.03) return { kind: 'feature', name: hit.wall.feature.name };
@@ -1069,17 +1003,12 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
       }
     },
 
-    /** Where a card hangs from, in the canvas's own pixels: over a feature's wall, or on an epic's thread. Null when the stack no longer shows it. */
+    /** Where a card hangs from, in the canvas's own pixels: over its feature's wall. Null when the stack no longer shows it. */
     anchorOf(target: RoadmapStackTarget): Point | null {
       for (const [index, tier] of tiers.entries()) {
         const place = placeOf(index);
-        if (target.kind === 'epic') {
-          const run = tier.epics.find((item) => item.epic.name === target.name);
-          if (run) return pointOn(tier, place, (run.from + run.to) / 2, 0, EPIC_RHO);
-        } else {
-          const wall = tier.walls.find((item) => item.feature.name === target.name);
-          if (wall) return pointOn(tier, place, wall.at, stance.wall * (motions.get(target.name)?.frame ?? wall.frame) * place.open + 4);
-        }
+        const wall = tier.walls.find((item) => item.feature.name === target.name);
+        if (wall) return pointOn(tier, place, wall.at, stance.wall * (motions.get(target.name)?.frame ?? wall.frame) * place.open + 4);
       }
       return null;
     },
