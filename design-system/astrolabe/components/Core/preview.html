@@ -1,0 +1,34 @@
+<!-- @dsCard group="Objects" height=480 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Core — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var ORDER = ['idle', 'listening', 'speaking', 'thinking', 'reading', 'writing'], WORD = { idle: 'Idle', listening: 'Listen', speaking: 'Speak', thinking: 'Think', reading: 'Read', writing: 'Write' };
+  /* a voice that never stops, so every state has something to move to. Synthetic: for this preview only. */
+  var beats = 0, lastBeat = 0;
+  function voice() {
+    var t = performance.now() / 1000, syl = Math.pow(Math.max(0, Math.sin(t * 9)), 2) * (0.55 + 0.45 * Math.sin(t * 1.7)), k = Math.floor(t * 9 / Math.PI);
+    if (k !== lastBeat) { lastBeat = k; beats++; }
+    return { rms: 0.15 + 0.6 * syl, low: 0.2 + 0.7 * syl, mid: 0.1 + 0.5 * syl, high: 0.3 * syl, f0: 150 + 90 * Math.sin(t * 0.9), voicing: 0.9, onsets: beats, onsetAmp: 0.7, words: Math.floor(beats / 2), units: beats, unit: '', word: '', wordIndex: 0, phase: 'speech' };
+  }
+  function Demo() {
+    var s = React.useState('idle'), m = React.useState('mercury'), held = React.useRef(false);
+    /* left alone it goes through the six states; pick one and it stays there */
+    React.useEffect(function () { var id = setInterval(function () { if (!held.current) s[1](function (v) { return ORDER[(ORDER.indexOf(v) + 1) % ORDER.length]; }); }, 3400); return function () { clearInterval(id); }; }, []);
+    return h('div', { className: 'ast-persona-' + m[0], style: { height: 480, display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'var(--ground)' } },
+      h('div', { style: { width: '100%', flex: 1, minHeight: 0 } }, h(A.Core, { state: s[0], signal: voice, azimuth: s[0] === 'reading' ? 150 : 28 })),
+      h('div', { style: { display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', padding: '0 16px 18px' } },
+        h(A.SegmentedControl, { label: 'State', options: ORDER.map(function (o) { return { value: o, label: WORD[o] }; }), value: s[0], onChange: function (v) { held.current = true; s[1](v); } }),
+        h(A.SegmentedControl, { label: 'Material', options: [{ value: 'mercury', label: 'Mercury' }, { value: 'tube', label: 'Tube' }, { value: 'wire', label: 'Wire' }, { value: 'plasma', label: 'Plasma' }], value: m[0], onChange: m[1] })));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

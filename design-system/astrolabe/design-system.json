@@ -1,0 +1,80 @@
+{
+  "v": 3,
+  "layout": "files",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-09T07:50:30Z"
+  },
+  "title": "Astrolabe",
+  "namespace": "Astrolabe",
+  "libraries": [
+    {
+      "name": "react",
+      "version": "18"
+    },
+    {
+      "name": "react-dom",
+      "version": "18"
+    }
+  ],
+  "sections": {},
+  "groups": [
+    "Icons"
+  ],
+  "assetGroups": {
+    "Icons": {
+      "name": "Icons",
+      "tile": "s",
+      "order": [
+        "play.svg",
+        "stop.svg",
+        "mic.svg",
+        "upload.svg",
+        "chevron.svg"
+      ],
+      "files": {
+        "play.svg": {
+          "name": "play.svg",
+          "blob": "bad053690e03d20dc413e5cbde76fb55",
+          "size": 140,
+          "type": "image/svg+xml"
+        },
+        "stop.svg": {
+          "name": "stop.svg",
+          "blob": "8bbe9233827061e01ad1715f04474cfa",
+          "size": 157,
+          "type": "image/svg+xml"
+        },
+        "mic.svg": {
+          "name": "mic.svg",
+          "blob": "d729340e4f34e0bc07e96636f850a257",
+          "size": 307,
+          "type": "image/svg+xml"
+        },
+        "upload.svg": {
+          "name": "upload.svg",
+          "blob": "ac457b46823a490f1803752c7325bcbd",
+          "size": 259,
+          "type": "image/svg+xml"
+        },
+        "chevron.svg": {
+          "name": "chevron.svg",
+          "blob": "a3bd695300b033e90b3cfa2d51e65d67",
+          "size": 228,
+          "type": "image/svg+xml"
+        }
+      }
+    }
+  },
+  "blobs": {},
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "lastChange": {
+    "by": "Claude",
+    "at": "2026-11-17T02:30:00Z",
+    "via": "Claude",
+    "note": "New marks: menu, settings."
+  }
+}

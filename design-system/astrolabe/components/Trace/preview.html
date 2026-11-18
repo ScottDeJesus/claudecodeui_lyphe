@@ -1,0 +1,29 @@
+<!-- @dsCard group="Openings" height=330 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trace — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var POOL = [
+    { at: '09:52', source: 'Chat · Bugfixes', text: 'Run the migration on staging now?', by: 'Kaylee', did: 'Answered' },
+    { at: '09:47', source: 'Run · nightly-5', status: 'Failed', tone: 'danger', text: 'Two checks failed in upload.' },
+    { at: '09:41', source: 'Roadmap · Arrival physics', text: 'Queued for tonight\u2019s run.', words: 'queue it for tonight', via: 'spoken' },
+    { at: '09:33', source: 'Memory', text: 'Keeps: briefs end with the test to run.', by: 'Kaylee', did: 'Kept' },
+    { at: '09:12', source: 'Run · nightly-4', status: 'Done', tone: 'positive', text: 'Finished: 212 checks, all green.' },
+  ];
+  function Demo() {
+    var s = React.useState(1), n = s[0];
+    React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return v >= POOL.length ? 1 : v + 1; }); }, 2200); return function () { clearInterval(id); }; }, []);
+    var ev = POOL.slice(POOL.length - n).map(function (e, i) { return Object.assign({ id: e.at }, e); });
+    return h('div', { style: { maxWidth: 520 } }, h(A.Trace, { events: ev, max: 3 }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

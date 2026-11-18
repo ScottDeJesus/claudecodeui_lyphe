@@ -1,0 +1,29 @@
+<!-- @dsCard group="Places" height=196 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Arrival — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Slot(p) {
+    return h('div', { style: { flex: '1 1 0', minWidth: 200, display: 'flex', flexDirection: 'column', gap: 10 } },
+      h('span', { className: 'caption-caps', style: { color: 'var(--ink-muted)', textTransform: 'uppercase' } }, p.label),
+      h('div', { style: { height: 104, display: 'flex', alignItems: 'flex-start' } }, h(A.Arrival, { when: p.on, from: p.from, spring: p.spring }, p.children)));
+  }
+  function Demo() {
+    var s = React.useState(true), on = s[0];
+    React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return !v; }); }, 2000); return function () { clearInterval(id); }; }, []);
+    return h(React.Fragment, null,
+      h(Slot, { label: 'From its object · lock', from: 'object', on: on }, h(A.Plate, null, 'Reading · Bugfixes')),
+      h(Slot, { label: 'From the dock · lock', from: 'dock', on: on }, h(A.Button, { icon: 'stop', active: true }, 'Stop')),
+      h(Slot, { label: 'From the core · lobe', from: 'core', spring: 'lobe', on: on }, h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, h(A.Footprint, { by: 'Kaylee' }, 'Sent'), h('p', { className: 'field-text', style: { margin: 0, color: 'var(--ink-quiet)' } }, 'I sent the brief to Bugfixes.'))));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

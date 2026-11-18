@@ -1,0 +1,19 @@
+<!-- @dsCard group="Openings" height=128 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Readout — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h(React.Fragment, null,
+    h('div', { style: { width: 220 } }, h(A.Readout, { value: 148.25, unit: 'Hz', note: 'D3 +12¢', source: 'Measured · YIN', voicing: 0.9 })),
+    h('div', { style: { width: 220 } }, h(A.Readout, { value: null, unit: 'Hz', note: '—', source: 'Standby' })),
+    h('div', { style: { width: 220 } }, h(A.Readout, { unit: 'Hz', source: 'Demo signal', signal: A.demoSignal }))));
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!-- @dsCard group="Companion" height=860 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Prose — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var h = React.createElement, A = window.Astrolabe;
+  var F = String.fromCharCode(96, 96, 96), T = String.fromCharCode(96);
+  var md = ['The first pass is in. The cases that were failing now pass, and **two edge cases** are still open.', '',
+    'VERDICT: PASS — B:0 H:0 M:2 L:1', '', '## What changed', '',
+    'rule() assumed its input was already sorted. It now sorts its own, in ' + T + 'src/scheduling/rules.ts:43' + T + '. See [the note on ties](https://example.com) for why the order is kept.', '',
+    'Decided without asking:', '- **Ties keep their old order.** Start time, then id.', '- legacyRule() is untouched. Nothing calls it.', '',
+    '> [!WARNING]', '> byStart() treats a missing start time as midnight. No test covers it.', '',
+    F + 'stats', 'Checks | 212', 'Passed | 210', 'Failed | 2', 'Time | 41 s | -3 s', F, '',
+    '| | Sort in rule() | Sort at each caller |', '| --- | --- | --- |', '| Files touched | 1 | 3 |', '| A fourth caller | Safe | Brings the bug back |', '',
+    F + 'diff', '@@ -42,3 +42,4 @@', '+  if (!input.length) return [];', '-  const sorted = input.sort(byStart);', '+  const sorted = [...input].sort(byStart);', F, '',
+    '### Next', '', '1. Close the two edge cases.', '2. Remove legacyRule().'].join('\n');
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { maxWidth: 680, margin: '0 auto', padding: '28px 24px' } }, h(A.Prose, { text: md, onFile: function () {} })));
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!-- @dsCard group="Openings" height=130 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Meter — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var h = React.createElement, A = window.Astrolabe;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'flex', gap: 28, justifyContent: 'center', padding: '32px 24px' } },
+    h(A.Meter, { label: 'personal: This week', value: 0.06, warn: 0.75, danger: 0.9, caption: 'wk · 5d' }),
+    h(A.Meter, { label: 'work: This week', value: 0.78, warn: 0.75, danger: 0.9, caption: 'wk · 3d' }),
+    h(A.Meter, { label: 'studio: This week', value: 0.96, warn: 0.75, danger: 0.9, caption: 'wk · 2d' }),
+    h(A.Meter, { label: 'lab: This week', value: null })));
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!-- @dsCard group="Objects" height=150 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spinner — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h(React.Fragment, null,
+    h('div', { style: { minWidth: 200, display: 'grid', placeItems: 'center' } }, h(A.Spinner, { label: 'Reading the roadmap…' })),
+    h('div', { style: { minWidth: 120, display: 'grid', placeItems: 'center' } }, h(A.Spinner, { size: 24 })),
+    h('div', { style: { minWidth: 120, display: 'grid', placeItems: 'center' } }, h(A.Spinner, { size: 16 }))));
+</script>
+</body>
+</html>

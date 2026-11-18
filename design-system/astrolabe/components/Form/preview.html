@@ -1,0 +1,23 @@
+<!-- @dsCard group="Companion" height=330 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Form — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var FIELDS = [{ id: 'env', label: 'Target', type: 'select', options: ['Staging', 'Production'], value: 'Staging', required: true }, { id: 'ticket', label: 'Ticket', type: 'text', required: true }, { id: 'tell', label: 'Announce', type: 'boolean', value: true }];
+  function Demo() {
+    var r = React.useState(null);
+    return h('div', { style: { maxWidth: 420, margin: '0 auto', padding: '28px 24px' } },
+      h(A.Form, { from: 'The deploy tool', message: 'Three things before it runs.', fields: FIELDS, result: r[0] ? r[0].result : undefined, values: r[0] ? r[0].values : undefined,
+        onSubmit: function (v) { r[1]({ result: 'submitted', values: v }); setTimeout(function () { r[1](null); }, 3600); }, onDecline: function () { r[1]({ result: 'declined' }); setTimeout(function () { r[1](null); }, 3600); } }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

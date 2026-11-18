@@ -1,0 +1,16 @@
+<!-- @dsCard group="Controls" height=96 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Files — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { padding: '28px 24px' } }, h(A.Files, { files: [{ id: 1, name: 'trace.log', size: 48213 }, { id: 2, name: 'notes.md', size: 812 }, { id: 3, name: 'recording-of-the-whole-session-from-tuesday.wav', size: 8840000 }], onRemove: function () {} })));
+</script>
+</body>
+</html>

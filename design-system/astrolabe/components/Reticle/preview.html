@@ -1,0 +1,28 @@
+<!-- @dsCard group="Companion" height=226 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reticle — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Block(p) {
+    return h('div', { style: { padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 } },
+      h('span', { className: 'caption-caps', style: { color: 'var(--ink-muted)', textTransform: 'uppercase' } }, p.source),
+      h('p', { className: 'field-text', style: { margin: 0 } }, p.children));
+  }
+  function Demo() {
+    var s = React.useState(0), k = s[0] % 3;
+    React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return v + 1; }); }, 1600); return function () { clearInterval(id); }; }, []);
+    return h('div', { style: { display: 'flex', gap: 64, alignItems: 'center', padding: '52px 40px 24px', flexWrap: 'wrap' } },
+      h('div', { style: { width: 300 } }, h(A.Reticle, { active: k > 0, locked: k === 2, label: k === 2 ? 'Taken' : 'Reading · Bugfixes' }, h(Block, { source: 'Chat · Bugfixes' }, 'Run the migration on staging now?'))),
+      h('div', { style: { width: 240 } }, h(A.Reticle, { active: true, tone: 'secondary', label: 'Helper · scout-2' }, h(Block, { source: 'File · arrival.ts' }, 'Reading the springs.'))));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

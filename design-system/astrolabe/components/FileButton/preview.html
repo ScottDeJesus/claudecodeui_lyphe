@@ -1,0 +1,22 @@
+<!-- @dsCard group="Controls" height=92 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FileButton — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Demo() {
+    var s = React.useState(null);
+    return h(React.Fragment, null,
+      h(A.FileButton, { accept: 'audio/*', onFile: function (f) { s[1](f.name); } }, 'Audio file'),
+      h(A.ReadoutRow, { items: [{ label: 'Source', value: s[0] || '—' }] }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

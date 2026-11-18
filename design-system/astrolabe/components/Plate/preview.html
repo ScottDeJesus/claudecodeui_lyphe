@@ -1,0 +1,17 @@
+<!-- @dsCard group="Voice" height=96 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plate — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'flex', gap: 28, padding: 32, alignItems: 'center', flexWrap: 'wrap' } },
+    h(A.Plate, null, 'Reading \u00b7 Bugfixes'), h(A.Plate, { tone: 'quiet' }, 'Helper \u00b7 scout-2'), h(A.Plate, { leader: 'start' }, 'Runs \u00b7 14 / 26'), h(A.Plate, { leader: 'end', tone: 'quiet' }, 'Roadmap \u00b7 Scheduling')));
+</script>
+</body>
+</html>

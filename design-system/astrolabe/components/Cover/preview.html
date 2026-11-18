@@ -1,0 +1,52 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Astrolabe</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--font-sans); overflow: hidden; }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; }
+  /* the composition: a 480-wide box on the right half of the 960 layout, clear of the name */
+  .art { position: absolute; top: 0; left: 480px; width: 480px; height: 288px; overflow: hidden; }
+  .art svg { display: block; width: 480px; height: 288px; }
+  .amber { fill: var(--mercury); }
+  .ice { fill: var(--mercury-signal-b); }
+  .deep { fill: var(--ink); }
+  .core { fill: var(--chrome-mid); }
+  .blk { rx: var(--radius-control); }
+  .ring { fill: none; stroke: var(--signal-loop); stroke-width: var(--stroke-hairline); }
+  .loop { fill: none; stroke: var(--signal-loop); stroke-width: var(--stroke-loop); }
+  .words { position: absolute; left: var(--space-28); bottom: var(--space-24); max-width: 440px; }
+  .name { margin: 0; font-family: var(--font-mono); font-size: 76px; line-height: .92; font-weight: 200; letter-spacing: -0.02em; color: var(--ink); }
+  .tag { margin: var(--space-8) 0 0 2px; font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 480 288" width="480" height="288">
+<!--
+  blocks      mercury 168×248 slab bled off the top (the accent the instrument is known by, largest) · chrome-mid disc r=72 (the core) · mercury-signal-b 104×168 and ink 104×96 bled off the right — ≈27% of 960×288
+  arrangement one tall slab with satellites; the disc sits on the slab's left edge, where the core sits inside the rig
+  pattern     orbits, from "hairline orbits around it" in the README: the loop at 2.3× the disc (stroke-loop) and two inclined rings at 1.42× and 1.8× (stroke-hairline), in signal-loop — three curves
+  scales      sides in space-8 multiples (168, 248, 104, 168, 96); gutter space-16; corners radius-control; ring radii are the rig's own ratios to the core
+-->
+<rect class="amber blk" x="208" y="-16" width="168" height="248" rx="2"/>
+<rect class="ice blk" x="392" y="-16" width="104" height="168" rx="2"/>
+<rect class="deep blk" x="392" y="168" width="104" height="96" rx="2"/>
+<circle class="core" cx="176" cy="168" r="72"/>
+<ellipse class="ring" cx="176" cy="168" rx="102" ry="35" transform="rotate(-18 176 168)"/>
+<ellipse class="ring" cx="176" cy="168" rx="130" ry="76" transform="rotate(28 176 168)"/>
+<circle class="loop" cx="176" cy="168" r="166"/>
+</svg>
+</div>
+<div class="words">
+<h1 class="name">Astrolabe</h1>
+<p class="tag">A few living objects in place of many panels. Quiet until it’s true.</p>
+</div>
+</div>
+</body>
+</html>

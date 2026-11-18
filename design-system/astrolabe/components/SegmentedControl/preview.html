@@ -1,0 +1,20 @@
+<!-- @dsCard group="Controls" height=92 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SegmentedControl — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Demo() {
+    var s = React.useState('runs');
+    return h(A.SegmentedControl, { label: 'Ring', options: [{ value: 'chats', label: 'Chats' }, { value: 'runs', label: 'Runs' }, { value: 'road', label: 'Roadmap' }], value: s[0], onChange: s[1] });
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

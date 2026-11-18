@@ -1,0 +1,22 @@
+<!-- @dsCard group="Openings" height=260 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Steps — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var STEPS = ['Read upload.test.ts', 'Find what races the clock', 'Install the timer first', 'Run the upload tests', 'Open a pull request'];
+  function Demo() {
+    var s = React.useState(0), k = s[0];
+    React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % (STEPS.length + 3); }); }, 1300); return function () { clearInterval(id); }; }, []);
+    return h('div', { style: { maxWidth: 440 } }, h(A.Steps, { steps: STEPS.map(function (l, i) { return { id: i, label: l, state: i < k ? 'done' : i === k ? 'live' : 'next', thinking: i === 1, detail: i === 3 && k === 3 ? '24 of 38 passed' : undefined }; }) }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

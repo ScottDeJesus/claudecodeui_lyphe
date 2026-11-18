@@ -1,0 +1,18 @@
+<!-- @dsCard group="Voice" height=120 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rule — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function useTicker(ms, n) { var s = React.useState(0); React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % n; }); }, ms); return function () { clearInterval(id); }; }, []); return s[0]; }
+  function Demo() { var t = useTicker(3000, 2); return h('div', { key: t, style: { display: 'flex', flexDirection: 'column', gap: 22 } }, h(A.Rule, null, 'Run \u00b7 restorly-scheduling'), h(A.Rule, { align: 'end' }, 'Steps \u00b7 14 of 26')); }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

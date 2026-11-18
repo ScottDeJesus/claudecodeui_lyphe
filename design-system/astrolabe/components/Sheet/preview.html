@@ -1,0 +1,28 @@
+<!-- @dsCard group="Places" height=380 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sheet — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function useTicker(ms, n) { var s = React.useState(0); React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % n; }); }, ms); return function () { clearInterval(id); }; }, []); return s[0]; }
+  function Demo() {
+    var t = useTicker(2600, 2), open = t === 1;
+    return h('div', { style: { position: 'relative', height: 380, overflow: 'hidden' } },
+      h('div', { style: { height: '100%', display: 'grid', placeItems: 'center' } }, h('span', { className: 'caption-caps', style: { color: 'var(--ink-muted)', textTransform: 'uppercase' } }, 'Your work')),
+      h(A.Sheet, { open: open, title: 'History', onClose: function () {} },
+        h(A.Trace, { events: [
+          { id: 'a', at: '09:41', source: 'Chat · Bugfixes', text: 'Run the migration on staging now?', by: 'Kaylee', did: 'Answered' },
+          { id: 'b', at: '09:31', source: 'Roadmap · Arrival physics', text: 'Queued for tonight\u2019s run.', words: 'queue it for tonight', via: 'spoken' },
+          { id: 'c', at: '09:12', source: 'Run · nightly-4', status: 'Done', tone: 'positive', text: 'Finished: 212 checks, all green.' },
+        ] })));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

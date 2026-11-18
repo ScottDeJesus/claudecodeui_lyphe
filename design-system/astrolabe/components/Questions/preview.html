@@ -1,0 +1,25 @@
+<!-- @dsCard group="Companion" height=540 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Questions — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var QS = [
+    { header: 'Scope', question: 'Which of these should it also bring up to date?', multiple: true, likely: 'tests', options: [{ value: 'tests', label: 'The tests' }, { value: 'docs', label: 'The docs' }, { value: 'log', label: 'The changelog' }] },
+    { header: 'Approach', question: 'There are two ways to do this part. Which one?', likely: 'keep', options: [{ value: 'keep', label: 'Keep to the current approach', detail: 'The smaller change.' }, { value: 'new', label: 'Move the callers over', detail: 'Cleaner. Nine files.' }] },
+  ];
+  function Demo() {
+    var a = React.useState(null);
+    return h('div', { style: { maxWidth: 460, margin: '0 auto', padding: '28px 24px' } },
+      h(A.Questions, { questions: QS, by: 'Kaylee', answers: a[0] || undefined, onSubmit: function (x) { a[1](x); setTimeout(function () { a[1](null); }, 4200); }, onSkip: function () {} }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>
