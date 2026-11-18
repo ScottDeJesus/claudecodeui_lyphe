@@ -17,6 +17,11 @@ type SessionsHaloProps = {
   enabled: boolean;
   /** The hoop's width, in px. It is as deep as it leans at that width (`haloHeightFor`); the words stand under it. */
   width: number;
+  /**
+   * How far the hoop is tipped toward the reader, as the share of its width its depth takes; absent, the hoop's own lean. A hoop
+   * round a larger core leans less, so its opening has the room for that core.
+   */
+  lean?: number;
   /** Whether the folders' names are written round it: a halo standing small writes none. */
   names: boolean;
   /** Whether the chat at the front is read out in words under the hoop. */
@@ -64,8 +69,8 @@ const EYEBROW = 'font-mono text-[10px] font-medium uppercase leading-[14px] trac
  * Exported through the sidebar barrel for the station's scene (`StationKaylee`), which stands the companion's core in its middle, and
  * for the chat's desk (project-workspace's `ChatDesk`), which stands the chat's own core there.
  */
-export function SessionsHalo({ enabled, width, names, reading, link, coreRadius, current = null, onOpenChat, children }: SessionsHaloProps) {
-  const height = haloHeightFor(width);
+export function SessionsHalo({ enabled, width, lean, names, reading, link, coreRadius, current = null, onOpenChat, children }: SessionsHaloProps) {
+  const height = haloHeightFor(width, lean);
   const { t } = useTranslation(['sidebar', 'common']);
   const busySessionIds = useBusySessionIdSet();
   const awaitingInputSessionIds = useAwaitingInputSessionIdSet();
@@ -171,8 +176,8 @@ export function SessionsHalo({ enabled, width, names, reading, link, coreRadius,
     if (painterRef.current?.bring(current)) broughtRef.current = current;
   }, [slots, current]);
   useEffect(() => {
-    painterRef.current?.resize(width, height, Math.min(2, window.devicePixelRatio || 1));
-  }, [width, height]);
+    painterRef.current?.resize(width, height, Math.min(2, window.devicePixelRatio || 1), lean);
+  }, [width, height, lean]);
   useEffect(() => {
     painterRef.current?.setNames(names);
   }, [names]);
@@ -181,7 +186,7 @@ export function SessionsHalo({ enabled, width, names, reading, link, coreRadius,
   useEffect(() => {
     painterRef.current?.setLink(linkId === null ? null : { id: linkId, way: linkWay }, coreRadius);
   }, [linkId, linkWay, coreRadius]);
-  const middle = haloMiddle(width, height);
+  const middle = haloMiddle(width, height, lean);
 
   const at = (event: { clientX: number; clientY: number; currentTarget: HTMLCanvasElement }): [number, number] => {
     const box = event.currentTarget.getBoundingClientRect();

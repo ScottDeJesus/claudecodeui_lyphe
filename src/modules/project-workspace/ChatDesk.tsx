@@ -15,8 +15,13 @@ const CIRCLE_RADIUS = 33;
 
 /** The air kept between the column's edges and the hoop of chats round the core, in px at each side. */
 const HOOP_INSET = 12;
-/** The core's own radius as the hoop reads it, in px: half the square `ChatCore` draws it in there. No line is drawn from it (no `link`). */
-const CORE_RADIUS = 48;
+/** The core's own radius as the hoop reads it, in px: about half the square `ChatCore` draws it in there. No line is drawn from it (no `link`). */
+const CORE_RADIUS = 60;
+/**
+ * How far the hoop round the chat's core leans (`SessionsHalo`'s `lean`): less than the station's own, so its opening is deep enough
+ * for the chat's larger core with its rings and its helpers round it.
+ */
+const HOOP_LEAN = 0.64;
 
 type ChatDeskProps = {
   /** The side column's width in px, or 0 for none: a narrow screen, the chat floating, no project chosen (`useChatDeskSide`). */
@@ -61,6 +66,7 @@ export function ChatDesk({ side, sessionId, head, children }: ChatDeskProps) {
               <SessionsHalo
                 enabled
                 width={side - 2 * HOOP_INSET}
+                lean={HOOP_LEAN}
                 names={false}
                 reading
                 link={null}

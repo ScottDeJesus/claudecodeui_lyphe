@@ -36,10 +36,10 @@
 .chat-desk[data-chat-desk='side'] [data-chat-head] > div { padding-inline: calc(1rem + 28px); }
 
 /* The column. The roadmap's circle lies over its top (66 px down, 33 px round: `ChatDesk` hands `RoadmapCircle` the place). Under it
- * the core has a box as tall as its disc at its widest (280 px) and stands in that box's middle, so the disc opens clear of the
+ * the core has a box as tall as its disc at its widest and the hoop of chats round it need (320 px), so the disc opens clear of the
  * circle above and of the follow-ups below, and nothing moves to make room for it. Only the follow-ups scroll. */
 .chat-desk__side { display: flex; flex: none; flex-direction: column; width: var(--chat-side); min-height: 0; padding-top: 116px; }
-.chat-desk__core { display: grid; flex: none; place-items: center; height: 280px; }
+.chat-desk__core { display: grid; flex: none; place-items: center; height: 320px; }
 /* The core's own box, in the middle of the hoop of chats (`SessionsHalo`). It takes no press itself, so the hoop's slots are pressed
  * through its empty corners; the core in it takes its own. */
 .chat-desk__core .chat-desk__place { display: grid; place-items: center; pointer-events: none; }

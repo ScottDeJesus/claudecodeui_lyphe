@@ -27,10 +27,16 @@ const CORE_PX = 56;
 const CORE_SHARE_OF_DISC = 0.36;
 
 /**
- * The side of the core's square where the page keeps a place for it apart from the line (`useChatCorePlace`), in px: the size it has in
- * its disc, so the rings open round it where it stands and it neither moves nor grows.
+ * The side of the core's square where the page keeps a place for it apart from the line (`useChatCorePlace`): this share of that
+ * place's width, between these two sizes in px. It is the size it keeps in its disc too, so the rings open round it where it stands
+ * and it neither moves nor grows. In the desk's two columns (300 and 360 px) it is 112 and 128 px.
  */
-const CORE_APART_PX = 96;
+const CORE_APART_SHARE = 0.372;
+const CORE_APART_MIN_PX = 96;
+const CORE_APART_MAX_PX = 128;
+
+/** The disc the rings open in round a core that stands apart: its side at most, in px. Wider than the docked one's, for the larger core. */
+const DISC_APART_PX = 300;
 
 
 /** From this share of the context window the ring takes the warn ink: the window is nearly full. */
@@ -136,6 +142,19 @@ export function ChatCore({
   const dockRef = useRef<HTMLDivElement>(null);
   const ringsRef = useRef<HTMLDivElement>(null);
   const pressRef = useRef<HTMLButtonElement>(null);
+  // How large the core stands in a place of its own: measured from that place, so a wider column carries a larger core.
+  const [apartPx, setApartPx] = useState(CORE_APART_MIN_PX);
+  useLayoutEffect(() => {
+    if (place === null) return undefined;
+    const measure = () => {
+      const next = Math.round(Math.max(CORE_APART_MIN_PX, Math.min(CORE_APART_MAX_PX, place.getBoundingClientRect().width * CORE_APART_SHARE)));
+      setApartPx((current) => (current === next ? current : next));
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(place);
+    return () => observer?.disconnect();
+  }, [place]);
   // Where the open disc stands from the dock, and its side: measured from the chat's own column each time it opens or its room changes.
   // Null while shut, when the core sits in its dock.
   const [lift, setLift] = useState<{ dx: number; dy: number; size: number } | null>(null);
@@ -188,7 +207,7 @@ export function ChatCore({
     if (place !== null) {
       // Apart from the line the core has its own place, with the room for its disc round it: it opens where it stands.
       const settleInPlace = () => {
-        const size = Math.round(Math.max(DISC_MIN_PX, Math.min(DISC_PX, place.getBoundingClientRect().width - 2 * DISC_EDGE)));
+        const size = Math.round(Math.max(DISC_MIN_PX, Math.min(DISC_APART_PX, place.getBoundingClientRect().width - 2 * DISC_EDGE)));
         setLift((current) => (current !== null && current.dx === 0 && current.dy === 0 && current.size === size ? current : { dx: 0, dy: 0, size }));
       };
       settleInPlace();
@@ -250,8 +269,8 @@ export function ChatCore({
   const up = open && lift !== null;
   // The core's square: its dock's, and larger in the disc; in a place of its own, the larger one always. Its two hairlines keep their
   // distance from its edge at any size.
-  const restPx = place !== null ? CORE_APART_PX : CORE_PX;
-  const corePx = place !== null ? CORE_APART_PX : up ? Math.round(lift.size * CORE_SHARE_OF_DISC) : CORE_PX;
+  const restPx = place !== null ? apartPx : CORE_PX;
+  const corePx = place !== null ? apartPx : up ? Math.round(lift.size * CORE_SHARE_OF_DISC) : CORE_PX;
   // The two rings are the core's own drawing, in orbit close on its body (`gauges`); the outer one's press is a band at its radius.
   const accountRadius = Math.round(corePx * CORE_BODY_SHARE) + CORE_GAUGE_GAPS[1];
   const week = useAccountWeek();

@@ -55,23 +55,24 @@ export type HaloPress = { open: number } | null;
 /**
  * The hoop in a box of `width` by `height`: its middle on the ground, its half-width and its band's height. Room is kept at the foot for
  * the pointer and a hair at the top so the far band's edge is whole. The painter stands the hoop by it, and `board/SessionsHalo` stands
- * the core by it too (`middleOf`), so the two never disagree.
+ * the core by it too (`middleOf`), so the two never disagree. `lean` is how far the hoop is tipped toward the reader, as the share of
+ * its width its depth takes (`TILT` unless the caller says): a hoop round a larger core leans less, so its opening is deeper.
  */
-export function haloGeometry(width: number, height: number) {
-  const radius = Math.max(24, Math.min(width / 2 - 6, (height - 18) / (2 * TILT + 0.18)));
+export function haloGeometry(width: number, height: number, lean = TILT) {
+  const radius = Math.max(24, Math.min(width / 2 - 6, (height - 18) / (2 * lean + 0.18)));
   const band = clamp(radius * 0.18, 12, 30);
-  return { cx: width / 2, cy: 4 + band + radius * TILT, radius, band };
+  return { cx: width / 2, cy: 4 + band + radius * lean, radius, band };
 }
 
 /** Where the hoop's opening has its middle, for what stands in it: over the ground's middle by half the band, as the eye reads it. */
-export function haloMiddle(width: number, height: number): { x: number; y: number } {
-  const { cx, cy, band } = haloGeometry(width, height);
+export function haloMiddle(width: number, height: number, lean = TILT): { x: number; y: number } {
+  const { cx, cy, band } = haloGeometry(width, height, lean);
   return { x: cx, y: cy - band / 2 };
 }
 
 /** The box's height that holds a hoop as wide as `width` whole, pointer and all: what a caller that knows only the width asks for. */
-export function haloHeightFor(width: number): number {
-  return Math.round(18 + (2 * TILT + 0.18) * (width / 2 - 6));
+export function haloHeightFor(width: number, lean = TILT): number {
+  return Math.round(18 + (2 * lean + 0.18) * (width / 2 - 6));
 }
 
 /**
@@ -91,6 +92,8 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
   let cx = 0;
   let cy = 0;
   let radius = 60;
+  // How far the hoop is tipped toward the reader (`haloGeometry`'s `lean`); the caller's, given with its size.
+  let lean = TILT;
   let band = 18;
   // Whether the folders' names are written round it (a hoop standing small writes none).
   let names = true;
@@ -122,7 +125,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
   /** A point on the band: `angle` round from the front, `up` the band's face from foot (0) to top (1), `out` its distance from the axis in radii. */
   const point = (angle: number, up: number, out = 1): [number, number] => [
     cx + radius * out * Math.sin(angle),
-    cy + radius * out * TILT * Math.cos(angle) - up * band,
+    cy + radius * out * lean * Math.cos(angle) - up * band,
   ];
 
   /** The piece of the band's face between two angles and two heights, as a path. */
@@ -168,7 +171,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
   };
 
   const fit = () => {
-    ({ cx, cy, radius, band } = haloGeometry(width, height));
+    ({ cx, cy, radius, band } = haloGeometry(width, height, lean));
   };
 
   /** The slot nearest the front under a turn. */
@@ -335,10 +338,11 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
   };
 
   return {
-    resize(nextWidth: number, nextHeight: number, nextRatio: number) {
+    resize(nextWidth: number, nextHeight: number, nextRatio: number, nextLean = TILT) {
       width = nextWidth;
       height = nextHeight;
       ratio = nextRatio;
+      lean = nextLean;
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
       fit();
@@ -428,7 +432,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
 
       // The ground the band stands on: a hairline, so a hoop with no chat on it is still a hoop.
       ctx.beginPath();
-      ctx.ellipse(cx, cy, radius, radius * TILT, 0, 0, TAU);
+      ctx.ellipse(cx, cy, radius, radius * lean, 0, 0, TAU);
       ctx.strokeStyle = rgba(colors.tone, slots.length === 0 ? 0.3 : 0.14);
       ctx.lineWidth = 1;
       ctx.stroke();
