@@ -4158,8 +4158,9 @@ export type SubagentDot = CompanionMaterial | null;
 //----------------- ROADMAP STACK: what the roadmap's stack, its painter and its face share ------------
 
 /**
- * One feature as a wall on its milestone's ring, laid out once by the roadmap module's `layoutStack` and read by the
- * stack's painter (`utils/stackPainter`), its canvas (`stack/RoadmapStack`) and its face (`RoadmapStackFace`). `at` and
+ * One feature as a wall on the roadmap's ring, laid out once by the roadmap module's `layoutStack` and read by the
+ * stack's painter (`utils/stackPainter`), its canvas (`stack/RoadmapStack`) and its card (`stack/StackCard`). `epic` and
+ * `milestone` are the feature's own, for its card. `kind` is which of the ring's three kinds it is. `at` and
  * `width` are its place and its room round the ring, in radians. `frame` is how tall it stands, as a share of a full wall:
  * how far along its path the feature is. `fill` is how much of that frame is built, the share of its tasks done. `tone` is
  * what it says in colour beside its form: `danger` when it is blocked (by its own, its epic's or its milestone's reason)
@@ -4169,6 +4170,8 @@ export type SubagentDot = CompanionMaterial | null;
 export type RoadmapStackWall = {
   feature: RoadmapFeature;
   epic: RoadmapEpic;
+  milestone: RoadmapMilestone;
+  kind: RoadmapStackKind;
   at: number;
   width: number;
   frame: number;
@@ -4178,24 +4181,22 @@ export type RoadmapStackWall = {
   attention: 0 | 1 | 2 | 3;
 };
 
-/** One epic as its thread on the floor of its milestone's ring: the arc it runs (`from` to `to`, radians) over its own walls. */
-export type RoadmapStackEpic = { epic: RoadmapEpic; from: number; to: number; walls: RoadmapStackWall[] };
+/** The three kinds of feature the ring holds: finished and not yet dismissed, being built, and ready to be started (held, cut and waiting on Accept, or still being cut). */
+export type RoadmapStackKind = 'finished' | 'building' | 'ready';
 
 /**
- * One milestone as a ring of the stack: its 1-based place on the roadmap, its epics' threads, and every wall in ring order.
- * `span` is how much of the ring its walls take, in radians: a reached milestone fills its ring, and one that is not keeps
- * its walls to a readable width and leaves the rest of the rim bare.
+ * One ring of walls, in ring order. The roadmap is ONE ring (`layoutStack`); the painter lays out however many it is handed.
+ * `name` is the ring's key across pictures (the roadmap's name). `span` is how much of the ring its walls take, in radians:
+ * the walls keep a readable width and leave the rest of the rim bare.
  */
 export type RoadmapStackTier = {
-  milestone: RoadmapMilestone;
-  n: number;
-  epics: RoadmapStackEpic[];
+  name: string;
   walls: RoadmapStackWall[];
   span: number;
 };
 
-/** What a press on the stack asks its face to open: a feature's card or an epic's, by the item's name. */
-export type RoadmapStackTarget = { kind: 'feature' | 'epic'; name: string };
+/** What a press on the stack asks its face to open: a feature's card, by the feature's name. */
+export type RoadmapStackTarget = { kind: 'feature'; name: string };
 
 /**
  * What the stack's owner can ask of it: bring a feature's wall to the front, on whichever ring it stands. Handed out
