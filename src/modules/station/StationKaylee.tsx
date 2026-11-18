@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AccountWeekRing } from '@/modules/accounts';
 import { CompanionControls, CompanionFace, CompanionStatus, CompanionStopButton, useCompanion, useCompanionPresence } from '@/modules/companion';
+import { PlacesMenu } from '@/modules/project-workspace';
 import { SessionsHalo } from '@/modules/sidebar';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
 import { useNeedsCount } from '@/modules/station/context/StationNeedsContext';
@@ -88,6 +89,8 @@ type StationKayleeViewProps = {
   speaking: CompanionSentenceRef | null;
   /** The controls' line (`CompanionControls`, `layout: 'line'`), drawn inside the panel behind its press. */
   controls: ReactNode;
+  /** The way to every other place, the last press in the row by the name (the workspace's `PlacesMenu` on the page); absent on a fixture. */
+  menu?: ReactNode;
   /** Stop, while a turn runs (`CompanionStopButton`), beside the name because the controls stand behind a press; null while none runs. */
   stop: ReactNode;
   /** This page's ears: the press by the name switches them, and is lit while they listen. */
@@ -142,7 +145,7 @@ function clockOf(stamp: string): string {
  * `data-station-kaylee` reads the form. A pure view: `StationKaylee` below binds it.
  */
 export function StationKayleeView({
-  form, halo, name, presence, face, corePx, onHome, week, turnedTo = null, picture, speaking, controls, stop, ears, onSayAgain, failedSentence, running, waiting, transcript,
+  form, halo, name, presence, face, corePx, onHome, week, turnedTo = null, picture, speaking, controls, menu, stop, ears, onSayAgain, failedSentence, running, waiting, transcript,
 }: StationKayleeViewProps) {
   const { t } = useTranslation();
   const nameId = useId();
@@ -259,6 +262,7 @@ export function StationKayleeView({
                 </span>
               )}
             />
+            {menu}
             <StationArrival when={stop !== null} from="dock" className="shrink-0">{stop}</StationArrival>
           </div>
           {counts !== '' && !mark && <span data-station-kaylee-counts="" className="font-mono text-[11px] leading-4 text-muted-foreground">{counts}</span>}
@@ -380,6 +384,7 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
       week={(radius) => <AccountWeekRing radius={radius} />}
       picture={picture}
       speaking={voice.speaking}
+      menu={<PlacesMenu here="station" triggerClassName={NAME_PRESS} />}
       controls={(
         <CompanionControls
           name={name}

@@ -42,6 +42,9 @@
     "station": "Open {{name}}'s station",
     "places": "Other screens"
   },
+  "places": {
+    "menu": "Menu"
+  },
   "rail": {
     "label": "Views",
     "settings": "Settings",

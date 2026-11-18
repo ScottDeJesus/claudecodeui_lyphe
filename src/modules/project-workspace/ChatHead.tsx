@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
 import { SessionFollowupsSwitch, SessionPanelSwitch } from '@/modules/session-panel';
 import { openHome, openStation } from '@/shared/cloudcliDoors';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
@@ -23,7 +24,8 @@ type ChatHeadProps = {
  * Station when it was opened there, else the sessions home, where every chat is. ESCAPE PRESSES IT (`WAY_BACK`): the key is the way back out
  * of a chat, and no longer stops its turn, which the core's own Stop does. Beside it, the word Chat with the project's name, and
  * the chat's own title under them. At the end, where the chat has them: the toggle for its next
- * steps (`SessionFollowupsSwitch`) and the switch to its panel (`SessionPanelSwitch`). Nothing else: what the chat is doing is its core's to say (`ChatCore`), and everything that sets the chat up
+ * steps (`SessionFollowupsSwitch`) and the switch to its panel (`SessionPanelSwitch`); and always, last, the menu to every other
+ * place (`PlacesMenu`). Nothing else: what the chat is doing is its core's to say (`ChatCore`), and everything that sets the chat up
  * is behind that core.
  *
  * It stands in place of the sidebar, the rail and the phone's header strip while the Chat view is on screen, at every width: the sessions
@@ -73,6 +75,8 @@ export default function ChatHead({ selectedProject, selectedSession, newSessionL
       <SessionFollowupsSwitch />
       {/* The chat's panel is a place switched to from here; with no panel this draws nothing. */}
       <SessionPanelSwitch />
+      {/* The way to every other place, last in the head: the same menu the home and the station carry. */}
+      <PlacesMenu here="chat" triggerClassName="relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']" />
       </div>
     </header>
   );
