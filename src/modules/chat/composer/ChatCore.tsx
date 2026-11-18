@@ -216,7 +216,7 @@ export function ChatCore({
   }, [open, hostWindow, place]);
 
   // Open, the settings let go on Escape or on a press anywhere else. Escape is taken on the window's capture phase and marked handled,
-  // so the chat's running turn is not stopped by it (`useEscapeToAbortSession` reads the mark), and a panel opened in front of the rings
+  // so the page's own Escape (the way back, `useEscapeBack`) stands down for it, and a panel opened in front of the rings
   // (a menu from the row, the account switcher) keeps the key until it has shut.
   useEffect(() => {
     if (!open) return undefined;

@@ -247,10 +247,13 @@ export function CelebrationLayer({ moment, onSkip, scope }: CelebrationLayerProp
     if (!holding) return undefined;
     const onKey = (event: KeyboardEvent) => {
       // The station on screen covers this page: an Escape typed there does not skip a celebration nobody sees.
-      if (event.key === 'Escape' && !isPageHeld() && !otherOverlayHoldsEscape(document)) skip();
+      if (event.key !== 'Escape' || event.defaultPrevented || isPageHeld() || otherOverlayHoldsEscape(document)) return;
+      // Marked, on the window's capture phase, so the page's own Escape (the way back) does not also leave the page.
+      event.preventDefault();
+      skip();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [holding, isPageHeld, skip]);
 
   // The reached milestone's size, the banner's figures, off the roadmap on screen.

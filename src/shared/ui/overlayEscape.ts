@@ -23,6 +23,26 @@ export const OWNS_ESCAPE = { 'data-owns-escape': '' } as const;
 export const OWNS_ESCAPE_SELECTOR = '[data-owns-escape]';
 
 /**
+ * What a BACK BUTTON states about itself: it is the way back from the place it stands in, so Escape presses it
+ * (`shared/hooks/useEscapeBack`, the page's one listener for the key). Carried by the chat's head, the screens opened from a list
+ * (a carrier's pages and a page, a tour and a panorama) and a helper's transcript read in place. A back button inside a panel
+ * that owns the key needs none: the panel's own Escape is its way back already.
+ */
+export const WAY_BACK = { 'data-way-back': '' } as const;
+
+/** The same fact as the selector the page's listener finds it with. */
+export const WAY_BACK_SELECTOR = '[data-way-back]';
+
+/**
+ * What a TEXT FIELD states when Escape is not its own: the key typed in it goes on to the page, as if nothing were in focus.
+ * Carried by the chat's line, which cancels nothing on the key while none of its menus is open.
+ */
+export const ESCAPE_PASSES = { 'data-escape-passes': '' } as const;
+
+/** The same fact as the selector the page's listener reads it with. */
+export const ESCAPE_PASSES_SELECTOR = '[data-escape-passes]';
+
+/**
  * Whether something in FRONT of a fullscreen surface holds Escape right now.
  *
  * Asked by the fullscreen surfaces — a transcript embed card (`WidgetFrame`) first among them — before they take

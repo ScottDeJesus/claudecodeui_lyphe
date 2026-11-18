@@ -12,6 +12,7 @@ import { addressBesideName, tourFacts, tourName } from '@/modules/affected-areas
 import type { Codebook, Face, TourDetail, TourSummary } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, DayOneSection, TourReaderProgress } from '@/shared/types';
 import { Button } from '@/shared/ui';
+import { WAY_BACK } from '@/shared/ui/overlayEscape';
 
 type TourScreenProps = {
   /** The tour as the picker listed it: its header is drawn from this while the detail is read. */
@@ -84,7 +85,7 @@ export function TourScreen({
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button variant="ghost" size="sm" className="-ml-3 max-md:h-11" onClick={onBack}>
+          <Button variant="ghost" size="sm" className="-ml-3 max-md:h-11" onClick={onBack} {...WAY_BACK}>
             <ChevronLeft aria-hidden="true" />
             {t('affectedAreas.tour.back')}
           </Button>

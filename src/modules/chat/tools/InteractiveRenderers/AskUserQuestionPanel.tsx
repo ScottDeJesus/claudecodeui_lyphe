@@ -185,12 +185,12 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
   }, [currentStep, questions, toggleOption, toggleOther, handleSubmit]);
 
   // Escape skips — from a window-level CAPTURE listener, the shape the accounts panel uses
-  // (docs/MANUAL.md (accounts)). `useEscapeToAbortSession` aborts the running turn from a document-level capture
+  // (docs/MANUAL.md (accounts)). The page's own Escape (the way back, `useEscapeBack`) is a document-level capture
   // listener gated on `defaultPrevented`, and window capture runs first: marking the event here
-  // is what keeps "Skip all — Esc" from killing the run instead. Only a key pressed INSIDE the
+  // is what keeps "Skip all — Esc" from leaving the chat instead. Only a key pressed INSIDE the
   // panel is the panel's: elsewhere Escape keeps its app-wide meaning. And inside the "Other"
   // field it is "back out of this field", never "skip every question and discard what I typed"
-  // — marked, so the run survives, and nothing more.
+  // — marked, so the chat stays, and nothing more.
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.repeat) return;

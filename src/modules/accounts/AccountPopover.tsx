@@ -56,7 +56,7 @@ function placeBeside(anchor: AccountSwitcherAnchor, width: number, height: numbe
  * running off the window. Taller than the window, it scrolls from a top edge the reader can see.
  *
  * HOW IT SHUTS. Its back arrow, Escape, a press anywhere outside it, or a second press on what opened it. Escape is taken on the
- * window's capture phase and marked handled, so a chat's running turn is not stopped by it (`useEscapeToAbortSession` reads the mark);
+ * window's capture phase and marked handled, so the page's own Escape (the way back, `useEscapeBack`) stands down for it;
  * the card states it owns the key (`OWNS_ESCAPE`), so the page under it stands down, and it stands down itself for a menu it opened.
  * While a sign-in window is up neither shuts it: that window is drawn outside this card, so every press in it would read as outside.
  *

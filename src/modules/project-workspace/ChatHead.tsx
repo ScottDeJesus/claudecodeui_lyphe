@@ -6,6 +6,7 @@ import { openHome, openStation } from '@/shared/cloudcliDoors';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { Project, ProjectSession } from '@/shared/types';
 import { Button } from '@/shared/ui';
+import { WAY_BACK } from '@/shared/ui/overlayEscape';
 import { getSessionTitle } from '@/shared/utils';
 
 type ChatHeadProps = {
@@ -19,7 +20,8 @@ type ChatHeadProps = {
 
 /**
  * THE HEAD OF A CHAT: the way back and what this is. A back arrow at the start goes back to the page the chat was reached from: Kaylee
- * Station when it was opened there, else the sessions home, where every chat is; beside it, the word Chat with the project's name, and
+ * Station when it was opened there, else the sessions home, where every chat is. ESCAPE PRESSES IT (`WAY_BACK`): the key is the way back out
+ * of a chat, and no longer stops its turn, which the core's own Stop does. Beside it, the word Chat with the project's name, and
  * the chat's own title under them. A chat with a panel has the switch to it at the end
  * (`SessionPanelSwitch`). Nothing else: what the chat is doing is its core's to say (`ChatCore`), and everything that sets the chat up
  * is behind that core.
@@ -50,6 +52,7 @@ export default function ChatHead({ selectedProject, selectedSession, newSessionL
       <div className="mx-auto flex w-full max-w-[var(--chat-column,868px)] items-center gap-3 px-4 finger:gap-2 finger:px-3">
       <Button
         data-chat-head-back=""
+        {...WAY_BACK}
         variant="outline"
         size="icon"
         className="relative size-9 shrink-0 finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']"

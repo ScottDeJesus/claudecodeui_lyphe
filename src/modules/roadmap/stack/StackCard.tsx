@@ -44,7 +44,7 @@ function CardFrame({ label, onClose, children }: { label: string; onClose: () =>
   }, []);
 
   // Escape is the card's while nothing that owns the key (a menu on the plan's card, one of the roadmap's questions) is in
-  // front of it. Heard on the host window's capture phase and marked first, as `Sheet` does, so the chat never also stops a turn.
+  // front of it. Heard on the host window's capture phase and marked first, as `Sheet` does, so the page never also steps back.
   useEffect(() => {
     const hostDocument = hostWindow.document;
     const onKeyDown = (event: KeyboardEvent) => {

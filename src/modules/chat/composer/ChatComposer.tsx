@@ -49,6 +49,7 @@ import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
 import type { SessionToolsetsState } from '@/modules/chat/hooks/useSessionToolsets';
 import ChatExportMenu, { type ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
+import { ESCAPE_PASSES } from '@/shared/ui/overlayEscape';
 
 type MentionableFile = {
   name: string;
@@ -625,6 +626,9 @@ export default function ChatComposer({
   
               <PromptInputTextarea
                 ref={textareaRef}
+                // Escape cancels nothing in the line while neither of its lists is up (the files after an @, the commands after a /):
+                // the key then goes on to the page, whose way back it is. With a list up the key is the line's, and shuts the list.
+                {...(showFileDropdown || isCommandMenuOpen ? {} : ESCAPE_PASSES)}
                 dir="auto"
                 rows={1}
                 value={input}

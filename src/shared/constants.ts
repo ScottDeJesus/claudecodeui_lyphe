@@ -801,9 +801,9 @@ export const MAX_ATTACHMENT_COUNT = 10;
 
 /**
  * Matches an open layer that dismisses itself on Escape: a menu, a modal dialog, or any panel that states it owns
- * Escape while it is open (`OWNS_ESCAPE`, the `data-owns-escape` marker of `shared/ui/overlayEscape`). The chat's
- * page-wide Escape that stops a running turn (`useEscapeToAbortSession`) checks for it with `querySelector` on the
- * document the chat is drawn in, and steps aside while one is open, so dismissing the layer is all that Escape does.
+ * Escape while it is open (`OWNS_ESCAPE`, the `data-owns-escape` marker of `shared/ui/overlayEscape`). The page's
+ * own Escape, the way back (`useEscapeBack`), checks for it with `querySelector` on the document, and steps aside
+ * while one is open, so dismissing the layer is all that Escape does.
  */
 export const ESCAPE_LAYER_SELECTOR = '[data-owns-escape], [aria-modal="true"], [role="menu"]';
 

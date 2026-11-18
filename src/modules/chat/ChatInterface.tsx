@@ -28,7 +28,6 @@ import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHan
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
 import { useIsLookingAtSession, useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
-import { useEscapeToAbortSession } from '@/modules/chat/hooks/useEscapeToAbortSession';
 import { useCliSessionId } from '@/modules/chat/hooks/useCliSessionId';
 import { useModelLabelResolver } from '@/modules/chat/hooks/useModelLabelResolver';
 import { useSessionToolsets } from '@/modules/chat/hooks/useSessionToolsets';
@@ -374,13 +373,6 @@ function ChatInterface({
     requestLatestMessages,
     sessionStore,
     onSteerOutcome: handleSteerOutcome,
-  });
-
-  // Escape stops the running turn, except where it belongs to a field or an open layer.
-  useEscapeToAbortSession({
-    canAbortSession,
-    onAbortSession: handleAbortSession,
-    composerRef: textareaRef,
   });
 
   useEffect(() => {

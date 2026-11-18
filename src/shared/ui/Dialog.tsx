@@ -138,10 +138,10 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       const hostDocument = hostWindow.document;
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
-          // Marked, from a WINDOW capture listener: ChatInterface stops the running turn on an
-          // Escape from a document capture listener unless the event is already marked, and window
-          // capture runs first — so closing a dialog never also stops the run. Marked in BOTH
-          // branches below: an Escape that closes a menu is no more the chat's to act on than one
+          // Marked, from a WINDOW capture listener: the page presses its way back on an Escape
+          // from a document capture listener unless the event is already marked, and window
+          // capture runs first — so closing a dialog never also leaves the page. Marked in BOTH
+          // branches below: an Escape that closes a menu is no more the page's to act on than one
           // that closes a dialog.
           e.preventDefault();
           // An overlay drawn in front of the dialog takes the key, and this handler stands down for
@@ -177,8 +177,8 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
         }
       };
 
-      // The host window's capture phase, which runs before the chat's own document capture listener
-      // (`useEscapeToAbortSession`) in that same window — the order the comment above
+      // The host window's capture phase, which runs before the page's own document capture listener
+      // (`useEscapeBack`, the way back) in that same window — the order the comment above
       // depends on holds in a picture-in-picture window exactly as it does at home.
       hostWindow.addEventListener('keydown', handleKeyDown, true);
 
