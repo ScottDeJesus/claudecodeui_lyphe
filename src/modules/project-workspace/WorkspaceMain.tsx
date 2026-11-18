@@ -373,6 +373,7 @@ function WorkspaceMain({
         <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
           <ChatDesk
             side={chatSide}
+            sessionId={selectedSession?.id ?? null}
             head={floating ? null : <ChatHead selectedProject={selectedProject} selectedSession={selectedSession} newSessionLabel={t('mainContent.newSession')} />}
           >
           {selectedProject ? (

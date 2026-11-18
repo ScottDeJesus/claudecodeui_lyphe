@@ -27,6 +27,11 @@ type SessionsHaloProps = {
    */
   link: { id: string; way: 'in' | 'out' } | null;
   coreRadius: number;
+  /**
+   * The chat the hoop stands in, by id, where it stands in one: the hoop arrives with that chat at the front, and comes back to it when
+   * the chat on screen changes. Absent where the hoop belongs to no chat (the station), which opens on the first chat that waits.
+   */
+  current?: string | null;
   /** The chat at the front, pressed (or Enter on the hoop): its page shows it. */
   onOpenChat: (sessionId: string) => void;
   /** What stands in the hoop's middle: the companion's core. It is drawn over the canvas, so its own press stays its own. */
@@ -54,9 +59,12 @@ const EYEBROW = 'font-mono text-[10px] font-medium uppercase leading-[14px] trac
  *
  * `data-sessions-halo` marks its root and reads how many chats it holds; `data-halo-front` the chat at the front, by id.
  *
- * Exported through the sidebar barrel for the station's scene (`StationKaylee`), which stands the companion's core in its middle.
+ * IN A CHAT (`current`) it arrives turned to that chat, so the slot at the front is where the reader is and the rest are a turn away.
+ *
+ * Exported through the sidebar barrel for the station's scene (`StationKaylee`), which stands the companion's core in its middle, and
+ * for the chat's desk (project-workspace's `ChatDesk`), which stands the chat's own core there.
  */
-export function SessionsHalo({ enabled, width, names, reading, link, coreRadius, onOpenChat, children }: SessionsHaloProps) {
+export function SessionsHalo({ enabled, width, names, reading, link, coreRadius, current = null, onOpenChat, children }: SessionsHaloProps) {
   const height = haloHeightFor(width);
   const { t } = useTranslation(['sidebar', 'common']);
   const busySessionIds = useBusySessionIdSet();
@@ -65,8 +73,8 @@ export function SessionsHalo({ enabled, width, names, reading, link, coreRadius,
   const subagentModels = useSubagentModelsBySession();
   const liveHostSessionIds = useSessionHostLiveSet();
   const isPageHeld = useIsPageHeld();
-  // No chat is open at the halo, so the feed is asked to keep none in view.
-  const { items } = useSimpleChatList(null, enabled);
+  // The feed keeps the chat the hoop stands in in view; at the station no chat is open, so it is asked to keep none.
+  const { items } = useSimpleChatList(current, enabled);
 
   const slots = useMemo(() => {
     const slotOf = (chat: RecentConversationListItem, folder: string | null, folderName: string | null): SessionsHaloSlot => {
@@ -128,8 +136,8 @@ export function SessionsHalo({ enabled, width, names, reading, link, coreRadius,
 
     let frame = 0;
     const loop = (now: number) => {
-      // A page held under another is not seen: nothing is drawn for it until it is back.
-      if (!isPageHeld()) {
+      // A page held under another is not seen, nor is a view folded away behind another: nothing is drawn until it is back.
+      if (!isPageHeld() && canvas.offsetParent !== null) {
         const next = painter.frame(now);
         setShown((held) => (held.front === next.front && held.hover === next.hover ? held : next));
       }
@@ -155,6 +163,13 @@ export function SessionsHalo({ enabled, width, names, reading, link, coreRadius,
   useEffect(() => {
     painterRef.current?.setSlots(slots);
   }, [slots]);
+  // The chat the hoop stands in, brought to the front once for each such chat: as soon as the feed has it, and never again after, so a
+  // turn the reader gave the hoop stays where they left it.
+  const broughtRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (current === null || broughtRef.current === current) return;
+    if (painterRef.current?.bring(current)) broughtRef.current = current;
+  }, [slots, current]);
   useEffect(() => {
     painterRef.current?.resize(width, height, Math.min(2, window.devicePixelRatio || 1));
   }, [width, height]);

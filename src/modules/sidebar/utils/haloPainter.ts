@@ -100,6 +100,8 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
   let rot = 0;
   let target = 0;
   let hover = -1;
+  // Where the pointer last was over the hoop, or null while it is off it: what is under it is asked again as the hoop turns beneath it.
+  let pointer: [number, number] | null = null;
   let drag: Drag | null = null;
   let lastAt = 0;
   let wheelAt = 0;
@@ -405,6 +407,15 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
       }
     },
 
+    /** Stands the chat `id` at the front at once, with no turn drawn. False while that chat is not on the hoop. */
+    bring(id: string) {
+      const at = slots.findIndex((slot) => slot.id === id);
+      if (at === -1 || at >= places.length) return false;
+      target = -places[at].at;
+      rot = target;
+      return true;
+    },
+
     /** Draws one picture and answers which slot is at the front and which is under the pointer (-1 for none). */
     frame(now: number) {
       const elapsed = lastAt === 0 ? 0 : Math.min(0.05, (now - lastAt) / 1000);
@@ -425,6 +436,8 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
       // Far half first, then the near half over it; within each, from the sides in, so what faces the reader is drawn last.
       const order = slots.map((_, index) => index).sort((a, b) => Math.cos(places[a].at + rot) - Math.cos(places[b].at + rot));
       for (const index of order) drawSlot(index, now);
+      // The hoop may have turned under a pointer that did not move (the wheel, a press on another slot): what it is over is read off this picture.
+      if (pointer !== null && drag === null) hover = slotAt(pointer[0], pointer[1]);
       if (names) for (const run of runs) drawName(run);
       drawLink(now);
 
@@ -466,6 +479,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
         }
         return true;
       }
+      pointer = [x, y];
       hover = slotAt(x, y);
       return hover !== -1;
     },
@@ -483,6 +497,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
       return null;
     },
     pointerLeave() {
+      pointer = null;
       hover = -1;
     },
     /** The wheel steps the hoop one slot, not faster than five a second. True when it took the wheel. */

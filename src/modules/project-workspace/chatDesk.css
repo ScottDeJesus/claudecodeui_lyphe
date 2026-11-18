@@ -40,4 +40,13 @@
  * circle above and of the follow-ups below, and nothing moves to make room for it. Only the follow-ups scroll. */
 .chat-desk__side { display: flex; flex: none; flex-direction: column; width: var(--chat-side); min-height: 0; padding-top: 116px; }
 .chat-desk__core { display: grid; flex: none; place-items: center; height: 280px; }
+/* The core's own box, in the middle of the hoop of chats (`SessionsHalo`). It takes no press itself, so the hoop's slots are pressed
+ * through its empty corners; the core in it takes its own. */
+.chat-desk__core .chat-desk__place { display: grid; place-items: center; pointer-events: none; }
+.chat-desk__core .chat-desk__place > * { pointer-events: auto; }
+/* While the core's own rings are open round it, the hoop and its reading step out of their way. */
+.chat-desk__core [data-sessions-halo] > div > canvas,
+.chat-desk__core [data-halo-reading] { transition: opacity 180ms ease; }
+.chat-desk__core:has([data-chat-core-dock='open']) [data-sessions-halo] > div > canvas,
+.chat-desk__core:has([data-chat-core-dock='open']) [data-halo-reading] { opacity: 0; pointer-events: none; }
 .chat-desk__followups { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 24px 16px; scrollbar-width: thin; }
