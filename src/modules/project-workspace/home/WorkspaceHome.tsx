@@ -24,8 +24,9 @@ import type { ActionMenuItem } from '@/shared/ui';
  */
 const MENU_VIEWS: readonly AppTab[] = ['runner', 'cerberus', 'inbox', 'api', 'kanban', 'universe', 'schedules'];
 
-/** The side of the square Kaylee's docked core is drawn in, in px: a chat's own core's size. */
+/** The side of the square Kaylee's docked core is drawn in, in px: on a phone, and larger at a desk, where the foot has the room. */
 const CORE_SIZE = 60;
+const CORE_SIZE_AT_DESK = 76;
 
 /**
  * Where the roadmap's circle rests at the head, in the home's own pixels, at a desk and on a phone: its middle on the line Kaylee's core stands on at the
@@ -73,6 +74,7 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
   const { setActiveTab, sidebarSharedProps } = useProjectSidebarState();
   const { projects, onNewSession, onSessionDelete, onShowSettings, isMobile } = sidebarSharedProps;
   const circle = isMobile ? CIRCLE_ON_PHONE : CIRCLE_AT_DESK;
+  const coreSize = isMobile ? CORE_SIZE : CORE_SIZE_AT_DESK;
   const { views } = useWorkspaceViews();
   const badges = useRailBadges();
   const doors = useStationDoors();
@@ -148,11 +150,12 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
         <SessionsBoard projects={projects} enabled={visited} onOpenChat={openChat} onNewChat={newChat} onSessionRemoved={sessionRemoved} />
       </main>
 
-      <footer className="flex h-[84px] flex-none items-center justify-between px-3 pb-[var(--safe-area-inset-bottom)] md:pl-9 md:pr-11">
+      {/* At a desk the foot is taller for the larger core, which keeps its middle under the roadmap's circle (66 px in). */}
+      <footer className="flex h-[84px] flex-none items-center justify-between px-3 pb-[var(--safe-area-inset-bottom)] md:h-[100px] md:pl-7 md:pr-11">
         {/* The core's own box: the account's week is a ring centred on it, under the core's press, so only the band outside the core
             reaches it and opens the account switcher. */}
-        <span className="relative grid flex-none place-items-center" style={{ width: CORE_SIZE, height: CORE_SIZE }}>
-          <AccountWeekRing radius={CORE_SIZE / 2 + 4} />
+        <span className="relative grid flex-none place-items-center" style={{ width: coreSize, height: coreSize }}>
+          <AccountWeekRing radius={coreSize / 2 + 4} />
           <button
             type="button"
             data-home-core
@@ -165,7 +168,7 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
             }}
             className="relative grid size-full place-items-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
           >
-            <CompanionFace size={CORE_SIZE} />
+            <CompanionFace size={coreSize} />
           </button>
         </span>
         {menuItems.length > 0 && (
