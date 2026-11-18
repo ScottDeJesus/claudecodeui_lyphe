@@ -1848,8 +1848,11 @@
       "widget": "Its own page"
     },
     "mark": "On the panel · V{{n}} · {{title}}",
-    "switchWithOpen_one": "Panel, {{count}} follow-up open",
-    "switchWithOpen": "Panel, {{count}} follow-ups open",
+    "followups": {
+      "name": "Next steps",
+      "nameWithOpen_one": "Next steps, {{count}} open",
+      "nameWithOpen_other": "Next steps, {{count}} open"
+    },
     "openPage": "Open the page",
     "enlarge": "Enlarge {{title}}",
     "reading": "Reading the panel",

@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
 
-import { FollowupsContext, FollowupsWidgetBody } from '@/modules/followups';
 import { useSessionPanel } from '@/modules/session-panel/context/sessionPanelContext';
 import { usePanelVersion } from '@/modules/session-panel/hooks/usePanelVersion';
 import { PanelStage } from '@/modules/session-panel/PanelStage';
@@ -10,12 +9,10 @@ import { Button, SegmentedControl, Spinner } from '@/shared/ui';
  * THE CHAT'S PANEL: the one place the chat has to itself, in front of the talk when the reader switches to it. It shows one
  * thing at a time, which the chat put there with its `panel` command: a diagram, a picture, a web page, or a page of its own.
  * Over the thing is what it is called and which version is on show; under it, once there is more than one, the line of its
- * versions to walk back along, with Latest to come back. On the panel's edge are the chat's follow-ups, in the app's own groups
- * and words (the followups module's body), each with its tick; where the page draws them apart (the chat's side column at a
- * desk, `followupsApart`) the panel leaves them out.
+ * versions to walk back along, with Latest to come back. The chat's follow-ups are not here: they have their own switch in the
+ * chat's head (`SessionFollowupsSwitch`).
  *
- * A chat with follow-ups and nothing shown has a panel of follow-ups alone. The panel scrolls as a whole: nothing in it is
- * squeezed to make room.
+ * The panel scrolls as a whole: nothing in it is squeezed to make room.
  *
  * It draws only what the provider read (`SessionPanelProvider`), and nothing when there is no provider or nothing to show.
  *
@@ -28,9 +25,8 @@ export function SessionPanel() {
   const version = usePanelVersion(viewing?.id ?? null);
 
   if (panel === null || panel.form === 'none') return null;
-  const { versions, followups, onLatest, lookAt } = panel;
+  const { versions, onLatest, lookAt } = panel;
   const newest = versions.length === 0 ? null : versions[versions.length - 1];
-  const hasFollowups = !panel.followupsApart && (followups.items?.length ?? 0) > 0;
 
   return (
     <section
@@ -71,14 +67,6 @@ export function SessionPanel() {
             </div>
           )}
         </>
-      )}
-
-      {hasFollowups && (
-        <div data-panel-followups className={viewing !== null ? 'border-t border-border pt-3' : undefined}>
-          <FollowupsContext.Provider value={followups}>
-            <FollowupsWidgetBody />
-          </FollowupsContext.Provider>
-        </div>
       )}
     </section>
   );

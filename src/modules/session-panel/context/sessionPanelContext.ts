@@ -6,7 +6,7 @@ import type { SessionPanelVersionHead } from '@/shared/types';
 
 /**
  * What the chat's panel is, for the places that draw a part of it: the panel in the talk's place, its switch in the chat's head,
- * the marks in the talk where the chat put a thing there, and the follow-ups in the chat's side column.
+ * the marks in the talk where the chat put a thing there, and the chat's follow-ups with their own switch beside the panel's.
  */
 export type SessionPanelValue = {
   /** The chat's versions, oldest first; empty while the panel shows nothing or has not been read. */
@@ -17,18 +17,19 @@ export type SessionPanelValue = {
   onLatest: boolean;
   /** Goes to a version by its id, or to the newest for null; a version asked for by its id brings the panel in front too. */
   lookAt: (id: number | null) => void;
-  /** The chat's follow-ups (its next steps and known gaps), the one reading the panel's edge and the switch's count share. */
+  /** The chat's follow-ups (its next steps and known gaps), the one reading their list and their switch's count share. */
   followups: ReturnType<typeof useFollowups>;
+  /** What the panel has to show: `none` (no panel is drawn) or `shown` (a thing the chat put there). Follow-ups never make one. */
+  form: 'none' | 'shown';
   /**
-   * What the panel has to show: `none` (no panel is drawn), `followups` (the chat's follow-ups alone) or `shown` (a thing the chat
-   * put there, with the follow-ups on its edge). Follow-ups drawn apart from the panel never make one: with them alone it is `none`.
-   */
-  form: 'none' | 'followups' | 'shown';
-  /**
-   * Whether the chat's follow-ups are drawn apart from the panel: at a desk they stand in the chat's side column, under its core
-   * (`SessionFollowups`), so the panel leaves them out and its switch does not count them.
+   * Whether the page keeps a place for the chat's follow-ups beside the talk: at a desk they stand in the chat's side column, under
+   * its core (`SessionFollowups`). Where it keeps none (a narrow screen) they open as a window over the chat.
    */
   followupsApart: boolean;
+  /** Whether the follow-ups are on show now: in their column at a desk (remembered), or as the window on a narrow screen. */
+  followupsOpen: boolean;
+  /** Shows the follow-ups or puts them away: the press of their switch in the chat's head, and the window's own way out. */
+  setFollowupsOpen: (open: boolean) => void;
   /** Which of the two is in front: the talk, or the panel in its place. */
   view: 'talk' | 'panel';
   setView: (view: 'talk' | 'panel') => void;
