@@ -6,16 +6,14 @@ import { useStepPhrase } from '@/modules/roadmap/hooks/useStepPhrase';
 import { StackAct } from '@/modules/roadmap/stack/StackAct';
 import { createStackPainter } from '@/modules/roadmap/utils/stackPainter';
 import { ROADMAP_FEATURE_WORD_KEYS } from '@/shared/constants';
-import type { Roadmap } from '@/shared/roadmap-types';
 import type { RoadmapStackHandle, RoadmapStackRest, RoadmapStackTarget, RoadmapStackTier, RoadmapStackWall } from '@/shared/types';
 import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { cn } from '@/shared/utils';
 
 type RoadmapStackProps = {
-  roadmap: Roadmap;
-  /** The roadmap laid out (`layoutStack`): its one ring. */
+  /** What is in flight, laid out (`layoutStack`): its one ring. */
   tiers: RoadmapStackTier[];
-  /** The ring a first picture opens on: the first, the roadmap being one ring. */
+  /** The ring a first picture opens on: the first, there being one ring. */
   arrival: number;
   /** The card that is open, so the stack can hang it from its wall; `null` for none. */
   open: RoadmapStackTarget | null;
@@ -68,7 +66,7 @@ const EYEBROW = 'text-xs font-medium uppercase tracking-[0.14em] text-muted-fore
 /** One line of the reading: it never wraps, so the lines keep the room the painter leaves them; the card says a long title whole. */
 const LINE = 'block max-w-full truncate';
 
-/** The facing wall in words: its title, and where it stands, in the roadmap's own words. */
+/** The facing wall in words: its title, then the project it belongs to (the ring holds every project's) and where it stands, in the roadmap's own words. */
 function WallReading({ wall }: { wall: RoadmapStackWall }) {
   const { t } = useTranslation();
   const { feature } = wall;
@@ -80,6 +78,7 @@ function WallReading({ wall }: { wall: RoadmapStackWall }) {
       <span className={cn('font-mono text-sm uppercase tracking-wide text-foreground', LINE)}>{feature.title}</span>
       <span data-tone={tone ?? undefined} data-roadmap-stack-words className={cn(EYEBROW, LINE, tone !== null && 'text-tone-ink')}>
         {[
+          feature.project || null,
           t('roadmap.stateLine', { word: t(ROADMAP_FEATURE_WORD_KEYS[feature.word]), phrase }),
           feature.tasks.length > 0 ? t('roadmap.panel.tasksDone', { done, count: feature.tasks.length }) : null,
         ].filter(Boolean).join(' · ')}
@@ -89,10 +88,10 @@ function WallReading({ wall }: { wall: RoadmapStackWall }) {
 }
 
 /**
- * THE ROADMAP AS ONE RING, on its canvas: a wall on its rim for each feature that is finished and not yet dismissed, being
- * built, or ready to be started (`utils/stackLayout` says which, `utils/stackPainter` how each is drawn). Under it, in
- * words, is the wall that faces the pointer, and the one press that wall offers (`StackAct`): Start for what is held,
- * Dismiss for what is finished.
+ * WHAT IS IN FLIGHT AS ONE RING, on its canvas: a wall on its rim for each plan that is finished and not yet dismissed, being
+ * built, or held (`utils/stackLayout` says which, `utils/stackPainter` how each is drawn), whichever project it belongs to.
+ * Under it, in words, is the wall that faces the pointer, and what that wall offers (`StackAct`): to start it, queue it,
+ * hold it or put it away, by the plan card's own presses.
  *
  * IT TURNS. A drag, a flick, the wheel or the left and right keys turn the ring; a press on a wall brings it round, and a
  * press on the wall that already faces opens its card. Space goes to the next thing that asks for the operator.
@@ -110,7 +109,7 @@ function WallReading({ wall }: { wall: RoadmapStackWall }) {
  *
  * Used by `stack/StackOf`, for the Roadmap tab's Stack face and the sessions home's circle.
  */
-export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, handleRef, rest, standing = false, onStand, restLabel, arriveFrom, arrivals = 0, returns = 0 }: RoadmapStackProps) {
+export function RoadmapStack({ tiers, arrival, open, onOpen, card, handleRef, rest, standing = false, onStand, restLabel, arriveFrom, arrivals = 0, returns = 0 }: RoadmapStackProps) {
   const { t } = useTranslation();
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -340,7 +339,7 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
         <div
           ref={readingRef}
           data-roadmap-stack-reading
-          // Two lines, what it is and how it stands, then its press; put away while a card is open, which says and offers all of it.
+          // Two lines, what it is and how it stands, then its presses; put away while a card is open, which says and offers all of it.
           className={cn('pointer-events-none absolute inset-x-0 flex flex-col items-center gap-0.5 px-4 text-center', open !== null && 'invisible')}
           style={{ top: reading.top }}
         >
@@ -351,7 +350,7 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
           </div>
           {facing && up && (
             <div className="mt-1.5 flex min-h-8 items-center justify-center">
-              <StackAct key={facing.feature.name} roadmap={roadmap} wall={facing} onOpen={() => onOpen({ kind: 'feature', name: facing.feature.name })} />
+              <StackAct key={facing.feature.name} wall={facing} onOpen={() => onOpen({ kind: 'feature', name: facing.feature.name })} />
             </div>
           )}
         </div>

@@ -961,10 +961,11 @@
       "inFlight": "In flight"
     },
     "stack": {
-      "label": "Roadmap stack",
+      "label": "In flight",
       "back": "Back",
-      "open": "Open the roadmap: {{title}}",
-      "empty": "Nothing building, held or finished",
+      "openInFlight_one": "In flight: {{count}} feature",
+      "openInFlight_other": "In flight: {{count}} features",
+      "empty": "Nothing in flight",
       "dismiss": "Dismiss",
       "review": "Review"
     },

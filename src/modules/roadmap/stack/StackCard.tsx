@@ -154,7 +154,9 @@ function FeatureCard({ wall, onClose }: { wall: RoadmapStackWall; onClose: () =>
     ...(feature.blocked !== null || word === 'shipped' ? [] : [press('block', t('roadmap.dialog.feature.markBlocked'), () => setFollowOn({ dialog: 'block' }), 'ghost')]),
     ...(word === 'idea' || word === 'proposed' ? [press('delete', t(word === 'idea' ? 'roadmap.dialog.feature.deleteIdea' : 'roadmap.dialog.feature.delete'), () => setFollowOn({ dialog: 'delete' }), 'ghost')] : []),
   ];
-  const blocks = feature.blocked !== null || epic.blocked !== null || milestone.blocked !== null;
+  const epicBlocked = epic?.blocked ?? null;
+  const milestoneBlocked = milestone?.blocked ?? null;
+  const blocks = feature.blocked !== null || epicBlocked !== null || milestoneBlocked !== null;
 
   return (
     <CardFrame label={feature.title} onClose={onClose}>
@@ -173,8 +175,8 @@ function FeatureCard({ wall, onClose }: { wall: RoadmapStackWall; onClose: () =>
                 <span className="break-words">{t('roadmap.blocked', { why: feature.blocked })}</span>
               </Banner>
             )}
-            {epic.blocked !== null && <Banner tone="warn"><span className="break-words">{t('roadmap.dialog.feature.epicBlocked', { why: epic.blocked })}</span></Banner>}
-            {milestone.blocked !== null && <Banner tone="warn"><span className="break-words">{t('roadmap.dialog.feature.milestoneBlocked', { why: milestone.blocked })}</span></Banner>}
+            {epicBlocked !== null && <Banner tone="warn"><span className="break-words">{t('roadmap.dialog.feature.epicBlocked', { why: epicBlocked })}</span></Banner>}
+            {milestoneBlocked !== null && <Banner tone="warn"><span className="break-words">{t('roadmap.dialog.feature.milestoneBlocked', { why: milestoneBlocked })}</span></Banner>}
           </div>
         )}
 
@@ -185,7 +187,9 @@ function FeatureCard({ wall, onClose }: { wall: RoadmapStackWall; onClose: () =>
         ) : facts !== null && facts.kind === 'feature' && (
           <Card className="flex min-w-0 flex-col gap-5 p-4 lg:p-5">
             <header className="min-w-0">
-              <p className="line-clamp-2 break-words text-sm text-muted-foreground">{t('roadmap.dialog.feature.path', { epic: epic.title, milestone: milestone.title })}</p>
+              {epic !== null && milestone !== null && (
+                <p className="line-clamp-2 break-words text-sm text-muted-foreground">{t('roadmap.dialog.feature.path', { epic: epic.title, milestone: milestone.title })}</p>
+              )}
               <h2 className="mt-1 break-words font-serif text-2xl/[1.15] font-normal text-foreground">{feature.title}</h2>
             </header>
             <FeatureFacts feature={facts.feature} picture={facts.picture} onWriteGoal={() => setFollowOn({ dialog: 'goal', then: null })} cases={facts.cases} />

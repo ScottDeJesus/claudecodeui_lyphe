@@ -4166,19 +4166,23 @@ export type SubagentDot = CompanionMaterial | null;
 //----------------- ROADMAP STACK: what the roadmap's stack, its painter and its face share ------------
 
 /**
- * One feature as a wall on the roadmap's ring, laid out once by the roadmap module's `layoutStack` and read by the
- * stack's painter (`utils/stackPainter`), its canvas (`stack/RoadmapStack`) and its card (`stack/StackCard`). `epic` and
- * `milestone` are the feature's own, for its card. `kind` is which of the ring's three kinds it is. `at` and
+ * One plan in flight as a wall on the ring, laid out once by the roadmap module's `layoutStack` and read by the
+ * stack's painter (`utils/stackPainter`), its canvas (`stack/RoadmapStack`), its presses (`stack/StackAct`) and its card
+ * (`stack/StackCard`). `plan` is the dispatcher's own plan, which the presses turn on. `feature` is that plan in the
+ * roadmap's words: the feature it is on whichever roadmap holds it, with `epic` and `milestone` its own there, or a
+ * feature read off the plan with both `null` when no roadmap holds it. `kind` is which of the ring's three kinds it is. `at` and
  * `width` are its place and its room round the ring, in radians. `frame` is how tall it stands, as a share of a full wall:
  * how far along its path the feature is. `fill` is how much of that frame is built, the share of its tasks done. `tone` is
  * what it says in colour beside its form: `danger` when it is blocked (by its own, its epic's or its milestone's reason)
- * or stalled, `warn` when it waits on the operator. `unseen` is a feature that shipped since the operator last looked.
- * `attention` orders what asks for him: 3 a word he owes, 2 shipped unseen, 1 stalled, 0 nothing.
+ * or stalled, `warn` when it waits on the operator. `unseen` is a wall said in the positive colour, standing over the
+ * rest: a finished one, until it is dismissed. `attention` orders what asks for him: 3 a word he owes, 2 finished,
+ * 1 stalled, 0 nothing.
  */
 export type RoadmapStackWall = {
   feature: RoadmapFeature;
-  epic: RoadmapEpic;
-  milestone: RoadmapMilestone;
+  epic: RoadmapEpic | null;
+  milestone: RoadmapMilestone | null;
+  plan: DispatcherPlan;
   kind: RoadmapStackKind;
   at: number;
   width: number;
@@ -4189,12 +4193,12 @@ export type RoadmapStackWall = {
   attention: 0 | 1 | 2 | 3;
 };
 
-/** The three kinds of feature the ring holds: finished and not yet dismissed, being built, and ready to be started (held, cut and waiting on Accept, or still being cut). */
-export type RoadmapStackKind = 'finished' | 'building' | 'ready';
+/** The three kinds of plan the ring holds: finished and not yet dismissed, being built (at work, or stalled at it), and held (waiting for its Start or its turn, stopped, parked, or still being designed and cut). */
+export type RoadmapStackKind = 'finished' | 'building' | 'held';
 
 /**
- * One ring of walls, in ring order. The roadmap is ONE ring (`layoutStack`); the painter lays out however many it is handed.
- * `name` is the ring's key across pictures (the roadmap's name). `span` is how much of the ring its walls take, in radians:
+ * One ring of walls, in ring order. What is in flight is ONE ring (`layoutStack`); the painter lays out however many it is handed.
+ * `name` is the ring's key across pictures. `span` is how much of the ring its walls take, in radians:
  * the walls keep a readable width and leave the rest of the rim bare.
  */
 export type RoadmapStackTier = {
