@@ -173,6 +173,20 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
     // The theme is a class and a few properties on the document's root: re-read the colours whenever it changes.
     const themed = new MutationObserver(theme);
     themed.observe(document.documentElement, { attributes: true });
+    // THE GROUND IS READ AGAIN ONCE IT HAS SETTLED. The app's own theme switch animates every colour for half a second, and the
+    // ground is a painted background, read off the page as it is: at the moment the class flips it is still the theme being left
+    // (the tokens are not animated, so the inks were already the new theme's, on the old theme's floor). Each background that
+    // finishes, or abandons, its change on something the stack stands on asks for one more read, on the next frame.
+    let settling = 0;
+    const settled = (event: TransitionEvent) => {
+      if (event.propertyName !== 'background-color' || !(event.target instanceof Node) || !event.target.contains(box) || settling !== 0) return;
+      settling = requestAnimationFrame(() => {
+        settling = 0;
+        theme();
+      });
+    };
+    document.addEventListener('transitionend', settled);
+    document.addEventListener('transitioncancel', settled);
     const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
     const stillness = () => painter.setStill(calm.matches);
     stillness();
@@ -229,6 +243,9 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
       cancelAnimationFrame(frame);
       sized.disconnect();
       themed.disconnect();
+      document.removeEventListener('transitionend', settled);
+      document.removeEventListener('transitioncancel', settled);
+      cancelAnimationFrame(settling);
       calm.removeEventListener('change', stillness);
       painterRef.current = null;
     };
