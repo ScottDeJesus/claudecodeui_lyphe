@@ -22,7 +22,8 @@
 // 70 ms in / 200 ms out (thinking), 160 ms (speaking), 250 ms (listening); the lock spring ω = 2π·2.2, ζ = 0.62; the lobes ω = 2π·2.3,
 // ζ = 0.36; reduced motion runs drift and rotation at 0.35×.
 
-import { CORE_BODY_SHARE, CORE_GAUGE_GAPS } from '@/shared/constants';
+import { CORE_BODY_SHARE } from '@/shared/constants';
+import { coreGaugeRadius, coreGaugeScale } from '@/shared/utils';
 import type { AstrolabeFrameInput, AstrolabeInstrument, AstrolabeTier, CompanionMaterial } from '@/shared/types';
 
 const TAU = Math.PI * 2;
@@ -473,7 +474,10 @@ void main() {
       if (uW.y > 0.002) c += uW.y * shTube(n, r, ndv, pos, cr);
       if (uW.z > 0.002) c += uW.z * shWire(sn, ndv, dsp, cr);
       if (uW.w > 0.002) c += uW.w * shPlasma(sn, r, ndv, cr);
-      col = 1.0 - exp(-c * 1.25);
+      col = 1.0 - exp(-c * mix(1.25, 1.9, uDay));
+      /* by day the body stands on a pale page, where the glow that lights it by night cannot be added and its dark glass reads as
+         a dark ball: the same light is laid into the body instead, so it reads in its own colour in both themes */
+      col += uDay * 0.42 * uHaloC * (1.0 - col);
       alpha = 1.0;
     } else {
       float e = 1.0 - smoothstep(0.0, uPx * 1.5, dmin);
@@ -1205,6 +1209,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
    * ring is its track, faint all the way round; the lit arc runs from a point that travels the ring, with a bead at its head, so a
    * full ring and an empty one are told apart at any tilt. The quiet ink until the measure runs high, then the warn ink, then the
    * danger ink. They share the dial's drift, so they turn faster while the body works and lean toward the reader while it listens.
+   * Round a larger body they run further out and are drawn heavier (`coreGaugeScale`), so they read at a desk's distance.
    * `front` false draws what passes behind the body, true what passes over it.
    */
   const drawGauges = (ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number, gauges: AstrolabeFrameInput['gauges'], front: boolean) => {
@@ -1214,9 +1219,12 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       { iota: (44 + 3 * Math.sin(v.t * 0.23 + 1.3) - 12 * v.listen) * DEG, omega: dial.midOmega, psi: dial.midPsi },
     ];
     ctx.lineCap = 'round';
+    const weight = coreGaugeScale(R);
+    // How far past the small core's weight this one is, 0 to 1: the track is also drawn more plainly round a large body.
+    const large = weight - 1;
     for (const [index, gauge] of gauges.slice(0, 2).entries()) {
       const orbit = orbits[index];
-      const radius = R + CORE_GAUGE_GAPS[index];
+      const radius = coreGaugeRadius(R, index === 0 ? 0 : 1);
       const basis = ringBasis(orbit.iota, orbit.omega);
       const ink = gauge.tone === 'danger' ? palette.danger : gauge.tone === 'warn' ? palette.warn : palette.loop;
       /** The stretch of the ring from `from` to `to` (radians along it) that lies on this side of the body, as one path. */
@@ -1235,19 +1243,19 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
         }
       };
       arc(0, TAU);
-      ctx.strokeStyle = rgba(palette.quiet, front ? 0.34 : 0.16);
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = rgba(palette.quiet, front ? 0.34 + 0.22 * large : 0.16 + 0.12 * large);
+      ctx.lineWidth = 1.5 * (1 + 0.5 * large);
       ctx.stroke();
       const filled = gauge.value === null ? 0 : clamp(gauge.value, 0, 1);
       if (filled <= 0.002) continue;
       arc(orbit.psi, orbit.psi + filled * TAU);
-      ctx.strokeStyle = rgba(ink, front ? 0.95 : 0.42);
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = rgba(ink, front ? 0.95 : 0.42 + 0.14 * large);
+      ctx.lineWidth = 2.5 * weight;
       ctx.stroke();
       const head = ringPoint(basis, radius, orbit.psi + filled * TAU);
       if (head[2] >= 0 === front) {
         ctx.beginPath();
-        ctx.arc(cx + head[0], cy - head[1], front ? 2.6 : 2, 0, TAU);
+        ctx.arc(cx + head[0], cy - head[1], (front ? 2.6 : 2) * (1 + 0.7 * large), 0, TAU);
         ctx.fillStyle = rgba(ink, front ? 1 : 0.5);
         ctx.fill();
       }

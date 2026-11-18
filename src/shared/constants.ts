@@ -817,6 +817,7 @@ export const CORE_BODY_SHARE = 0.35;
 
 /**
  * The rings a lone core wears as its gauges (a chat's context, then its account's week): how far outside the body each one's orbit
- * runs, in px, the inner first. The instrument draws them at these radii and the chat's core puts the outer one's press there.
+ * runs, in px, the inner first, round the small core beside the line. A larger body carries them further out and heavier
+ * (`coreGaugeScale` in `shared/utils`); the instrument draws them there and the chat's core puts the outer one's press there.
  */
 export const CORE_GAUGE_GAPS: readonly [number, number] = [6, 13];

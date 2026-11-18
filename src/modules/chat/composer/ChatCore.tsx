@@ -9,7 +9,7 @@ import { AccountWeekRing, useAccountWeek } from '@/modules/accounts';
 import { CoreRings } from '@/modules/chat/composer/CoreRings';
 import type { CoreRing } from '@/modules/chat/composer/CoreRings';
 import { replyMaterialOf } from '@/modules/chat/transcript/replyMark';
-import { CORE_BODY_SHARE, CORE_GAUGE_GAPS, DEFAULT_EFFORT_VALUE } from '@/shared/constants';
+import { CORE_BODY_SHARE, DEFAULT_EFFORT_VALUE } from '@/shared/constants';
 import { useChatCorePlace } from '@/shared/context/ChatCorePlaceContext';
 import { useCoreDrawing } from '@/shared/context/CoreDrawingContext';
 import type { CoreDrawingInput } from '@/shared/context/CoreDrawingContext';
@@ -18,7 +18,7 @@ import { resolveModelLabel, resolveModelOption } from '@/shared/modelLabels';
 import type { AstrolabeGauge, ProviderModelOption } from '@/shared/types';
 import { SignalLoop } from '@/shared/ui';
 import { OWNS_ESCAPE, overlayInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
-import { cn } from '@/shared/utils';
+import { cn, coreGaugeRadius } from '@/shared/utils';
 
 /** The side of the square the chat's core is drawn in, in px: the size of the companion's own core docked on the sessions home. */
 const CORE_PX = 56;
@@ -272,7 +272,7 @@ export function ChatCore({
   const restPx = place !== null ? apartPx : CORE_PX;
   const corePx = place !== null ? apartPx : up ? Math.round(lift.size * CORE_SHARE_OF_DISC) : CORE_PX;
   // The two rings are the core's own drawing, in orbit close on its body (`gauges`); the outer one's press is a band at its radius.
-  const accountRadius = Math.round(corePx * CORE_BODY_SHARE) + CORE_GAUGE_GAPS[1];
+  const accountRadius = Math.round(coreGaugeRadius(corePx * CORE_BODY_SHARE, 1));
   const week = useAccountWeek();
   const gauges = useMemo<AstrolabeGauge[]>(() => [
     { value: context === null ? null : filled, tone: filled >= CONTEXT_WARN ? 'warn' : 'quiet' },

@@ -21,7 +21,7 @@ const CORE_RADIUS = 60;
  * How far the hoop round the chat's core leans (`SessionsHalo`'s `lean`): less than the station's own, so its opening is deep enough
  * for the chat's larger core with its rings and its helpers round it.
  */
-const HOOP_LEAN = 0.64;
+const HOOP_LEAN = 0.72;
 
 type ChatDeskProps = {
   /** The side column's width in px, or 0 for none: a narrow screen, the chat floating, no project chosen (`useChatDeskSide`). */

@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
+import { CORE_GAUGE_GAPS } from '@/shared/constants';
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
 import type { AffectedAreasTrouble, ChatAttachment, DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
 
@@ -829,4 +830,27 @@ export function splitDiffLine(line: string): 'add' | 'remove' | 'hunk' | 'meta' 
   if (line.startsWith('+')) return 'add';
   if (line.startsWith('-')) return 'remove';
   return 'context';
+}
+
+// ---------------------------
+
+//----------------- A LONE CORE'S GAUGES, BY THE BODY'S SIZE ------------
+
+/**
+ * How much heavier and further out a lone core's two gauges are drawn for a body of `bodyRadius` px: 1 round the small core beside
+ * the line (a body of about 20 px), rising to 2 round the large core a desk keeps apart from it, so the rings are as easy to read
+ * there as the body is. Read by the instrument (`companion/utils/astrolabeInstrument`), for the rings' weight, and through
+ * `coreGaugeRadius` for where they run.
+ */
+export function coreGaugeScale(bodyRadius: number): number {
+  return Math.min(2, Math.max(1, bodyRadius / 20));
+}
+
+/**
+ * The radius the lone core's gauge `index` orbits at (0 the context, 1 the account's week), in px, for a body of `bodyRadius` px:
+ * `CORE_GAUGE_GAPS` outside the body, and up to 30% further for a larger body. Read by the instrument, which draws the ring there,
+ * and by the chat's core (`chat/composer/ChatCore`), which puts the account's press at the outer one.
+ */
+export function coreGaugeRadius(bodyRadius: number, index: 0 | 1): number {
+  return bodyRadius + CORE_GAUGE_GAPS[index] * (1 + 0.3 * (coreGaugeScale(bodyRadius) - 1));
 }
