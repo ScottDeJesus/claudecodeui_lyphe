@@ -428,7 +428,7 @@ export default function ChatComposer({
           second time and floated both tabs inside the input's corners (Athena, 2026-09-10). */}
       {!hasPendingPermissions && (
         <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-full max-w-[var(--chat-measure,54.25rem)] -translate-x-1/2 translate-y-px bg-transparent">
-          <ActivityIndicator activity={activity} onAbort={onAbortSession} />
+          <ActivityIndicator activity={activity} />
         </div>
       )}
 

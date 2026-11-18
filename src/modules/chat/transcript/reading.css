@@ -14,6 +14,9 @@
  * The loop at a reply's head wears its model's material: Opus the tube's amber, Haiku the wire's cyan, Sonnet the plasma's
  * violet, and every other model the chrome of Mercury. The name is the mark's title and its label for a reader; it is not written out. */
 [data-reply-mark] {
+  /* A box wherever it stands: left as a span in a plain line (over a turn's work while the turn runs) it has no width or height
+     and draws as its two side borders alone, a sliver. */
+  display: block;
   flex: none;
   width: 14px;
   height: 14px;
