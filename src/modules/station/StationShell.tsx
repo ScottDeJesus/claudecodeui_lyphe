@@ -197,6 +197,11 @@ export function StationShell() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || isPageHeld() || !doors.showing() || otherOverlayHoldsEscape(hostDocument)) return;
       if (event.key === 'Escape') {
+        // Something drawn over the station that states nothing about the key (Settings, opened from the menu by the companion's
+        // name): the key is that thing's, and the station under it is not walked away.
+        const shell = hostDocument.querySelector('[data-station-shell]');
+        const inFront = hostDocument.elementFromPoint(hostWindow.innerWidth / 2, hostWindow.innerHeight / 2);
+        if (shell !== null && inFront !== null && !shell.contains(inFront)) return;
         // A key typed into a field is the field's: `closest` is asked of the node itself, whichever window made it.
         const field = (event.target as Element | null)?.closest?.('input, textarea, select, [contenteditable="true"]') ?? null;
         if (field !== null) return;

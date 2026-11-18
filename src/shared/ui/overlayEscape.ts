@@ -25,7 +25,7 @@ export const OWNS_ESCAPE_SELECTOR = '[data-owns-escape]';
 /**
  * What a BACK BUTTON states about itself: it is the way back from the place it stands in, so Escape presses it
  * (`shared/hooks/useEscapeBack`, the page's one listener for the key). Carried by the chat's head, the screens opened from a list
- * (a carrier's pages and a page, a tour and a panorama) and a helper's transcript read in place. A back button inside a panel
+ * (a carrier's pages and a page, a tour and a panorama), a helper's transcript read in place, and Settings' Close. A back button inside a panel
  * that owns the key needs none: the panel's own Escape is its way back already.
  */
 export const WAY_BACK = { 'data-way-back': '' } as const;

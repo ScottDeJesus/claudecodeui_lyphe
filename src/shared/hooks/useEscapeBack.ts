@@ -15,10 +15,22 @@ const TEXT_ENTRY_SELECTOR = [
   `input${NON_TEXT_INPUT_TYPES.map((type) => `:not([type="${type}"])`).join('')}`,
 ].join(', ');
 
-/** Whether a way back is on screen and can be pressed: not in a page held under another (inert, hidden), not folded away, not disabled. */
+/**
+ * Whether a way back is on screen and can be pressed: not in a page held under another (inert, hidden), not folded away, not
+ * disabled, and NOT UNDER SOMETHING. The last is asked of the page itself: whatever is drawn at the button's middle must be the
+ * button. Several of the app's whole-page overlays are hand-drawn and state nothing about the key (Settings, the version notice, the
+ * task dialogs), and with one of them up a press of Escape must not walk the page under it away. A button scrolled out of the
+ * window has nothing drawn at its middle to ask, and is taken as in reach.
+ */
 function canBePressed(back: HTMLElement): boolean {
   if (back.matches(':disabled') || back.closest('[inert]') !== null || back.getClientRects().length === 0) return false;
-  return getComputedStyle(back).visibility !== 'hidden';
+  if (getComputedStyle(back).visibility === 'hidden') return false;
+  const box = back.getBoundingClientRect();
+  const x = box.left + box.width / 2;
+  const y = box.top + box.height / 2;
+  if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return true;
+  const drawn = document.elementFromPoint(x, y);
+  return drawn !== null && back.contains(drawn);
 }
 
 /**
@@ -26,7 +38,8 @@ function canBePressed(back: HTMLElement): boolean {
  * (`WAY_BACK`, the mark a back button states itself with), so every page that has a way back has it on the same key, and a page's
  * own handler stays the one thing that says where back leads.
  *
- * THE KEY IS SOMEONE ELSE'S FIRST, in the order the app already keeps. A panel that owns it (a dialog, a sheet, a menu, the core's
+ * THE KEY IS SOMEONE ELSE'S FIRST, in the order the app already keeps, and a back button covered by anything at all is not pressed
+ * (`canBePressed`). A panel that owns it (a dialog, a sheet, a menu, the core's
  * open rings, the roadmap's standing stack) takes it on the window's capture phase and marks it handled, which is read here as
  * `defaultPrevented`; an open layer that closes itself later in the key's travel is seen by its marker (`ESCAPE_LAYER_SELECTOR`);
  * and a key typed into a text field is that field's (a rename is cancelled, the terminal keeps it), except a field that says the
