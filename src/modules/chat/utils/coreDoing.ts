@@ -1,7 +1,7 @@
 import { getToolConfig } from '@/modules/chat/tools';
 import { shellDoingOf } from '@/modules/chat/utils/shellDoing';
 import { parseToolInput } from '@/modules/chat/utils/toolGrouping';
-import type { ChatMessage } from '@/shared/types';
+import type { ChatMessage, SubagentActivity } from '@/shared/types';
 
 /** What a chat is doing while its turn runs, as its core shows it: its reply arriving, a read, a change, or thought. */
 export type CoreDoing = 'thinking' | 'reading' | 'writing' | 'speaking';
@@ -13,7 +13,7 @@ const READS: ReadonlySet<string> = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 
 const SENDS: ReadonlySet<string> = new Set(['Agent', 'Task']);
 
 /** What one tool call is doing: `reading`, `writing`, or `thinking` for a tool that neither reads nor writes files. */
-function toolDoingOf(message: ChatMessage): CoreDoing {
+function toolDoingOf(message: { toolName?: string; toolInput?: unknown }): CoreDoing {
   const name = message.toolName ?? '';
   if (READS.has(name)) return 'reading';
   const config = getToolConfig(name).input;
@@ -51,4 +51,16 @@ export function coreDoingOf(messages: readonly ChatMessage[]): CoreDoing {
   if (last.isToolUse) return toolDoingOf(last);
   if (last.type === 'assistant' && last.isStreaming && !last.isThinking) return 'speaking';
   return 'thinking';
+}
+
+/**
+ * WHAT A SUBAGENT IS DOING NOW, read off the end of its own record by the same rule as the chat's (`coreDoingOf`): its newest
+ * step a tool call is a read, a change or thought by what the tool is; its newest step words is `speaking`; with nothing yet,
+ * or a thought last, it is `thinking`. Called by `usePinnedSubagentRows` for the core each running agent's row wears.
+ */
+export function subagentDoingOf(activity: readonly SubagentActivity[] | undefined): CoreDoing {
+  const last = activity?.[activity.length - 1];
+  if (!last) return 'thinking';
+  if (last.kind === 'tool') return toolDoingOf(last);
+  return last.kind === 'text' ? 'speaking' : 'thinking';
 }

@@ -10,6 +10,7 @@ import {
   type SubagentMarkProvider,
   type SubagentSummary,
 } from '@/modules/chat/utils/subagentSummary';
+import { subagentDoingOf, type CoreDoing } from '@/modules/chat/utils/coreDoing';
 import { dismissPin, dismissPins, useDismissedPins } from '@/modules/chat/utils/pinnedDismissals';
 import { mergeSoulLaunchIds, readStampedLaunchIds } from '@/modules/chat/utils/soulLaunchAnchors';
 
@@ -66,6 +67,10 @@ type AgentEntry = {
   provider?: SubagentMarkProvider;
   /** The name a person calls the model the agent runs on (`Opus 5.5`), or `null` while its record names no model, or one nothing names. */
   modelLabel: string | null;
+  /** The model as its record names it, for the material its core is made of; empty while it names none. */
+  model: string;
+  /** What it is doing now, for the form its core takes (`subagentDoingOf`). */
+  doing: CoreDoing;
   latest: string;
   summary: SubagentSummary;
 };
@@ -79,6 +84,8 @@ type SoulEntry = {
   launch: SoulLaunchSnapshot;
   /** The name a person calls the model the soul ran on, or `null` while its launch records name no model, or one nothing names. */
   modelLabel: string | null;
+  /** The model as its launch names it, for the material its core is made of; empty while it names none. */
+  model: string;
 };
 
 /**
@@ -179,6 +186,8 @@ export function usePinnedSubagentRows(
         dismissKey: message.subagent?.resume ? `${id}@${message.subagent.resume.toolUseId}` : id,
         provider: subagentMarkProvider(message.subagentProvider, message.subagentModel),
         modelLabel: message.subagentModel ? resolveModelLabel(message.subagentModel) : null,
+        model: message.subagentModel ?? '',
+        doing: subagentDoingOf(message.subagentActivity),
         latest: describeLatestActivity(message.subagentActivity),
         summary,
       };
@@ -220,6 +229,7 @@ export function usePinnedSubagentRows(
       running: launch.state === 'running',
       launch,
       modelLabel: launch.model ? resolveModelLabel(launch.model) : null,
+      model: launch.model ?? '',
     });
   }
 

@@ -6,10 +6,11 @@ import { useTranslation } from 'react-i18next';
 import { useCpuRelease } from '@/shared/hooks/useCpuRelease';
 import { useElapsed } from '@/shared/hooks/useElapsed';
 import { spendText } from '@/shared/spend';
-import { Button, LLMProviderLogo } from '@/shared/ui';
+import { Button } from '@/shared/ui';
 import type { SoulLaunchSnapshot } from '@/shared/types';
 import { cn } from '@/shared/utils';
 import { soulName } from '@/modules/chat/subagents/subagentRow';
+import { SubagentCore } from '@/modules/chat/transcript/SubagentCore';
 import { formatSubagentFinishTime } from '@/modules/chat/utils/subagentSummary';
 
 /**
@@ -41,6 +42,8 @@ type SoulLaunchPinRowProps = {
   launch: SoulLaunchSnapshot;
   /** The name a person calls the model the soul ran on (`Opus 5.5`), drawn after its name. Absent while its launch records name no model, or one nothing names. */
   modelLabel?: string | null;
+  /** Whether this row may draw a live core (the strip's cap). */
+  liveCore: boolean;
   onDismiss: (id: string) => void;
   /** Opens this row's transcript — in place in the gutter's widget, in a dialog from the strip. */
   onOpen: () => void;
@@ -72,7 +75,7 @@ function costLabel(launch: SoulLaunchSnapshot, t: TFunction): string {
   );
 }
 
-export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, openLabel }: SoulLaunchPinRowProps) => {
+export const SoulLaunchPinRow = memo(({ launch, modelLabel, liveCore, onDismiss, onOpen, openLabel }: SoulLaunchPinRowProps) => {
   const { t } = useTranslation();
   const running = launch.state === 'running';
   // `null` for a finished launch: the hook then holds NO interval at all, so a strip of a dozen
@@ -117,8 +120,9 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
       // The mark sits beside BOTH lines, centred on the row's height; the lines stack to its right.
       className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs text-muted-foreground"
     >
-      {/* The mascot for a soul that ran on Claude, as every other row in this strip wears it. */}
-      <LLMProviderLogo provider={launch.provider} claudeMark="mascot" className="h-4 w-4 flex-shrink-0" />
+      {/* Its own core, as every other row in this strip wears one: its model's material, thinking while it runs (a launch's record
+          says what it has spent, not what step it is on), at rest while it waits for the CPU, a still ring once it is done. */}
+      <SubagentCore model={launch.model ?? ''} doing={!running ? null : waiting !== null ? 'idle' : 'thinking'} live={liveCore} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* Wraps rather than clips the role, as the agent rows do (`PinnedAgentRow.tsx`): it keeps a floor of
           * `basis-40` (10rem), so on a phone it takes a line of its own when the name and the model leave it

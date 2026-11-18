@@ -62,6 +62,9 @@ type PinnedSubagentsProps = {
   resolveModelLabel: (modelId: string) => string | null;
 };
 
+/** How many rows draw a live core at once: each holds a WebGL context, and a browser gives a page about sixteen. The rest wear the still ring. */
+const LIVE_CORES = 8;
+
 /** The row whose transcript is open, tagged with the chat it was opened in. */
 type OpenedTranscript = {
   sessionId: string | null;
@@ -90,8 +93,10 @@ function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId, res
       {/* Capped and scrollable: a fan-out of six agents is ordinary here, and at ~44px a row
         * an uncapped strip took a third of a phone's reading area for the whole run. */}
       <div className="scrollbar-thin flex max-h-44 flex-col gap-1 overflow-y-auto rounded-xl border border-[var(--info-dot)] bg-popover/95 p-1.5 shadow-sm backdrop-blur-sm">
-        {rows.map((entry) => {
+        {rows.map((entry, index) => {
           const id = rowId(entry);
+          // Running rows come first (the hook's order), so the cap falls on the newest of a wide fan-out.
+          const liveCore = index < LIVE_CORES;
           const label = rowLabel(entry);
           const open = () => setOpened({ sessionId, target: { kind: entry.kind, id, label } });
           const openLabel = t('gutters.subagents.openRow', { name: label });
@@ -102,6 +107,9 @@ function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId, res
               latest={entry.latest}
               summary={entry.summary}
               provider={entry.provider}
+              model={entry.model}
+              doing={entry.doing}
+              liveCore={liveCore}
               modelLabel={entry.modelLabel}
               onDismiss={dismiss}
               onOpen={open}
@@ -111,6 +119,7 @@ function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId, res
             <SoulLaunchPinRow
               key={entry.key}
               launch={entry.launch}
+              liveCore={liveCore}
               modelLabel={entry.modelLabel}
               onDismiss={dismiss}
               onOpen={open}

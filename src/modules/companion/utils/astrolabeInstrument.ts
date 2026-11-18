@@ -58,6 +58,10 @@ type Palette = {
   signalB: Rgb;
   loop: Rgb;
   halo: Rgb;
+  /** What the body itself is lit in: the material's two signals and its halo AS THE NIGHT THEME DECLARES THEM, whatever theme is on. */
+  bodyA: Rgb;
+  bodyB: Rgb;
+  bodyHalo: Rgb;
   accent: Rgb;
   quiet: Rgb;
   warn: Rgb;
@@ -95,10 +99,20 @@ function luminance(c: Rgb): number {
   return 0.2126 * channel(c[0]) + 0.7152 * channel(c[1]) + 0.0722 * channel(c[2]);
 }
 
-/** The palette of `material` as the host's tokens declare it now (Mercury reads the plain `--signal-*`; the others their own). */
-function readPalette(host: HTMLElement, material: CompanionMaterial): Palette {
+/**
+ * The palette of `material` as the host's tokens declare it now (Mercury reads the plain `--signal-*`; the others their own).
+ *
+ * THE BODY KEEPS ONE LIGHTING IN BOTH THEMES. Everything drawn on the page's own ground (the loop, the rings, the reticle, the
+ * words) follows the theme, because it has to read against that ground. The body does not stand on the ground: it is a lit
+ * object, and the day theme's signals are inks made dark enough to read on a pale page, which lit an amber or a violet body
+ * dim and muddy. So the body's colours are read off `night`, an element that carries the night theme's tokens whatever theme
+ * the page is in.
+ */
+function readPalette(host: HTMLElement, night: HTMLElement, material: CompanionMaterial): Palette {
   const style = getComputedStyle(host);
   const token = (name: string, fallback: string) => parseColour(style.getPropertyValue(`--${name}`), fallback);
+  const nightStyle = getComputedStyle(night);
+  const lit = (name: string, fallback: string) => parseColour(nightStyle.getPropertyValue(`--${name}`), fallback);
   const prefix = material === 'mercury' ? '' : `${material}-`;
   const ground = token('canvas', '#08090b');
   return {
@@ -107,6 +121,9 @@ function readPalette(host: HTMLElement, material: CompanionMaterial): Palette {
     signalB: token(`${prefix}signal-b`, '#9ed3e6'),
     loop: token(`${prefix}signal-loop`, '#ecf2f7'),
     halo: token(`${prefix}signal-halo`, '#96b4cd'),
+    bodyA: lit(`${prefix}signal-a`, '#f2a65a'),
+    bodyB: lit(`${prefix}signal-b`, '#9ed3e6'),
+    bodyHalo: lit(`${prefix}signal-halo`, '#96b4cd'),
     accent: token(material === 'mercury' ? 'accent' : material, '#f2a65a'),
     quiet: token('ink-mid', '#c9ced3'),
     warn: token('warn-dot', '#e8c45a'),
@@ -116,7 +133,7 @@ function readPalette(host: HTMLElement, material: CompanionMaterial): Palette {
   };
 }
 
-const PALETTE_COLOURS = ['ground', 'signalA', 'signalB', 'loop', 'halo', 'accent', 'quiet', 'warn'] as const;
+const PALETTE_COLOURS = ['ground', 'signalA', 'signalB', 'loop', 'halo', 'bodyA', 'bodyB', 'bodyHalo', 'accent', 'quiet', 'warn'] as const;
 
 /** Eases the drawn palette toward the tokens' (a theme switch or a new material crossfades over about 180 ms). */
 function easePalette(drawn: Palette, target: Palette, dt: number): void {
@@ -135,6 +152,9 @@ const clonePalette = (p: Palette): Palette => ({
   signalB: [...p.signalB],
   loop: [...p.loop],
   halo: [...p.halo],
+  bodyA: [...p.bodyA],
+  bodyB: [...p.bodyB],
+  bodyHalo: [...p.bodyHalo],
   accent: [...p.accent],
   quiet: [...p.quiet],
   warn: [...p.warn],
@@ -458,9 +478,11 @@ void main() {
     }
   }
   float halo = uHalo * exp(-max(rl - uR, 0.0) / (0.1 * uR)) * (1.0 - smoothstep(0.86, 1.0, rl));
-  /* by day the halo blends as a tint instead of adding light */
-  col += uHaloC * halo * mix(1.0, 0.25, uDay) * (1.0 - alpha);
-  alpha = alpha + halo * 0.25 * (1.0 - alpha);
+  /* by day the halo blends as a tint instead of adding light: light cannot be added to a pale page, so the same glow is laid on
+     it as its colour, at twice the cover it has by night */
+  float cover = mix(0.25, 0.5, uDay);
+  col += uHaloC * halo * mix(1.0, cover, uDay) * (1.0 - alpha);
+  alpha = alpha + halo * cover * (1.0 - alpha);
   gl_FragColor = vec4(col, alpha);
 }`;
 const CORE_UNIFORMS = ['uFlow', 'uLK', 'uTime', 'uR', 'uBound', 'uSpikeH', 'uSpikeB', 'uSpikeN', 'uBreath', 'uThink', 'uHalo', 'uEnergy', 'uPx', 'uStepK', 'uL0', 'uL1', 'uL2', 'uLA', 'uW', 'uCA', 'uCB', 'uHaloC', 'uS0', 'uS1', 'uS2', 'uS3', 'uSA', 'uSpin', 'uSteps', 'uDay', 'uListen', 'uRead', 'uWrite', 'uSwell', 'uFacetT', 'uTide', 'uRip', 'uTen', 'uAim', 'uFacet'] as const;
@@ -643,7 +665,13 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
 
   let size = 0;
   let material = initialMaterial;
-  let targetPalette = readPalette(host, material);
+  // The night theme's tokens, for the body's own lighting (`readPalette`): `.dark` declares them on whatever element wears it.
+  const night = host.ownerDocument.createElement('span');
+  night.className = 'dark';
+  night.hidden = true;
+  night.setAttribute('aria-hidden', 'true');
+  host.appendChild(night);
+  let targetPalette = readPalette(host, night, material);
   const palette = clonePalette(targetPalette);
   let paletteReadAt = 0;
   let quality = 1;
@@ -869,7 +897,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     if (now - paletteReadAt > PALETTE_READ_MS) {
       paletteReadAt = now;
       try {
-        targetPalette = readPalette(host, material);
+        targetPalette = readPalette(host, night, material);
       } catch {
         // keep the last palette
       }
@@ -1147,10 +1175,10 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       uFlow: (0.004 + 0.02 * drv + 0.024 * v.energy * sp) * (1 - th), uLK: lobes.k,
       uListen: ls, uRead: rd, uWrite: wr, uSwell: swell, uTide: tide, uRip: [ringCount, 0.78 + 0.22 * Math.cos(clock * TAU * 2.2), ringDepth, 0],
       uFacetT: facetBeat, uFacet: facet, uAim: aim, uTen: [tendril, thick, needles, bouton],
-      uHalo: (0.14 + 0.5 * drv + 0.8 * E * sp + 0.3 * th + 0.1 * ls + 0.2 * rd + 0.26 * wr) * (palette.light ? 0.7 : 1), uEnergy: E + 0.6 * drv, uPx: 2 / (glCanvas.width || 1),
+      uHalo: (0.14 + 0.5 * drv + 0.8 * E * sp + 0.3 * th + 0.1 * ls + 0.2 * rd + 0.26 * wr) , uEnergy: E + 0.6 * drv, uPx: 2 / (glCanvas.width || 1),
       uStepK: clamp(0.88 / Math.sqrt(1 + slope * slope), 0.4, 0.85),
       uL0: lobes.d[0], uL1: lobes.d[1], uL2: lobes.d[2], uLA: LA, uW: materialWeights,
-      uCA: toUnit(palette.signalA), uCB: toUnit(palette.signalB), uHaloC: toUnit(palette.halo),
+      uCA: toUnit(palette.bodyA), uCB: toUnit(palette.bodyB), uHaloC: toUnit(palette.bodyHalo),
       uS0: shockVectors[0], uS1: shockVectors[1], uS2: shockVectors[2], uS3: shockVectors[3], uSA: shockAmps, uSpin: spinMatrix(spin),
       uSteps: quality > 0.9 ? 96 : quality > 0.7 ? 80 : 64, uDay: palette.light ? 1 : 0,
     });
@@ -1354,6 +1382,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     frame,
     resize,
     destroy() {
+      night.remove();
       core?.destroy();
       for (const canvas of [back, glCanvas, front]) canvas?.remove();
     },
