@@ -6,5 +6,6 @@ export { AccountsProvider } from '@/modules/accounts/context/AccountsContext';
 export { AccountRailButton } from '@/modules/accounts/AccountRailButton';
 export { AccountSwitcher } from '@/modules/accounts/AccountPopover';
 export { AccountWeekRing } from '@/modules/accounts/AccountWeekRing';
+export { useAccountWeek } from '@/modules/accounts/hooks/useAccountWeek';
 export { UsageRings } from '@/modules/accounts/UsageRings';
 export { announceAccountsChanged } from '@/modules/accounts/hooks/useClaudeAccounts';

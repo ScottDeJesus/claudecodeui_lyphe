@@ -814,3 +814,9 @@ export const ESCAPE_LAYER_SELECTOR = '[data-owns-escape], [aria-modal="true"], [
  * figure for both, because the two live in modules that cannot import each other.
  */
 export const CORE_BODY_SHARE = 0.35;
+
+/**
+ * The rings a lone core wears as its gauges (a chat's context, then its account's week): how far outside the body each one's orbit
+ * runs, in px, the inner first. The instrument draws them at these radii and the chat's core puts the outer one's press there.
+ */
+export const CORE_GAUGE_GAPS: readonly [number, number] = [6, 13];

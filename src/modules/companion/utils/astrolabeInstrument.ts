@@ -22,7 +22,7 @@
 // 70 ms in / 200 ms out (thinking), 160 ms (speaking), 250 ms (listening); the lock spring ω = 2π·2.2, ζ = 0.62; the lobes ω = 2π·2.3,
 // ζ = 0.36; reduced motion runs drift and rotation at 0.35×.
 
-import { CORE_BODY_SHARE } from '@/shared/constants';
+import { CORE_BODY_SHARE, CORE_GAUGE_GAPS } from '@/shared/constants';
 import type { AstrolabeFrameInput, AstrolabeInstrument, AstrolabeTier, CompanionMaterial } from '@/shared/types';
 
 const TAU = Math.PI * 2;
@@ -66,6 +66,7 @@ type Palette = {
   accent: Rgb;
   quiet: Rgb;
   warn: Rgb;
+  danger: Rgb;
   chrome: [Rgb, Rgb, Rgb, Rgb, Rgb];
   mono: string;
   light: boolean;
@@ -128,13 +129,14 @@ function readPalette(host: HTMLElement, night: HTMLElement, material: CompanionM
     accent: token(material === 'mercury' ? 'accent' : material, '#f2a65a'),
     quiet: token('ink-mid', '#c9ced3'),
     warn: token('warn-dot', '#e8c45a'),
+    danger: token('danger-dot', '#ff7b6b'),
     chrome: [token('chrome-highlight', '#ffffff'), token('chrome-light', '#dce1e6'), token('chrome-mid', '#8c939b'), token('chrome-dark', '#3b4046'), token('chrome-rim', '#b9c1c9')],
     mono: style.getPropertyValue('--font-mono').trim() || '"Geist Mono", ui-monospace, monospace',
     light: luminance(ground) > 0.4,
   };
 }
 
-const PALETTE_COLOURS = ['ground', 'signalA', 'signalB', 'loop', 'halo', 'bodyA', 'bodyB', 'bodyHalo', 'accent', 'quiet', 'warn'] as const;
+const PALETTE_COLOURS = ['ground', 'signalA', 'signalB', 'loop', 'halo', 'bodyA', 'bodyB', 'bodyHalo', 'accent', 'quiet', 'warn', 'danger'] as const;
 
 /** Eases the drawn palette toward the tokens' (a theme switch or a new material crossfades over about 180 ms). */
 function easePalette(drawn: Palette, target: Palette, dt: number): void {
@@ -159,6 +161,7 @@ const clonePalette = (p: Palette): Palette => ({
   accent: [...p.accent],
   quiet: [...p.quiet],
   warn: [...p.warn],
+  danger: [...p.danger],
 });
 
 /* ---------------- the core: raymarched ferrofluid in WebGL1 ---------------- */
@@ -658,7 +661,8 @@ function makeCanvas(host: HTMLElement): HTMLCanvasElement {
  * `tier`, and returns its `frame`, `resize` and `destroy` (see `AstrolabeInstrument`).
  */
 export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier, initialMaterial: CompanionMaterial): AstrolabeInstrument {
-  const back = tier === 'dial' ? makeCanvas(host) : null;
+  // Behind the body: the dial's rings and printed face, and the back halves of the gauges a lone body wears.
+  const back = tier === 'dial' || tier === 'body' ? makeCanvas(host) : null;
   const glCanvas = makeCanvas(host);
   const front = makeCanvas(host);
   const core = createCoreGl(glCanvas);
@@ -715,12 +719,15 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
   const begin2d = (canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    const scale = canvas.width / Math.max(1, size);
+    const scale = canvas.width / Math.max(1, flatSide());
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     return ctx;
   };
+
+  /** The side of the two flat canvases, in px: the square, and for a lone body the wider reach its forms and its orbiting gauges have. */
+  const flatSide = () => (tier === 'body' ? Math.round(size * CORE_BODY_SHARE * 4.6) : size);
 
   /** The geometry of the square: loop radius `Ro`, core radius `R` and the GL canvas's side, by tier. */
   const geometry = () => {
@@ -742,8 +749,10 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
   const resize = (next: number) => {
     size = Math.max(16, Math.round(next));
     const scale = dpr();
-    if (back) fit(back, size, scale, 0);
-    fit(front, size, scale, 0);
+    const flat = flatSide();
+    const flatOffset = Math.round((size - flat) / 2);
+    if (back) fit(back, flat, scale, flatOffset);
+    fit(front, flat, scale, flatOffset);
     if (core) {
       const { glSide } = geometry();
       const side = Math.round(glSide);
@@ -1065,14 +1074,15 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
 
     // ---- draw ----
     const { Ro, R } = geometry();
-    const cx = size / 2;
-    const cy = size / 2;
+    const cx = flatSide() / 2;
+    const cy = flatSide() / 2;
     const loopColour = input.failed ? palette.warn : palette.loop;
     host.style.opacity = v.presence.toFixed(3);
 
     if (back) {
       const bctx = begin2d(back);
-      if (bctx) drawRingsBack(bctx, cx, cy, R, Ro);
+      if (bctx && tier === 'dial') drawRingsBack(bctx, cx, cy, R, Ro);
+      else if (bctx) drawGauges(bctx, cx, cy, R, input.gauges, false);
     }
     const busy = v.think > 0.01 || v.speak > 0.01 || v.listen > 0.01 || v.read > 0.01 || v.write > 0.01 || shocks.length > 0;
     if (core && !core.lost()) {
@@ -1101,8 +1111,11 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     const fctx = begin2d(front);
     if (!fctx) return;
     if (!core || core.lost()) drawChromeCore(fctx, cx, cy, R);
-    // The body alone wears no loop, pointer or echo of its own: whoever draws it draws its rings.
-    if (tier === 'body') return;
+    // The body alone wears no loop, pointer or echo of its own: only the gauges it is given, in orbit round it.
+    if (tier === 'body') {
+      drawGauges(fctx, cx, cy, R, input.gauges, true);
+      return;
+    }
     if (tier === 'dial') drawRingsFront(fctx, cx, cy, R, Ro);
     drawLoop(fctx, cx, cy, Ro, loopColour, tier !== 'dial', rate);
     drawWalk(fctx, cx, cy, Ro, input.walk);
@@ -1184,6 +1197,62 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       uS0: shockVectors[0], uS1: shockVectors[1], uS2: shockVectors[2], uS3: shockVectors[3], uSA: shockAmps, uSpin: spinMatrix(spin),
       uSteps: quality > 0.9 ? 96 : quality > 0.7 ? 80 : 64, uDay: palette.light ? 1 : 0,
     });
+  };
+
+  /**
+   * THE GAUGES A LONE BODY WEARS, as rings in orbit round it: the armillary rings' own geometry (a tilted circle that precesses, its
+   * far half behind the body and its near half over it), each lit as far as its measure is full. The inner is the first gauge. A
+   * ring is its track, faint all the way round; the lit arc runs from a point that travels the ring, with a bead at its head, so a
+   * full ring and an empty one are told apart at any tilt. The quiet ink until the measure runs high, then the warn ink, then the
+   * danger ink. They share the dial's drift, so they turn faster while the body works and lean toward the reader while it listens.
+   * `front` false draws what passes behind the body, true what passes over it.
+   */
+  const drawGauges = (ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number, gauges: AstrolabeFrameInput['gauges'], front: boolean) => {
+    if (!gauges || gauges.length === 0) return;
+    const orbits = [
+      { iota: (56 + 4 * Math.sin(v.t * 0.31) - 14 * v.listen) * DEG, omega: dial.inOmega, psi: dial.inPsi },
+      { iota: (44 + 3 * Math.sin(v.t * 0.23 + 1.3) - 12 * v.listen) * DEG, omega: dial.midOmega, psi: dial.midPsi },
+    ];
+    ctx.lineCap = 'round';
+    for (const [index, gauge] of gauges.slice(0, 2).entries()) {
+      const orbit = orbits[index];
+      const radius = R + CORE_GAUGE_GAPS[index];
+      const basis = ringBasis(orbit.iota, orbit.omega);
+      const ink = gauge.tone === 'danger' ? palette.danger : gauge.tone === 'warn' ? palette.warn : palette.loop;
+      /** The stretch of the ring from `from` to `to` (radians along it) that lies on this side of the body, as one path. */
+      const arc = (from: number, to: number) => {
+        const steps = Math.max(2, Math.ceil(((to - from) / TAU) * 120));
+        ctx.beginPath();
+        let previous: boolean | null = null;
+        for (let i = 0; i <= steps; i++) {
+          const p = ringPoint(basis, radius, from + ((to - from) * i) / steps);
+          const isFront = p[2] >= 0;
+          if (isFront === front) {
+            if (previous !== front) ctx.moveTo(cx + p[0], cy - p[1]);
+            else ctx.lineTo(cx + p[0], cy - p[1]);
+          }
+          previous = isFront;
+        }
+      };
+      arc(0, TAU);
+      ctx.strokeStyle = rgba(palette.quiet, front ? 0.34 : 0.16);
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      const filled = gauge.value === null ? 0 : clamp(gauge.value, 0, 1);
+      if (filled <= 0.002) continue;
+      arc(orbit.psi, orbit.psi + filled * TAU);
+      ctx.strokeStyle = rgba(ink, front ? 0.95 : 0.42);
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      const head = ringPoint(basis, radius, orbit.psi + filled * TAU);
+      if (head[2] >= 0 === front) {
+        ctx.beginPath();
+        ctx.arc(cx + head[0], cy - head[1], front ? 2.6 : 2, 0, TAU);
+        ctx.fillStyle = rgba(ink, front ? 1 : 0.5);
+        ctx.fill();
+      }
+    }
+    ctx.lineCap = 'butt';
   };
 
   /** The armillary rings, split at the image plane: `front` false draws what passes behind the core, true what passes over it. */

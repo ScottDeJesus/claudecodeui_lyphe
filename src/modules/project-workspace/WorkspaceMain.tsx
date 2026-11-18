@@ -105,7 +105,7 @@ const CORE_PRESENCE: Record<CoreDrawingInput['state'], CompanionPresence['state'
  * voice and no look of its own. Handed to the chat through `CoreDrawingProvider`, because the chat module cannot import the companion's.
  * One function for the app's life, so the provider's value never changes.
  */
-const drawChatCore = ({ material, state, drive, size, azimuth }: CoreDrawingInput) => (
+const drawChatCore = ({ material, state, drive, size, azimuth, gauges }: CoreDrawingInput) => (
   <CompanionAvatar
     presence={{ state: CORE_PRESENCE[state], session: null, files: null, walk: null }}
     voice={null}
@@ -118,6 +118,7 @@ const drawChatCore = ({ material, state, drive, size, azimuth }: CoreDrawingInpu
     bare
     form={state}
     bearing={azimuth}
+    gauges={gauges}
   />
 );
 

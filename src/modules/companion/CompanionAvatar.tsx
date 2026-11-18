@@ -46,6 +46,8 @@ type CompanionAvatarProps = {
   form?: AstrolabeFrameInput['state'];
   /** Where what it reads or writes to lies from it, in degrees counter-clockwise from three o'clock, when no look or subject says: a chat's core gives its talk's side. */
   bearing?: number;
+  /** With `bare`: the measures it wears as rings in orbit round it, the inner first (a chat's context, then its account's week). */
+  gauges?: AstrolabeFrameInput['gauges'];
 };
 
 /**
@@ -127,7 +129,7 @@ function frameFromLevel(level: number, previous: AstrolabeVoiceFrame | null): As
  * Her accessible name is her name and the state in words ("Kaylee, reading Bugfixes"), which a button around her may replace with a label
  * of its own; the canvases are for the eye alone.
  */
-export function CompanionAvatar({ presence, voice, sentences, look, material = 'mercury', drive = 0, name, size, bare = false, form, bearing }: CompanionAvatarProps) {
+export function CompanionAvatar({ presence, voice, sentences, look, material = 'mercury', drive = 0, name, size, bare = false, form, bearing, gauges }: CompanionAvatarProps) {
   const { t } = useTranslation();
   const her = name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
   const tier: AstrolabeTier = bare ? 'body' : size < 120 ? 'disc' : size < 260 ? 'core' : 'dial';
@@ -148,9 +150,9 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
   })();
 
   // The latest of what the loop reads, kept off React's render path: a frame reads these, and each commit replaces them.
-  const latest = useRef({ presence, voice, sentences, look, material, drive, label, form, bearing });
+  const latest = useRef({ presence, voice, sentences, look, material, drive, label, form, bearing, gauges });
   useLayoutEffect(() => {
-    latest.current = { presence, voice, sentences, look, material, drive, label, form, bearing };
+    latest.current = { presence, voice, sentences, look, material, drive, label, form, bearing, gauges };
   });
 
   useEffect(() => {
@@ -244,6 +246,7 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
           word,
           material: current.material,
           drive: current.drive,
+          gauges: current.gauges,
         });
       } catch (error) {
         // One bad frame must not take the page down: report it once and keep drawing.

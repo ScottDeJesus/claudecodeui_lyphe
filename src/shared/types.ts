@@ -1207,6 +1207,12 @@ export type AstrolabeVoiceFrame = { rms: number; low: number; mid: number; high:
 export type AstrolabeTier = 'disc' | 'core' | 'dial' | 'body';
 
 /**
+ * One measure a lone core wears as a ring in orbit round it: how full it is (0 to 1, or null while nobody has measured it: the ring
+ * is then its track alone) and what it says in colour (`quiet` until it runs high, then `warn`, then `danger`).
+ */
+export type AstrolabeGauge = { value: number | null; tone: 'quiet' | 'warn' | 'danger' };
+
+/**
  * What her face's instrument draws one frame from, as CompanionAvatar builds it from her presence: the instrument's own `state` (her
  * fourteen presence words fold into these six: the body has a form for each), what her voice is doing (`voice`, null while nothing sounds), where she looks
  * (`azimuth`, degrees counter-clockwise from the right; null lets the pointer drift), the reticle's words (`label`), the walk she is on
@@ -1225,6 +1231,8 @@ export type AstrolabeFrameInput = {
   material: CompanionMaterial;
   /** How hard it is driven, 0 to 1 (a chat's effort): it stirs the surface and widens the glow. Absent is 0, at rest. */
   drive?: number;
+  /** The measures a lone core wears as orbiting rings (the `body` tier), the inner first, at most two; absent or empty, it wears none. */
+  gauges?: readonly AstrolabeGauge[];
 };
 
 /**

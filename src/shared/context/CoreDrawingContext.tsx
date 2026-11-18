@@ -2,7 +2,7 @@ import { useContext } from 'react';
 import type { ReactNode } from 'react';
 
 import { createStableContext } from '@/shared/context/stableContext';
-import type { CompanionMaterial } from '@/shared/types';
+import type { AstrolabeGauge, CompanionMaterial } from '@/shared/types';
 
 /**
  * What a core is asked to draw: the material it is made of, what it is doing (the body has a form for each: at rest, thinking,
@@ -15,6 +15,8 @@ export type CoreDrawingInput = {
   drive: number;
   size: number;
   azimuth: number;
+  /** The measures it wears as rings in orbit round it, the inner first (a chat's context, then its account's week); absent, none. */
+  gauges?: readonly AstrolabeGauge[];
 };
 
 /** Draws a core. Null where no page has given one: the caller then draws its own plain mark. */
