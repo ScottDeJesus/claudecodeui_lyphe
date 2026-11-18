@@ -2874,15 +2874,25 @@ export type ClaudeApiUnreadable = { unreadable: true };
 //----------------- CHAT NAMES: what the naming pass reads of a chat ------------
 
 /**
- * A chat's first exchange as the naming pass reads it from the transcript: `ask` is the first message the person wrote himself,
- * `reply` the first answer the model gave after it, each trimmed and cut to 2,000 characters. Both are non-empty — a chat that has
- * no such pair yet has no `ChatFirstExchange` at all (`readFirstExchange` answers `null`). Read-only prose handed to a model as data,
- * never as instructions. Consumed by the chat-names module: `first-exchange.ts` builds it, `haiku-name.ts` asks Haiku about it.
+ * One exchange of a chat as the naming pass reads it from the transcript: `ask` a message the person wrote himself, `reply` an
+ * answer the model gave after it, each trimmed and cut to 2,000 characters, both non-empty. The pass reads two of them: the
+ * chat's first exchange (the first message he wrote and the first answer after it; `readFirstExchange`) and its latest (the last
+ * message he wrote that has an answer after it, and the last answer after that message; `readFirstAndLatestExchange`). A chat with
+ * no such pair yet has none (the readers answer `null`). Read-only prose handed to a model as data, never as instructions.
+ * Consumed by the chat-names module: `exchanges.ts` builds it, `haiku-name.ts` asks Haiku about it.
  */
-export type ChatFirstExchange = {
+export type ChatExchange = {
   ask: string;
   reply: string;
 };
+
+/**
+ * Haiku's answer about a chat's current label in the every-turn naming pass: `keep` when the chat's subject has not moved
+ * (Haiku answered KEEP), `rename` with a cleaned, checked name of two to four words a person could say aloud. A reply that is
+ * neither is no verdict at all (`askHaikuToKeepOrRename` answers `null`). `rename` may still equal the current name; the namer
+ * treats that as a keep. Consumed by the chat-names module: `haiku-name.ts` builds it, `chat-namer.service.ts` acts on it.
+ */
+export type ChatLabelVerdict = { verdict: 'keep' } | { verdict: 'rename'; name: string };
 
 // ---------------------------
 

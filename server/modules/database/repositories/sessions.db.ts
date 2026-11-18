@@ -578,17 +578,21 @@ export const sessionsDb = {
 
   /**
    * The facts the namer decides on: the name, whether a person gave it, whether the app created the
-   * chat, and whether it is archived. Consumed by the chat-names module.
+   * chat, whether it is archived, and when it was created. Consumed by the chat-names module.
    *
    * `appCreated` is the app's own allocation of the id: its row was inserted before any provider run
    * (`provider_session_id` still NULL) or the two ids have since parted. A chat discovered on disk has
    * the one id in both columns. `null` when no row answers to the id.
+   *
+   * `createdAt` is `created_at` as a canonical ISO string (stored rows hold both SQLite's space-separated
+   * UTC form and ISO), `null` when the row holds none; the namer compares it with its cutoff.
    */
   nameFactsOf(sessionId: string): {
     customName: string | null;
     nameGiven: boolean;
     appCreated: boolean;
     isArchived: boolean;
+    createdAt: string | null;
   } | null {
     const db = getConnection();
     const row = db
@@ -596,12 +600,13 @@ export const sessionsDb = {
         `SELECT custom_name,
                 name_given,
                 (provider_session_id IS NULL OR session_id <> provider_session_id) AS app_created,
-                isArchived
+                isArchived,
+                created_at
          FROM sessions
          WHERE session_id = ?`
       )
       .get(sessionId) as
-      | { custom_name: string | null; name_given: number; app_created: number; isArchived: number }
+      | { custom_name: string | null; name_given: number; app_created: number; isArchived: number; created_at: string | null }
       | undefined;
 
     if (!row) return null;
@@ -611,6 +616,7 @@ export const sessionsDb = {
       nameGiven: row.name_given === 1,
       appCreated: row.app_created === 1,
       isArchived: Boolean(row.isArchived),
+      createdAt: normalizeTimestamp(row.created_at ?? undefined),
     };
   },
 

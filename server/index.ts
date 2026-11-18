@@ -69,6 +69,7 @@ import { createBootReportModule } from './modules/boot-report/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createKanbanModule } from './modules/kanban/index.js';
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
+import { createKanbanIntakeRouter } from './modules/kanban-intake/index.js';
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
 import { createFollowupsModule } from './modules/followups/index.js';
 import { createSessionPanelModule } from './modules/session-panel/index.js';
@@ -345,6 +346,13 @@ app.use('/api/cerberus', authenticateToken, cerberus.router);
 // secret derived from the session id, and it refuses the lesson review and the byte-deleting verbs
 // outright.
 app.use('/api/kanban-pm', kanbanMetisSecretGuard, createKanbanModule(kanbanReadings));
+
+// The Kanban intake door, for eis_backend and nothing else: Restorly's "Something not working?" reports, filed from
+// the owner's account, land as Backlog cards. Deliberately NO `authenticateToken` — the caller is a machine with no
+// user token; the router's own first middleware checks `X-Kanban-Intake-Secret` against the value in eis_backend's
+// env file, read at call time and never held in this server's environment (the sessions it spawns inherit that).
+// One verb, `POST /cards`, through the card service, every write stamped actor `restorly`.
+app.use('/api/kanban-intake', createKanbanIntakeRouter());
 
 // The applications this host serves, and the registry file the switcher's drawer reads (protected).
 // The registry file is created at module creation, so it exists from the first boot.
