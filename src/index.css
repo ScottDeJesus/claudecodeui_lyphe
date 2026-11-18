@@ -956,6 +956,22 @@
     to { opacity: 1; }
   }
 
+  /* A word of the companion's sentence as it lands (CompanionSentence): it fades in where it will stand, on its own delay. */
+  .companion-word {
+    animation: companion-word-in 220ms ease-out both;
+  }
+
+  @keyframes companion-word-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .companion-word {
+      animation: none;
+    }
+  }
+
   /* Search result highlight flash */
   .search-highlight-flash {
     animation: search-flash 4s ease-out;
