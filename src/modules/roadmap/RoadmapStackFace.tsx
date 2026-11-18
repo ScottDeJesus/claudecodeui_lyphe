@@ -69,7 +69,7 @@ function StackFaceBody() {
  *
  * `data-roadmap-stack-face` marks its root; `data-roadmap-header` (the roadmap's name) its picker row.
  *
- * Used by `RoadmapTab`, as its Features face.
+ * Used by `RoadmapTab`, as its Stack face.
  */
 export function RoadmapStackFace({ openCard }: RoadmapStackFaceProps) {
   const reveal = useRevealCard();

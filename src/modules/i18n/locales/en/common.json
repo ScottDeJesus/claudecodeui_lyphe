@@ -956,13 +956,14 @@
   "roadmap": {
     "faces": {
       "label": "Roadmap view",
-      "stack": "Features",
+      "path": "Roadmap",
+      "stack": "Stack",
       "inFlight": "In flight"
     },
     "stack": {
-      "label": "Features",
+      "label": "Roadmap stack",
       "back": "Back",
-      "open": "Open the features: {{title}}",
+      "open": "Open the roadmap: {{title}}",
       "empty": "Nothing building, held or finished",
       "dismiss": "Dismiss",
       "review": "Review"

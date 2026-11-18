@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
 import { RoadmapStackFace } from '@/modules/roadmap/RoadmapStackFace';
+import { RoadmapTreeFace } from '@/modules/roadmap/RoadmapTreeFace';
 import { RunnerPanel } from '@/modules/runner-tab';
 import { Spinner, Tabs } from '@/shared/ui';
 
-/** The tab's two faces: the ring of features (finished, being built, ready to start) and the live cards of what is in flight. */
-type Face = 'stack' | 'inFlight';
+/** The tab's three faces: the roadmap as a tree from its goal, the ring of its features (finished, being built, ready to start), and the live cards of what is in flight. */
+type Face = 'path' | 'stack' | 'inFlight';
 
 type RoadmapTabProps = {
   /** The plan a `?runner=` landing named, held by `useRunnerLanding` until its card has been brought into view; `null` on every ordinary visit. */
@@ -19,27 +20,25 @@ type RoadmapTabProps = {
   openRoadmap: string | null;
   /** Called once the landing has run, whether or not the roadmap exists, so the workspace retires the request. */
   onRoadmapOpened: () => void;
-  /** The face a visit opens on: In flight, unless the surface names the other. */
+  /** The face a visit opens on: In flight, unless the surface names the other (the Roadmap widget at full screen names `path`). */
   startFace?: Face;
 };
 
 /**
- * The Roadmap tab: a segmented switch over its two faces. Features is the ring (`RoadmapStackFace`): one wall for each
- * feature that is finished and not yet dismissed, being built, or ready to be started. In flight is the live cards
- * (`RunnerPanel`, mounted whole beneath the switch with only a reveal handed down). A visit opens on In flight
- * (`startFace`). In flight carries a pill and the amber — the cards
+ * The Roadmap tab: a segmented switch over its three faces. Roadmap is the tree from the goal
+ * (`RoadmapTreeFace`, in viewport fit); Stack is one ring of the roadmap's features, the ones finished and not yet dismissed,
+ * being built, or ready to be started (`RoadmapStackFace`); In flight is the live cards (`RunnerPanel`, mounted whole beneath the switch with only a
+ * reveal handed down). A visit opens on In flight (`startFace`); the Roadmap widget at full screen opens on Roadmap,
+ * the face its column body was already showing. In flight carries a pill and the amber — the cards
  * drawn, and the sentence for the prompts waiting on the operator — so the switch says where the
  * urgent thing is before he turns to it.
- *
- * THE TREE FROM THE GOAL IS NOT A FACE ANY MORE (the operator, 2026-11-18: features only, no roadmap). Its files
- * (`RoadmapTreeFace` and what it draws) are still in the module, mounted by nothing.
  *
  * Both ways onto a card land on In flight: a `?runner=<plan>` landing, which turns the face before
  * `RunnerPanel` is handed the plan, and a feature's "Open its card" or "Answer" on the Roadmap face,
  * which turns it and hands the plan down the same way. `RunnerPanel` does the reveal in both cases and
  * calls back once it has tried; this tab retires whichever request it was handed.
  *
- * A `?roadmap=<name>` landing is the other way in, onto the Features face. It turns the face the moment it
+ * A `?roadmap=<name>` landing is the other way in, onto the Roadmap face. It turns the face the moment it
  * arrives — once, so nothing the operator presses while the picture loads is undone, and a `?runner=`
  * landing that arrived with it keeps In flight — and once the picture has been read it selects that
  * roadmap and retires the request. A name the picture lacks selects nothing and is retired all the same:
@@ -76,7 +75,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
   const [faceTurnedFor, setFaceTurnedFor] = useState<string | null>(null);
   if (openRoadmap !== faceTurnedFor) {
     setFaceTurnedFor(openRoadmap);
-    if (openRoadmap !== null && revealPlan === null) setFace('stack');
+    if (openRoadmap !== null && revealPlan === null) setFace('path');
   }
 
   // Stable on purpose: `RunnerPanel`'s reveal effect lists it as a dependency, and a fresh identity per
@@ -86,7 +85,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
     onRevealed();
   }, [onRevealed]);
 
-  // The operator's own press on the switch. Turning to Features answers any request still pending — a
+  // The operator's own press on the switch. Turning to Roadmap or to Stack answers any request still pending — a
   // landing the workspace holds, or a card press waiting on `RunnerPanel`'s lazy chunk — so both are
   // retired here: the render-time turn above then has nothing to re-apply, and no reveal can fire later
   // on a plain visit to In flight or after a trip to another tab.
@@ -97,7 +96,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
     }
     setRequestedPlan(null);
     if (revealPlan !== null) onRevealed();
-    setFace('stack');
+    setFace(id === 'stack' ? 'stack' : 'path');
   };
 
   // The `?roadmap=` landing's selection, answered once there is something to answer it with (the face
@@ -127,6 +126,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
         <Tabs
           ariaLabel={t('roadmap.faces.label')}
           tabs={[
+            { id: 'path', label: t('roadmap.faces.path') },
             { id: 'stack', label: t('roadmap.faces.stack') },
             {
               id: 'inFlight',
@@ -142,7 +142,9 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
       </div>
 
       <div className="min-h-0 flex-1">
-        {face === 'stack' ? (
+        {face === 'path' ? (
+          <RoadmapTreeFace fit="viewport" openCard={openCard} />
+        ) : face === 'stack' ? (
           <RoadmapStackFace openCard={openCard} />
         ) : (
           // The live cards load the first time the face is drawn; the switch above stays put while they do.
