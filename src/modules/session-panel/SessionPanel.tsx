@@ -51,7 +51,8 @@ export function SessionPanel() {
             {!onLatest && <Button variant="outline" size="sm" className="h-8 finger:h-11" data-panel-latest onClick={() => lookAt(null)}>{t('sessionPanel.latest')}</Button>}
           </header>
 
-          <div data-panel-stage={viewing.kind} className="grid min-h-[240px] place-items-center py-2 max-[879.98px]:min-h-0">
+          {/* A web page takes all the height the panel has left: it is a window onto a page, not a thing with a size of its own. */}
+          <div data-panel-stage={viewing.kind} className="grid min-h-[240px] place-items-center py-2 data-[panel-stage=page]:min-h-[360px] data-[panel-stage=page]:flex-1 data-[panel-stage=page]:place-items-stretch max-[879.98px]:min-h-0 max-[879.98px]:data-[panel-stage=page]:min-h-[360px]">
             {version === null
               ? <Spinner label={t('sessionPanel.reading')} />
               : version === 'gone'
