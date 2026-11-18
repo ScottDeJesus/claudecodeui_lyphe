@@ -1,6 +1,6 @@
 import { AudioWaveform } from 'lucide-react';
 import { Fragment } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import type { CompanionSound } from '@/shared/companion-types';
 import { Tooltip } from '@/shared/ui';
@@ -10,11 +10,8 @@ type CompanionSentenceProps = {
   text: string;
   /** Her sounds, each at its offset into `text` (UTF-16 units, the unit `slice` cuts in). */
   sounds: CompanionSound[];
-  /**
-   * Set for a sentence that has just landed: its words come in one after another, the first after `delay` ms and each next one
-   * `step` ms later. Absent, the sentence is its bare words.
-   */
-  arriving?: { delay: number; step: number };
+  /** True for a sentence that has just landed: each word is a span of its own, which the paragraph brings in in turn. Absent, the sentence is its bare words. */
+  arriving?: boolean;
 };
 
 /**
@@ -42,26 +39,27 @@ function SoundMark({ tag }: { tag: string }) {
  * landed." draws the mark hugging "nice". An offset past the end is drawn at the end, and two sounds at one offset stand
  * side by side, in the order she made them.
  *
- * ARRIVING, each word is a span that fades in on its own delay (`.companion-word`, index.css), and a sound's mark takes the delay
- * of the word it follows. The spans are inline and the white space between them stays text, so the paragraph wraps exactly as its
- * bare words do: nothing moves when a sentence lands, and nothing moves when its words have come in. Reduced motion draws them whole.
+ * ARRIVING, each word is a span that carries its place in the sentence (`--i`; `.companion-word`, index.css) and is seen once the
+ * paragraph's count of words said (`--said`, which CompanionReply moves) has passed it; a sound's mark comes in with the word it
+ * follows. The spans are inline and the white space between them stays text, so the paragraph wraps exactly as its bare words do:
+ * nothing moves when a sentence lands, and nothing moves as its words come in. Reduced motion draws them whole.
  *
  * Used by this module's CompanionReply, once per sentence of a turn's paragraph.
  */
-export function CompanionSentence({ text, sounds, arriving }: CompanionSentenceProps) {
-  if (sounds.length === 0 && arriving === undefined) return <>{text}</>;
+export function CompanionSentence({ text, sounds, arriving = false }: CompanionSentenceProps) {
+  if (sounds.length === 0 && !arriving) return <>{text}</>;
   let word = 0;
-  const delayOf = (index: number) => ({ animationDelay: `${Math.round((arriving?.delay ?? 0) + index * (arriving?.step ?? 0))}ms` });
+  const placeOf = (index: number) => ({ '--i': index }) as CSSProperties;
   /** A stretch of the text: bare, or cut into its words while the sentence arrives. */
   const stretch = (from: number, to: number): ReactNode => {
     const piece = text.slice(from, to);
-    if (arriving === undefined) return <Fragment key={`t${from}`}>{piece}</Fragment>;
+    if (!arriving) return <Fragment key={`t${from}`}>{piece}</Fragment>;
     return (
       <Fragment key={`t${from}`}>
         {piece.split(/(\s+)/).map((run, at) => (
           run === '' || /^\s+$/.test(run)
             ? run
-            : <span key={at} className="companion-word" style={delayOf(word++)}>{run}</span>
+            : <span key={at} data-companion-word="" className="companion-word" style={placeOf(word++)}>{run}</span>
         ))}
       </Fragment>
     );
@@ -73,9 +71,9 @@ export function CompanionSentence({ text, sounds, arriving }: CompanionSentenceP
     const at = Math.min(Math.max(sound.at, cursor), text.length);
     if (at > cursor) parts.push(stretch(cursor, at));
     parts.push(
-      arriving === undefined
-        ? <SoundMark key={`s${sound.made}`} tag={sound.tag} />
-        : <span key={`s${sound.made}`} className="companion-word" style={delayOf(Math.max(0, word - 1))}><SoundMark tag={sound.tag} /></span>,
+      arriving
+        ? <span key={`s${sound.made}`} className="companion-word" style={placeOf(Math.max(0, word - 1))}><SoundMark tag={sound.tag} /></span>
+        : <SoundMark key={`s${sound.made}`} tag={sound.tag} />,
     );
     cursor = at;
   }

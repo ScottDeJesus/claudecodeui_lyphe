@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { CompanionVoiceClockContext } from '@/modules/companion/context/CompanionVoiceClockContext';
+import type { CompanionVoiceClock } from '@/modules/companion/context/CompanionVoiceClockContext';
 import { useCompanionFab } from '@/modules/companion/hooks/useCompanionFab';
 import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
 import { useEars } from '@/modules/companion/hooks/useEars';
@@ -502,5 +504,15 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     ],
   );
 
-  return <CompanionContext.Provider value={value}>{children}</CompanionContext.Provider>;
+  // The voice as the words' clock, on a context of its own: the reply reads it where no provider stands too (a fixture's drawing).
+  const voiceClock = useMemo<CompanionVoiceClock>(
+    () => ({ active: speech.active, cut: speech.voice.cut, progress: speech.progress }),
+    [speech.active, speech.voice.cut, speech.progress],
+  );
+
+  return (
+    <CompanionContext.Provider value={value}>
+      <CompanionVoiceClockContext.Provider value={voiceClock}>{children}</CompanionVoiceClockContext.Provider>
+    </CompanionContext.Provider>
+  );
 }

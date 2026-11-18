@@ -33,6 +33,8 @@ function writeVoiceSwitch(on: boolean): void {
 type CompanionVoiceHook = {
   /** This page's voice as her panel draws it: the switch, the sentence sounding, the breath after a cut. */
   voice: CompanionVoice;
+  /** Whether this page sounds the companion's sentences: its switch is on and it holds the floor. The words on screen keep the voice's time only then. */
+  active: boolean;
   /** Opens or resumes the page's audio inside a gesture, when the switch is on. */
   unlock: () => void;
   /** The press that opens his mic asks this first: holds the pull while he records, and cuts her off if she is sounding (see `createSpeechPull().cutOff`). */
@@ -158,7 +160,7 @@ export function useCompanionVoice({ picture, clientId }: { picture: CompanionPic
   // The store's three functions close over its own map and never read `this`, so they too are handed out as they stand and keep one identity.
   const { of: mouth, hear: hearMouth, forget: forgetMouth } = mouthPieces;
   return useMemo(
-    () => ({ voice, unlock, cutOff, release, silence, again, level, progress, analyser, mouth, hearMouth, forgetMouth }),
-    [voice, unlock, cutOff, release, silence, again, level, progress, analyser, mouth, hearMouth, forgetMouth],
+    () => ({ voice, active, unlock, cutOff, release, silence, again, level, progress, analyser, mouth, hearMouth, forgetMouth }),
+    [voice, active, unlock, cutOff, release, silence, again, level, progress, analyser, mouth, hearMouth, forgetMouth],
   );
 }

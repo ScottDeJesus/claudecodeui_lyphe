@@ -1,7 +1,8 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionSentence } from '@/modules/companion/CompanionSentence';
+import { useWordsInTime } from '@/modules/companion/hooks/useWordsInTime';
 import type { CompanionLogEntry } from '@/shared/companion-types';
 import type { CompanionSentenceRef } from '@/shared/types';
 import { cn } from '@/shared/utils';
@@ -35,43 +36,6 @@ type CompanionReplyProps = {
 const SPEAKING_MARK =
   'rounded-sm bg-tone-ink/20 ring-2 ring-tone-ink/20 shadow-[-2px_0_0_0] shadow-tone-ink box-decoration-clone forced-colors:underline';
 
-/** A sentence that lands comes in a word at a time: this long between words, in ms. */
-const WORD_STEP_MS = 42;
-/** No sentence takes longer than this to come in, in ms: a long one runs its words closer together. */
-const SENTENCE_MAX_MS = 1500;
-/** How long one word takes to come in, in ms (`.companion-word`, index.css): the dots wait this much past the last word's start. */
-const WORD_IN_MS = 220;
-
-/** What a paragraph knows of its sentences' arrivals: the ones it has drawn, how each that landed comes in, and when the dots may follow. */
-type Arrivals = {
-  seen: ReadonlySet<number>;
-  timing: ReadonlyMap<number, { delay: number; step: number }>;
-  /** The newest sentence that landed and how long its words take, for the dots that follow it; null before any has. */
-  last: { id: number; ms: number } | null;
-};
-
-/** How many words a sentence has, as CompanionSentence cuts them: the runs between white space. */
-function wordCountOf(text: string): number {
-  return text.split(/\s+/).filter(Boolean).length;
-}
-
-/** The arrivals with `fresh` (sentences not drawn before, in order) added: each starts when the one before it in the batch has come in. */
-function landed(arrivals: Arrivals, fresh: CompanionLogEntry[]): Arrivals {
-  const seen = new Set(arrivals.seen);
-  const timing = new Map(arrivals.timing);
-  let delay = 0;
-  let last = arrivals.last;
-  for (const sentence of fresh) {
-    const words = Math.max(1, wordCountOf(sentence.text));
-    const step = Math.min(WORD_STEP_MS, SENTENCE_MAX_MS / words);
-    seen.add(sentence.id);
-    timing.set(sentence.id, { delay, step });
-    delay += words * step;
-    last = { id: sentence.id, ms: delay + WORD_IN_MS };
-  }
-  return { seen, timing, last };
-}
-
 /**
  * The three dots of a turn still being said; the words are for a screen reader, the dots for the eye. Used by this module's
  * CompanionReply (the end of her paragraph) and CompanionLog (its waiting row, before the first sentence has landed).
@@ -95,50 +59,53 @@ export function SpeakingDots({ label }: { label: string }) {
 /**
  * A turn as one paragraph: its sentences joined, each sound a small mark at its offset (CompanionSentence), the sentence the
  * voice is sounding on a band of the info tone (`SPEAKING_MARK`) and, while the turn is still being answered, the breathing dots
- * after the last word. Only the sentence being spoken gets a wrapper: with none spoken the paragraph is its words, so its lines
- * never re-wrap as the mark moves.
+ * after the last word. Every sentence is a span of its own, bare unless it is the one being spoken, so the paragraph's lines
+ * never re-wrap as the mark moves and a sentence is the same element before, while and after it is said.
  *
- * A SENTENCE THAT LANDS STREAMS IN. The server sends an answer a whole sentence at a time; a sentence this paragraph has not
- * drawn before comes in a word at a time (`WORD_STEP_MS`, never longer than `SENTENCE_MAX_MS`), sentences that land together
- * one after another, and the dots follow the last word. What was already there when the paragraph was first drawn stands whole,
- * so a transcript opened on old turns does not replay them; the one exception is the newest sentence of a turn still being
- * answered, which has only just landed (the station's line is drawn afresh for each turn, with that sentence already in it).
- * The words fade in where they will stand, so nothing re-wraps and the pane's following of the end is unchanged.
+ * A SENTENCE THAT LANDS COMES IN A WORD AT A TIME, IN TIME WITH THE VOICE (`useWordsInTime` says how, and what it does on a page
+ * with no voice). The server sends an answer a whole sentence at a time; a sentence this paragraph has not drawn before is an
+ * arriving one for as long as the paragraph stands. What was already there when the paragraph was first drawn stands whole, so a
+ * transcript opened on old turns does not replay them; the one exception is the newest sentence of a turn still being answered,
+ * which has only just landed (the station's line is drawn afresh for each turn, with that sentence already in it). The words
+ * come in where they will stand, so nothing re-wraps and the pane's following of the end is unchanged.
  *
  * Used by this module's CompanionLog (each turn, under its caption) and by the station's portrait view (the latest turn
  * alone), so the panel, the log and the station's line draw one paragraph.
  */
 export function CompanionReply({ sentences, turnId, answering, speaking, name, className }: CompanionReplyProps) {
   const { t } = useTranslation();
-  const [arrivals, setArrivals] = useState<Arrivals>(() => ({
+  const rootRef = useRef<HTMLDivElement>(null);
+  // The sentences this paragraph has drawn, and those of them that landed while it stood.
+  const [arrivals, setArrivals] = useState<{ seen: ReadonlySet<number>; landed: ReadonlySet<number> }>(() => ({
     seen: new Set((answering ? sentences.slice(0, -1) : sentences).map((sentence) => sentence.id)),
-    timing: new Map(),
-    last: null,
+    landed: new Set(),
   }));
-  // State that follows a prop, set during the render the sentences arrive in: the words are cut before they are first painted.
-  const fresh = sentences.filter((sentence) => !arrivals.seen.has(sentence.id));
-  if (fresh.length > 0) setArrivals(landed(arrivals, fresh));
+  // State that follows a prop, set during the render the sentences arrive in: their words are cut before they are first painted.
+  const fresh = sentences.filter((sentence) => !arrivals.seen.has(sentence.id)).map((sentence) => sentence.id);
+  if (fresh.length > 0) setArrivals({ seen: new Set([...arrivals.seen, ...fresh]), landed: new Set([...arrivals.landed, ...fresh]) });
+  useWordsInTime(rootRef, [...arrivals.landed].join(' '));
   return (
-    <div className={cn('break-words text-sm leading-relaxed text-foreground', className)}>
+    <div ref={rootRef} className={cn('break-words text-sm leading-relaxed text-foreground', className)}>
       {sentences.map((sentence, index) => {
         const spoken = speaking !== null && turnId === speaking.turnId && sentence.index === speaking.index;
-        const words = <CompanionSentence text={sentence.text} sounds={sentence.sounds} arriving={arrivals.timing.get(sentence.id)} />;
+        const arriving = arrivals.landed.has(sentence.id);
         return (
           <Fragment key={sentence.id}>
             {index > 0 && ' '}
-            {spoken ? <span data-companion-speaking-sentence="" data-tone="info" className={SPEAKING_MARK}>{words}</span> : words}
+            <span
+              data-companion-speaking-sentence={spoken ? '' : undefined}
+              data-tone={spoken ? 'info' : undefined}
+              data-companion-arriving-sentence={arriving ? sentence.id : undefined}
+              data-turn={arriving ? turnId ?? '' : undefined}
+              data-index={arriving ? sentence.index ?? '' : undefined}
+              className={spoken ? SPEAKING_MARK : undefined}
+            >
+              <CompanionSentence text={sentence.text} sounds={sentence.sounds} arriving={arriving} />
+            </span>
           </Fragment>
         );
       })}
-      {answering && (
-        arrivals.last === null
-          ? <SpeakingDots label={t('companion.log.speaking', { name })} />
-          : (
-            <span key={arrivals.last.id} className="companion-word" style={{ animationDelay: `${Math.round(arrivals.last.ms)}ms` }}>
-              <SpeakingDots label={t('companion.log.speaking', { name })} />
-            </span>
-          )
-      )}
+      {answering && <SpeakingDots label={t('companion.log.speaking', { name })} />}
     </div>
   );
 }

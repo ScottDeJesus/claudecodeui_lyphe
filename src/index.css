@@ -956,19 +956,34 @@
     to { opacity: 1; }
   }
 
-  /* A word of the companion's sentence as it lands (CompanionSentence): it fades in where it will stand, on its own delay. */
+  /* A word of the companion's sentence as it lands (CompanionSentence). `--i` is its place in the sentence and `--said` how many
+     words of the sentence have been said so far, which CompanionReply moves on the sentence: the word comes in as the count passes
+     it, where it will stand. Until the count is first set, nothing of the sentence is seen. */
   .companion-word {
-    animation: companion-word-in 220ms ease-out both;
+    opacity: clamp(0, calc((var(--said, 0) - var(--i)) * 0.9), 1);
   }
 
-  @keyframes companion-word-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+  /* The answering dots wait for the words still coming in. */
+  [data-companion-arriving] [data-companion-speaking] {
+    opacity: 0;
+  }
+
+  /* A sentence still coming in wears no band while it is spoken: its words arriving are the mark, and a band would run on ahead
+     of them over words not yet seen. Settled (a replay, or a voice that starts late), the band is back. */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-companion-arriving-sentence]:not([data-companion-settled]) {
+      background-color: transparent !important;
+      box-shadow: none !important;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .companion-word {
-      animation: none;
+      opacity: 1;
+    }
+
+    [data-companion-arriving] [data-companion-speaking] {
+      opacity: 1;
     }
   }
 
