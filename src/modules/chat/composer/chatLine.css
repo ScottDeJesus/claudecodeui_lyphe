@@ -132,3 +132,68 @@
 @media (prefers-reduced-motion: reduce) {
   .core-ring__turn { transition-duration: var(--duration-fade); transition-timing-function: ease; }
 }
+
+/* ---------- the chat's helpers ----------
+ * A dot for each subagent, on an arc over the core (`CoreHelperDots`). The layer is a point at the core's middle; each dot is
+ * placed from it. A dot's ink is its model's material, as a ring's is its chat's. */
+.core-helpers { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2; }
+.core-helper {
+  --helper-ink: var(--ink-strong);
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  outline: none;
+  cursor: pointer;
+}
+.core-helper[data-material='tube'] { --helper-ink: var(--tube); }
+.core-helper[data-material='wire'] { --helper-ink: var(--wire); }
+.core-helper[data-material='plasma'] { --helper-ink: var(--plasma); }
+.core-helper__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--helper-ink);
+  background: var(--helper-ink);
+  transition: transform var(--dur-quick) var(--ease-enter), background-color var(--duration-fade) ease;
+}
+/* At work it breathes; held back it is still and paler; ended, it is a ring: its own ink when it finished, the danger ink when it
+   failed, the warn ink when it was stopped. */
+.core-helper[data-core-helper='running'] .core-helper__dot { animation: core-helper-breathe 1.8s ease-in-out infinite; }
+.core-helper[data-core-helper='held'] .core-helper__dot { opacity: 0.45; }
+.core-helper[data-core-helper='finished'] .core-helper__dot,
+.core-helper[data-core-helper='failed'] .core-helper__dot,
+.core-helper[data-core-helper='stopped'] .core-helper__dot { background: transparent; }
+.core-helper[data-core-helper='failed'] .core-helper__dot { border-color: var(--danger-ink); }
+.core-helper[data-core-helper='stopped'] .core-helper__dot { border-color: var(--warn-ink); }
+.core-helper:hover .core-helper__dot,
+.core-helper:focus-visible .core-helper__dot,
+.core-helper[data-picked] .core-helper__dot { transform: scale(1.35); }
+.core-helper:focus-visible,
+.core-helper[data-picked] { box-shadow: 0 0 0 1px var(--helper-ink); }
+.core-helper--more { width: auto; min-width: 16px; padding: 0 3px; font: 500 10px/16px var(--font-mono); color: var(--ink-muted); }
+.core-helper--more:hover, .core-helper--more:focus-visible { color: var(--ink-strong); }
+/* Sent out: from the core's middle to its place. */
+.core-helper--out { animation: core-helper-out 520ms var(--ease-lock) both; }
+@keyframes core-helper-out {
+  from { transform: translate(calc(-50% - var(--hx)), calc(-50% - var(--hy))) scale(0.2); opacity: 0.2; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+@keyframes core-helper-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.72); opacity: 0.7; }
+}
+/* Under a finger a dot's press is as wide as its pitch allows and reaches outward, away from the core's own press. */
+@media (hover: none) and (pointer: coarse) {
+  .core-helper::after { content: ''; position: absolute; inset: -8px -0px; border-radius: 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .core-helper--out, .core-helper[data-core-helper='running'] .core-helper__dot { animation: none; }
+}
+/* Beside the line, where the rail of turns stands over the core, the rail starts above the helpers' arc. */
+@container chat (min-width: 44rem) {
+  .chat-column:not([data-chat-core-apart]) .chat-line:has([data-core-helpers]) .chat-line__rail { bottom: calc(50% + 62px); }
+}

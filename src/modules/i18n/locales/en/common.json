@@ -1811,7 +1811,20 @@
       "failed": "Could not read the transcript",
       "live": "Live",
       "showEarlier": "Show earlier steps",
-      "openRow": "Read {{name}}'s transcript"
+      "openRow": "Read {{name}}'s transcript",
+      "open": "Open",
+      "previous": "Previous subagent",
+      "next": "Next subagent",
+      "more_one": "{{count}} more subagent",
+      "more_other": "{{count}} more subagents",
+      "dot": "{{name}}: {{state}}",
+      "state": {
+        "running": "running",
+        "held": "waiting for CPU",
+        "finished": "finished",
+        "failed": "failed",
+        "stopped": "stopped"
+      }
     },
     "embed": {
       "plainHttpBlocked": "This page is plain http, and a browser will not draw a plain-http page inside this app while it is open over https. Use the Open link to see it in its own tab."

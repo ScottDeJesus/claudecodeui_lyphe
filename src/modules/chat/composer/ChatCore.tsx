@@ -1,7 +1,7 @@
 import '@/modules/chat/composer/chatLine.css';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -92,6 +92,8 @@ type ChatCoreProps = {
   open: boolean;
   /** The id of the row the press opens, for `aria-controls`. */
   controls: string;
+  /** The chat's helpers, drawn round the core at rest (its subagents' dots), given the core's square in px; nothing while the settings are open. */
+  helpers?: (corePx: number) => ReactNode;
   /** The core, pressed: the chat's settings open or close. */
   onToggle: () => void;
   /** Escape, or a press anywhere else: the settings close. */
@@ -109,7 +111,8 @@ type ChatCoreProps = {
  * while it reads; a tendril out toward the talk while it changes a file or sends an agent; lobes and spikes while its reply arrives;
  * and a dish turned to the reader while it waits on them. What it is doing is also in its name for a reader and its title for a
  * pointer. THE HAIRLINE ROUND IT is how full the context window is, in the warn ink once it is nearly full. THE HAIRLINE OUTSIDE THAT is the
- * account's week (`AccountWeekRing`), and a press on its band opens the account switcher.
+ * account's week (`AccountWeekRing`), and a press on its band opens the account switcher. THE DOTS ON AN ARC OVER IT are the chat's
+ * subagents (`helpers`, drawn by `transcript/PinnedSubagents`), one each, in its model's colour.
  *
  * PRESS THE CORE AND IT IS SET BY TURNING. The core rises out of its dock into a disc over the talk, with two flat rings round it
  * (`CoreRings`): the effort inside, lit as far as it is set, and the model outside, lit whole in the model's own colour. Turn one and
@@ -128,7 +131,7 @@ type ChatCoreProps = {
  * its stops as `data-ring-stop`, so a script can set one by pressing the core and then a stop. Used by `ChatComposer`.
  */
 export function ChatCore({
-  model, modelOptions, modelLabelsById, onSelectModel, effort, effortOptions, onSelectEffort, state, context, open, controls, onToggle, onClose, className,
+  model, modelOptions, modelLabelsById, onSelectModel, effort, effortOptions, onSelectEffort, state, context, open, controls, helpers, onToggle, onClose, className,
 }: ChatCoreProps) {
   const { t } = useTranslation('chat');
   const draw = useCoreDrawing();
@@ -284,6 +287,8 @@ export function ChatCore({
           {/* The account's week, outside the context's hairline. A chat standing in a window of its own has no switcher to open beside
               it, so there the ring only reads. */}
           <AccountWeekRing radius={corePx / 2 + ACCOUNT_GAP} pressable={hostWindow === window} />
+          {/* Its helpers, on an arc over it: out of the way while its own rings are open round it. */}
+          {!up && helpers?.(corePx)}
           <button
             ref={pressRef}
             type="button"

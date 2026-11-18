@@ -101,7 +101,8 @@ type ChatComposerProps = {
    * workspace header below that width, which is the one surface a phone has room for.
    */
   exportSurface?: ChatExportSurface | null;
-  pinnedAgents?: ReactNode;
+  /** The chat's subagents, drawn as dots round its core (`ChatCore`'s `helpers`), given the core's square in px. */
+  pinnedAgents?: (corePx: number) => ReactNode;
   /** Every message goes out under `/plain` while this is on. */
   plainMode: boolean;
   onTogglePlainMode: () => void;
@@ -418,7 +419,6 @@ export default function ChatComposer({
 
   return (
     <div className="chat-composer-shell relative flex-shrink-0 px-2 pb-2 pt-0 sm:px-4 sm:pb-4 md:px-4 md:pb-6">
-      {pinnedAgents}
       {/* What a running turn is doing is the core's to say, in its form: no line of words stands over the box for it. */}
       <div className="relative">
 
@@ -530,8 +530,7 @@ export default function ChatComposer({
         </div>
       )}
 
-      {/* The line: the chat's core, then the box. The anchor is the box's own column, not the shell: the shell also holds the
-          pinned agents' strip, which would carry a guide's centre away from the box she is looking at. */}
+      {/* The line: the chat's core, then the box. The anchor is the box's own column, not the shell. */}
       <div className="chat-line mx-auto max-w-[var(--chat-measure,54.25rem)]">
         <ChatCore
           model={model}
@@ -545,6 +544,7 @@ export default function ChatComposer({
           context={contextShare}
           open={settingsOpen}
           controls={settingsId}
+          helpers={pinnedAgents}
           onToggle={() => setSettingsOpen((open) => !open)}
           onClose={closeSettings}
         />
