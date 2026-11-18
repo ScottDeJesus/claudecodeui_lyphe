@@ -474,10 +474,10 @@ void main() {
       if (uW.y > 0.002) c += uW.y * shTube(n, r, ndv, pos, cr);
       if (uW.z > 0.002) c += uW.z * shWire(sn, ndv, dsp, cr);
       if (uW.w > 0.002) c += uW.w * shPlasma(sn, r, ndv, cr);
-      col = 1.0 - exp(-c * mix(1.25, 1.9, uDay));
+      col = 1.0 - exp(-c * mix(1.25, 2.1, uDay));
       /* by day the body stands on a pale page, where the glow that lights it by night cannot be added and its dark glass reads as
          a dark ball: the same light is laid into the body instead, so it reads in its own colour in both themes */
-      col += uDay * 0.42 * uHaloC * (1.0 - col);
+      col += uDay * 0.5 * uHaloC * (1.0 - col);
       alpha = 1.0;
     } else {
       float e = 1.0 - smoothstep(0.0, uPx * 1.5, dmin);
@@ -689,6 +689,10 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
 
   // The instrument's envelopes and eases (`v`), the pointer and its lock (`dial`), the rings, the lobes and what rides out on an onset.
   // `work` is being at work at all (thinking, reading or writing): the rig follows it. `think`, `read` and `write` are the body's forms.
+  // A lone body's two gauges as they are drawn: how full each is shown (it eases to its measure, so a ring is seen to grow), and
+  // the surge a ring keeps for a moment after it grew.
+  const gaugeShown: [number, number] = [0, 0];
+  const gaugeSurge: [number, number] = [0, 0];
   const v = { t: 0, rest: 1, think: 0, work: 0, read: 0, write: 0, speak: 0, listen: 0, rms: 0, low: 0, mid: 0, high: 0, energy: 0, spikeEnv: 0, f0: 0, f0vis: 150, voicing: 0, presence: 1, drive: 0 };
   // Where the body's mouth faces and its tendril runs, and how far the tendril is out (a spring, with its speed).
   let aim: Vec3 = norm3([0.4, 0.45, 0.8]);
@@ -928,6 +932,15 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     clock += dt * rate;
     // At rest outright (not working, speaking or listening): a lone body's gauges lie flat and still then (`drawGauges`).
     v.rest = ease(v.rest, state === 'idle' ? 1 : 0, dt, state === 'idle' ? 0.3 : 0.12);
+    for (const index of [0, 1] as const) {
+      const measure = input.gauges?.[index]?.value ?? null;
+      const full = measure === null ? 0 : clamp(measure, 0, 1);
+      const before = gaugeShown[index];
+      const next = ease(before, full, dt, 0.45);
+      gaugeShown[index] = Math.abs(full - next) < 0.0004 ? full : next;
+      // Growth lights the ring: the surge rises with how fast it fills and dies away in about a second.
+      gaugeSurge[index] = clamp(gaugeSurge[index] * Math.exp(-dt / 0.9) + Math.max(0, gaugeShown[index] - before) * 30, 0, 1);
+    }
     v.think = ease(v.think, state === 'thinking' ? 1 : 0, dt, state === 'thinking' ? 0.07 : 0.2);
     v.work = ease(v.work, working ? 1 : 0, dt, working ? 0.07 : 0.2);
     v.read = ease(v.read, state === 'reading' ? 1 : 0, dt, 0.22);
@@ -1217,6 +1230,14 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
    * from twelve, so what it reads is where a pointer finds it (the chat's core lays a press over each there). As the body goes to
    * work they tip back into orbit, and settle again when it stops.
    *
+   * THE RING ITSELF IS ALIVE, where it is filled, and its place never moves for it: a glow under the filled part that breathes; a
+   * light that travels the filled part from its start to its head, again and again, quicker while the body works; a bead at the
+   * head that breathes with a ring opening out of it; and growth, which is shown (the filled part eases out to its measure) and
+   * lights the whole ring for a moment. With reduced motion the glow stands and nothing travels or opens.
+   *
+   * BY DAY THE FILLED PART IS THE BODY'S OWN COLOUR, a little deepened to read on a pale page, as the body beside it is; the
+   * theme's dark ink there read as a black band round an amber core. By night it is the bright ink it was.
+   *
    * `front` false draws what passes behind the body, true what passes over it.
    */
   const drawGauges = (ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number, gauges: AstrolabeFrameInput['gauges'], front: boolean) => {
@@ -1242,11 +1263,18 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     const weight = coreGaugeScale(R);
     // How far past the small core's weight this one is, 0 to 1: the track is also drawn more plainly round a large body.
     const large = weight - 1;
+    const calm = reducedMotion();
+    const mixed = (a: Rgb, b: Rgb, share: number): Rgb => [a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share, a[2] + (b[2] - a[2]) * share];
+    // The filled part's ink while the measure is not running high: the theme's bright ink by night, the body's own colour by day.
+    const plain = palette.light ? mixed(palette.bodyHalo, palette.loop, 0.18) : palette.loop;
     for (const [index, gauge] of gauges.slice(0, 2).entries()) {
       const orbit = orbits[index];
       const radius = coreGaugeRadius(R, index === 0 ? 0 : 1);
       const basis = ringBasis(orbit.iota, orbit.omega);
-      const ink = gauge.tone === 'danger' ? palette.danger : gauge.tone === 'warn' ? palette.warn : palette.loop;
+      const ink = gauge.tone === 'danger' ? palette.danger : gauge.tone === 'warn' ? palette.warn : plain;
+      // The ring's own breath, each ring on its own beat, and what is left of its last growth.
+      const breath = calm ? 0.5 : 0.5 + 0.5 * Math.sin(v.t * 1.7 + index * 2.3);
+      const surge = gaugeSurge[index];
       /** The stretch of the ring from `from` to `to` (radians along it) that lies on this side of the body, as one path. */
       const arc = (from: number, to: number) => {
         const steps = Math.max(2, Math.ceil(((to - from) / TAU) * 120));
@@ -1266,17 +1294,45 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       ctx.strokeStyle = rgba(palette.quiet, front ? 0.34 + 0.22 * large : 0.16 + 0.12 * large);
       ctx.lineWidth = 1.5 * (1 + 0.5 * large);
       ctx.stroke();
-      const filled = gauge.value === null ? 0 : clamp(gauge.value, 0, 1);
+      const filled = gaugeShown[index];
       if (filled <= 0.002) continue;
-      // The filled part runs back from its start, which on the flat ring is clockwise from twelve; its head is its far end.
-      arc(orbit.psi - filled * TAU, orbit.psi);
-      ctx.strokeStyle = rgba(ink, front ? 0.95 : 0.42 + 0.14 * large);
-      ctx.lineWidth = 2.5 * weight;
+      const span = filled * TAU;
+      const line = 2.5 * weight;
+      const near = front ? 1 : 0.45;
+      // The glow under the filled part: wider than the line, breathing, and brighter for a moment after the ring grew.
+      arc(orbit.psi - span, orbit.psi);
+      ctx.strokeStyle = rgba(ink, near * (0.08 + 0.09 * breath + 0.3 * surge));
+      ctx.lineWidth = line * (1.9 + 0.5 * breath + 1.4 * surge);
       ctx.stroke();
-      const head = ringPoint(basis, radius, orbit.psi - filled * TAU);
+      // The filled part runs back from its start, which on the flat ring is clockwise from twelve; its head is its far end.
+      arc(orbit.psi - span, orbit.psi);
+      ctx.strokeStyle = rgba(ink, front ? 0.95 : 0.42 + 0.14 * large);
+      ctx.lineWidth = line;
+      ctx.stroke();
+      // The light that travels it, from the start to the head: a short brighter stretch that fades in and out at the two ends.
+      if (!calm && span > 0.2) {
+        const along = (v.t * (0.16 + 0.42 * v.work) + index * 0.41) % 1;
+        const reach = Math.min(0.7, span * 0.3);
+        const at = orbit.psi - along * span;
+        arc(Math.max(orbit.psi - span, at - reach / 2), Math.min(orbit.psi, at + reach / 2));
+        ctx.strokeStyle = rgba(mixed(ink, [255, 255, 255], palette.light ? 0.55 : 0.7), near * Math.sin(Math.PI * along) * (0.55 + 0.45 * surge));
+        ctx.lineWidth = line * 0.5;
+        ctx.stroke();
+      }
+      const head = ringPoint(basis, radius, orbit.psi - span);
       if (head[2] >= 0 === front) {
+        const bead = (front ? 2.6 : 2) * (1 + 0.7 * large) * (1 + 0.12 * breath + 0.45 * surge);
+        if (!calm) {
+          // A ring opening out of the bead, once a breath: where the measure stands is where the eye is drawn.
+          const opening = (v.t * 0.27 + index * 0.5) % 1;
+          ctx.beginPath();
+          ctx.arc(cx + head[0], cy - head[1], bead * (1.2 + 2.2 * opening), 0, TAU);
+          ctx.strokeStyle = rgba(ink, near * 0.5 * (1 - opening) * (1 - opening));
+          ctx.lineWidth = 1 + 0.5 * large;
+          ctx.stroke();
+        }
         ctx.beginPath();
-        ctx.arc(cx + head[0], cy - head[1], (front ? 2.6 : 2) * (1 + 0.7 * large), 0, TAU);
+        ctx.arc(cx + head[0], cy - head[1], bead, 0, TAU);
         ctx.fillStyle = rgba(ink, front ? 1 : 0.5);
         ctx.fill();
       }
