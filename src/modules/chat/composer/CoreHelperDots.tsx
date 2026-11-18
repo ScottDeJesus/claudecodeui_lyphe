@@ -2,13 +2,17 @@ import { useState } from 'react';
 import type { CSSProperties } from 'react';
 
 import { useChatCorePlace } from '@/shared/context/ChatCorePlaceContext';
+import type { CoreDoing } from '@/modules/chat/utils/coreDoing';
 import type { CompanionMaterial } from '@/shared/types';
 
 /** How a helper stands, as its dot says it: at work, held back (waiting for the CPU), or ended one of three ways. */
 export type CoreHelperState = 'running' | 'held' | 'finished' | 'failed' | 'stopped';
 
-/** One helper as its dot: what it is made of (its model), how it stands, and its name for a reader. */
-export type CoreHelperDot = { id: string; material: CompanionMaterial; state: CoreHelperState; label: string };
+/**
+ * One helper as its mote: what it is made of (its model), how it stands, what it is doing while it works (absent where no record
+ * of its steps is kept: it then reads as thinking), and its name for a reader.
+ */
+export type CoreHelperDot = { id: string; material: CompanionMaterial; state: CoreHelperState; doing?: CoreDoing; label: string };
 
 type CoreHelperDotsProps = {
   /** The helpers, in the order they stand round the core: the running first. */
@@ -28,7 +32,7 @@ type CoreHelperDotsProps = {
 /** From the core's outer ring to the orbit, in px: clear of that ring's own press. */
 const ORBIT_GAP = 12;
 /** From one dot's middle to the next along the orbit, in px: a dot's own press, so two never overlap. */
-const PITCH = 16;
+const PITCH = 18;
 
 /** The arc the dots stand on, in degrees counter-clockwise from three o'clock: [where it is centred, how wide it is]. */
 const ARC_APART: readonly [number, number] = [90, 150];
@@ -36,10 +40,15 @@ const ARC_APART: readonly [number, number] = [90, 150];
 const ARC_DOCKED: readonly [number, number] = [84, 108];
 
 /**
- * THE CHAT'S HELPERS, AS DOTS ROUND ITS CORE: one for each subagent the chat has out or has had out, on an arc over the core, in
- * its model's colour (the app's one colour coding). No window stands over the line for them. A dot filled and breathing is a
- * helper at work; filled and still, one held back; a ring, one that has finished, in the danger colour when it failed and the
- * warn colour when it was stopped. The dot whose card is open wears a ring of its own.
+ * THE CHAT'S HELPERS, AS MOTES ROUND ITS CORE: one for each subagent the chat has out or has had out, on an arc over the core, in
+ * its model's colour (the app's one colour coding). No window stands over the line for them.
+ *
+ * EACH IS A SMALL CORE OF ITS OWN, drawn in the stylesheet (no canvas: a page has few of those to give). At work it is a lit body
+ * with a ring in orbit round it and a bead travelling that ring, and how it moves is what it is doing (`doing`): slow while it
+ * thinks, quicker while it reads, quicker still and reaching while it changes something, and shimmering while its words arrive.
+ * Held back it is pale and its ring stands still. Ended, it is a still ring: its own ink when it finished, the danger colour when
+ * it failed, the warn colour when it was stopped. The one whose card is open wears a ring of its own. The whole arc sways a little
+ * round the core while any of them works, and holds still under a pointer so a mote is never chased.
  *
  * THE CORE THROWS THEM OUT. A dot that appears while the chat is on screen starts at the core's middle and goes out to its place
  * (`.core-helper--out`, `chatLine.css`); the ones already there when the chat was opened simply stand. The core itself is in its
@@ -77,7 +86,7 @@ export function CoreHelperDots({ dots, ringRadius, picked, onPick, label, moreLa
   };
 
   return (
-    <div role="group" aria-label={label} data-core-helpers={dots.length} className="core-helpers">
+    <div role="group" aria-label={label} data-core-helpers={dots.length} data-working={dots.some((dot) => dot.state === 'running') ? '' : undefined} className="core-helpers">
       {shown.map((dot, index) => (
         <button
           key={dot.id}
@@ -85,6 +94,7 @@ export function CoreHelperDots({ dots, ringRadius, picked, onPick, label, moreLa
           data-core-helper={dot.state}
           data-core-helper-id={dot.id}
           data-material={dot.material}
+          data-doing={dot.state === 'running' ? dot.doing ?? 'thinking' : undefined}
           data-picked={picked === dot.id ? '' : undefined}
           aria-label={dot.label}
           title={dot.label}
@@ -92,8 +102,10 @@ export function CoreHelperDots({ dots, ringRadius, picked, onPick, label, moreLa
           aria-expanded={picked === dot.id}
           onClick={() => onPick(dot.id)}
           className={sent.has(dot.id) ? 'core-helper core-helper--out' : 'core-helper'}
-          style={at(index)}
+          style={{ ...at(index), '--i': index } as CSSProperties}
         >
+          {/* Its ring in orbit, behind the body; the bead that travels it is the button's own `::before` (`chatLine.css`). */}
+          <span aria-hidden="true" className="core-helper__orbit" />
           <span aria-hidden="true" className="core-helper__dot" />
         </button>
       ))}

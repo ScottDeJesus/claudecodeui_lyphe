@@ -147,6 +147,7 @@ function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId, res
       id: rowId(row),
       material: replyMaterialOf(row.model),
       state,
+      doing: 'doing' in row ? row.doing : undefined,
       label: t('gutters.subagents.dot', { name: rowLabel(row) || t('gutters.subagents.title'), state: t(`gutters.subagents.state.${state}`) }),
     };
   });
