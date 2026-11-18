@@ -160,8 +160,11 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
     const instrument = createAstrolabeInstrument(host, tier, latest.current.material);
     let side = 0;
     const fitSquare = () => {
-      const box = frameBox.getBoundingClientRect();
-      const next = Math.max(16, Math.floor(Math.min(box.width, box.height)));
+      // The frame's layout size, never its on-screen box: an ancestor's transform is not the
+      // body's size (the chat core opens under a grow that starts at 0.64), and the resize
+      // observer does not fire again when that transform ends. The frame's zero minimums keep
+      // the body from holding its own frame open when the frame shrinks.
+      const next = Math.max(16, Math.min(frameBox.clientWidth, frameBox.clientHeight));
       if (next === side) return;
       side = next;
       host.style.width = `${side}px`;
@@ -262,7 +265,7 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
   return (
     <div
       ref={frameRef}
-      className="relative grid size-full place-items-center"
+      className="relative grid size-full min-h-0 min-w-0 place-items-center"
       data-state={presence.state}
       data-tier={tier}
       data-material={material}
