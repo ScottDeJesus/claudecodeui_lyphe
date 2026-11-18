@@ -28,9 +28,9 @@ import {
 } from '@/shared/ui';
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
-import type { PendingSteer, QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
+import type { CoreDoing } from '@/modules/chat/utils/coreDoing';
+import type { PendingSteer, QueuedDraft, ScheduledMessage, SlashCommand,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
 import CommandMenu from '@/modules/chat/composer/CommandMenu';
-import ActivityIndicator from '@/modules/chat/composer/ActivityIndicator';
 import { ComposerAttachmentTray } from '@/modules/chat/composer/ComposerAttachmentTray';
 import { ComposerDropOverlay } from '@/modules/chat/composer/ComposerDropOverlay';
 import VoiceInputButton from '@/modules/chat/composer/VoiceInputButton';
@@ -70,8 +70,9 @@ type ChatComposerProps = {
     decision: { allow?: boolean; message?: string; rememberEntry?: string | null; updatedInput?: unknown },
   ) => void;
   handleGrantToolPermission: (suggestion: { entry: string; toolName: string }) => { success: boolean };
-  activity: SessionActivity | null;
   isLoading: boolean;
+  /** What the chat is doing while its turn runs (`coreDoingOf`): the form its core takes. Read only while `isLoading`. */
+  doing: CoreDoing;
   onAbortSession: () => void;
   permissionMode: PermissionMode;
   availablePermissionModes: PermissionMode[];
@@ -92,8 +93,7 @@ type ChatComposerProps = {
   /**
    * The pinned-agents strip, seated at the top of this shell so it sits between the
    * transcript and the input: the transcript's scroller ends above it, so the last message
-   * is never under it, and the activity tab still floats above it as it floats above the
-   * transcript today. The composer knows nothing about agents; it only holds the seat.
+   * is never under it. The composer knows nothing about agents; it only holds the seat.
    */
   /**
    * What an export needs, or `null` while there is nothing to export. Drawn here from `md` up —
@@ -180,8 +180,8 @@ export default function ChatComposer({
   pendingPermissionRequests,
   handlePermissionDecision,
   handleGrantToolPermission,
-  activity,
   isLoading,
+  doing,
   onAbortSession,
   permissionMode,
   availablePermissionModes,
@@ -419,18 +419,8 @@ export default function ChatComposer({
   return (
     <div className="chat-composer-shell relative flex-shrink-0 px-2 pb-2 pt-0 sm:px-4 sm:pb-4 md:px-4 md:pb-6">
       {pinnedAgents}
-      {/* The activity tab is anchored HERE, not on the shell: it floats above the input and
-          below the pinned agents, whose work it does not describe — the tab is this
-          conversation's own thinking, and a subagent above it is not thinking. */}
+      {/* What a running turn is doing is the core's to say, in its form: no line of words stands over the box for it. */}
       <div className="relative">
-      {/* `w-full`, not the shell-padding calc it had on the shell: this wrapper IS the shell's
-          content box, so 100% is already the input's width — the calc took the padding off a
-          second time and floated both tabs inside the input's corners (Athena, 2026-09-10). */}
-      {!hasPendingPermissions && (
-        <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-full max-w-[var(--chat-measure,54.25rem)] -translate-x-1/2 translate-y-px bg-transparent">
-          <ActivityIndicator activity={activity} />
-        </div>
-      )}
 
       <PermissionRequestsBanner
         pendingPermissionRequests={pendingPermissionRequests}
@@ -541,7 +531,7 @@ export default function ChatComposer({
       )}
 
       {/* The line: the chat's core, then the box. The anchor is the box's own column, not the shell: the shell also holds the
-          pinned agents' strip and the activity tab, which would carry a guide's centre away from the box she is looking at. */}
+          pinned agents' strip, which would carry a guide's centre away from the box she is looking at. */}
       <div className="chat-line mx-auto max-w-[var(--chat-measure,54.25rem)]">
         <ChatCore
           model={model}
@@ -551,7 +541,7 @@ export default function ChatComposer({
           effort={effort}
           effortOptions={availableEffortOptions}
           onSelectEffort={onSelectEffort}
-          state={hasPendingPermissions || awaitingInput ? 'waiting' : isLoading ? 'working' : 'idle'}
+          state={hasPendingPermissions || awaitingInput ? 'waiting' : isLoading ? doing : 'idle'}
           context={contextShare}
           open={settingsOpen}
           controls={settingsId}

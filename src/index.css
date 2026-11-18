@@ -554,22 +554,6 @@
     animation: chat-loading-appear 150ms ease-out 150ms both;
   }
 
-  .chat-activity-enter {
-    animation: chat-activity-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    transform-origin: bottom center;
-    will-change: transform, opacity, filter;
-  }
-
-  .chat-activity-exit {
-    animation: chat-activity-exit 220ms cubic-bezier(0.4, 0, 1, 1) both;
-    transform-origin: bottom center;
-    will-change: transform, opacity, filter;
-  }
-
-  .chat-activity-tab {
-    clip-path: inset(-8px -8px 0 -8px);
-  }
-
   /* Never render-skipped and never contained. `content-visibility: auto` is out because a row
      reports a stand-in height until the browser draws it, and the transcript's settle loop, its
      fill check and LazyMessageRow's measured heights all read row geometry on a row's first
@@ -936,37 +920,6 @@
 
   .settings-content-enter {
     animation: settings-fade-in 150ms ease-out;
-  }
-
-  @keyframes chat-activity-enter {
-    0% {
-      opacity: 0;
-      filter: blur(3px);
-      transform: translateY(18px) scaleY(0.92);
-    }
-    65% {
-      opacity: 1;
-      filter: blur(0);
-      transform: translateY(-2px) scaleY(1.01);
-    }
-    100% {
-      opacity: 1;
-      filter: blur(0);
-      transform: translateY(0) scaleY(1);
-    }
-  }
-
-  @keyframes chat-activity-exit {
-    0% {
-      opacity: 1;
-      filter: blur(0);
-      transform: translateY(0) scaleY(1);
-    }
-    100% {
-      opacity: 0;
-      filter: blur(2px);
-      transform: translateY(14px) scaleY(0.96);
-    }
   }
 
   /* One dot's hop, as the Lottie file keys it (frames of a 110-frame loop at 60fps): a

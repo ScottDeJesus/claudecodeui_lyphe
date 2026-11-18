@@ -19,7 +19,7 @@ import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
 import { NotesPanel } from '@/modules/notes';
-import type { AppTab, FileOpenRequest, FilesRoot, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
+import type { AppTab, CompanionPresence, FileOpenRequest, FilesRoot, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { absolutePathIn } from '@/shared/utils';
@@ -95,13 +95,30 @@ async function readCapped(response: Response, cap: number): Promise<Blob | null>
 }
 
 
+/** The presence word each of a chat core's forms goes by, for the instrument's own marker (`data-state`); the form itself is handed over as `form`. */
+const CORE_PRESENCE: Record<CoreDrawingInput['state'], CompanionPresence['state']> = {
+  idle: 'idle', thinking: 'thinking', reading: 'reading_code', writing: 'drafting', speaking: 'speaking', listening: 'listening',
+};
+
 /**
  * A chat's core, drawn: the companion's own instrument (`CompanionAvatar`), made of the material and in the form the chat asks for, with no
  * voice and no look of its own. Handed to the chat through `CoreDrawingProvider`, because the chat module cannot import the companion's.
  * One function for the app's life, so the provider's value never changes.
  */
-const drawChatCore = ({ material, state, drive, size }: CoreDrawingInput) => (
-  <CompanionAvatar presence={{ state, session: null, files: null, walk: null }} voice={null} sentences={null} look={null} material={material} drive={drive} size={size} />
+const drawChatCore = ({ material, state, drive, size, azimuth }: CoreDrawingInput) => (
+  <CompanionAvatar
+    presence={{ state: CORE_PRESENCE[state], session: null, files: null, walk: null }}
+    voice={null}
+    sentences={null}
+    look={null}
+    material={material}
+    drive={drive}
+    size={size}
+    // The body alone, in the form the chat names: the chat draws the rings round it.
+    bare
+    form={state}
+    bearing={azimuth}
+  />
 );
 
 /**

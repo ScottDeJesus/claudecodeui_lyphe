@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon } from 'lucide-react';
 
 import { useTasksSettings } from '@/modules/task-master';
+import { coreDoingOf } from '@/modules/chat/utils/coreDoing';
 import { useChatCorePlace } from '@/shared/context/ChatCorePlaceContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
@@ -176,7 +177,6 @@ function ChatInterface({
     soulLaunchIds,
     addMessage,
     armReplyAnchor,
-    sessionActivity,
     isProcessing,
     canAbortSession,
     currentSessionId,
@@ -456,10 +456,8 @@ function ChatInterface({
     }
   }, [currentSessionId, provider, selectProviderEffort, selectedSession?.id]);
 
-  // Mirrors ChatComposer's own visibility check so the message pane can
-  // reserve enough bottom space to keep the floating status tab from
-  // overlapping the last message.
-  const hasActivityIndicator = Boolean(sessionActivity && pendingPermissionRequests.length === 0);
+  // What the chat is doing while its turn runs, read off the end of what is on screen: the form its core takes.
+  const coreDoing = useMemo(() => coreDoingOf(visibleMessages), [visibleMessages]);
 
   const readToolPermissionState = useToolPermissionState(pendingPermissionRequests, currentSessionId);
 
@@ -563,7 +561,6 @@ function ChatInterface({
           onTouchMove={handleScroll}
           isLoadingSessionMessages={isLoadingSessionMessages}
           isProcessing={isProcessing}
-          hasActivityIndicator={hasActivityIndicator}
           // The transcript asks the same permission layer the banner draws from:
           // a row blocked on one of those prompts must not read as done, and one
           // the person allowed by hand must not read as automatic.
@@ -641,8 +638,8 @@ function ChatInterface({
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}
-          activity={sessionActivity}
           isLoading={isProcessing}
+          doing={coreDoing}
           onAbortSession={handleAbortSession}
           permissionMode={permissionMode}
           availablePermissionModes={availablePermissionModes}

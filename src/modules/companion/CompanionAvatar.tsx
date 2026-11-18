@@ -37,9 +37,21 @@ type CompanionAvatarProps = {
   name?: string;
   /** The square she fills, in CSS pixels: it picks the tier (disc under 120 px, core under 260 px, the whole dial above). The canvases follow the square's own box frame by frame. */
   size: number;
+  /**
+   * The body alone, filling its square, at any size: no loop, pointer or dial of its own. For a core that wears its own rings (a chat's):
+   * the tier is `body` whatever `size` is.
+   */
+  bare?: boolean;
+  /** What the body is doing, said outright, in place of what `presence` folds to: a chat's core says it, Kaylee's never does. */
+  form?: AstrolabeFrameInput['state'];
+  /** Where what it reads or writes to lies from it, in degrees counter-clockwise from three o'clock, when no look or subject says: a chat's core gives its talk's side. */
+  bearing?: number;
 };
 
-/** Her fourteen presence words, as the four states the instrument knows. Reading, drafting and walking are her working: the instrument thinks. */
+/**
+ * Her fourteen presence words, as the six states the instrument knows: the body has a form for each. Reading a chat or code opens the
+ * mouth toward it; drafting sends the tendril out to what the draft is for; a walkthrough, a wake and a transcription are thought.
+ */
 const INSTRUMENT_STATE: Record<CompanionPresence['state'], AstrolabeFrameInput['state']> = {
   idle: 'idle',
   cut: 'idle',
@@ -51,9 +63,9 @@ const INSTRUMENT_STATE: Record<CompanionPresence['state'], AstrolabeFrameInput['
   transcribing: 'thinking',
   thinking: 'thinking',
   waking: 'thinking',
-  reading_session: 'thinking',
-  reading_code: 'thinking',
-  drafting: 'thinking',
+  reading_session: 'reading',
+  reading_code: 'reading',
+  drafting: 'writing',
   walking: 'thinking',
 };
 
@@ -70,6 +82,20 @@ function bearingOf(subject: string): number {
   return ((hash >>> 0) % 3600) / 10;
 }
 
+/**
+ * A voice for a body that speaks with none to hear: a reply arriving as text. Syllables at about five a second inside slower phrases,
+ * with a hard onset now and then, so the lobes swell and the spikes stand in a cadence and never on a loop that reads as a metronome.
+ * `at` is seconds; `previous` carries the count of onsets from frame to frame.
+ */
+function frameFromCadence(at: number, previous: AstrolabeVoiceFrame | null): AstrolabeVoiceFrame {
+  const syllable = 0.5 + 0.5 * Math.sin(at * Math.PI * 2 * 4.7 + 1.3 * Math.sin(at * 1.9));
+  const phrase = 0.55 + 0.45 * Math.sin(at * Math.PI * 2 * 0.31 + 0.8 * Math.sin(at * 0.47));
+  const rms = 0.1 + 0.34 * syllable * phrase;
+  // An onset as a syllable rises through its middle, on the louder half of a phrase.
+  const rising = previous !== null && previous.rms < 0.27 && rms >= 0.27;
+  return { rms, low: 0.18 + 0.5 * phrase * (0.4 + 0.6 * syllable), mid: 0.12 + 0.42 * syllable * phrase, high: 0.2 * syllable, f0: 0, voicing: 0, onsets: (previous?.onsets ?? 0) + (rising ? 1 : 0), onsetAmp: rising ? 0.45 + 0.3 * phrase : previous?.onsetAmp ?? 0 };
+}
+
 /** What her voice is doing when the page's analyser is not there yet: the player's level alone, shaped into bands. */
 function frameFromLevel(level: number, previous: AstrolabeVoiceFrame | null): AstrolabeVoiceFrame {
   const rms = Math.min(1, level * 3);
@@ -83,8 +109,13 @@ function frameFromLevel(level: number, previous: AstrolabeVoiceFrame | null): As
  * provider-bound face that her button's disc and the station's head and portrait draw), by Settings' material card, and by the station
  * module's fixtures, which draw her on fixture presences; the face fills the square it is given and owns no chrome.
  *
- * TIERS by the square: under 120 px (her button) the loop round a 2D chrome core; under 260 px the raymarched WebGL core inside the loop;
- * above, the whole dial. The instrument owns its canvases (`astrolabeInstrument.ts`); this component feeds it once per animation frame
+ * TIERS by the square, and the raymarched WebGL core is in all of them: under 120 px (the button, the home, the station's halo) the
+ * core inside its loop; under 260 px the same with more room; above, the whole dial. `bare` is the core alone at any size, for a core
+ * that wears rings of its own (a chat's).
+ *
+ * THE BODY HAS A FORM FOR EACH STATE (`astrolabeInstrument.ts` says each): a tide at rest, a dish while listening, lobes and spikes
+ * while speaking, a polyhedron while thinking, a mouth turned to what is read, a tendril out to what is written. The instrument owns
+ * its canvases; this component feeds it once per animation frame
  * from refs, so her voice redraws nothing in React. A face off screen or in a hidden tab draws nothing.
  *
  * WHAT DRAWS WHAT. Speaking: her player's analyser drives the lobes, the spikes where the core extrudes, the shocks on hard consonants
@@ -96,10 +127,10 @@ function frameFromLevel(level: number, previous: AstrolabeVoiceFrame | null): As
  * Her accessible name is her name and the state in words ("Kaylee, reading Bugfixes"), which a button around her may replace with a label
  * of its own; the canvases are for the eye alone.
  */
-export function CompanionAvatar({ presence, voice, sentences, look, material = 'mercury', drive = 0, name, size }: CompanionAvatarProps) {
+export function CompanionAvatar({ presence, voice, sentences, look, material = 'mercury', drive = 0, name, size, bare = false, form, bearing }: CompanionAvatarProps) {
   const { t } = useTranslation();
   const her = name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
-  const tier: AstrolabeTier = size < 120 ? 'disc' : size < 260 ? 'core' : 'dial';
+  const tier: AstrolabeTier = bare ? 'body' : size < 120 ? 'disc' : size < 260 ? 'core' : 'dial';
   const frameRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
 
@@ -117,9 +148,9 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
   })();
 
   // The latest of what the loop reads, kept off React's render path: a frame reads these, and each commit replaces them.
-  const latest = useRef({ presence, voice, sentences, look, material, drive, label });
+  const latest = useRef({ presence, voice, sentences, look, material, drive, label, form, bearing });
   useLayoutEffect(() => {
-    latest.current = { presence, voice, sentences, look, material, drive, label };
+    latest.current = { presence, voice, sentences, look, material, drive, label, form, bearing };
   });
 
   useEffect(() => {
@@ -159,7 +190,7 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
         return;
       }
       const current = latest.current;
-      const state = INSTRUMENT_STATE[current.presence.state];
+      const state = current.form ?? INSTRUMENT_STATE[current.presence.state];
       frameCount += 1;
       if (state === 'idle' && frameCount % IDLE_FRAME_STRIDE !== 0) return;
       const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
@@ -174,6 +205,10 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
             levelFrame = frameFromLevel(current.voice.level(), levelFrame);
             heard = levelFrame;
           }
+        } else if (state === 'speaking') {
+          // No voice on this page to hear (a chat's core, whose reply arrives as text): it speaks on a cadence of its own.
+          levelFrame = frameFromCadence(now / 1000, levelFrame);
+          heard = levelFrame;
         } else if (state === 'listening') {
           const tap = listeningTap();
           if (tap) heard = hearVoice(tap);
@@ -193,6 +228,7 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
         const working = p.state === 'reading_code' || p.state === 'reading_session' || p.state === 'drafting' || p.state === 'walking';
         const azimuth = anchor && (anchor.dx !== 0 || anchor.dy !== 0)
           ? (Math.atan2(-anchor.dy, anchor.dx) * 180) / Math.PI
+          : current.bearing !== undefined ? current.bearing
           : working ? bearingOf(subject ?? p.state) : null;
         instrument.frame(dt, {
           state,

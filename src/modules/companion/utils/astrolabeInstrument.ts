@@ -1,10 +1,18 @@
-// Her face's instrument: the Astrolabe visualizer drawn into a square, without React. CompanionAvatar makes one per face and calls
-// `frame` on every animation frame with what she is doing; this file owns the canvases, the WebGL core and every motion constant.
+// The companion's instrument: the Astrolabe visualizer drawn into a square, without React. CompanionAvatar makes one per face and calls
+// `frame` on every animation frame with what the companion is doing; this file owns the canvases, the WebGL core and every motion constant.
 //
-// THREE TIERS, by the square's size (CompanionAvatar chooses): `disc` (her button) is one 2D canvas, the breathing loop round a chrome
-// core drawn from the chrome ramp; `core` adds the raymarched ferrofluid core in WebGL between a back and a front canvas; `dial` (the
-// station's portrait) is the whole rig: the core inside two armillary rings (their back halves behind it, their front halves over it),
-// the loop, a bezel and the reticle that slews to where she is looking and locks.
+// FOUR TIERS (CompanionAvatar chooses), and the raymarched ferrofluid core is in every one, so the body takes its forms at any size:
+// `disc` (the button, the home, the station's halo) is the core inside the breathing loop, as large as the forms' reach allows;
+// `core` gives the loop more room and adds the echoes; `dial` (the station's portrait) is the whole rig: the core inside two armillary
+// rings (their back halves behind it, their front halves over it), the loop, a bezel and the reticle that slews to what is being read
+// and locks; `body` is the core ALONE, filling the square, for a core that wears rings of its own (a chat's). Where WebGL is missing
+// or lost, every tier falls back to a 2D chrome core.
+//
+// THE BODY TAKES A FORM FOR EACH THING IT DOES (the design system's Core): at rest a tide, one long bulge coming round on a slow swell;
+// listening, a dish that faces the reader with what it hears standing on it as rings; speaking, lobes and spikes in time with the
+// voice; thinking, it stiffens into a polyhedron whose facets hold, then turn and re-cut on a beat; reading, a mouth opens toward what
+// it reads and the surface spirals down into it; writing, a tendril springs out at what it writes to, needles riding out along it.
+// It never cuts between them: every form eases in and out (70 to 250 ms), and the tendril goes out and comes back on a spring.
 //
 // EVERYTHING IS READ FROM TOKENS. Colours come from tokens.css's custom properties on the host (the signal colours of her material, the
 // ground, the accent, the warn dot, the chrome ramp), re-read a few times a second and eased, so a theme switch or a new material
@@ -143,6 +151,11 @@ precision mediump float;
 #endif
 varying vec2 vUv;
 uniform float uTime, uR, uBound, uSpikeH, uSpikeB, uSpikeN, uBreath, uThink, uHalo, uEnergy, uPx, uStepK, uFlow, uDay;
+/* the kinetic states: how much of each is present (0 to 1), and what drives it */
+uniform float uListen, uRead, uWrite, uSwell, uFacetT;
+uniform vec4 uTide, uRip, uTen;
+uniform vec3 uAim;
+uniform mat3 uFacet;
 uniform vec3 uL0, uL1, uL2, uLA, uLK, uCA, uCB, uHaloC;
 uniform vec4 uW;
 uniform vec4 uS0, uS1, uS2, uS3, uSA;
@@ -172,9 +185,59 @@ float box(vec3 r, vec3 d, vec2 hs, float soft) {
 float field(vec3 n) {
   return uLA.x * pow(max(dot(n, uL0), 0.0), uLK.x) + uLA.y * pow(max(dot(n, uL1), 0.0), uLK.y) + uLA.z * pow(max(dot(n, uL2), 0.0), uLK.z);
 }
+/* Thinking: the liquid stiffens into a polyhedron. Twenty-six planes on thirteen axes (a dodecahedron's six, an
+   octahedron's four, a cube's three); the surface is whichever plane is nearest along n. Each plane sits at its own
+   depth and the depths jump together on uFacetT, so faces appear, widen and are cut away: it holds, then re-forms. */
+float facetR(vec3 q, vec3 a, float rho, float ph) {
+  return (rho + 0.055 * sin(uFacetT * 2.4 + ph)) / max(abs(dot(q, a)), 0.05);
+}
+float facets(vec3 n) {
+  vec3 q = uFacet * n;
+  float r = facetR(q, vec3(0.0, 0.5257, 0.8507), 0.88, 0.0);
+  r = min(r, facetR(q, vec3(0.0, -0.5257, 0.8507), 0.88, 1.9));
+  r = min(r, facetR(q, vec3(0.5257, 0.8507, 0.0), 0.88, 3.7));
+  r = min(r, facetR(q, vec3(-0.5257, 0.8507, 0.0), 0.88, 5.1));
+  r = min(r, facetR(q, vec3(0.8507, 0.0, 0.5257), 0.88, 0.8));
+  r = min(r, facetR(q, vec3(0.8507, 0.0, -0.5257), 0.88, 2.9));
+  r = min(r, facetR(q, vec3(0.5774, 0.5774, 0.5774), 0.95, 4.4));
+  r = min(r, facetR(q, vec3(-0.5774, 0.5774, 0.5774), 0.95, 1.3));
+  r = min(r, facetR(q, vec3(0.5774, -0.5774, 0.5774), 0.95, 5.8));
+  r = min(r, facetR(q, vec3(0.5774, 0.5774, -0.5774), 0.95, 2.4));
+  r = min(r, facetR(q, vec3(1.0, 0.0, 0.0), 0.97, 3.2));
+  r = min(r, facetR(q, vec3(0.0, 1.0, 0.0), 0.97, 0.4));
+  r = min(r, facetR(q, vec3(0.0, 0.0, 1.0), 0.97, 4.9));
+  return r - 1.0;
+}
 float disp(vec3 n) {
-  float d = uBreath * (sin(3.1 * n.x + uTime * 0.71) * sin(2.7 * n.y - uTime * 0.53) * sin(3.3 * n.z + uTime * 0.47) + 0.5 * sin(5.3 * n.y + 1.7 * n.x + uTime * 1.13));
-  if (uThink > 0.003) d += uThink * 0.011 * sin(17.0 * n.x + uTime * 9.0) * sin(19.0 * n.y - uTime * 8.0) * sin(15.0 * n.z + uTime * 7.0);
+  /* what is liquid about it goes still as it stiffens */
+  float liquid = 1.0 - uThink;
+  float d = liquid * uBreath * (sin(3.1 * n.x + uTime * 0.71) * sin(2.7 * n.y - uTime * 0.53) * sin(3.3 * n.z + uTime * 0.47) + 0.5 * sin(5.3 * n.y + 1.7 * n.x + uTime * 1.13));
+  /* Idle: a tide. One long bulge whose axis slowly comes round, on a slow swell of the whole body. */
+  float ta = dot(n, uTide.xyz);
+  d += uTide.w * (1.5 * ta * ta - 0.5) + uSwell;
+  if (uThink > 0.003) d += uThink * facets(n);
+  /* Listening: it flattens into a dish that faces you, and what it hears stands on the dish as rings. */
+  if (uListen > 0.003) {
+    float cz = n.z, rho2 = max(1.0 - cz * cz, 0.0), rho = sqrt(rho2);
+    d += uListen * (inversesqrt(rho2 / 1.21 + cz * cz / 0.3) - 1.0);
+    float face = smoothstep(-0.05, 0.3, cz);
+    d += uListen * uRip.z * cos(uRip.x * rho) * uRip.y * face * (1.0 - smoothstep(0.72, 0.9, rho));
+    /* the lip of the dish */
+    d += uListen * 0.03 * exp(-(rho - 0.9) * (rho - 0.9) * 90.0) * face;
+  }
+  /* Reading: a mouth opens toward what it reads, and the surface spirals down into it. */
+  if (uRead > 0.003) {
+    float th = acos(clamp(dot(n, uAim), -1.0, 1.0));
+    vec3 ru = normalize(cross(uAim, vec3(0.0, 1.0, 0.001)));
+    vec3 rv = cross(uAim, ru);
+    float ph = atan(dot(n, rv), dot(n, ru));
+    d -= uRead * 0.4 * exp(-th * th * 7.0);
+    d += uRead * 0.05 * exp(-(th - 0.66) * (th - 0.66) * 16.0);
+    d += uRead * 0.034 * sin(3.0 * ph + 7.0 * log(th + 0.08) + uTime * 5.0) * smoothstep(0.05, 0.3, th) * exp(-th * th * 1.3);
+    /* what it drinks: a ring drawn in from the far side and swallowed, again and again */
+    float g = fract(uTime * 0.8), tg = 2.5 * (1.0 - g);
+    d += uRead * 0.03 * sin(PI * g) * exp(-(th - tg) * (th - tg) * 46.0);
+  }
   if (uFlow > 0.0005) d += uFlow * sin(2.3 * n.x + uTime * 1.9 + 1.7 * sin(1.3 * n.y + uTime * 0.7)) * sin(2.9 * n.y - uTime * 1.4 + 1.1 * sin(1.7 * n.z - uTime * 0.9)) * sin(2.1 * n.z + uTime * 1.1);
   d += field(n);
   if (uSA.x > 0.0005) d += shockW(n, uS0, uSA.x);
@@ -229,10 +292,36 @@ float spikes(vec3 p, vec3 n, float d) {
   }
   return d;
 }
+/* Writing: a tendril reaches for the target with a bouton at its end, and needles ride out along it, point first.
+   uTen = (how far it reaches beyond the surface in radii, its thickness, where the needles are, the bouton's size). */
+float tendril(vec3 p, float d) {
+  float s = dot(p, uAim);
+  if (s < uR * 0.3) return d;
+  vec3 tu = normalize(cross(uAim, vec3(0.0, 0.001, 1.0)));
+  vec3 tv = cross(uAim, tu);
+  float L = uR * (1.0 + uTen.x);
+  float k = clamp((s - uR * 0.85) / max(L - uR * 0.85, 1e-3), 0.0, 1.0);
+  /* it wavers like something alive, pinned at the root and at the target */
+  float wv = sin(PI * k) * uR * 0.04;
+  vec2 w = vec2(dot(p, tu), dot(p, tv)) - wv * vec2(sin(k * 9.0 - uTime * 6.0), 0.6 * cos(k * 7.0 - uTime * 4.6));
+  float rad = uR * uTen.y * mix(2.6, 1.0, smoothstep(0.0, 0.45, k));
+  for (int j = 0; j < 3; j++) {
+    float f = fract(uTen.z + float(j) / 3.0);
+    float x = k - f;
+    /* a needle: widest at its tail, drawn to a point at the front */
+    float prof = clamp(-x / 0.2, 0.0, 1.0) * smoothstep(-0.24, -0.2, x) * step(x, 0.0);
+    rad += uR * 0.055 * prof * smoothstep(0.0, 0.1, f) * (1.0 - smoothstep(0.86, 1.0, f));
+  }
+  float dc = length(w) - rad;
+  dc = max(dc, s - L);
+  dc = min(dc, length(p - uAim * L) - uR * uTen.w);
+  return smin(d, dc, uR * 0.1);
+}
 float map(vec3 p) {
   float r = length(p);
   vec3 n = p / max(r, 1e-4);
   float d = r - uR * (1.0 + disp(n));
+  if (uTen.x > 0.004) d = tendril(p, d);
   if (uSpikeH > 0.006) {
     /* only pay for the spike lattice near a mound that is actually extruding */
     float near = max(step(0.01, uLA.x) * pow(max(dot(n, uL0), 0.0), uLK.x), max(step(0.01, uLA.y) * pow(max(dot(n, uL1), 0.0), uLK.y), step(0.01, uLA.z) * pow(max(dot(n, uL2), 0.0), uLK.z)));
@@ -373,9 +462,8 @@ void main() {
   col += uHaloC * halo * mix(1.0, 0.25, uDay) * (1.0 - alpha);
   alpha = alpha + halo * 0.25 * (1.0 - alpha);
   gl_FragColor = vec4(col, alpha);
-}
-`;
-const CORE_UNIFORMS = ['uFlow', 'uLK', 'uTime', 'uR', 'uBound', 'uSpikeH', 'uSpikeB', 'uSpikeN', 'uBreath', 'uThink', 'uHalo', 'uEnergy', 'uPx', 'uStepK', 'uL0', 'uL1', 'uL2', 'uLA', 'uW', 'uCA', 'uCB', 'uHaloC', 'uS0', 'uS1', 'uS2', 'uS3', 'uSA', 'uSpin', 'uSteps', 'uDay'] as const;
+}`;
+const CORE_UNIFORMS = ['uFlow', 'uLK', 'uTime', 'uR', 'uBound', 'uSpikeH', 'uSpikeB', 'uSpikeN', 'uBreath', 'uThink', 'uHalo', 'uEnergy', 'uPx', 'uStepK', 'uL0', 'uL1', 'uL2', 'uLA', 'uW', 'uCA', 'uCB', 'uHaloC', 'uS0', 'uS1', 'uS2', 'uS3', 'uSA', 'uSpin', 'uSteps', 'uDay', 'uListen', 'uRead', 'uWrite', 'uSwell', 'uFacetT', 'uTide', 'uRip', 'uTen', 'uAim', 'uFacet'] as const;
 type CoreUniforms = Partial<Record<(typeof CORE_UNIFORMS)[number], number | readonly number[] | Float32Array>>;
 
 /** The spin of the spike lattice about a fixed tilted axis. */
@@ -392,6 +480,36 @@ function spinMatrix(angle: number): Float32Array {
   const t = 1 - c;
   return new Float32Array([t * x * x + c, t * x * y + s * z, t * x * z - s * y, t * x * y - s * z, t * y * y + c, t * y * z + s * x, t * x * z + s * y, t * y * z - s * x, t * z * z + c]);
 }
+
+/** A turn of `angle` about any axis, column-major as the shader wants it. */
+function axisTurn(ux: number, uy: number, uz: number, angle: number): number[] {
+  const length = Math.hypot(ux, uy, uz) || 1;
+  const x = ux / length;
+  const y = uy / length;
+  const z = uz / length;
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  const t = 1 - c;
+  return [t * x * x + c, t * x * y + s * z, t * x * z - s * y, t * x * y - s * z, t * y * y + c, t * y * z + s * x, t * x * z + s * y, t * y * z - s * x, t * z * z + c];
+}
+
+/** The product of two turns, column-major. */
+function turns(a: number[], b: number[]): Float32Array {
+  const out = new Float32Array(9);
+  for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) out[c * 3 + r] = a[r] * b[c * 3] + a[3 + r] * b[c * 3 + 1] + a[6 + r] * b[c * 3 + 2];
+  return out;
+}
+
+/** Time that holds, then jumps: a beat every `tau` seconds, crossed in the first fifth of it. The polyhedron's facets turn on it. */
+function stepped(t: number, tau: number): number {
+  const x = t / tau;
+  const f = x - Math.floor(x);
+  const k = clamp(f / 0.2, 0, 1);
+  return Math.floor(x) + k * k * (3 - 2 * k);
+}
+
+/** How far the tendril reaches beyond the surface, in core radii. */
+const TENDRIL_REACH = 1.06;
 
 type CoreGl = { draw: (uniforms: CoreUniforms) => void; destroy: () => void; lost: () => boolean };
 
@@ -518,10 +636,10 @@ function makeCanvas(host: HTMLElement): HTMLCanvasElement {
  */
 export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier, initialMaterial: CompanionMaterial): AstrolabeInstrument {
   const back = tier === 'dial' ? makeCanvas(host) : null;
-  const glCanvas = tier === 'disc' ? null : makeCanvas(host);
+  const glCanvas = makeCanvas(host);
   const front = makeCanvas(host);
-  const core = glCanvas ? createCoreGl(glCanvas) : null;
-  if (glCanvas && !core) glCanvas.style.display = 'none';
+  const core = createCoreGl(glCanvas);
+  if (!core) glCanvas.style.display = 'none';
 
   let size = 0;
   let material = initialMaterial;
@@ -533,7 +651,12 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
   let fastMs = 0;
 
   // The instrument's envelopes and eases (`v`), the pointer and its lock (`dial`), the rings, the lobes and what rides out on an onset.
-  const v = { t: 0, think: 0, speak: 0, listen: 0, rms: 0, low: 0, mid: 0, high: 0, energy: 0, spikeEnv: 0, f0: 0, voicing: 0, presence: 1, drive: 0 };
+  // `work` is being at work at all (thinking, reading or writing): the rig follows it. `think`, `read` and `write` are the body's forms.
+  const v = { t: 0, think: 0, work: 0, read: 0, write: 0, speak: 0, listen: 0, rms: 0, low: 0, mid: 0, high: 0, energy: 0, spikeEnv: 0, f0: 0, f0vis: 150, voicing: 0, presence: 1, drive: 0 };
+  // Where the body's mouth faces and its tendril runs, and how far the tendril is out (a spring, with its speed).
+  let aim: Vec3 = norm3([0.4, 0.45, 0.8]);
+  let tendril = 0;
+  let tendrilVel = 0;
   const dial = {
     az: 1.15, azVel: 0, lockErr: 1, locked: false, acquired: false, lockAmt: 0, lockPulse: 0, sweep: 0, thinkStart: 0, wasThinking: false, target: null as number | null,
     inPsi: 0, inPsiT: 0, inOmega: 0.4, inIota: 70 * DEG, midPsi: 2, midPsiT: 2, midOmega: 2.3, midIota: 54 * DEG, pitchDev: 0, walk: 0,
@@ -580,7 +703,10 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       const R = size / 5.4;
       return { Ro: 2.3 * R, R, glSide: 4.6 * R };
     }
-    return { Ro: size * 0.42, R: size * 0.25, glSide: 0 };
+    // The body alone: the GL square is the whole square, so the body is as large as its forms' reach allows.
+    if (tier === 'body') return { Ro: size / 2, R: size / 4.6, glSide: size };
+    // The disc: the same body in the same square, with the loop drawn through the reach of its forms.
+    return { Ro: size * 0.42, R: size / 4.6, glSide: size };
   };
 
   const resize = (next: number) => {
@@ -588,7 +714,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     const scale = dpr();
     if (back) fit(back, size, scale, 0);
     fit(front, size, scale, 0);
-    if (glCanvas && core) {
+    if (core) {
       const { glSide } = geometry();
       const side = Math.round(glSide);
       const px = Math.max(64, Math.round(side * Math.min(scale, 1.5) * quality));
@@ -606,7 +732,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
   /** The loop: one ring whose radius ripples with the formant bands; it breaks into turning dashes while she thinks. */
   const drawLoop = (ctx: CanvasRenderingContext2D, cx: number, cy: number, Ro: number, colour: Rgb, solo: boolean, rate: number) => {
     const sp = v.speak;
-    const th = v.think;
+    const th = v.work;
     const gm = solo ? 2.2 : 1;
     const a3 = (0.004 + 0.013 * v.low * gm) * sp + 0.012 * v.listen * v.rms;
     const a7 = 0.007 * v.mid * sp * gm;
@@ -702,9 +828,9 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     ctx.fill();
   };
 
-  /** The 2D chrome core: the Mercury ramp in a breathing outline (the disc tier, and where WebGL is missing). */
+  /** The 2D chrome core: the Mercury ramp in a breathing outline, drawn where WebGL is missing or lost. */
   const drawChromeCore = (ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number) => {
-    const k = 1 + 0.06 * v.rms * v.speak - 0.03 * v.listen + 0.02 * v.think * Math.sin(v.t * 9);
+    const k = 1 + 0.06 * v.rms * v.speak - 0.03 * v.listen + 0.02 * v.work * Math.sin(v.t * 9);
     ctx.beginPath();
     for (let i = 0; i <= 120; i++) {
       const a = (i / 120) * TAU;
@@ -752,10 +878,15 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
 
     // State eases and envelopes: features move the instrument only while she speaks or listens.
     const state = input.state;
-    const thinking = state === 'thinking';
+    // At work at all: thinking, reading or writing. The rig (the loop's dashes, the rings' pace, the pointer's sweep and lock) follows
+    // `working`; the body takes the form of whichever of the three it is.
+    const working = state === 'thinking' || state === 'reading' || state === 'writing';
     v.t += dt * asleepRate;
     clock += dt * rate;
-    v.think = ease(v.think, thinking ? 1 : 0, dt, thinking ? 0.07 : 0.2);
+    v.think = ease(v.think, state === 'thinking' ? 1 : 0, dt, state === 'thinking' ? 0.07 : 0.2);
+    v.work = ease(v.work, working ? 1 : 0, dt, working ? 0.07 : 0.2);
+    v.read = ease(v.read, state === 'reading' ? 1 : 0, dt, 0.22);
+    v.write = ease(v.write, state === 'writing' ? 1 : 0, dt, 0.14);
     v.speak = ease(v.speak, state === 'speaking' ? 1 : 0, dt, 0.16);
     v.listen = ease(v.listen, state === 'listening' ? 1 : 0, dt, 0.25);
     v.presence = ease(v.presence, input.asleep ? 0.55 : 1, dt, 0.4);
@@ -766,7 +897,10 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     v.mid = follow(v.mid, heard ? heard.mid : 0, dt, 0.015, 0.09);
     v.high = follow(v.high, heard ? heard.high : 0, dt, 0.006, 0.05);
     v.voicing = follow(v.voicing, heard ? heard.voicing : 0, dt, 0.02, 0.07);
-    if (heard && heard.f0 > 0) v.f0 = heard.f0;
+    if (heard && heard.f0 > 0) {
+      v.f0 = heard.f0;
+      v.f0vis = ease(v.f0vis, heard.f0, dt, 0.15);
+    }
     v.energy = ease(v.energy, v.rms, dt, 0.12);
     v.spikeEnv = follow(v.spikeEnv, v.rms, dt, 0.035, 0.3);
 
@@ -796,14 +930,14 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     echoes = echoes.filter((e) => e.age < 0.95);
 
     // The pointer: sweeps for the first 42% of the anticipation window, springs to where she looks, locks; drifts with no target.
-    if (thinking && !dial.wasThinking) dial.thinkStart = now;
-    dial.wasThinking = thinking;
+    if (working && !dial.wasThinking) dial.thinkStart = now;
+    dial.wasThinking = working;
     const target = input.azimuth === null ? null : input.azimuth * DEG;
     if (target !== dial.target) {
       dial.target = target;
       dial.acquired = false;
     }
-    const sweeping = thinking && (target === null || now - dial.thinkStart < 320 * 0.42);
+    const sweeping = working && (target === null || now - dial.thinkStart < 320 * 0.42);
     const steps = Math.max(1, Math.ceil(dt / 0.008));
     const h = dt / steps;
     for (let i = 0; i < steps; i++) {
@@ -835,26 +969,27 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     dial.sweep += dt * 4.2 * rate;
 
     // The armillary rings tick with her units and words, tilt with pitch, lean in while she listens.
-    dial.inPsiT += dt * (0.12 + 0.9 * v.think) * rate;
-    dial.midPsiT -= dt * (0.05 + 0.5 * v.think) * rate;
+    dial.inPsiT += dt * (0.12 + 0.9 * v.work) * rate;
+    dial.midPsiT -= dt * (0.05 + 0.5 * v.work) * rate;
     dial.inPsi = ease(dial.inPsi, dial.inPsiT, dt, 0.07);
     dial.midPsi = ease(dial.midPsi, dial.midPsiT, dt, 0.12);
     const pitchDeviation = v.f0 > 0 && v.voicing > 0.3 ? clamp((v.f0 - 190) / 190, -0.4, 0.4) : 0;
     dial.pitchDev = ease(dial.pitchDev, pitchDeviation, dt, 0.1);
-    dial.inOmega += dt * (0.06 + 0.45 * v.think) * rate;
-    dial.midOmega -= dt * (0.035 + 0.3 * v.think) * rate;
-    dial.inIota = (70 + 5 * Math.sin(v.t * 0.31) + 8 * v.think - 16 * v.listen) * DEG;
+    dial.inOmega += dt * (0.06 + 0.45 * v.work) * rate;
+    dial.midOmega -= dt * (0.035 + 0.3 * v.work) * rate;
+    dial.inIota = (70 + 5 * Math.sin(v.t * 0.31) + 8 * v.work - 16 * v.listen) * DEG;
     dial.midIota = (54 + 32 * dial.pitchDev - 18 * v.listen) * DEG;
 
     // The core's lobes: damped springs that swell, overshoot and settle; their directions glide after the ring nodes and the pointer.
+    // Speaking pulls it out into them; writing leans it toward its target, where the tendril leaves it. Thinking and listening have
+    // forms of their own (the polyhedron, the dish), so neither moves a lobe.
     const sp = v.speak;
-    const ls = v.listen;
     const w0 = TAU * 2.3;
     const z0 = 0.36;
     const lobeTargets = [
-      0.42 * v.low * sp + 0.02 * v.think - 0.13 * v.low * ls,
-      0.32 * (0.6 * v.low + 0.4 * v.mid) * sp + 0.02 * v.think - 0.09 * v.mid * ls,
-      0.1 * dial.lockPulse + 0.2 * v.rms * sp + 0.05 * v.think - 0.05 * v.rms * ls,
+      0.42 * v.low * sp,
+      0.32 * (0.6 * v.low + 0.4 * v.mid) * sp,
+      0.1 * dial.lockPulse + 0.2 * v.rms * sp + 0.12 * v.write,
     ];
     for (let s = 0; s < steps; s++) {
       for (let i = 0; i < 3; i++) {
@@ -874,7 +1009,23 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       lobes.d[i] = norm3([lerp(d0[0], d1[0], glide), lerp(d0[1], d1[1], glide), lerp(d0[2], d1[2], glide)]);
       lobes.k[i] = 5 + 6 * clamp(Math.abs(lobes.a[i]) / 0.3, 0, 1);
     }
-    spin += dt * (0.05 + 0.35 * v.energy * v.speak + 0.3 * v.think) * rate;
+    spin += dt * (0.05 + 0.35 * v.energy * v.speak) * rate;
+    // What it reads or writes to lies where the pointer points: the mouth turns to face it and the reader; the tendril runs straight at it.
+    if (v.read > 0.01 || v.write > 0.01) {
+      const reading = v.read / (v.read + v.write + 1e-4);
+      const flat = lerp(1, 0.52, reading);
+      const toward = norm3([Math.cos(dial.az) * flat, Math.sin(dial.az) * flat, lerp(0.12, 0.82, reading)]);
+      const turn = 1 - Math.exp(-dt / 0.16);
+      aim = norm3([lerp(aim[0], toward[0], turn), lerp(aim[1], toward[1], turn), lerp(aim[2], toward[2], turn)]);
+    }
+    // The tendril: sprung out to its reach while it writes, drawn back in when it stops.
+    const reachTo = state === 'writing' ? TENDRIL_REACH : 0;
+    const wt = TAU * 1.9;
+    const zt = 0.5;
+    for (let i = 0; i < steps; i++) {
+      tendrilVel += (wt * wt * (reachTo - tendril) - 2 * zt * wt * tendrilVel) * h;
+      tendril = clamp(tendril + tendrilVel * h, 0, 1.12);
+    }
     const ti = MATERIALS.indexOf(material);
     for (let i = 0; i < MATERIALS.length; i++) {
       const goal = i === ti ? 1 : 0;
@@ -893,8 +1044,8 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       const bctx = begin2d(back);
       if (bctx) drawRingsBack(bctx, cx, cy, R, Ro);
     }
-    const busy = v.think > 0.01 || v.speak > 0.01 || v.listen > 0.01 || shocks.length > 0;
-    if (core && glCanvas && !core.lost()) {
+    const busy = v.think > 0.01 || v.speak > 0.01 || v.listen > 0.01 || v.read > 0.01 || v.write > 0.01 || shocks.length > 0;
+    if (core && !core.lost()) {
       const ms = dt * 1000;
       if (busy) {
         if (ms > 24) {
@@ -920,6 +1071,8 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     const fctx = begin2d(front);
     if (!fctx) return;
     if (!core || core.lost()) drawChromeCore(fctx, cx, cy, R);
+    // The body alone wears no loop, pointer or echo of its own: whoever draws it draws its rings.
+    if (tier === 'body') return;
     if (tier === 'dial') drawRingsFront(fctx, cx, cy, R, Ro);
     drawLoop(fctx, cx, cy, Ro, loopColour, tier !== 'dial', rate);
     drawWalk(fctx, cx, cy, Ro, input.walk);
@@ -939,14 +1092,16 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
   };
 
   const drawCore = () => {
-    if (!core || !glCanvas) return;
+    if (!core) return;
     // The GL square is 4.6 core radii across in every tier, so the core's radius in its own clip space is fixed.
     const uR = 2 / 4.6;
     const sp = v.speak;
     const th = v.think;
     const ls = v.listen;
-    // The voice's loudness, or how hard it is driven when that is more: the filament, the charge and the glow all feed on it.
-    const E = Math.max(v.rms, 0.5 * v.drive);
+    const rd = v.read;
+    const wr = v.write;
+    const drv = v.drive;
+    const E = v.rms;
     const LA = lobes.a;
     const se = clamp((v.spikeEnv - 0.02) / 0.3, 0, 1);
     const spikeH = 0.62 * se * se * (3 - 2 * se) * sp;
@@ -964,13 +1119,35 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     }
     const lobeSum = Math.max(0, LA[0]) + Math.max(0, LA[1]) + Math.max(0, LA[2]);
     const lobeMag = Math.max(Math.abs(LA[0]), Math.abs(LA[1]), Math.abs(LA[2]));
-    const bound = Math.min(0.985, uR * (1 + lobeSum + spikeH + 0.1 + shockMax * 1.2));
-    const slope = 2.1 * lobeMag + 22 * shockMax + 0.15;
+    // At rest: a tide. A slow swell, in a little faster than out, and one long bulge whose axis comes round. It is there only as far
+    // as nothing else is: any other form calms it away.
+    const calm = (1 - clamp(Math.max(sp, ls, rd, wr), 0, 1)) * (1 - th);
+    const breath = (clock * TAU) / 7.5;
+    const round = clock * 0.12;
+    const swell = 0.02 * (Math.sin(breath) - 0.2 * Math.sin(2 * breath)) * calm;
+    const tide = [...norm3([Math.cos(round), 0.3 * Math.sin(clock * 0.19), Math.sin(round)]), 0.05 * (0.65 + 0.35 * Math.sin(breath - 0.9)) * calm];
+    // Listening: more rings the higher the voice, deeper the louder it is; they stand, and pulse.
+    const ringCount = 16 + 20 * clamp((v.f0vis - 90) / 260, 0, 1);
+    const ringDepth = Math.min(0.01 + 0.07 * v.rms, 0.85 / ringCount);
+    // Thinking: the facets hold, then turn and re-cut on a beat.
+    const facetBeat = stepped(clock, 0.95);
+    const facet = turns(axisTurn(0.3, 0.9, 0.2, facetBeat * 0.62), axisTurn(0.8, -0.1, 0.55, stepped(clock + 0.4, 1.9) * 0.9));
+    // Writing: three needles in flight along the tendril; the bouton at its end swells as each one lands.
+    const needles = clock * 1.35;
+    const landing = needles * 3 - Math.floor(needles * 3);
+    const out = clamp(tendril / TENDRIL_REACH, 0, 1);
+    const bouton = (0.062 + 0.04 * Math.exp(-landing * 5)) * out;
+    const thick = Math.max(0.02, (1.1 * 2) / (glCanvas.width || 1) / uR);
+    const bound = Math.min(0.985, uR * Math.max(1 + lobeSum + spikeH + 0.1 + shockMax * 1.2 + 0.07 * calm + 0.09 * drv + 0.13 * ls + 0.24 * th + 0.06 * rd, tendril > 0.004 ? 1 + tendril + bouton + 0.06 : 0));
+    const slope = 2.1 * lobeMag + 22 * shockMax + 0.15 + 0.7 * drv + (0.9 + ringDepth * ringCount) * ls + 1.0 * rd + 0.8 * th + 0.5 * out;
     const toUnit = (c: Rgb) => [c[0] / 255, c[1] / 255, c[2] / 255];
     core.draw({
-      uTime: clock, uR, uBound: bound, uSpikeH: spikeH, uSpikeB: 0.24, uSpikeN: 260, uBreath: 0.02 * (1 - 0.5 * sp) + 0.008, uThink: th,
-      uFlow: 0.004 + 0.024 * v.energy * sp + 0.01 * th + 0.012 * v.drive, uLK: lobes.k,
-      uHalo: (0.22 + 0.8 * E * sp + 0.3 * th + 0.1 * ls) * (palette.light ? 0.7 : 1), uEnergy: E, uPx: 2 / (glCanvas.width || 1),
+      // How hard it is driven stirs the surface, feeds the filament and widens the glow, in every form.
+      uTime: clock, uR, uBound: bound, uSpikeH: spikeH, uSpikeB: 0.24, uSpikeN: 260, uBreath: lerp(0.011, 0.018, sp) * (1 + 2.4 * drv), uThink: th,
+      uFlow: (0.004 + 0.02 * drv + 0.024 * v.energy * sp) * (1 - th), uLK: lobes.k,
+      uListen: ls, uRead: rd, uWrite: wr, uSwell: swell, uTide: tide, uRip: [ringCount, 0.78 + 0.22 * Math.cos(clock * TAU * 2.2), ringDepth, 0],
+      uFacetT: facetBeat, uFacet: facet, uAim: aim, uTen: [tendril, thick, needles, bouton],
+      uHalo: (0.14 + 0.5 * drv + 0.8 * E * sp + 0.3 * th + 0.1 * ls + 0.2 * rd + 0.26 * wr) * (palette.light ? 0.7 : 1), uEnergy: E + 0.6 * drv, uPx: 2 / (glCanvas.width || 1),
       uStepK: clamp(0.88 / Math.sqrt(1 + slope * slope), 0.4, 0.85),
       uL0: lobes.d[0], uL1: lobes.d[1], uL2: lobes.d[2], uLA: LA, uW: materialWeights,
       uCA: toUnit(palette.signalA), uCB: toUnit(palette.signalB), uHaloC: toUnit(palette.halo),
@@ -1068,9 +1245,9 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
   const drawRingsFront = (ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number, Ro: number) => {
     drawRings(ctx, cx, cy, R, true);
     // The sweep: a conic flare that turns while she thinks.
-    if (v.think > 0.02 && typeof ctx.createConicGradient === 'function') {
+    if (v.work > 0.02 && typeof ctx.createConicGradient === 'function') {
       const sweep = ctx.createConicGradient(-dial.sweep, cx, cy);
-      sweep.addColorStop(0, rgba(palette.signalA, 0.16 * v.think));
+      sweep.addColorStop(0, rgba(palette.signalA, 0.16 * v.work));
       sweep.addColorStop(0.09, rgba(palette.signalA, 0));
       sweep.addColorStop(1, rgba(palette.signalA, 0));
       ctx.fillStyle = sweep;

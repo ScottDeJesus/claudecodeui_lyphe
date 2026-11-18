@@ -50,11 +50,24 @@ const DISC_EDGE = 12;
 /** What counts as the settings' own surface for a press: the row the core opens, a menu or dialog opened from it, the account switcher. */
 const OWN_SURFACE = '[data-chat-settings], [role="menu"], [role="dialog"], [data-owns-escape]';
 
-/** What the chat is doing, as its core draws it. */
-export type ChatCoreState = 'idle' | 'working' | 'waiting';
+/**
+ * What the chat is doing, as its core draws it: at rest; while a turn runs, thinking, reading, writing or speaking (its reply
+ * arriving); and waiting on the reader.
+ */
+export type ChatCoreState = 'idle' | 'thinking' | 'reading' | 'writing' | 'speaking' | 'waiting';
 
-/** The core's own forms for the three: at rest, the loop turning while a turn runs, and drawn in (listening) while it waits on the reader. */
-const FORM: Record<ChatCoreState, CoreDrawingInput['state']> = { idle: 'idle', working: 'thinking', waiting: 'listening' };
+/** The body's form for each: its own, and the dish turned to the reader (listening) while it waits on them. */
+const FORM: Record<ChatCoreState, CoreDrawingInput['state']> = { idle: 'idle', thinking: 'thinking', reading: 'reading', writing: 'writing', speaking: 'speaking', waiting: 'listening' };
+
+/**
+ * Where what the chat reads and writes to lies from its core, in degrees counter-clockwise from three o'clock: the talk. Docked
+ * beside the line the talk is over it and across; in a place of its own (a desk's side column) the talk is beside it.
+ */
+const TALK_FROM_DOCK = 58;
+const TALK_FROM_PLACE = 14;
+
+/** The word for each thing it does, as its name and title say it. */
+const DOING_WORD: Record<Exclude<ChatCoreState, 'idle'>, string> = { thinking: 'Thinking', reading: 'Reading', writing: 'Writing', speaking: 'Answering', waiting: 'Waiting on you' };
 
 type EffortOption = NonNullable<ProviderModelOption['effort']>['values'][number];
 
@@ -91,8 +104,11 @@ type ChatCoreProps = {
  * is the page's to give (`useCoreDrawing`): the instrument is the companion module's, which the chat cannot import without a cycle.
  *
  * IT SAYS FIVE THINGS WITHOUT A WORD. WHAT IT IS MADE OF is the model the chat runs on (`replyMaterialOf`). HOW RESTLESS ITS SURFACE IS is the
- * effort it is driven at. ITS FORM is what the chat is doing: at rest, the loop turning while a turn runs, drawn in while it waits on the
- * reader. THE HAIRLINE ROUND IT is how full the context window is, in the warn ink once it is nearly full. THE HAIRLINE OUTSIDE THAT is the
+ * effort it is driven at. ITS FORM is what the chat is doing, and it is the whole of how a running turn is said (no line of words
+ * stands over the box for it): a tide at rest; a polyhedron that holds and re-cuts while it thinks; a mouth opened toward the talk
+ * while it reads; a tendril out toward the talk while it changes a file or sends an agent; lobes and spikes while its reply arrives;
+ * and a dish turned to the reader while it waits on them. What it is doing is also in its name for a reader and its title for a
+ * pointer. THE HAIRLINE ROUND IT is how full the context window is, in the warn ink once it is nearly full. THE HAIRLINE OUTSIDE THAT is the
  * account's week (`AccountWeekRing`), and a press on its band opens the account switcher.
  *
  * PRESS THE CORE AND IT IS SET BY TURNING. The core rises out of its dock into a disc over the talk, with two flat rings round it
@@ -227,9 +243,11 @@ export function ChatCore({
   }, [open, hostWindow, onClose]);
 
   const effortLabel = effortStops.find((stop) => stop.value === effort)?.label ?? null;
-  const label = effortLabel === null || effort === DEFAULT_EFFORT_VALUE
+  const settingsLabel = effortLabel === null || effort === DEFAULT_EFFORT_VALUE
     ? t('core.settings', { defaultValue: 'Chat settings · {{model}}', model: modelLabel })
     : t('core.settingsWithEffort', { defaultValue: 'Chat settings · {{model}}, {{effort}} effort', model: modelLabel, effort: effortLabel });
+  // What it is doing, in a word, ahead of what the press opens: the form says it to the eye, this to a reader and a resting pointer.
+  const label = state === 'idle' ? settingsLabel : `${t(`core.doing.${state}`, { defaultValue: DOING_WORD[state] })} · ${settingsLabel}`;
   const filled = context === null ? 0 : Math.min(1, Math.max(0, context));
   const up = open && lift !== null;
   // The core's square: its dock's, and larger in the disc; in a place of its own, the larger one always. Its two hairlines keep their
@@ -281,9 +299,9 @@ export function ChatCore({
             {/* The core's own accessible name is the companion's; here the button speaks for it. */}
             <span aria-hidden="true" className="pointer-events-none grid size-full place-items-center">
               {draw !== null
-                ? draw({ material, state: FORM[state], drive, size: corePx })
+                ? draw({ material, state: FORM[state], drive, size: corePx, azimuth: place !== null ? TALK_FROM_PLACE : TALK_FROM_DOCK })
                 // No page gave the instrument (a surface that mounts the chat alone): the app's small loop stands in.
-                : <SignalLoop state={state === 'working' ? 'thinking' : 'idle'} size={28} />}
+                : <SignalLoop state={state === 'idle' || state === 'waiting' ? 'idle' : 'thinking'} size={28} />}
             </span>
             {context !== null && (
               <svg

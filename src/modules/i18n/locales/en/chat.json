@@ -158,7 +158,14 @@
     "settingsWithEffort": "Chat settings · {{model}}, {{effort}} effort",
     "rings": "How this chat is set",
     "model": "Model",
-    "effort": "Effort"
+    "effort": "Effort",
+    "doing": {
+      "thinking": "Thinking",
+      "reading": "Reading",
+      "writing": "Writing",
+      "speaking": "Answering",
+      "waiting": "Waiting on you"
+    }
   },
   "input": {
     "placeholder": "Ask for a change, or describe what you want next",

@@ -4,8 +4,18 @@ import type { ReactNode } from 'react';
 import { createStableContext } from '@/shared/context/stableContext';
 import type { CompanionMaterial } from '@/shared/types';
 
-/** What a core is asked to draw: the material it is made of, what it is doing, how hard it is driven (0 to 1), and the square it fills in px. */
-export type CoreDrawingInput = { material: CompanionMaterial; state: 'idle' | 'thinking' | 'listening'; drive: number; size: number };
+/**
+ * What a core is asked to draw: the material it is made of, what it is doing (the body has a form for each: at rest, thinking,
+ * reading, writing, speaking, and listening while it waits on the reader), how hard it is driven (0 to 1), the square it fills in px,
+ * and where what it reads or writes to lies from it (`azimuth`, degrees counter-clockwise from three o'clock).
+ */
+export type CoreDrawingInput = {
+  material: CompanionMaterial;
+  state: 'idle' | 'thinking' | 'reading' | 'writing' | 'speaking' | 'listening';
+  drive: number;
+  size: number;
+  azimuth: number;
+};
 
 /** Draws a core. Null where no page has given one: the caller then draws its own plain mark. */
 type CoreDrawing = ((core: CoreDrawingInput) => ReactNode) | null;

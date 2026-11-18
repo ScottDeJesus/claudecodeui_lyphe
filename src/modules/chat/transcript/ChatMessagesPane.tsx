@@ -45,7 +45,6 @@ type ChatMessagesPaneProps = {
   /** True while the viewed session has an active provider run in flight. */
   isProcessing?: boolean;
   /** True while ChatComposer's floating activity/stop tab is rendered above the input. */
-  hasActivityIndicator?: boolean;
   chatMessages: ChatMessage[];
   selectedSession: ProjectSession | null;
   currentSessionId: string | null;
@@ -130,7 +129,6 @@ function ChatMessagesPane({
   onTouchMove,
   isLoadingSessionMessages,
   isProcessing = false,
-  hasActivityIndicator = false,
   chatMessages,
   selectedSession,
   currentSessionId,
@@ -335,9 +333,7 @@ function ChatMessagesPane({
       <div
         // `chat-talk`: in a column with room, the talk gives up a strip at its start for the chat's core and starts where the line
         // starts (`composer/chatLine.css`).
-        className={`chat-talk mx-auto w-full max-w-[var(--chat-measure,54.25rem)] space-y-3 px-4 sm:space-y-4 ${
-          hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
-        } ${
+        className={`chat-talk mx-auto w-full max-w-[var(--chat-measure,54.25rem)] space-y-3 px-4 pb-3 sm:space-y-4 sm:pb-4 ${
           isOpeningSession ? 'pointer-events-none opacity-0' : 'opacity-100 transition-opacity duration-150'
         }`}
         aria-busy={isOpeningSession || undefined}

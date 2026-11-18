@@ -1199,21 +1199,22 @@ export type CompanionMaterial = 'mercury' | 'tube' | 'wire' | 'plasma';
 export type AstrolabeVoiceFrame = { rms: number; low: number; mid: number; high: number; f0: number; voicing: number; onsets: number; onsetAmp: number };
 
 /**
- * How much of the instrument her face draws, chosen by the companion module's CompanionAvatar from the square it fills: `disc` (her
- * button: the loop round a 2D chrome core), `core` (the raymarched WebGL core inside the loop) or `dial` (the station's portrait: the
- * core inside the armillary rings, the bezel and the reticle).
+ * How much of the instrument her face draws, chosen by the companion module's CompanionAvatar from the square it fills: `disc` (the
+ * button: the raymarched WebGL core inside the loop), `core` (the same with more room and its echoes) or `dial` (the station's portrait: the
+ * core inside the armillary rings, the bezel and the reticle). `body` is never chosen by size: it is the raymarched core alone,
+ * filling its square, for a core that wears rings of its own (a chat's).
  */
-export type AstrolabeTier = 'disc' | 'core' | 'dial';
+export type AstrolabeTier = 'disc' | 'core' | 'dial' | 'body';
 
 /**
  * What her face's instrument draws one frame from, as CompanionAvatar builds it from her presence: the instrument's own `state` (her
- * fourteen presence words fold into these four), what her voice is doing (`voice`, null while nothing sounds), where she looks
+ * fourteen presence words fold into these six: the body has a form for each), what her voice is doing (`voice`, null while nothing sounds), where she looks
  * (`azimuth`, degrees counter-clockwise from the right; null lets the pointer drift), the reticle's words (`label`), the walk she is on
  * (`walk`), whether her process failed (`failed`, the loop in the warn colour) or sleeps (`asleep`, dimmed and slowed), the word she
  * is saying (`word`, plated on the middle ring) and the `material` she is drawn in.
  */
 export type AstrolabeFrameInput = {
-  state: 'idle' | 'thinking' | 'speaking' | 'listening';
+  state: 'idle' | 'thinking' | 'reading' | 'writing' | 'speaking' | 'listening';
   voice: AstrolabeVoiceFrame | null;
   azimuth: number | null;
   label: string | null;
