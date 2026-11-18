@@ -1,6 +1,6 @@
 # Astrolabe, the design system
 
-This folder is the design language LypheCLI is drawn in, kept here so it can be read beside the code. It is reference only: nothing in it is imported, built, linted or shipped with the app.
+This folder is the design language LypheCLI is drawn in, kept here so it can be read beside the code. It is the design system every UI change in this project follows (the directive is in `AGENTS.md`); nothing in this folder is imported, built, linted or shipped with the app.
 
 - **Start with** [astrolabe/README.md](astrolabe/README.md), the brand book: the three principles (Multipurpose, Minimalistic, Futuristic and living), the places, working with the companion, voice and copy, colour, type, space, motion, states, materials, iconography and accessibility.
 - **Tokens** are in [astrolabe/tokens.json](astrolabe/tokens.json): every colour (Night and Day), type style, space, size, radius and motion value, each with a line on what it is for.
