@@ -27,7 +27,6 @@ import {
   PromptInputSubmit,
 } from '@/shared/ui';
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
-import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
 import type { CoreDoing } from '@/modules/chat/utils/coreDoing';
 import type { PendingSteer, QueuedDraft, ScheduledMessage, SlashCommand,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
 import CommandMenu from '@/modules/chat/composer/CommandMenu';
@@ -312,7 +311,6 @@ export default function ChatComposer({
 
   // Voice state is hosted here (not in the mic button) so the main Send button can stop
   // recording and send the transcript in one tap, the way the mic button drops it in the box.
-  const voiceAvailable = useVoiceAvailable('dictate');
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const handleVoiceError = useCallback((msg: string) => setVoiceError(msg), []);
   // The notice clears itself. An effect keyed on the window, not a timer armed once in the handler: a
@@ -331,11 +329,9 @@ export default function ChatComposer({
   );
   const isRecording = voiceState === 'recording';
   const isTranscribing = voiceState === 'transcribing';
-  // Named because TWO things in the footer turn on it: the mic is rendered by it, and the
-  // DeepSeek chip stands down on a narrow row by it. The row's room is decided by what the row
-  // actually holds, so the chip asks this question rather than assuming the mic is always here —
-  // an account with voice off has no mic, and on that phone the chip's 36px are free.
-  const voiceShown = Boolean(onVoiceTranscript && voiceAvailable);
+  // The talk button is in the line wherever the line can take a transcript: the server transcribes every clip on its own, so
+  // it needs no setting switched on (Settings' Voice switch is the read-aloud button's alone).
+  const voiceShown = Boolean(onVoiceTranscript);
 
   // A hold is only an alternate for SEND. While a turn is running the button means stop, while
   // a recording is live it means finish, and with nothing typed there is nothing to schedule —
@@ -614,9 +610,22 @@ export default function ChatComposer({
 
           <input {...getInputProps()} />
 
-          {/* ONE ROW: the field, what goes with a message (a file, the voice), and the one button that sends or stops. Everything
+          {/* ONE ROW: the plus (attach) at its start, the field, the talk button, and the one button that sends or stops. Everything
               that sets the chat up rather than writes to it stands behind the chat's core (`settings`, below). */}
-          <div className="flex items-end gap-1 py-1 pl-1 pr-2">
+          <div className="flex items-end gap-1 py-1 pl-1.5 pr-2">
+            {/* The plus (attach), before the words it goes with. The kit's 32px button keeps its size to the eye and takes a
+                44px catch under a finger. */}
+            <span className="mb-1 flex-none">
+              <PromptInputButton
+                data-composer-attach=""
+                tooltip={{ content: t('input.attachFiles') }}
+                onClick={openAttachmentPicker}
+                aria-label={t('input.attachFiles')}
+                className="relative before:absolute before:inset-0 before:content-[''] finger:before:-inset-1.5"
+              >
+                <PlusIcon />
+              </PromptInputButton>
+            </span>
             <PromptInputBody className="min-w-0 flex-1">
               <div ref={inputHighlightRef} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
                 <div className="chat-input-placeholder block w-full whitespace-pre-wrap break-words px-4 py-2 text-sm leading-6 text-transparent">
@@ -647,16 +656,7 @@ export default function ChatComposer({
           </PromptInputBody>
 
             <PromptInputTools className="mb-1 min-w-0 gap-0.5">
-              {/* The plus (attach). The kit's 32px button keeps its size to the eye and takes a 44px catch under a finger. */}
-              <PromptInputButton
-                tooltip={{ content: t('input.attachFiles') }}
-                onClick={openAttachmentPicker}
-                aria-label={t('input.attachFiles')}
-                className="relative before:absolute before:inset-0 before:content-[''] finger:before:-inset-1.5"
-              >
-                <PlusIcon />
-              </PromptInputButton>
-
+              {/* Speech to text, where the plus stood: beside the button that sends. */}
               {voiceShown && (
                 <VoiceInputButton state={voiceState} onToggle={voiceToggle} />
               )}

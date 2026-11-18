@@ -1,42 +1,59 @@
+import { Mic } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Mic, Square, Loader2 } from 'lucide-react';
 
-import { PromptInputButton } from '@/shared/ui';
 import type { VoiceInputState } from '@/shared/types';
+import { PromptInputButton, Spinner } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 type Props = {
   state: VoiceInputState;
   onToggle: () => void;
 };
 
-// Rendered by chat's ChatComposer next to the send button.
-// Push-to-talk mic button (presentational). Recording state and the stop-and-send action
-// are owned by the composer so the main Send button can drive them too. This button just
-// starts recording and, while recording, stops and drops the transcript into the input box.
-// The mic's notice and error sentences are the composer's to draw (above its form, which clips what overflows it).
+/**
+ * THE LINE'S TALK BUTTON: speech to text, into the line. One press opens the mic, the next stops it, and the clip's words are
+ * added to what is typed (the server hears it as it hears a press to the companion: the account's home server first, Gemini when
+ * that cannot). It is always in the line; it needs nothing switched on.
+ *
+ * ONE BUTTON, THREE STATES, drawn as the companion's own talk button is, so the two read as the same press:
+ * - idle: the mic in the muted ink;
+ * - recording: lit (the kit's tonal ground and ink) with a breathing ring. The mic is open only now, so this is the look that
+ *   must never be missed;
+ * - transcribing: the kit's spinner turning round the mic while the clip becomes words.
+ *
+ * Presentational: the recording, the stop-and-send from the Send button and the mic's notice and error sentences are the
+ * composer's (`ChatComposer`, which draws the sentences above its form). `data-chat-talk` reads the state.
+ */
 export default function VoiceInputButton({ state, onToggle }: Props) {
   const { t } = useTranslation('chat');
-
-  const icon =
-    state === 'recording' ? (
-      <Square className="text-[var(--danger-ink)]" />
-    ) : state === 'transcribing' ? (
-      <Loader2 className="animate-spin" />
-    ) : (
-      <Mic />
-    );
+  const recording = state === 'recording';
+  const label = recording ? t('voice.stopRecording') : state === 'transcribing' ? t('voice.transcribing') : t('voice.input');
 
   return (
-    <span className="relative inline-flex">
+    <span data-chat-talk={state} className="relative inline-flex shrink-0">
       <PromptInputButton
-        tooltip={{ content: state === 'recording' ? t('voice.stopRecording') : t('voice.input') }}
+        tooltip={{ content: label }}
+        variant={recording ? 'tonal' : 'ghost'}
+        aria-label={label}
         onClick={(e: { preventDefault: () => void }) => {
           e.preventDefault();
           onToggle();
         }}
+        // The kit's 32px button keeps its size to the eye and takes a 44px catch under a finger.
+        className={cn("relative rounded-lg before:absolute before:inset-0 before:content-[''] finger:before:-inset-1.5", !recording && 'text-muted-foreground hover:text-foreground')}
       >
-        {icon}
+        <Mic aria-hidden="true" />
       </PromptInputButton>
+      {recording && (
+        // The breathing ring: the mic is open. It stands over the button's edge and takes no press.
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-primary motion-safe:animate-pulse" />
+      )}
+      {state === 'transcribing' && (
+        // The kit's spinner round the mic, laid over the button so the mic stays the thing to press.
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 grid place-items-center">
+          <Spinner size={28} />
+        </span>
+      )}
     </span>
   );
 }
