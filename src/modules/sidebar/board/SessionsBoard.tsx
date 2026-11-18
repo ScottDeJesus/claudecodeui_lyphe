@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from 'react';
-import { FolderPlus, Plus } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+import { Archive, FolderPlus, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { BoardChatRow } from '@/modules/sidebar/board/BoardChatRow';
+import { ClosedChatsDialog } from '@/modules/sidebar/board/ClosedChatsDialog';
 import { BoardFolder } from '@/modules/sidebar/board/BoardFolder';
 import { useBoardCarry } from '@/modules/sidebar/hooks/useBoardCarry';
 import { useSimpleChatFolders } from '@/modules/sidebar/hooks/useSimpleChatFolders';
@@ -59,6 +60,8 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
   const subagentRunningSessionIds = useSubagentRunningSessionIdSet();
   const subagentModels = useSubagentModelsBySession();
   const liveHostSessionIds = useSessionHostLiveSet();
+
+  const [closedOpen, setClosedOpen] = useState(false);
 
   // No chat is open on the board, so the feed is asked to keep none in view.
   const { items, hasMore, isLoading, hasError, reload, loadMore, patchLocal, patchFolderLocal, removeLocal, moveLocal } = useSimpleChatList(null, enabled);
@@ -136,7 +139,7 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
     />
   );
 
-  // The two ways something new starts, after the last column: each a button with its mark and its word; under a finger, the mark alone.
+  // The two ways something new starts, and the way back to a closed chat, after the last column: each a button with its mark and its word; under a finger, the mark alone.
   const starts = (
     <div className="flex flex-wrap gap-2 pl-[13px]">
       <Button
@@ -163,6 +166,18 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
       >
         <FolderPlus aria-hidden="true" />
         <span className="finger:hidden">{t('simpleList.newFolder')}</span>
+      </Button>
+      <Button
+        data-board-closed
+        variant="outline"
+        size="sm"
+        className="finger:h-11 finger:w-11 finger:px-0"
+        aria-label={t('search.modeClosed')}
+        title={t('search.modeClosed')}
+        onClick={() => setClosedOpen(true)}
+      >
+        <Archive aria-hidden="true" />
+        <span className="finger:hidden">{t('search.modeClosed')}</span>
       </Button>
     </div>
   );
@@ -250,6 +265,7 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
         ]}
         onDismiss={cancelFolderDelete}
       />
+      {closedOpen && <ClosedChatsDialog onDismiss={() => setClosedOpen(false)} />}
     </div>
   );
 }
