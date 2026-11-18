@@ -12709,17 +12709,21 @@ Behaviour: MAN-9067. The mark: INV-9787.
 | Drop the `alreadyRecorded` skip in the `onRunCompleted` listener | a re-adopted host's old completion names an idle chat at every boot | that completion is no turn |
 | Put an `await` between the re-read (`nameFactsOf`) and `updateSessionCustomName` | a rename made in the gap is overwritten | with no `await`, nothing in this process can rename the chat between the two |
 | Write with `renameByPerson` or call `markNameGiven` | the app's name reads as his and is never replaced | the mark means a person typed the name |
-| Put an `await` in questions 1 to 4 of `considerChat`, or `inFlight.set` after one | two completions start two passes: two Haiku calls, two writes | the questions claim the chat in one synchronous step |
+| Put an `await` in `considerChat`'s questions, or `inFlight.set` after one | two completions start two passes: two Haiku calls, two writes | the questions claim the chat in one synchronous step |
 | Add a project-visibility question to `considerChat` | probe chats in `PROBE_PROJECT` (a hidden root) are never named, and the live proof cannot show a name | the pass names every app chat; visibility is no question |
-| Fill `attempted` before question 5 | a chat whose first exchange is not yet readable is never named | a chat with nothing to read is asked again at its next turn |
-| Clear `attempted` on a timer or per completion | a chat Haiku cannot name costs a call at every turn | one try per chat per process |
+| Fill `attempted` (chats created before the cutoff) before a first exchange is readable | a chat whose first exchange is not yet readable is never named | a chat with nothing to read is asked again at its next turn |
+| Clear `attempted` on a timer or per completion | a chat created before the cutoff that Haiku cannot name costs a call at every turn | one try per old chat per process |
+| Treat a `null` or unparseable `createdAt` as new, compare `created_at` as a raw string, or move `RELABEL_CHATS_CREATED_FROM` earlier | chats made before the change are relabelled at every turn | the operator limited every-turn relabelling to chats created after it landed; stored rows hold both SQLite's space-separated UTC and ISO, so `nameFactsOf` normalizes them |
+| Write or broadcast on a KEEP, or on a name equal to the current one (case-insensitive) | the sidebar churns at every turn though the subject has not moved | only a new name is written |
+| Loosen `RELABEL_SYSTEM_PROMPT`'s lean to KEEP, or drop `effort: 'low'` from `askHaikuToKeepOrRename` | the label moves on rewordings, and every turn's call costs more | the operator asked that it change only when the topic does, at low effort |
+| Drop `isPlaceholderLabel` from `relabelChat`, or hand the placeholder judgement to the keep-or-rename prompt | a new chat keeps its opening words ("I have a series") or "Untitled Session" as its label | Haiku at low effort answered KEEP for exactly those labels (2026-11-18); the data decides, and the naming question names them. Cases: `cases/modules/a-new-chat-still-named-by-its-opening-words-gets-a-name-at-its-first-turn.ts`, `cases/modules/a-new-chat-whose-label-cannot-be-said-aloud-gets-a-sayable-name-at-its-first-turn.ts` |
 | Give the Haiku launch tools, `persistSession: true`, `settingSources`, the auto-memory setting on, or a visible `cwd` | it can act, write a transcript that shows as a chat, or read and write the operator's memory | `tools: []`, `persistSession: false`, `autoMemoryEnabled: false`, `~/.claude/state/chat-names` |
 | Write Haiku's reply without `cleanedName`, or accept a result with `is_error` | an API error text ("Prompt is too long") or a sentence becomes the chat's name | an `is_error` turn arrives as `subtype: 'success'` with the error in `result` |
 | Skip `broadcastSessionUpserted` after the write | every sidebar surface keeps the old name until a reload | it is the frame they redraw on |
 | Drop `await chatNamer.stop()` from `shutdownRuntimeServices` | a Haiku child outlives the server | `stop()` aborts the passes and waits for them |
-| Let `readFirstExchange` take an injected `<system-reminder>` / `<task-notification>` turn, a compaction summary or a `<synthetic>` row | a chat is named from text no one wrote | those rows say nothing of what the chat is about |
+| Let `exchanges.ts` (first or latest exchange) take an injected `<system-reminder>` / `<task-notification>` turn, a compaction summary or a `<synthetic>` row | a chat is named from text no one wrote | those rows say nothing of what the chat is about |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/first-exchange.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/exchanges.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
 
 ## INV-9821 — probe — The ask she answers "on her own judgment" is shown to her cut at 60 characters; the page shows the whole input
 

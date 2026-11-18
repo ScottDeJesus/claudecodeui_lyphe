@@ -5543,21 +5543,21 @@ section: server/modules/companion/tools — read_session, list_followups and ask
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
 
-## MAN-9067 — server/modules/chat-names — the naming pass: the trigger, the five questions, the write, the Haiku call, the sayable rule
+## MAN-9067 — server/modules/chat-names — the naming pass: the trigger, the questions, the two kinds of chat, the write, the Haiku call, the sayable rule
 
-Gives an app chat a name a person could say aloud, once a turn of it has ended. Writes `sessions.custom_name`, never `name_given` (MAN-9060, INV-9787). Edits that break it: INV-9817. `server/index.ts` builds it (`createChatNamer()`), calls `chatNamer.start()` in the listen callback after `startRunStallWatchdog()`, and `await chatNamer.stop()` in `shutdownRuntimeServices`.
+Gives an app chat a name a person could say aloud, once a turn of it has ended, and — for a chat created at or after `RELABEL_CHATS_CREATED_FROM` (`2026-11-18T17:22:00.000Z`) — keeps its label in step with its subject at every turn until he names it. Writes `sessions.custom_name`, never `name_given` (MAN-9060, INV-9787). Edits that break it: INV-9817. `server/index.ts` builds it (`createChatNamer()`), calls `chatNamer.start()` in the listen callback after `startRunStallWatchdog()`, and `await chatNamer.stop()` in `shutdownRuntimeServices`.
 
 ## Files
 | file | owns |
 | --- | --- |
 | `index.ts` | exports `createChatNamer` only |
-| `chat-namer.service.ts` | `createChatNamer(): { start(): void; stop(): Promise<void> }` — the trigger, the five questions, the write |
-| `first-exchange.ts` | `readFirstExchange(sessionId)` → `ChatFirstExchange { ask, reply }` or `null` |
-| `haiku-name.ts` | `askHaikuForName(exchange, signal)` → a cleaned name or `null`; never rejects |
+| `chat-namer.service.ts` | `createChatNamer(): { start(): void; stop(): Promise<void> }` — the trigger, the questions, the two kinds of chat, the write |
+| `exchanges.ts` | `readFirstExchange(sessionId)` → `ChatExchange { ask, reply }` or `null`; `readFirstAndLatestExchange(sessionId)` → `{ first, latest }` or `null` |
+| `haiku-name.ts` | `askHaikuForName(exchange, signal)` → a cleaned name or `null`; `askHaikuToKeepOrRename(currentName, first, latest, signal)` → `ChatLabelVerdict` (`keep` / `rename` + name) or `null`; neither rejects |
 | `../../shared/sayable-name.ts` | `isSayableName(name)`, `countWords`, `hasScriptWithoutSpaces` — one rule, applied to the chat's current name and to Haiku's answer, and read by her memory's titles (MAN-9192) |
 
 ## Trigger — `chatRunRegistry.onRunCompleted`
-No timer, no boot sweep: a chat that already holds an unsayable name is named at its next turn. why: the house names its events, it does not poll.
+No timer, no boot sweep: a chat is considered at its next turn, not before. why: the house names its events, it does not poll.
 
 | completion | the namer |
 | --- | --- |
@@ -5567,41 +5567,54 @@ No timer, no boot sweep: a chat that already holds an unsayable name is named at
 
 `start()` twice is a no-op. `stop()` unsubscribes, aborts every pass in flight (the Haiku child ends with it) and awaits them with `Promise.allSettled`.
 
-## The five questions — cheapest first; Haiku is asked only when all pass
+## The questions every chat answers — cheapest first, all synchronous
 | # | question | read from |
 | --- | --- | --- |
 | 1 | an app chat, not archived | `sessionsDb.nameFactsOf`: `appCreated`, `isArchived`; `null` (no row) stops |
-| 2 | `name_given` still 0 | `nameFactsOf.nameGiven` |
-| 3 | the current name fails `isSayableName` | `nameFactsOf.customName` |
-| 4 | neither in flight nor already tried by this process | `inFlight` (`Map<sessionId, Promise<void>>`), `attempted` (`Set`) |
-| 5 | the transcript holds a first exchange | `readFirstExchange` non-`null` |
+| 2 | `name_given` still 0 — his rename ends the namer for good | `nameFactsOf.nameGiven` |
+| 3 | no pass in flight for it — a turn that ends during a pass is skipped | `inFlight` (`Map<sessionId, Promise<void>>`) |
 
-- Questions 1 to 4 are synchronous and claim the chat in one step (`inFlight.set`), so two completions never start two passes.
+- The questions and the claim (`inFlight.set`) are one synchronous step in `considerChat`, so two completions never start two passes.
 - A project's visibility is no question: a probe chat in `PROBE_PROJECT` (a hidden root under `/tmp`) is named like any other.
-- `attempted` is filled at question 5's yes: one Haiku try per chat per process, whatever the answer; a restart allows one more. A chat with nothing to read yet is asked again at its next turn.
 
-## The write
-1. `askHaikuForName` → `null`: log `[Chat names] <id> was not named this time; it keeps "<name>"`, write nothing.
-2. Re-read `nameFactsOf`, no `await` between this read and step 3:
+## Two kinds of chat — `nameFactsOf.createdAt` against `RELABEL_CHATS_CREATED_FROM`
+`createdAt` is `sessions.created_at` through `normalizeTimestamp` (stored rows hold both SQLite's `YYYY-MM-DD HH:MM:SS` UTC and ISO); a missing or unparseable value is an old chat. why the cutoff: the operator limited every-turn relabelling to chats created after it landed.
+
+| chat | at every turn that passes the questions |
+| --- | --- |
+| created at or after the cutoff | `relabelChat`: `readFirstAndLatestExchange` (null → log `has no exchange to read yet`). While the label is a placeholder (`isPlaceholderLabel`: it fails `isSayableName`, or equals `buildCloudCliSessionName(first.ask)` — the first four words a new chat starts with, from the providers barrel) → `askHaikuForName(first)`; `null` → log `was not named this time`; otherwise the write. Once it holds a name a pass gave → `askHaikuToKeepOrRename` at low effort. `keep` → log `kept <id> "<name>": Haiku answered KEEP`; a name equal to the current one, case-insensitive → log `kept … : Haiku answered the same name`; `null` → log `was not relabelled this time`; otherwise the write. No `attempted`. |
+| created before the cutoff | `nameChat`, unchanged: only while the name fails `isSayableName` and the chat is not in `attempted` (`Set`); `readFirstExchange` (null → asked again next turn); `attempted` filled at a readable first exchange — one try per chat per process, a restart allows one more; `askHaikuForName`. |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/exchanges.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
+
+## MAN-9986 — server/modules/chat-names — the naming pass: the trigger, the questions — The write
+section: server/modules/chat-names — the naming pass: the trigger, the questions, the two kinds of chat, the write, the Haiku call, the sayable rule/001 The write
+
+`writeName`, shared by both kinds; a keep, a same name or a refused answer never reaches it, so nothing is written or broadcast.
+1. Re-read `nameFactsOf`, no `await` between this read and step 2:
    - `null`: log `was deleted while Haiku was answering; "<name>" is not written`.
-   - `nameGiven` set or `customName` no longer the name that failed question 3: log `was renamed while Haiku was answering; "<name>" is not written`.
-3. `sessionsDb.updateSessionCustomName(id, name)` — never `renameByPerson`. Log `[Chat names] named <id> "<name>" (was "<old>")`.
-4. `broadcastSessionUpserted(id)` — the frame the sidebar, the simple list, the floating chat's picker, the notifications and Kaylee's roster redraw on. A send failure is logged; the name stays written.
+   - `nameGiven` set or `customName` no longer the name read before Haiku was asked: log `was renamed while Haiku was answering; "<name>" is not written`.
+2. `sessionsDb.updateSessionCustomName(id, name)` — never `renameByPerson`. Log `[Chat names] named <id> "<name>" (was "<old>")`.
+3. `broadcastSessionUpserted(id)` — the frame the sidebar, the simple list, the floating chat's picker, the notifications and Kaylee's roster redraw on. A send failure is logged; the name stays written.
 
 A pass that throws logs `the pass for <id> failed; the chat keeps its name: <reason>`.
 Read the log: `journalctl -u cloudcli-server-dev | grep '\[Chat names\]'`. Every line carries the session id.
 
-## `readFirstExchange`
-Reads `sessionsService.fetchHistory(id, { limit: null })` — the rows the person sees. Rejects when the chat is gone or its transcript cannot be read.
+## `readFirstExchange`, `readFirstAndLatestExchange`
+Each reads `sessionsService.fetchHistory(id, { limit: null })` once — the rows the person sees. Rejects when the chat is gone or its transcript cannot be read. His message: a user `text` row, non-empty, not starting `<system-reminder>` or `<task-notification>`; a slash command he typed counts. An answer: an assistant `text` row, non-empty, not `isCompactSummary`, not `isLocalCommandStdout`, not `model === '<synthetic>'`.
 
-| side | taken |
-| --- | --- |
-| `ask` | the first user `text` row he wrote: non-empty, not starting `<system-reminder>` or `<task-notification>`; a slash command he typed counts |
-| `reply` | the first assistant `text` row after it: non-empty, not `isCompactSummary`, not `isLocalCommandStdout`, not `model === '<synthetic>'` |
+| exchange | `ask` | `reply` |
+| --- | --- | --- |
+| first | his first message | the first answer after it |
+| latest | his last message before the reply | the last answer in the transcript — a turn's conclusion, not the preamble before its tool calls |
 
 Each side is cut to 2,000 characters (`MOST_CHARACTERS_PER_SIDE`) without splitting a surrogate pair. `null` when the transcript holds no such pair.
 
-## `askHaikuForName`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/exchanges.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
+
+## MAN-9987 — server/modules/chat-names — the naming pass: the trigger, the questions — `askHaikuForName`
+section: server/modules/chat-names — the naming pass: the trigger, the questions, the two kinds of chat, the write, the Haiku call, the sayable rule/002 `askHaikuForName`
+
 One `query()`, one turn, no session of its own.
 
 | option | value |
@@ -5614,9 +5627,23 @@ One `query()`, one turn, no session of its own.
 | `cwd` | `~/.claude/state/chat-names`, made on demand: a hidden root, so a stray launch is in no project list |
 | `env` | `userFacingEnv()` plus `launchAccountEnv().env` |
 | `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH)`, passed when it resolves |
-| prompt | `FIRST MESSAGE:\n<ask>\n\nFIRST REPLY:\n<reply>` |
 | bound | `NAMING_TIMEOUT_MS` = 30 s, and the namer's `signal` |
 | init check | the CLI's `system`/`init` message lists its `tools`; any entry ends the pass with `null` |
+| `effort` | none for `askHaikuForName`; `'low'` (`RELABEL_EFFORT`) for `askHaikuToKeepOrRename` — the SDK's `Options.effort`, passed to the CLI as `--effort` |
+
+Both questions share one private `askHaiku({ prompt, systemPrompt, effort? }, signal)` that answers Haiku's raw `result` or `null`.
+
+| question | prompt | system prompt |
+| --- | --- | --- |
+| `askHaikuForName` | `FIRST MESSAGE:\n<ask>\n\nFIRST REPLY:\n<reply>` | `NAMING_SYSTEM_PROMPT` |
+| `askHaikuToKeepOrRename` | `CURRENT LABEL:\n<name or (none)>\n\nFIRST MESSAGE:\n…\n\nLATEST MESSAGE:\n…\n\nLATEST REPLY:\n…` | `RELABEL_SYSTEM_PROMPT` |
+
+`askHaikuToKeepOrRename` reads `KEEP` (outer quotes and trailing punctuation dropped, any case) as `keep`; anything else goes through `cleanedName` and is `rename` or refused (`null`). It does not compare with the current name; the namer does.
+
+`RELABEL_SYSTEM_PROMPT`, verbatim — it leans to KEEP, because a label that moves at every turn is one he cannot find again. It is asked only about a label a pass already gave: whether a label is still a placeholder is decided by the namer from data (`isPlaceholderLabel`), because Haiku at low effort answered KEEP for "I have a series", "Can we hook in" and "Untitled Session" (measured 2026-11-18 on the operator's chats):
+```text
+You keep the label of a chat session for a person who refers to it aloud. You are given the chat's current label, the first message of the chat, and its latest exchange. Answer with the single word KEEP unless the subject of the chat has clearly moved to something the current label does not cover. Never rename for a rewording, a sharper phrasing or a sub-step of the same subject; when in doubt, answer KEEP. When you do rename, answer with a name of two to four plain words saying what the chat is about now, the way a person would call it in conversation, for example Kanban board, Login fix, Estimate drafts. No punctuation, no quotes, no emoji, no file names, no paths, no slash commands. Reply with KEEP or the name only.
+```
 
 `NAMING_SYSTEM_PROMPT`, verbatim:
 ```text
@@ -5629,6 +5656,11 @@ Returns `null` and writes nothing, each with one `[Chat names]` line, when: the 
 1. refuse a reply of several lines or holding an emoji (`\p{Extended_Pictographic}`);
 2. drop outer quote marks and trailing punctuation, repeatedly; collapse spaces; capitalize the first letter;
 3. accept only 2 to 4 words (`FEWEST_NAME_WORDS`, `MOST_NAME_WORDS`) that pass `isSayableName`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/exchanges.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
+
+## MAN-9988 — server/modules/chat-names — the naming pass: the trigger, the questions — `countWords(name)` (`server/shared/sayable-name.ts`) is the count: a token between spaces is one
+section: server/modules/chat-names — the naming pass: the trigger, the questions, the two kinds of chat, the write, the Haiku call, the sayable rule/003 `countWords(name)` (`server/shared/sayable-name.ts`) is the count: a token between spaces is one
 
 `countWords(name)` (`server/shared/sayable-name.ts`) is the count: a token between spaces is one word ("Login-fix" is 1), except a token holding Han, Kana, Thai, Lao, Khmer or Myanmar letters, which `Intl.Segmenter` (ICU's word dictionaries) divides ("看板ボード" is 2, "見積書の下書き" is 4). The dictionary divides finer than a reader hears ("数据库连接排查" counts 5 and reads as 3), so a name with a letter in such a script may count one over: `SEGMENT_COUNT_OVERRUN`, 2 to 5. `isSayableName` below is unchanged and still reads a current name by its whitespace tokens: a Japanese first message with no space in it is one token there, kept or replaced by its 40 characters alone.
 
@@ -5662,17 +5694,21 @@ The file is in `server/shared/` because two modules read it: this one (`chat-nam
 ## Prove it
 `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/chat-names-unspaced.mjs` → `ALL PASS`: `countWords` on twelve names, then `askHaikuForName` on a Japanese, a Chinese, a Thai and an English exchange (four Haiku calls, no chat made). 2026-10-28, 22 Haiku answers to Japanese, Chinese and Thai exchanges: before `countWords` every answer in those scripts was refused (Haiku answered in the chat's language for about half of the 22 and in English for the rest); after, 22 of 22 named, the longest counting 5.
 
-`node .verify/chat-namer-live.mjs` → `ALL PASS`. Every turn is on Haiku in `PROBE_PROJECT` (under `/tmp`, a hidden root), chats deleted after.
+`node .verify/chat-namer-live.mjs` → `ALL PASS`. One chat made with a first message in `PROBE_PROJECT` (under `/tmp`, a hidden root), put on Haiku through the picker's route, four short turns, deleted after. 2026-11-18:
 
-| leg | shows |
+| step | shows |
 | --- | --- |
-| A | first turn: "Untitled Session" becomes a name, `name_given` 0, unchanged 10 s later; renamed by hand: `name_given` 1, a second turn leaves it and logs no `[Chat names]` line |
-| B | a sayable `initialMessage`: no `[Chat names]` line for the id |
-| C | a rename sent at `complete` wins: `was renamed while Haiku was answering` |
+| turn 1, a birthday dinner menu | `named … "Birthday dinner menu" (was "Help me plan a")` — the opening-words name replaced |
+| turn 2, the same menu with a dessert | `kept … "Birthday dinner menu": Haiku answered KEEP`, name unchanged |
+| turn 3, a flat bicycle tyre | `named … "Bicycle tyre repair" (was "Birthday dinner menu")` |
+| renamed "probe dinner" by the sidebar's door, turn 4 | `name_given` 1, name unchanged, no further `[Chat names]` line |
+| a second chat renamed "raced rename" at its first turn's `complete` | the rename wins (`name_given` 1) and the journal says `was renamed while Haiku was answering` |
 
-A probe chat is in no sidebar list (`visibleProjectPathSql` leaves a hidden root out) and its `session_upserted` frame carries `project: null`, which the page's project store drops: the leg reads the frame off the page's websocket instead.
+The opening-words and "Untitled Session" placeholders: `cases/modules/a-new-chat-still-named-by-its-opening-words-gets-a-name-at-its-first-turn.ts` and `cases/modules/a-new-chat-whose-label-cannot-be-said-aloud-gets-a-sayable-name-at-its-first-turn.ts` (`cloudcli-tsx <case>` → `HELD`, one Haiku call each, scratch database).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/first-exchange.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
+A chat created before the cutoff with a sayable name is not considered: "Bugfixes" (created 2026-10-10, app chat, `name_given` 0) finished a turn on the new server and logged no `[Chat names]` line. A probe chat is in no sidebar list (`visibleProjectPathSql` leaves a hidden root out), so the probe reads the row, the journal (`journalctl -u cloudcli-server-dev`) and the page's socket.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/exchanges.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
 
 ## MAN-9072 — server/modules/companion — the send: `companion-send.ts` and `tools/send-options.ts`, what a draft checks, runs, records and clears
 
@@ -6451,7 +6487,7 @@ A probe that makes her think, or that makes a chat think through her, spends a r
 |---|---|
 | Her model is Haiku | set it before talking to her: the panel's model picker, or `PUT /api/companion/settings` `{"model":"haiku"}`. Never Sonnet or Opus for a probe. A switch with no message after it only switches the running process |
 | Probe chats live in `PROBE_PROJECT` | `/tmp/cloudcli-probe-chat` (`.verify/lib/probe-project.mjs`; `ensureProbeProject()` makes the folder: the turn's launch falls back to `$HOME` when it is missing). Every chat she sends to, steers, stops, answers or creates during a probe lives there, never in a real project. Why: the heal files a typed turn as the operator's unless the chat's project sits in a hidden root (`HIDDEN_PROJECT_ROOTS`, INV-4352) |
-| Every probe chat sends with `model: 'haiku'` | the composer's own model chip (`.verify/lib/scratch-chat.mjs`: `createScratchChat`, `MODEL_CHIP`) |
+| Every probe chat sends with `model: 'haiku'` | `openScratchChatOnHaiku` (`.verify/lib/scratch-chat.mjs`) sets it through the model picker's route, `POST /api/providers/claude/sessions/<id>/active-model` `{"model":"haiku"}`, and reads it back from `GET` on the same route before any turn; a model that does not read Haiku throws |
 | Turns are short and few | one line, one word back |
 | A changed tool schema or prompt is shown after her first message of the fresh start | the CLI keeps the tools and prompt of the conversation it began with; her first message after the change is refused and starts fresh (MAN-9209). Ask her to name the changed parameter after that message; before it she answers from the old shape. That message costs one summarizer call and up to 90 s of wake (the fresh-start handover, MAN-9210): say nothing to the other account's Kaylee while it runs |
 | A hidden chat or project is resolved only when named EXACTLY | below |

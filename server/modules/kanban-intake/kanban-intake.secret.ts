@@ -3,9 +3,11 @@
  * `KANBAN_INTAKE_SECRET=<64 hex chars>` in `/opt/shadow-connector/.eis_backend.env`;
  * eis_backend sends that same value as the `X-Kanban-Intake-Secret` header, and the door's guard compares the header against it.
  *
- * Why the file and not `process.env`: the secret's one home is eis_backend's env file. It is never written
- * to `process.env`, this server's `.env`, a log line or an error message, because the agent sessions this
- * server spawns inherit its environment and could then file cards themselves. A copy would also drift on
+ * Why the file and not `process.env`: the secret's one home is eis_backend's env file; it is never written
+ * to `process.env`, this server's `.env`, a log line or an error message, so the agent sessions this server
+ * spawns do not inherit it for free. That is hygiene, not a wall: those sessions run as the same user that
+ * owns the file (mode 600), so one that goes looking can read the line — closing that needs a file owner the
+ * sessions do not run as. A copy would also drift on
  * rotation, so the file is read at call time, its parse is kept only while the file's stat is unchanged,
  * and a rotation is picked up by the next request with no restart.
  *
