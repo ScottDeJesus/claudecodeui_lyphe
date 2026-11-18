@@ -9,7 +9,7 @@ import { AccountWeekRing } from '@/modules/accounts';
 import { CoreRings } from '@/modules/chat/composer/CoreRings';
 import type { CoreRing } from '@/modules/chat/composer/CoreRings';
 import { replyMaterialOf } from '@/modules/chat/transcript/replyMark';
-import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
+import { CORE_BODY_SHARE, DEFAULT_EFFORT_VALUE } from '@/shared/constants';
 import { useChatCorePlace } from '@/shared/context/ChatCorePlaceContext';
 import { useCoreDrawing } from '@/shared/context/CoreDrawingContext';
 import type { CoreDrawingInput } from '@/shared/context/CoreDrawingContext';
@@ -32,18 +32,18 @@ const CORE_SHARE_OF_DISC = 0.36;
  */
 const CORE_APART_PX = 96;
 
-/** The ring that reads the context: how far outside the core's edge it runs, and how thick it is drawn, in px. */
-const CONTEXT_GAP = 3;
-const RING_WIDTH = 1.5;
+/** The ring that reads the context: how far outside the core's BODY it runs (`CORE_BODY_SHARE` of the square), and how thick it is drawn, in px. */
+const CONTEXT_GAP = 6;
+const RING_WIDTH = 2.5;
 
-/** The account's week, the ring outside the context's: how far outside the core's edge it runs, in px. */
+/** The account's week, the ring outside the context's: how far outside the context's it runs, in px. Far enough that the two read apart and take separate presses. */
 const ACCOUNT_GAP = 7;
 
 /** From this share of the context window the ring takes the warn ink: the window is nearly full. */
 const CONTEXT_WARN = 0.8;
 
 /** The disc the rings open in: its side at most, its side at least, and the air it keeps from the chat column's edges, in px. */
-const DISC_PX = 280;
+const DISC_PX = 250;
 const DISC_MIN_PX = 200;
 const DISC_EDGE = 12;
 
@@ -92,8 +92,8 @@ type ChatCoreProps = {
   open: boolean;
   /** The id of the row the press opens, for `aria-controls`. */
   controls: string;
-  /** The chat's helpers, drawn round the core at rest (its subagents' dots), given the core's square in px; nothing while the settings are open. */
-  helpers?: (corePx: number) => ReactNode;
+  /** The chat's helpers, drawn round the core at rest (its subagents' dots), given the radius of the core's outer ring in px; nothing while the settings are open. */
+  helpers?: (ringRadius: number) => ReactNode;
   /** The core, pressed: the chat's settings open or close. */
   onToggle: () => void;
   /** Escape, or a press anywhere else: the settings close. */
@@ -257,9 +257,11 @@ export function ChatCore({
   // distance from its edge at any size.
   const restPx = place !== null ? CORE_APART_PX : CORE_PX;
   const corePx = place !== null ? CORE_APART_PX : up ? Math.round(lift.size * CORE_SHARE_OF_DISC) : CORE_PX;
-  const contextRadius = corePx / 2 + CONTEXT_GAP;
+  // The two rings sit close on the body, not on the square's edge: the body is `CORE_BODY_SHARE` of its square at any size.
+  const contextRadius = Math.round(corePx * CORE_BODY_SHARE) + CONTEXT_GAP;
+  const accountRadius = contextRadius + ACCOUNT_GAP;
   const contextLength = 2 * Math.PI * contextRadius;
-  const contextBox = contextRadius + CONTEXT_GAP;
+  const contextBox = contextRadius + RING_WIDTH;
 
   const dock = (
     // The dock: the core's place beside the line. Its position is the stylesheet's (`chatLine.css`): in the line's row, or in the strip.
@@ -286,9 +288,9 @@ export function ChatCore({
         <div className="chat-inst__heart">
           {/* The account's week, outside the context's hairline. A chat standing in a window of its own has no switcher to open beside
               it, so there the ring only reads. */}
-          <AccountWeekRing radius={corePx / 2 + ACCOUNT_GAP} pressable={hostWindow === window} />
+          <AccountWeekRing radius={accountRadius} pressable={hostWindow === window} />
           {/* Its helpers, on an arc over it: out of the way while its own rings are open round it. */}
-          {!up && helpers?.(corePx)}
+          {!up && helpers?.(accountRadius)}
           <button
             ref={pressRef}
             type="button"
@@ -314,7 +316,8 @@ export function ChatCore({
                 data-chat-core-context={Math.round(filled * 100)}
                 data-tone={filled >= CONTEXT_WARN ? 'warn' : undefined}
                 viewBox={`${-contextBox} ${-contextBox} ${2 * contextBox} ${2 * contextBox}`}
-                className="pointer-events-none absolute -inset-1.5 -rotate-90"
+                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-90"
+                style={{ width: 2 * contextBox, height: 2 * contextBox }}
               >
                 <circle r={contextRadius} fill="none" strokeWidth={RING_WIDTH} style={{ stroke: 'var(--border)' }} />
                 <circle

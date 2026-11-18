@@ -9,7 +9,7 @@ import { cn } from '@/shared/utils';
 const REACH = 7;
 
 /** The ring's line, as thick as it is drawn: a hairline, a little heavier once the week runs high. */
-const LINE = { quiet: 1.5, high: 2 } as const;
+const LINE = { quiet: 2.5, high: 3 } as const;
 
 type AccountWeekRingProps = {
   /** The ring's radius in px, from the middle of the core it stands round. */
@@ -54,7 +54,7 @@ export function AccountWeekRing({ radius, pressable = true, className }: Account
 
   const drawing = (
     <svg aria-hidden="true" viewBox={`${-side / 2} ${-side / 2} ${side} ${side}`} className="pointer-events-none size-full -rotate-90">
-      <circle r={radius} fill="none" strokeWidth={1} style={{ stroke: 'var(--border)' }} />
+      <circle r={radius} fill="none" strokeWidth={1.5} style={{ stroke: 'var(--border)' }} />
       {percent !== null && (
         <circle
           r={radius}

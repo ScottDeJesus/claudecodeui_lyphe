@@ -5,7 +5,7 @@
 // `disc` (the button, the home, the station's halo) is the core inside the breathing loop, as large as the forms' reach allows;
 // `core` gives the loop more room and adds the echoes; `dial` (the station's portrait) is the whole rig: the core inside two armillary
 // rings (their back halves behind it, their front halves over it), the loop, a bezel and the reticle that slews to what is being read
-// and locks; `body` is the core ALONE, filling the square, for a core that wears rings of its own (a chat's). Where WebGL is missing
+// and locks; `body` is the core ALONE, its forms reaching past the square, for a core that wears rings of its own (a chat's). Where WebGL is missing
 // or lost, every tier falls back to a 2D chrome core.
 //
 // THE BODY TAKES A FORM FOR EACH THING IT DOES (the design system's Core): at rest a tide, one long bulge coming round on a slow swell;
@@ -22,6 +22,7 @@
 // 70 ms in / 200 ms out (thinking), 160 ms (speaking), 250 ms (listening); the lock spring ω = 2π·2.2, ζ = 0.62; the lobes ω = 2π·2.3,
 // ζ = 0.36; reduced motion runs drift and rotation at 0.35×.
 
+import { CORE_BODY_SHARE } from '@/shared/constants';
 import type { AstrolabeFrameInput, AstrolabeInstrument, AstrolabeTier, CompanionMaterial } from '@/shared/types';
 
 const TAU = Math.PI * 2;
@@ -732,7 +733,8 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       return { Ro: 2.3 * R, R, glSide: 4.6 * R };
     }
     // The body alone: the GL square is the whole square, so the body is as large as its forms' reach allows.
-    if (tier === 'body') return { Ro: size / 2, R: size / 4.6, glSide: size };
+    // The body alone: `CORE_BODY_SHARE` of its square, on a canvas wide enough for its forms' reach (4.6 radii), which runs past the square.
+    if (tier === 'body') return { Ro: size / 2, R: size * CORE_BODY_SHARE, glSide: size * CORE_BODY_SHARE * 4.6 };
     // The disc: the same body in the same square, with the loop drawn through the reach of its forms.
     return { Ro: size * 0.42, R: size / 4.6, glSide: size };
   };

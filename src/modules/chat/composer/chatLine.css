@@ -95,12 +95,12 @@
 .core-rings .core-ring[data-ring-held] { cursor: grabbing; }
 .core-ring__turn { transition: transform var(--duration-lock) var(--ease-lock); }
 .core-ring__turn--held { transition: none; }
-.core-ring__band { fill: none; stroke: transparent; stroke-width: 26px; pointer-events: stroke; }
-.core-ring__track { fill: none; stroke: var(--border-strong); stroke-width: 1px; opacity: 0.55; pointer-events: none; }
-.core-ring__lit { fill: none; stroke: var(--core-ink); stroke-width: 2px; pointer-events: none; transition: stroke-dasharray var(--dur-move) var(--ease-enter), stroke var(--dur-move) ease; }
+.core-ring__band { fill: none; stroke: transparent; stroke-width: 30px; pointer-events: stroke; }
+.core-ring__track { fill: none; stroke: var(--border-strong); stroke-width: 2.5px; opacity: 0.55; pointer-events: none; }
+.core-ring__lit { fill: none; stroke: var(--core-ink); stroke-width: 4px; pointer-events: none; transition: stroke-dasharray var(--dur-move) var(--ease-enter), stroke var(--dur-move) ease; }
 .core-ring[data-chat-ring='effort'] .core-ring__lit { stroke: color-mix(in oklab, var(--core-ink) 55%, var(--ink-strong)); }
-.core-ring__mark { stroke: var(--ink-muted); stroke-width: 1px; pointer-events: none; }
-.core-ring__mark--at { stroke: var(--ink-strong); stroke-width: 1.5px; }
+.core-ring__mark { stroke: var(--ink-muted); stroke-width: 1.5px; pointer-events: none; }
+.core-ring__mark--at { stroke: var(--ink-strong); stroke-width: 2.5px; }
 .core-ring__stop { fill: transparent; pointer-events: all; }
 /* A ring under the pointer shows its line whole; a ring that holds the keys shows the band it is taken hold of by. */
 .core-ring:hover .core-ring__track,

@@ -44,7 +44,7 @@ import SoulLaunchPinRow from '@/modules/chat/transcript/SoulLaunchPinRow';
  * closes it rather than leaving another conversation's agent on screen.
  *
  * The rows themselves are derived by `hooks/usePinnedSubagentRows.ts`: this file is the dots' data, the card, the open dialog
- * and the memo boundary. Drawn by `ChatInterface` into the composer's core (`ChatCore`'s `helpers`), which hands it the core's size.
+ * and the memo boundary. Drawn by `ChatInterface` into the composer's core (`ChatCore`'s `helpers`), which hands it the radius of the core's outer ring.
  */
 type PinnedSubagentsProps = {
   messages: ChatMessage[];
@@ -60,8 +60,8 @@ type PinnedSubagentsProps = {
   cliSessionId: string | null;
   /** The chat's resolver from a model id to its name, so a row says "Opus 5.5" as the transcript's headers do. */
   resolveModelLabel: (modelId: string) => string | null;
-  /** The square of the core the dots stand round, in px. */
-  corePx: number;
+  /** The radius of the outer ring of the core the dots stand round, in px. */
+  ringRadius: number;
 };
 
 /** The row whose transcript is open, tagged with the chat it was opened in. */
@@ -89,7 +89,7 @@ const CARD_EDGE = 8;
 /** Where the card stands, in the window's own px: over its dot, starting a little before it, never past the window's edges. */
 type CardPlace = { left: number; bottom: number; width: number; maxHeight: number };
 
-function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId, resolveModelLabel, corePx }: PinnedSubagentsProps) {
+function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId, resolveModelLabel, ringRadius }: PinnedSubagentsProps) {
   const { t } = useTranslation();
   const hostWindow = useHostWindow();
   const { rows, dismiss } = usePinnedSubagentRows(messages, soulLaunchIds, cliSessionId, resolveModelLabel);
@@ -162,7 +162,7 @@ function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId, res
         <div ref={layerRef} className="contents">
           <CoreHelperDots
             dots={dots}
-            corePx={corePx}
+            ringRadius={ringRadius}
             picked={picked}
             onPick={(id) => pick(picked === id ? null : id)}
             label={t('gutters.subagents.title')}

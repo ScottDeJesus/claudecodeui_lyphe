@@ -806,3 +806,11 @@ export const MAX_ATTACHMENT_COUNT = 10;
  * document the chat is drawn in, and steps aside while one is open, so dismissing the layer is all that Escape does.
  */
 export const ESCAPE_LAYER_SELECTOR = '[data-owns-escape], [aria-modal="true"], [role="menu"]';
+
+/**
+ * A CORE DRAWN ALONE (the instrument's `body` tier: a chat's core, a helper's): how much of its square its body's RADIUS is. The
+ * instrument draws the body this large and lets its forms (a tendril, spikes, the dish's rings) reach past the square; whoever
+ * draws rings round such a core (the chat's `ChatCore`) measures them from the body, so they sit close on it at any size. One
+ * figure for both, because the two live in modules that cannot import each other.
+ */
+export const CORE_BODY_SHARE = 0.35;

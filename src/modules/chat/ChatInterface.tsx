@@ -634,7 +634,7 @@ function ChatInterface({
             turnsScrollerRef={scrollContainerRef}
             messageCount={chatMessages.length}
             exportSurface={exportSurface}
-          pinnedAgents={(corePx) => <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} resolveModelLabel={resolveModelLabel} corePx={corePx} />}
+          pinnedAgents={(ringRadius) => <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} resolveModelLabel={resolveModelLabel} ringRadius={ringRadius} />}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}

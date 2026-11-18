@@ -101,8 +101,8 @@ type ChatComposerProps = {
    * workspace header below that width, which is the one surface a phone has room for.
    */
   exportSurface?: ChatExportSurface | null;
-  /** The chat's subagents, drawn as dots round its core (`ChatCore`'s `helpers`), given the core's square in px. */
-  pinnedAgents?: (corePx: number) => ReactNode;
+  /** The chat's subagents, drawn as dots round its core (`ChatCore`'s `helpers`), given the radius of the core's outer ring in px. */
+  pinnedAgents?: (ringRadius: number) => ReactNode;
   /** Every message goes out under `/plain` while this is on. */
   plainMode: boolean;
   onTogglePlainMode: () => void;

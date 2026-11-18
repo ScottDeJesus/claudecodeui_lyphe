@@ -13,8 +13,8 @@ export type CoreHelperDot = { id: string; material: CompanionMaterial; state: Co
 type CoreHelperDotsProps = {
   /** The helpers, in the order they stand round the core: the running first. */
   dots: readonly CoreHelperDot[];
-  /** The core's square, in px: the orbit is measured from its edge. */
-  corePx: number;
+  /** The radius of the core's outer ring (the account's week), in px: the orbit is measured from it. */
+  ringRadius: number;
   /** The helper whose card is open, or null. */
   picked: string | null;
   /** A dot was pressed. */
@@ -25,8 +25,8 @@ type CoreHelperDotsProps = {
   moreLabel: (count: number) => string;
 };
 
-/** From the core's edge to the orbit, in px: past the two hairlines the core wears (the context's, then the account's week). */
-const ORBIT_GAP = 18;
+/** From the core's outer ring to the orbit, in px: clear of that ring's own press. */
+const ORBIT_GAP = 12;
 /** From one dot's middle to the next along the orbit, in px: a dot's own press, so two never overlap. */
 const PITCH = 16;
 
@@ -50,7 +50,7 @@ const ARC_DOCKED: readonly [number, number] = [84, 108];
  *
  * Drawn inside the core's own heart, so it is centred on the core wherever the core stands. Used by `transcript/PinnedSubagents`.
  */
-export function CoreHelperDots({ dots, corePx, picked, onPick, label, moreLabel }: CoreHelperDotsProps) {
+export function CoreHelperDots({ dots, ringRadius, picked, onPick, label, moreLabel }: CoreHelperDotsProps) {
   const apart = useChatCorePlace() !== null;
   // The dots this orbit has drawn before: one not among them was just sent out. Seeded with the ones there at first, which stand.
   const [seen, setSeen] = useState<ReadonlySet<string>>(() => new Set(dots.map((dot) => dot.id)));
@@ -61,7 +61,7 @@ export function CoreHelperDots({ dots, corePx, picked, onPick, label, moreLabel 
     setSent(new Set([...sent, ...fresh]));
   }
 
-  const radius = corePx / 2 + ORBIT_GAP;
+  const radius = ringRadius + ORBIT_GAP;
   const [centre, span] = apart ? ARC_APART : ARC_DOCKED;
   const room = Math.max(1, Math.floor(((span * Math.PI) / 180) * radius / PITCH) + 1);
   const over = dots.length > room;
