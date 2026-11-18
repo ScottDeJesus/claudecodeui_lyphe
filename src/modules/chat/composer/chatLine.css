@@ -33,6 +33,12 @@
 .chat-column[data-chat-core-apart] .chat-composer-shell { padding-left: calc(1rem + 28px); }
 .chat-column[data-chat-core-apart] .chat-line__rail { position: absolute; right: 100%; bottom: 0; display: flex; width: 28px; }
 .chat-column[data-chat-core-apart] .chat-talk { max-width: calc(var(--chat-measure, 54.25rem) + 28px + 2rem); padding-left: calc(1rem + 28px); }
+/* THE SAME AIR AT BOTH SIDES. The talk and the line start 44 px in (the rail's 28 px and the column's 1rem); they end 44 px in too.
+ * The scroll bar stands 8 px clear of the surface's edge instead of on it, and the talk's own end is the rest of the 44 px less
+ * the bar (a thin one, about 10 px), so the words and the line still end together. */
+.chat-column[data-chat-core-apart] .chat-messages-pane { margin-right: 8px; scrollbar-width: thin; scrollbar-gutter: stable; }
+.chat-column[data-chat-core-apart] .chat-talk { padding-right: 26px; }
+.chat-column[data-chat-core-apart] .chat-composer-shell { padding-right: calc(1rem + 28px); }
 
 /* ---------- the core in its dock, and risen into its disc ----------
  * The dock keeps the core's place beside the line. Everything the core is made of hangs on one point at the dock's middle

@@ -29,6 +29,12 @@
   background: var(--surface);
 }
 
+/* The surface's first line, its head: air above it as at the surface's sides, and its row starts and ends where the talk under it
+ * does (44 px in), so the way back stands over the talk's own edge. Under a finger too: the head's one-line form (`ChatHead`) is
+ * a phone's, where the screen's own edge is the frame; on a surface with a hairline round it, 2 px of air reads as cramped. */
+.chat-desk[data-chat-desk='side'] [data-chat-head] { padding-top: 14px !important; padding-bottom: 10px !important; }
+.chat-desk[data-chat-desk='side'] [data-chat-head] > div { padding-inline: calc(1rem + 28px); }
+
 /* The column. The roadmap's circle lies over its top (66 px down, 33 px round: `ChatDesk` hands `RoadmapCircle` the place). Under it
  * the core has a box as tall as its disc at its widest (280 px) and stands in that box's middle, so the disc opens clear of the
  * circle above and of the follow-ups below, and nothing moves to make room for it. Only the follow-ups scroll. */
