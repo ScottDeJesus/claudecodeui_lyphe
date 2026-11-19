@@ -195,7 +195,7 @@ export function SchedulingView({ shown }: SchedulingViewProps) {
             <EmptyState
               icon={CalendarSearchIcon}
               title={t('cerberus.scheduling.empty.title', { days })}
-              message={t(overview.filters.machines === 1 ? 'cerberus.scheduling.empty.messageMachines' : 'cerberus.scheduling.empty.message')}
+              message={t(overview.filters.machines ? 'cerberus.scheduling.empty.messageMachines' : 'cerberus.scheduling.empty.message')}
               actionLabel={wider === undefined ? undefined : t('cerberus.scheduling.empty.wider', { days: wider })}
               onAction={wider === undefined ? undefined : () => onWindow(wider)}
             />

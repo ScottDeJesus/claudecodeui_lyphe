@@ -83,7 +83,7 @@ function createHub<F>(name: string): FeedHub<F> {
  * cleared when the view is hidden. It is the one timer here, and it asks nothing but "is the feed answering": what moved
  * meanwhile is read on the `open` that ends the wait.
  *
- * Used by the upload-runs module's `useRunsFeed`.
+ * Used by the upload-runs module's `useRunsFeed` and the scheduling-report module's `useSchedulingRead`.
  */
 export function useEventFeed<F>({ url, parse, active, name }: EventFeedAsk<F>): EventFeed<F> {
   const hostWindow = useHostWindow();
@@ -148,7 +148,8 @@ export function useEventFeed<F>({ url, parse, active, name }: EventFeedAsk<F>): 
  * ref, written in a layout effect, so a caller can hand in an inline function without re-subscribing on each render: a
  * subscription re-made each render would open a gap in which a frame goes unheard.
  *
- * Used by the upload-runs module's `useUploadsRead`, `useLiveRun` and `useRunSheet`.
+ * Used by the upload-runs module's `useUploadsRead`, `useLiveRun` and `useRunSheet`, and the scheduling-report module's
+ * `useSchedulingRead` and `useEntrySheet`.
  */
 export function useFeedEvents<F>(feed: EventFeed<F>, listener: FeedListener<F>): void {
   const latest = useRef(listener);

@@ -6,7 +6,7 @@ import { troubleOfFailure, troubleOfResponse } from '@/shared/utils';
 type Settled<T> = { key: string; value: T | null; trouble: AffectedAreasTrouble | null };
 
 /**
- * One JSON read of a shadow-connector lane (affected-areas', carrier-bulletins', upload-runs'), kept for the key it was made for. The read happens when the key is set or
+ * One JSON read of a shadow-connector lane (affected-areas', carrier-bulletins', upload-runs', scheduling-report'), kept for the key it was made for. The read happens when the key is set or
  * changes and when `retry` or `reload` is called — never on a timer, so a view that is hidden reads nothing. A null
  * key reads nothing. `fetchFor` must be the same function on every render (a module-level one, or one that changes only
  * when the key does, as the upload-runs `useOverviewRead`'s): it is in the effect's dependencies, so a new one each render
@@ -21,7 +21,7 @@ type Settled<T> = { key: string; value: T | null; trouble: AffectedAreasTrouble 
  *
  * Used by the affected-areas module's `useTours`, `useTour`, `useCodebook`, `usePano`, `useQueue` and `useProving`, and the
  * carrier-bulletins module's `useOverview`, `useBulletinPages` and `usePageReading`, and the upload-runs module's
- * `useOverviewRead` and `useRunSheet`.
+ * `useOverviewRead` and `useRunSheet`, and the scheduling-report module's `useSchedulingOverview` and `useEntrySheet`.
  */
 export function useLaneRead<T>(key: string | null, fetchFor: (key: string) => Promise<Response>): AffectedAreasRead<T> & {
   reload: () => void;

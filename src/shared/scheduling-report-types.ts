@@ -174,14 +174,14 @@ export type SchedulingKindCounts = {
 
 /**
  * The body of GET /overview (internal_routes.py answers it; read.py builds it). Entries are newest first, at most 2000
- * (`truncated` says the window held more). `filters` echoes the ask: `machines` 0 leaves machine entries out of `entries`,
+ * (`truncated` says the window held more). `filters` echoes the ask: `machines` false leaves machine entries out of `entries`,
  * `openers` and `people`; `by` and `account` narrow all of them. `accounts` lists the accounts with entries, so a screen can
  * offer a filter for each.
  */
 export type SchedulingOverview = {
   generated_at: string;
   window: { days: SchedulingWindowDays; from: string; to: string };
-  filters: { by: string | null; machines: 0 | 1; account: string | null };
+  filters: { by: string | null; machines: boolean; account: string | null };
   kinds: [SchedulingKindCounts, SchedulingKindCounts, SchedulingKindCounts];
   entries: SchedulingEntry[];
   truncated: boolean;

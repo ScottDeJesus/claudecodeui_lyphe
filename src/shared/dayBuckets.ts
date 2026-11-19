@@ -33,7 +33,8 @@ const startOfDay = (date: Date): Date => new Date(date.getFullYear(), date.getMo
  * An item counts in its `part`; a `null` part counts in none. An item outside the buckets (older than the window opened, or
  * started after `now`) is left out.
  *
- * Used by the upload-runs module's `useUploadsRead`, which hands the buckets to How often as `read.days`.
+ * Used by the upload-runs module's `useUploadsRead` and the scheduling-report module's `entriesToBuckets`, which hand the
+ * buckets to How often as `read.days`.
  */
 export function bucketDays(items: DayBucketItem[], days: number, now: number): DayBucket[] {
   const lastDay = startOfDay(new Date(now));
@@ -56,7 +57,8 @@ export function bucketDays(items: DayBucketItem[], days: number, now: number): D
  * any item but a `test`, a null `part` included (it was pressed); a `test` is not one, so it is in none, as it is in none of
  * the view's figures. An item whose `at` cannot be read is left out rather than counted in the wrong hour.
  *
- * Used by the upload-runs module's `useUploadsRead`, which hands the counts to How often as `read.hours`.
+ * Used by the upload-runs module's `useUploadsRead` and the scheduling-report module's `entriesToBuckets`, which hand the
+ * counts to How often as `read.hours`.
  */
 export function bucketHours(items: DayBucketItem[]): number[] {
   const hours = Array.from({ length: HOURS_IN_A_DAY }, () => 0);

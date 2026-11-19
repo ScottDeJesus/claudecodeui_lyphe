@@ -3616,7 +3616,7 @@
       },
       "empty": {
         "title": "Nobody scheduled in the last {{days}} days",
-        "message": "No Schedule-a-visit form was opened in this window, and no visit was changed on the grid or through the API.",
+        "message": "Nobody booked, changed or cancelled a visit in this window. Machine calls are not listed.",
         "messageMachines": "No person and no machine scheduled anything in this window.",
         "wider": "Look back {{days}} days"
       }
