@@ -854,6 +854,26 @@ export function useProjectsState({
         return mergeProjectSelectionMetadata(previousProject, upsert.project);
       });
 
+      // The open chat holds its own copy of its row, so a rename the server announces (the Haiku naming pass)
+      // reaches its header only through here; only the name fields are carried, and only when
+      // one differs, so a busy chat's other upserts do not wake the content tree.
+      setSelectedSession((previousSession) => {
+        if (!previousSession || previousSession.id !== upsert.sessionId) {
+          return previousSession;
+        }
+        const nameFields = ['summary', 'name', 'title'] as const;
+        const changed = nameFields.filter((field) =>
+          upsert.session[field] !== undefined && upsert.session[field] !== previousSession[field]);
+        if (changed.length === 0) {
+          return previousSession;
+        }
+        const next = { ...previousSession };
+        for (const field of changed) {
+          next[field] = upsert.session[field];
+        }
+        return next;
+      });
+
       const aliasedSelectedSessionId =
         typeof upsert.providerSessionId === 'string' && upsert.providerSessionId !== upsert.sessionId
           ? upsert.providerSessionId
