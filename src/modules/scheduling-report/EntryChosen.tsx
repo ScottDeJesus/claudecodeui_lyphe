@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { FactList } from '@/modules/scheduling-report/FactList';
 import type { Fact } from '@/modules/scheduling-report/FactList';
-import { durationWord, leadPlace, spanWord } from '@/modules/scheduling-report/utils/schedulingWords';
+import { lengthWord, leadPlace, spanWord } from '@/modules/scheduling-report/utils/schedulingWords';
 import type { SchedulingPerson, SchedulingSession } from '@/shared/scheduling-report-types';
 
 type EntryChosenProps = {
@@ -48,7 +48,7 @@ export function EntryChosen({ session, lead }: EntryChosenProps) {
     },
     { label: t(`${c}.when`), parts: chosen.start_at === null ? [t(`${c}.whenNone`)] : [spanWord(t, chosen.start_at, end), t(chosen.slot_picked ? `${c}.slotPicked` : `${c}.slotOwn`)] },
     { label: t(`${c}.type`), parts: [chosen.visit_type, !chosen.type_changed ? t(`${c}.typeKept`) : proposal.visit_type === null ? t(`${c}.typeChangedBare`) : t(`${c}.typeChanged`, { from: proposal.visit_type })] },
-    { label: t(`${c}.length`), parts: [durationWord(t, chosen.duration_minutes * MS_PER_MINUTE), t(chosen.duration_stepped ? `${c}.lengthStepped` : `${c}.lengthKept`)] },
+    { label: t(`${c}.length`), parts: [lengthWord(t, chosen.duration_minutes), t(chosen.duration_stepped ? `${c}.lengthStepped` : `${c}.lengthKept`)] },
     ...(chosen.job_changed ? [{ label: t(`${c}.job`), parts: [t(`${c}.jobChanged`)] }] : []),
   ];
 

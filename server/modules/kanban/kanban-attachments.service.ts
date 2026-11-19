@@ -61,6 +61,20 @@ export const ATTACHMENT_MIME_TO_EXT: Record<string, string> = {
   'application/pdf': 'pdf',
 };
 
+/**
+ * The same allowlist read from the extension side, so a file's extension resolves to its mime.
+ *
+ * Built once from `ATTACHMENT_MIME_TO_EXT` so the two directions cannot drift apart. `jpeg` is added
+ * by hand because it is the same format as `jpg`, and the allowlist stores only `jpg`: refusing
+ * `shot.jpeg` would turn a valid screenshot away over its spelling.
+ */
+const EXT_TO_ATTACHMENT_MIME: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(ATTACHMENT_MIME_TO_EXT).map(([mime, ext]): [string, string] => [ext, mime])
+  ),
+  jpeg: 'image/jpeg',
+};
+
 /** Whether one mime may be stored as a card attachment. The route's `fileFilter` asks this too. */
 export function isAllowedAttachmentMime(mime: string): boolean {
   return Object.prototype.hasOwnProperty.call(ATTACHMENT_MIME_TO_EXT, mime);
@@ -244,6 +258,89 @@ export function addAttachment(
 }
 
 /**
+ * Attaches a file that is already on this machine: the in-process twin of the upload.
+ *
+ * A walk's screenshots are files on this box, and the dispatcher attaches them to a card. Reading the
+ * file here keeps it behind the one gate, with the same size cap, sniff, row and event as an upload,
+ * rather than having a caller re-upload the bytes over HTTP to the very server it is running in.
+ * `filename` is the name the attachment is shown under; absent, it is the file's own basename.
+ *
+ * IN-PROCESS ONLY. No route reaches this, so a request can never name a path on this machine; the
+ * path is trusted only because nothing outside this process can supply one.
+ */
+export function addAttachmentFromPath(
+  cardId: string,
+  filePath: string,
+  context?: KanbanWriteContext,
+  filename?: string
+): KanbanAttachment {
+  if (!path.isAbsolute(filePath)) {
+    throw new AppError('An attachment path must be absolute.', {
+      code: 'KANBAN_ATTACHMENT_PATH_REFUSED',
+      statusCode: 400,
+    });
+  }
+
+  // An own-property check, not a bare index: an extension of `constructor` would otherwise read a
+  // method off Object.prototype and pass for a mime.
+  const extension = path.extname(filePath).slice(1).toLowerCase();
+  const mime = Object.prototype.hasOwnProperty.call(EXT_TO_ATTACHMENT_MIME, extension)
+    ? EXT_TO_ATTACHMENT_MIME[extension]
+    : undefined;
+  if (mime === undefined) {
+    throw new AppError(`An attachment must be one of ${Object.keys(ATTACHMENT_MIME_TO_EXT).join(', ')}.`, {
+      code: 'KANBAN_ATTACHMENT_MIME_REFUSED',
+      statusCode: 422,
+    });
+  }
+
+  // Every one of these codes comes from the path, so it is refused naming the path; only a code no
+  // path can cause rises as the server's.
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(filePath);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      throw new AppError(`No file at "${filePath}".`, {
+        code: 'KANBAN_ATTACHMENT_SOURCE_NOT_FOUND',
+        statusCode: 404,
+      });
+    }
+    if (code === 'EACCES' || code === 'EPERM') {
+      throw new AppError(`"${filePath}" cannot be read by the server.`, {
+        code: 'KANBAN_ATTACHMENT_PATH_REFUSED',
+        statusCode: 400,
+      });
+    }
+    if (code === 'ENAMETOOLONG' || code === 'ELOOP' || code === 'ERR_INVALID_ARG_VALUE') {
+      throw new AppError(`"${filePath}" is not a valid path.`, {
+        code: 'KANBAN_ATTACHMENT_PATH_REFUSED',
+        statusCode: 400,
+      });
+    }
+    throw error;
+  }
+
+  if (!stat.isFile()) {
+    throw new AppError(`"${filePath}" is not a file.`, {
+      code: 'KANBAN_ATTACHMENT_PATH_REFUSED',
+      statusCode: 400,
+    });
+  }
+
+  // Checked from the stat, before the read, so a huge file is refused without ever being loaded.
+  if (stat.size > ATTACHMENT_MAX_BYTES) {
+    throw new AppError(`An attachment may be at most ${ATTACHMENT_MAX_BYTES} bytes.`, {
+      code: 'KANBAN_ATTACHMENT_TOO_LARGE',
+      statusCode: 413,
+    });
+  }
+
+  return addAttachment(cardId, { filename: filename?.trim() || path.basename(filePath), mime, bytes: fs.readFileSync(filePath) }, context);
+}
+
+/**
  * Where one attachment's bytes are, and what to serve them as — or null when nothing answers.
  *
  * Null covers all four misses the serving route must not distinguish: no such row, a mime with no
@@ -333,12 +430,14 @@ export function removeAttachment(
 /** The verbs in the one-object shape `kanban.module.ts` hands the route package. */
 export type KanbanAttachmentsService = {
   addAttachment: typeof addAttachment;
+  addAttachmentFromPath: typeof addAttachmentFromPath;
   resolveAttachmentFile: typeof resolveAttachmentFile;
   removeAttachment: typeof removeAttachment;
 };
 
 export const kanbanAttachmentsService: KanbanAttachmentsService = {
   addAttachment,
+  addAttachmentFromPath,
   resolveAttachmentFile,
   removeAttachment,
 };

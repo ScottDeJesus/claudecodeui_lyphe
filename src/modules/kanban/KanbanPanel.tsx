@@ -2,17 +2,19 @@ import { CloudOff, KanbanSquare } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { KanbanBoardDialog, type KanbanBoardDialogMode } from '@/modules/kanban/KanbanBoardDialog';
+import { KanbanBoardDialog, type KanbanBoardDialogMode, type KanbanBoardDraft } from '@/modules/kanban/KanbanBoardDialog';
 import { KanbanBoardHeader } from '@/modules/kanban/KanbanBoardHeader';
-import { KanbanMetisPanel } from '@/modules/kanban/KanbanMetisPanel';
 import { KanbanRail } from '@/modules/kanban/KanbanRail';
 import { KanbanCardDrawer } from '@/modules/kanban/card-drawer/KanbanCardDrawer';
 import { useKanbanBoards } from '@/modules/kanban/hooks/useKanbanBoards';
 import { useKanbanDrag } from '@/modules/kanban/hooks/useKanbanDrag';
 import { useKanbanLanes } from '@/modules/kanban/hooks/useKanbanLanes';
 import { useKanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
+import { useKanbanWalks } from '@/modules/kanban/hooks/useKanbanWalks';
 import type { KanbanViewSort } from '@/modules/kanban/utils/cardModel';
 import { foldedStatuses, kanbanLanes } from '@/modules/kanban/utils/lanePolicy';
+import { FAKE_BOARD_ID, FAKE_GONE, FAKE_PROJECTS, FAKE_TITLES } from '@/modules/kanban/utils/walkFixtures';
+import type { KanbanLinkedTitle } from '@/modules/kanban/utils/walkModel';
 import { Banner, EmptyState, Spinner } from '@/shared/ui';
 
 /**
@@ -51,7 +53,6 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
     boards,
     currentBoardId,
     autonomy,
-    deepseekFlash,
     loading: boardsLoading,
     unreachable: boardsUnreachable,
     refresh: refreshBoards,
@@ -94,17 +95,54 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
   /** Cards To Do carries that wait on an answer — the questions row, and zero under autonomy. */
   const foldedQuestions = board.countOf(foldedStatuses(autonomy));
 
-  /** The name surface's one write. Archive NEVER falls back by hand: every board write re-reads the
+  // FILL: walks — each card's walk off the dispatcher's feed, read ONCE here for the faces and the drawer.
+  const walkOf = useKanbanWalks(currentBoardId);
+
+  // FILL: linkTitle — what the board knows of another of its cards, by id. `{ title }` off the
+  // lanes already loaded (`board.summaryOf`), or read by id for a card no loaded page holds (an
+  // archived one, one further down a lane). `'unread'` only while that read is out. `'gone'` when
+  // the read answers 404: the card was deleted, and its link is then words with no press. A link
+  // never falls back to an id.
+  const titleOf = useCallback(
+    (cardId: string): KanbanLinkedTitle => {
+      if (currentBoardId !== FAKE_BOARD_ID) return 'unread';
+      if (FAKE_GONE.includes(cardId)) return 'gone';
+      const title = FAKE_TITLES[cardId];
+      return title === undefined ? 'unread' : { title };
+    },
+    [currentBoardId]
+  );
+
+  // FILL: projects — the projects the app already lists, each a name and its absolute path.
+  const projects = FAKE_PROJECTS;
+
+  // FILL: needsRepos — the sentence of the 409 `KANBAN_BOARD_NEEDS_REPOS` a refused Autonomy switch
+  // answers with. Set, it opens the dialog on `repos` (`setDialog('repos')`) with the sentence above
+  // the list; it is cleared when the dialog closes.
+  const reposNotice: string | null = null;
+
+  // FILL: reposRefusal — the server's sentence when it refused the repositories: the 400 of a path
+  // that is not a directory inside a git work tree. The dialog stays open over the draft.
+  const reposRefusal: string | null = null;
+
+  /** The board dialog's one write. Archive NEVER falls back by hand: every board write re-reads the
    *  list, and the board the server answers with as current is the one this panel paints. */
-  const confirmDialog = (name: string) => {
+  const confirmDialog = (draft: KanbanBoardDraft) => {
     const mode = dialog;
+    // FILL: onSaveRepos — `draft.repos`, written through `PATCH /api/kanban/boards/:boardId` for
+    // `repos`, and sent WITH the name for `new` (`POST /api/kanban/boards` takes `repos`), so a new
+    // board is made with its repositories in one call or not made at all. Either save closes the
+    // dialog on the server's answer and not on the press: a refusal has to find the draft still on
+    // screen. The line below is this marker's: it is where `repos` is read off the draft.
+    const { name } = draft;
     setDialog(null);
     if (mode === 'new') void createBoard(name);
     else if (mode === 'rename' && currentBoardId) void updateBoard(currentBoardId, { name });
     else if (mode === 'archive' && currentBoardId) void updateBoard(currentBoardId, { archived: true });
   };
 
-  const currentName = boards.find((candidate) => candidate.id === currentBoardId)?.name ?? '';
+  const currentBoard = boards.find((candidate) => candidate.id === currentBoardId);
+  const currentName = currentBoard?.name ?? '';
 
   /** Loading, unreachable, no board, board. Four different pieces of news, never one spinner. */
   const body = () => {
@@ -161,6 +199,8 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
           drag={drag}
           writes={writes}
           boardId={currentBoardId}
+          walkOf={walkOf}
+          titleOf={titleOf}
           sorts={sorts}
           collapsed={collapsed}
           onSort={(laneId, sort) => setSorts((held) => ({ ...held, [laneId]: sort }))}
@@ -176,7 +216,6 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
         boards={boards}
         currentBoardId={currentBoardId}
         autonomy={autonomy}
-        deepseekFlash={deepseekFlash}
         // Boards are GLOBAL: selecting one writes the one `current_board` setting, and the lanes
         // repaint from the id the server answers with. Never scoped to the open project.
         onSelectBoard={(boardId) => { void selectBoard(boardId); }}
@@ -185,15 +224,11 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
           // server, which is why the lanes are recomposed from the same setting the faces read.
           if (currentBoardId) void updateBoard(currentBoardId, { autonomy: next });
         }}
-        onToggleDeepseekFlash={(next) => {
-          // A board's own switch, and the row is the only thing that holds it: the flag file a
-          // Metis and her plan runners read is derived from it at spawn, and nothing running moves.
-          if (currentBoardId) void updateBoard(currentBoardId, { deepseekFlash: next });
-        }}
         // A kit `Dialog` + `Field`, never `window.prompt`: a new board is labelled with THIS panel's
         // projectId (none, when no project is open), and that label is the point of `board.project_id`.
         onNewBoard={() => setDialog('new')}
         onRenameBoard={() => setDialog('rename')}
+        onEditRepos={() => setDialog('repos')}
         onArchiveBoard={() => setDialog('archive')}
       />
 
@@ -205,6 +240,10 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
         key={dialog ?? 'closed'}
         mode={dialog}
         initialName={dialog === 'rename' ? currentName : ''}
+        initialRepos={dialog === 'repos' ? (currentBoard?.repos ?? []) : []}
+        projects={projects}
+        notice={dialog === 'repos' ? reposNotice : null}
+        refusal={reposRefusal}
         onClose={() => setDialog(null)}
         onConfirm={confirmDialog}
       />
@@ -218,15 +257,12 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
         // The writes are the PANEL's, not the drawer's: one `applyCard`, one idea of where a card
         // sits. The drawer hands the verbs down to the sections it painted.
         writes={writes}
+        walk={board.selectedCardId === null ? null : walkOf(board.selectedCardId)}
+        titleOf={titleOf}
+        // FILL: onOpenCard — a link's press opens the linked card in this same sheet.
+        onOpenCard={board.openCard}
         onClose={() => board.openCard(null)}
       />
-
-      {/* THE FLEET, IN THE BOARD'S OWN COLUMN, under the rail. A sibling of the drawer rather than a
-          child of it: it is a strip in the board's flow, and it must be readable while a card is
-          open beside it. Mounted ONLY while a board is selected — a fleet belongs to a board, and
-          with none there is nothing to ask about. It reads the fleet itself and reports into
-          nothing here. */}
-      {currentBoardId !== null && <KanbanMetisPanel boardId={currentBoardId} boardName={currentName} />}
 
       {/* The board's single live region. Every move announces here, and nowhere else.
           `key` is the ANNOUNCEMENT and not the text: a reader who moves two cards to the same

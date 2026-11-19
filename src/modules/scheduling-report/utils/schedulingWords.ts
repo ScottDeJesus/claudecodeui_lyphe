@@ -77,6 +77,16 @@ export function durationWord(t: TFunction, ms: number): string {
   return t(`${K}.duration.s`, { s });
 }
 
+/** "30 m", "2 h 30 m", "10 h": a visit's length from its whole minutes; a length is never worded in seconds. */
+export function lengthWord(t: TFunction, minutes: number): string {
+  const total = Math.max(0, Math.round(minutes));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h > 0 && m > 0) return t(`${K}.duration.hm`, { h, m });
+  if (h > 0) return t(`${K}.duration.h`, { h });
+  return t(`${K}.duration.m`, { m });
+}
+
 /** "11:11 AM", in the reader's own clock; `seconds` adds them, for a press, where two can fall in one minute. */
 export function clockWord(iso: string, seconds = false): string {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: seconds ? '2-digit' : undefined });

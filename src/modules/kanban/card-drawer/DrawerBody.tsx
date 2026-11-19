@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { MarkdownPreview } from '@/modules/markdown-preview';
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
+import { plainTagsOf } from '@/modules/kanban/utils/walkModel';
 import type { KanbanCardDetail, KanbanPriority } from '@/shared/kanban-types';
 import { Badge, Button, Chip, Field, Input } from '@/shared/ui';
 
@@ -66,6 +67,11 @@ export function DrawerBody({ detail, writes }: DrawerBodyProps) {
   const [body, setBody] = useState(detail.body);
   const [editingBody, setEditingBody] = useState(false);
   const [tag, setTag] = useState('');
+
+  // The tags that are only names. The flow's tag is the word in the sheet's header and each link
+  // is a row under this body (`DrawerLinks`), by the other card's title: neither is a chip here,
+  // where a link would read as `duplicate-of:` and an id.
+  const tagNames = plainTagsOf(detail.tags);
 
   /** The three text fields save the same way: skip a no-op, write, and put the DRAFT back the way
    *  the card still is when the write is refused. */
@@ -158,9 +164,9 @@ export function DrawerBody({ detail, writes }: DrawerBodyProps) {
 
       <Field label={t('kanban.drawer.tags')} htmlFor={tagId}>
         <div className="flex flex-col gap-2">
-          {detail.tags.length > 0 && (
+          {tagNames.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
-              {detail.tags.map((name) => (
+              {tagNames.map((name) => (
                 <li key={name}>
                   {/* A tag is a name, never a verdict: outline, never a tone. The only coloured
                       thing a tag may carry is nothing at all. */}

@@ -1475,7 +1475,7 @@ export const api = {
       patch(`/api/kanban/boards/${encodeURIComponent(id)}`, body),
     selectBoard: (id: string) => post(`/api/kanban/boards/${encodeURIComponent(id)}/select`, {}),
     lanes: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/lanes`),
-    // The header's six registers in one request — four of this board, two of the whole estate.
+    // The header's five registers in one request — three of this board, two of the whole estate.
     vitals: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/vitals`),
 
     // The lessons lane's REVIEW surface (docs/MANUAL.md (memory-intake); the store itself is

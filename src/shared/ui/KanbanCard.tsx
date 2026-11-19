@@ -5,12 +5,14 @@ import type { Tone } from '@/shared/types';
 import { cn } from '@/shared/utils';
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/ActionMenu';
 import { Badge } from '@/shared/ui/Badge';
+import { KANBAN_CARD_LINK_ATTRIBUTE, KanbanCardLinks, type KanbanCardLink } from '@/shared/ui/KanbanCardLinks';
 import { Meter } from '@/shared/ui/Meter';
 import { Tooltip } from '@/shared/ui/Tooltip';
 
 /**
  * One card on a board lane: a title, how urgent it is, its tags, and — only when the board that
- * owns it asked for them — the signals that say whether it needs a person.
+ * owns it asked for them — the signals that say whether it needs a person, one sentence about
+ * where it stands, and the cards it is tied to.
  *
  * KIT, not a board. It knows no statuses, no lane names and no policy: which lane a card sits
  * in, whether that lane is muted and what the menu offers all arrive as props. Paint is
@@ -39,15 +41,17 @@ export type KanbanCardSignals = {
   checklist?: { done: number; total: number };
   /** Preformatted spend ("128k"). The card never does token math. */
   tokens?: string;
-  approval?: 'unapproved' | 'approved';
-  /** 'stale' is a lease older than 40s. */
-  lease?: 'held' | 'stale';
 };
 
 export type KanbanCardModel = {
   id: string; title: string; priority: CardPriority; tags: string[];
   /** Absent = autonomy OFF: the face is title + priority + tags and nothing else. */
   signals?: KanbanCardSignals;
+  /** One sentence about where the card stands, printed whole on the face in calm ink: why it is
+   *  being held, in the board's words. Never a tooltip: a finger has no hover. */
+  note?: string;
+  /** The cards this one is tied to. Each is a word, that card's title, and a press that opens it. */
+  links?: KanbanCardLink[];
 };
 
 type KanbanCardProps = {
@@ -68,11 +72,6 @@ type KanbanCardProps = {
 const WORDS = {
   high: 'High',
   low: 'Low',
-  needsApproval: 'Needs approval',
-  building: 'Building',
-  stalled: 'Stalled',
-  leaseHint: 'Build lease',
-  staleHint: 'Build lease has gone stale',
   tokensHint: 'Build tokens',
   checklist: 'Checklist',
   moreTags: (n: number) => `+${n}`,
@@ -88,12 +87,12 @@ const TONE_BUDGET = 2;
 const HEAVY_BUDGET = 1;
 const HEAVY_TONES: Tone[] = ['warn', 'danger'];
 
-/** The five things that can ask for colour. Each key is spelled as the `KanbanCardSignals` field
+/** The three things that can ask for colour. Each key is spelled as the `KanbanCardSignals` field
  *  it reads, so the two never drift apart. */
-type SignalKey = 'openIssues' | 'lease' | 'approval' | 'priority' | 'openQuestions';
+type SignalKey = 'openIssues' | 'priority' | 'openQuestions';
 
-/** `glyph` is kept apart from `label` so the lease glyph alone can breathe. */
-type FaceSignal = { key: SignalKey; tone: Tone; glyph: string; label: string; hint?: string; pulse?: boolean };
+/** `glyph` is kept apart from `label`: the glyph is hidden from a screen reader, the word is read. */
+type FaceSignal = { key: SignalKey; tone: Tone; glyph: string; label: string };
 
 /**
  * Colour is a budget, not a property of a state. Every candidate keeps its glyph and its count
@@ -119,9 +118,9 @@ function grantTones(candidates: FaceSignal[]): Set<SignalKey> {
   return granted;
 }
 
-/** The candidates raised, in the ruled precedence: issues > lease > unapproved > high priority >
- *  questions. `priority` is in the list yet renders on the row above, because the budget is over
- *  the FACE and not over one row. */
+/** The candidates raised, in the ruled precedence: issues > high priority > questions. `priority`
+ *  is in the list yet renders on the row above, because the budget is over the FACE and not over
+ *  one row. */
 function faceSignals(card: KanbanCardModel): FaceSignal[] {
   const signals = card.signals;
   const raised: FaceSignal[] = [];
@@ -131,17 +130,6 @@ function faceSignals(card: KanbanCardModel): FaceSignal[] {
   }
   if (signals.openIssues) {
     raised.push({ key: 'openIssues', tone: 'danger', glyph: '✕', label: WORDS.issues(signals.openIssues) });
-  }
-  // The ruling spells this `◐` (U+25D0). Measured in the body font at a compact badge's 10px it
-  // draws as an ambiguous sliver and only resolves into a half-circle near 28px, while U+25CF
-  // reads at every size. The ruling's own word for it is "dot", so the dot ships.
-  if (signals.lease === 'held') {
-    raised.push({ key: 'lease', tone: 'positive', glyph: '●', label: WORDS.building, hint: WORDS.leaseHint, pulse: true });
-  } else if (signals.lease === 'stale') {
-    raised.push({ key: 'lease', tone: 'warn', glyph: '●', label: WORDS.stalled, hint: WORDS.staleHint });
-  }
-  if (signals.approval === 'unapproved') {
-    raised.push({ key: 'approval', tone: 'warn', glyph: '▲', label: WORDS.needsApproval });
   }
   if (card.priority === 'high') {
     raised.push({ key: 'priority', tone: 'warn', glyph: '▲', label: WORDS.high });
@@ -166,24 +154,26 @@ function priorityLine(priority: CardPriority, toned: boolean): { text: string; c
 }
 
 /**
- * Whether a pointer or key event landed on the card's own `…` control rather than on the card.
+ * Whether a pointer or key event landed on a press INSIDE the card — its `…` control, or a link
+ * to another card — rather than on the card.
  *
- * The card is a single focusable, clickable surface with a menu inside it, so every event the
+ * The card is a single focusable, clickable surface with presses inside it, so every event the
  * card cares about also fires there — one from the menu included, which is portalled out to
- * `<body>` and still bubbles through the card in the React tree. The check matches the two
- * attributes those nodes carry, the trigger's `aria-haspopup="menu"` and the menu's own
- * `role="menu"`: a check against a class name would break the moment the paint file renamed one,
- * and a check against the card's children would swallow the title.
+ * `<body>` and still bubbles through the card in the React tree. The check matches the attributes
+ * those nodes carry, the trigger's `aria-haspopup="menu"`, the menu's own `role="menu"` and the
+ * link's own marker: a check against a class name would break the moment the paint file renamed
+ * one, and a check against the card's children would swallow the title.
  */
-function fromOverflowMenu(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest('[aria-haspopup="menu"], [role="menu"]') !== null;
+function fromInnerPress(target: EventTarget | null): boolean {
+  return target instanceof Element
+    && target.closest(`[aria-haspopup="menu"], [role="menu"], [${KANBAN_CARD_LINK_ATTRIBUTE}]`) !== null;
 }
 
 /** One signal, loud or quiet. Both spellings carry the glyph AND the word; a bare dot is not a signal. */
 function SignalBadge({ signal, toned }: { signal: FaceSignal; toned: boolean }) {
-  const badge = toned ? (
+  return toned ? (
     <Badge tone={signal.tone} className="vv-badge--compact vv-lane-card__signal">
-      <span className={cn(signal.pulse && 'vv-pulse')} aria-hidden="true">{signal.glyph}</span>
+      <span aria-hidden="true">{signal.glyph}</span>
       <span className="ml-1">{signal.label}</span>
     </Badge>
   ) : (
@@ -192,8 +182,6 @@ function SignalBadge({ signal, toned }: { signal: FaceSignal; toned: boolean }) 
       <span className="ml-1">{signal.label}</span>
     </Badge>
   );
-
-  return signal.hint ? <Tooltip content={signal.hint}>{badge}</Tooltip> : badge;
 }
 
 /** Rendered by KanbanLane for one card in its list. The lane owns the gap between cards; this sets no margin. */
@@ -212,8 +200,10 @@ export function KanbanCard({
   const titleId = `${reactId}-title`;
   const metaId = `${reactId}-meta`;
   const signalsId = `${reactId}-signals`;
+  const noteId = `${reactId}-note`;
 
   const signals = card.signals;
+  const links = card.links ?? [];
   const raised = faceSignals(card);
   const granted = grantTones(raised);  // which of them get to be loud
   const priority = priorityLine(card.priority, granted.has('priority'));
@@ -227,17 +217,21 @@ export function KanbanCard({
     ? Math.round((checklist.done / checklist.total) * 100)
     : null;
 
+  // The tag row also holds what a hover reveals, so it stands even when it is blank at rest — except
+  // on a face whose next rows are the board's own sentence or links: there a blank row is a 20 px
+  // hole between the title and the one thing the card has to say.
+  const showMeta = priority !== null || card.tags.length > 0 || (links.length === 0 && !card.note);
   const visibleTags = card.tags.slice(0, TAGS_ON_FACE);
   const hiddenTags = card.tags.slice(TAGS_ON_FACE);
-  // A click on the `…` trigger bubbles through here too, and opening the drawer behind the menu
-  // the reader just asked for is the one outcome this guard exists to prevent.
+  // A click on the `…` trigger or on a link bubbles through here too, and opening THIS card's
+  // drawer behind the menu or the other card the reader just asked for is what this guard prevents.
   const handleOpen = (event: MouseEvent<HTMLLIElement>) => {
-    if (fromOverflowMenu(event.target)) return;
+    if (fromInnerPress(event.target)) return;
     onOpen(card.id);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLLIElement>) => {
-    if (fromOverflowMenu(event.target)) return;
+    if (fromInnerPress(event.target)) return;
 
     if (event.key === 'Enter' || event.key === ' ') {
       // Space is prevented, not merely ignored: on a focusable element it scrolls the lane, and
@@ -296,14 +290,13 @@ export function KanbanCard({
         selected && 'vv-lane-card--selected',
         dragging && 'vv-lane-card--lifted',
         muted && 'vv-lane-card--muted',
-        signals?.lease === 'held' && 'vv-lane-card--leased',
         dropEdge === 'top' && 'vv-lane-card--edge-top',
         dropEdge === 'bottom' && 'vv-lane-card--edge-bottom',
       )}
       draggable
       tabIndex={tabStop ? 0 : -1}
       aria-labelledby={titleId}
-      aria-describedby={badges.length > 0 || showChecklist ? `${metaId} ${signalsId}` : metaId}
+      aria-describedby={[showMeta && metaId, (badges.length > 0 || showChecklist) && signalsId, card.note && noteId].filter(Boolean).join(' ') || undefined}
       aria-roledescription="draggable card"
       aria-current={selected || undefined}
       data-card-id={card.id}
@@ -330,6 +323,7 @@ export function KanbanCard({
         {card.title}
       </h4>
 
+      {showMeta && (
       <div id={metaId} className="flex min-w-0 items-center gap-1.5 overflow-hidden">
         {priority && <span className={cn('shrink-0 text-xs', priority.className)}>{priority.text}</span>}
         {visibleTags.map((tag) => (
@@ -347,6 +341,7 @@ export function KanbanCard({
           </Tooltip>
         )}
       </div>
+      )}
 
       {(badges.length > 0 || showChecklist) && (
         <div id={signalsId} className="flex min-w-0 items-center gap-1.5 overflow-hidden">
@@ -364,6 +359,14 @@ export function KanbanCard({
           )}
         </div>
       )}
+
+      {/* Printed, whole, in the calm ink: a card that is being held says why where it sits, and a
+          sentence in a tooltip is a sentence a finger never reads. */}
+      {card.note && (
+        <p id={noteId} className="vv-lane-card__note text-xs leading-snug text-muted-foreground">{card.note}</p>
+      )}
+
+      {links.length > 0 && <KanbanCardLinks links={links} tabStop={tabStop} onOpen={onOpen} />}
     </li>
   );
 }

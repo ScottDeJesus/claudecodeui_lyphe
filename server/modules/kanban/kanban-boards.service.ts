@@ -9,6 +9,7 @@ import {
 } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
+import { requireBoardRepos } from './kanban-board-repos.js';
 import { writeKanban } from './kanban-write.service.js';
 
 /**
@@ -61,6 +62,16 @@ function requireBoardName(name: string): string {
   return trimmed;
 }
 
+/** An autonomous board always names a repository; see `updateBoard` for why. */
+function requireReposForAutonomy(autonomy: boolean, repos: readonly string[]): void {
+  if (autonomy && repos.length === 0) {
+    throw new AppError('A board runs itself only once it names at least one repository.', {
+      code: 'KANBAN_BOARD_NEEDS_REPOS',
+      statusCode: 409,
+    });
+  }
+}
+
 /**
  * The board verbs: create, list, read, update, select, resolve for a project, count a board's
  * cards per status, nudge, and read the audit log.
@@ -75,9 +86,13 @@ function requireBoardName(name: string): string {
  */
 export const kanbanBoardsService = {
   /** Creates one board and returns it. Its id is minted inside the write, so a create cannot collide. */
-  createBoard(input: { name: string; projectId?: string | null }, context?: KanbanWriteContext): KanbanBoard {
+  createBoard(
+    input: { name: string; projectId?: string | null; repos?: string[] },
+    context?: KanbanWriteContext
+  ): KanbanBoard {
     const name = requireBoardName(input.name);
     const projectId = input.projectId ?? null;
+    const repos = requireBoardRepos(input.repos ?? []);
 
     return writeKanban(
       // The board id does not exist until `mutate` runs — it is minted in the transaction — so the
@@ -91,6 +106,7 @@ export const kanbanBoardsService = {
           name,
           projectId,
           autonomy: false,
+          repos,
         });
       }
     );
@@ -122,15 +138,19 @@ export const kanbanBoardsService = {
   /**
    * Applies a patch and returns the board as it stands. A missing board is a 404.
    *
-   * The write is the only thing that decides whether the board was there, so the existence check
-   * and the update are one statement inside one transaction rather than a read followed by a
-   * hopeful write. Archiving is its own event kind, because "the board was archived" is what the
-   * audit log is read for.
+   * The existence check and the update sit in one transaction rather than a read followed by a
+   * hopeful write, so the board cannot change between them. Archiving is its own event kind,
+   * because "the board was archived" is what the audit log is read for.
    *
    * `concurrency` is CLAMPED on the way in — `[0, KANBAN_CONCURRENCY_MAX]`, through the one clamp
    * the read side uses too — so the number this returns is the number every later tick compares
    * against, and a `99` is stored as the ceiling it was read back as rather than as a value the board
    * would fan out to. Zero is a real setting: it means the board spawns nothing.
+   *
+   * A board that runs itself must name a repository, because the dispatcher builds each card in the
+   * board's repositories, and a board with none would take cards it has nowhere to build. The check
+   * reads the board inside the transaction so that the autonomy and repos it judges are the ones the
+   * write stores.
    */
   updateBoard(
     boardId: string,
@@ -141,21 +161,32 @@ export const kanbanBoardsService = {
       concurrency?: number;
       projectId?: string | null;
       archived?: boolean;
+      repos?: string[];
     },
     context?: KanbanWriteContext
   ): KanbanBoard {
     const name = patch.name === undefined ? undefined : requireBoardName(patch.name);
     const concurrency =
       patch.concurrency === undefined ? undefined : clampKanbanConcurrency(patch.concurrency);
+    // Outside the transaction: normalising the paths runs git, and a write should not hold the
+    // database while a subprocess runs.
+    const repos = patch.repos === undefined ? undefined : requireBoardRepos(patch.repos);
 
     return writeKanban(
       {
         kind: patch.archived === true ? 'board.archived' : 'board.updated',
         boardId,
         actor: context?.actor,
+        // Named in the audit row, so a listener (the board-dispatch module) can tell the autonomy switch moving from a rename.
+        payload: patch.autonomy === undefined ? {} : { autonomy: patch.autonomy },
       },
       () => {
         if (patch.projectId !== undefined && patch.projectId !== null) requireProject(patch.projectId);
+
+        if (patch.autonomy === true || repos !== undefined) {
+          const current = requireBoard(boardId);
+          requireReposForAutonomy(patch.autonomy ?? current.autonomy, repos ?? current.repos);
+        }
 
         const board = kanbanBoardsDb.updateBoard({
           id: boardId,
@@ -165,6 +196,7 @@ export const kanbanBoardsService = {
           concurrency,
           projectId: patch.projectId,
           archived: patch.archived,
+          repos,
         });
 
         if (!board) {

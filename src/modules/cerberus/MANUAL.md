@@ -38,7 +38,7 @@ The Cerberus tab: the fleet's health, on the views rail's house run. One provide
 - Layout of the module: `context/` (provider), `hooks/`, `utils/` (pure), `fleet/`, `sheet/`, `history/`, `catalog/` (the Catalog view), `modals/` (the dialogs).
 - Colour: no hex, `rgba(` or `var(--` in a className or style under `src/modules/cerberus/` (2026-10-06: none outside one comment). Tone reaches paint only as `data-tone` plus a `tone-*` name (MAN-739 rule 3); the set stays five, so denied is `danger` (MAN-739 rule 4).
 - A status is painted from one table, `STATUS_TABLE` (MAN-7873), and a state that speaks in colour also carries its icon or word (MAN-578).
-- Words: every sentence is a `cerberus.*` key through `t()`, English only; a label, reason, node name or description is data, never a key (MAN-7870). The Tours strip's two words are `cerberus.*` (`cerberus.tours.tab`, `cerberus.tours.tabHint`); the Tours view's own are `affectedAreas.*` (MAN-8575). The Uploads view's, its strip name included, are `cerberus.uploads.*` (MAN-9891).
+- Words: every sentence is a `cerberus.*` key through `t()`, English only; a label, reason, node name or description is data, never a key (MAN-7870). The Tours strip's two words are `cerberus.*` (`cerberus.tours.tab`, `cerberus.tours.tabHint`); the Tours view's own are `affectedAreas.*` (MAN-8575). The Uploads view's, its strip name included, are `cerberus.uploads.*` (MAN-9891); the Scheduling view's, its strip name (`cerberus.scheduling.tab`, `cerberus.scheduling.tabHint`) included, are `cerberus.scheduling.*` (MAN-9992). A login, a customer, a person's name, a code and a reason's detail are data, never keys.
 - No unit tests: each seam is shown on the real app against the live center.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/
@@ -1066,7 +1066,7 @@ The Cerberus tab's root and header, live: the root reads the one overview throug
 | `src/modules/cerberus/CerberusHeader.tsx` | `CerberusHeader({ overview, stale, wardens, onEnroll, onUpdateWardens })` and `ClockPill`: eyebrow, headline, summary, clock pill, the update button, Enroll a node |
 | `src/modules/cerberus/hooks/useClock.ts` | `useClock(tickMs = 1000)`: the browser's clock as epoch ms, read again each tick on the host window |
 | `src/modules/cerberus/hooks/useCountTo.ts` | `useCountTo(target)`: the passing count as drawn |
-| `src/shared/types.ts` | `CerberusView = 'fleet' | 'catalog' | 'history' | 'tours' | 'bulletins' | 'uploads'` |
+| `src/shared/types.ts` | `CerberusView = 'fleet' | 'catalog' | 'history' | 'tours' | 'bulletins' | 'uploads' | 'scheduling'` |
 
 `index.ts` exports `CerberusPanel` as a `lazy` import (its own chunk, loaded on the tab's first open); `WorkspaceMain` renders it with its `projectChoices`, which it only does once the workspace's projects have been read.
 

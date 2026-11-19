@@ -8,6 +8,7 @@ import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations'
 import { cardMenuItems, laneMenuItems } from '@/modules/kanban/utils/boardMenus';
 import type { KanbanViewSort } from '@/modules/kanban/utils/cardModel';
 import type { KanbanLaneSpec } from '@/modules/kanban/utils/lanePolicy';
+import { withWalkFace, type KanbanLinkedTitle, type KanbanWalk } from '@/modules/kanban/utils/walkModel';
 import { KanbanLane } from '@/shared/ui';
 
 /**
@@ -40,6 +41,11 @@ type KanbanRailProps = {
   writes: Pick<KanbanMutations, 'createCard' | 'archiveCard' | 'clearLane'>;
   /** The open board, for the one write a `+` makes. */
   boardId: string | null;
+  /** A card's walk, or `null` for a card the dispatcher is not walking. The panel reads it once. */
+  walkOf: (cardId: string) => KanbanWalk | null;
+  /** What the board knows of another of its cards — its title, not read yet, or gone: what a link
+   *  to that card is drawn as. */
+  titleOf: (cardId: string) => KanbanLinkedTitle;
   /** The view sort each lane is painted in — the panel's own state, per SCREEN. */
   sorts: Record<string, KanbanViewSort>;
   /** Which lanes are folded to their spine. */
@@ -56,6 +62,8 @@ export function KanbanRail({
   drag,
   writes,
   boardId,
+  walkOf,
+  titleOf,
   sorts,
   collapsed,
   onSort,
@@ -223,7 +231,12 @@ export function KanbanRail({
             laneId={spec.id}
             title={t(spec.titleKey)}
             count={view.count}
-            cards={view.cards}
+            // The walk's half of each face: the flow's word, the links by title, and — in the one
+            // lane the policy names — why the card is being held. A link's press is the lane's own
+            // `onOpenCard`, so the linked card opens the way every card does.
+            cards={view.cards.map((card) =>
+              withWalkFace(card, { t, titleOf, walk: walkOf(card.id), showsHold: spec.showsHold === true })
+            )}
             selectedCardId={board.selectedCardId}
             muted={spec.muted}
             loading={view.loading}

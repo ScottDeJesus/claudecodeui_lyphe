@@ -68,7 +68,7 @@ import { createCliVersionModule } from './modules/cli-version/index.js';
 import { createBootReportModule } from './modules/boot-report/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createKanbanModule } from './modules/kanban/index.js';
-import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
+import { createKanbanDispatchModule } from './modules/kanban-dispatch/index.js';
 import { createKanbanIntakeRouter } from './modules/kanban-intake/index.js';
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
 import { createFollowupsModule } from './modules/followups/index.js';
@@ -267,8 +267,8 @@ followChatRuns(chatRunRegistry);
 // Express routes is a spelling that has already passed the JWT check.
 //
 // ⚠ NOT `app.use('/api', authenticateToken, …)`: that would run the check in front of every mount
-// declared BELOW this line too — `/api/kanban-pm` (a board Metis holds no user token),
-// `/api/ntfy/act` (signed buttons), `/api/agent` and `/api/browser-use-mcp` are public by design.
+// declared BELOW this line too — `/api/kanban-intake` (a machine's own secret), `/api/ntfy/act`
+// (signed buttons), `/api/agent` and `/api/browser-use-mcp` are public by design.
 app.use('/api/accounts', authenticateToken);
 app.use('/api/usage', authenticateToken);
 app.use('/api', createAccountsModule());
@@ -291,11 +291,7 @@ const kanbanReadings = { memoryPending };
 // the module imports `authenticateToken` and a sibling route package cannot forget it.
 app.use('/api/kanban', authenticateToken, createKanbanModule(kanbanReadings));
 
-// A board's own Metis: launching one by hand, watching her, stopping and resuming her (protected).
-app.use('/api/kanban-metis', authenticateToken, createKanbanMetisModule());
-
-// The memory-intake lane (protected), at ONE address and never on the board's router — so the second
-// kanban mount a board Metis can reach cannot see it. Its proposals wait on a person's approval here,
+// The memory-intake lane (protected), at ONE address and never on the board's router. Its proposals wait on a person's approval here,
 // and nothing reaches a shelf or a project's memory directory until one is given.
 app.use('/api/memory', authenticateToken, createMemoryIntakeModule());
 
@@ -340,13 +336,6 @@ app.use('/api/session-panel-cmd', sessionPanel.commandRouter);
 // to stop all three.
 const cerberus = createCerberusModule({ supervised });
 app.use('/api/cerberus', authenticateToken, cerberus.router);
-
-// The SAME board router behind a second door, for the `kanban-pm` MCP child and nothing else —
-// no verb is duplicated here, and there is deliberately NO `authenticateToken`: a Metis is not a
-// user and holds no user token. `kanbanMetisSecretGuard` is that door's own credential check, on a
-// secret derived from the session id, and it refuses the lesson review and the byte-deleting verbs
-// outright.
-app.use('/api/kanban-pm', kanbanMetisSecretGuard, createKanbanModule(kanbanReadings));
 
 // The Kanban intake door, for eis_backend and nothing else: Restorly's "Something not working?" reports, filed from
 // the owner's account, land as Backlog cards. Deliberately NO `authenticateToken` — the caller is a machine with no
@@ -396,6 +385,13 @@ app.use('/api/dispatcher', authenticateToken, dispatcher.router);
 // writes (protected). Built once here for the dispatcher's reason: its lane starts after `listen`.
 const roadmap = createRoadmapModule(dispatcherStoreWatch);
 app.use('/api/roadmap', authenticateToken, roadmap.router);
+
+// The board and the dispatcher, joined (protected): the board tells the dispatcher what a person did to a card of a
+// self-running board (`dispatcher card told`), and applies the notes the dispatcher's card walks owe the board, poked by
+// the same store watch that pokes the state lane. Its router relays the card-walk settings (`dispatcher card config`).
+// Built here for the dispatcher's reason: it is started after `listen` and stopped on shutdown.
+const kanbanDispatch = createKanbanDispatchModule(dispatcherStoreWatch);
+app.use('/api/kanban-dispatch', authenticateToken, kanbanDispatch.router);
 
 // The heal reflex's ledger, the switches that steer it, and the door to a heal on demand
 // (protected — this is the operator's own friction record, and this app is reachable from a LAN).
@@ -860,6 +856,7 @@ async function startServer() {
             dispatcherStoreWatch.start();
             dispatcher.start();
             roadmap.start();
+            kanbanDispatch.start();
 
             // The Claude update check: armed here rather than at module build, because its first
             // tick writes a file and asks the registry, and a boot that never got this far has no
@@ -925,6 +922,7 @@ async function startServer() {
             stopChatCompaction();
             dispatcher.stop();
             roadmap.stop();
+            kanbanDispatch.stop();
             dispatcherStoreWatch.stop();
             claudeUpdates.stop();
             dispatchSouls.stop();

@@ -5,7 +5,7 @@ import { Badge } from '@/shared/ui';
 
 /**
  * Used by `AgentLaunchRowItem` to say where a row launches and at what: each lane — the Agent tool,
- * the dispatcher, a chain, Metis — with the model·effort of every side of it, and the lane's own note.
+ * the dispatcher, a chain, Metis, a board card's sort — with the model·effort of every side of it, and the lane's own note.
  *
  * A lane whose `reach` is `new-session` carries a marker, because it is the one that does not take a
  * change at the next launch (an Agent call reads its definition once per session). The side's word

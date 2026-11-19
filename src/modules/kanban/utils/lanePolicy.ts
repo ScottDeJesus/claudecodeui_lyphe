@@ -7,9 +7,9 @@ import type { KanbanStatus } from '@/shared/kanban-types';
  * The server stores five statuses and counts them five ways; it never learns that a board has
  * lanes. The kit renders a title, a count and an array of cards; it never learns what a status
  * is. Everything between those two — that To Do carries the questions cards while autonomy is
- * off, that Done is the muted lane, that only the two intake lanes offer a `+` — is decided here
- * and read by the panel, the drawer and the drag hook alike. A second copy of any of it is where
- * the three would drift apart.
+ * off, that Done is the muted lane, that only the intake lanes offer a `+` — Backlog and To Do
+ * with autonomy off, To Do alone with it on — is decided here and read by the panel, the drawer
+ * and the drag hook alike. A second copy of any of it is where the three would drift apart.
  */
 
 export type KanbanLaneSpec = {
@@ -23,6 +23,9 @@ export type KanbanLaneSpec = {
   canAdd: boolean;
   /** Decides whether the panel passes `muted` — a weight change on the lane and its cards. */
   muted: boolean;
+  /** Set on the ONE lane whose cards print why the dispatcher is holding them: a card is held only
+   *  while it waits to be taken up, so the sentence belongs to that lane's faces and no other's. */
+  showsHold?: boolean;
   /**
    * Which end of the lane new work arrives at: `true` pages newest-first, `false` follows the
    * server's `sort_order` ascending.
@@ -56,7 +59,8 @@ export const DONE_LANE_ID = 'done';
  *
  * AUTONOMY ON — five. To Do narrows to `todo` alone and Open questions becomes a lane of its own,
  * placed DIRECTLY AFTER To Do: those are the cards that just left it, and a card that splits out
- * should land next door rather than two columns away.
+ * should land next door rather than two columns away. Only To Do offers `+`, because a
+ * self-running board takes new work through To Do and nowhere else.
  *
  * This order IS the keyboard's: `Ctrl/Cmd + →` moves the focused card to the ADJACENT lane, so
  * from a To Do card the easiest key asks a question about it (autonomy on) or starts building it
@@ -70,6 +74,7 @@ export function kanbanLanes(autonomy: boolean): KanbanLaneSpec[] {
     statuses: autonomy ? ['todo'] : ['todo', 'questions'],
     canAdd: true,
     muted: false,
+    showsHold: true,
     newestFirst: false,
   };
 
@@ -86,7 +91,8 @@ export function kanbanLanes(autonomy: boolean): KanbanLaneSpec[] {
     id: 'not_ready',
     titleKey: 'kanban.lanes.backlog',
     statuses: ['not_ready'],
-    canAdd: true,
+    // With autonomy on, new work enters through To Do alone, so a `+` here would strand its card.
+    canAdd: !autonomy,
     muted: false,
     newestFirst: false,
   };

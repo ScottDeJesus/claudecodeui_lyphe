@@ -3,15 +3,15 @@ import { useTranslation } from 'react-i18next';
 
 import { KanbanVitalsStrip } from '@/modules/kanban/KanbanVitalsStrip';
 import type { KanbanBoard } from '@/shared/kanban-types';
-import { ActionMenu, type ActionMenuItem, LLMProviderLogo, Select, Switch, Tooltip } from '@/shared/ui';
+import { ActionMenu, type ActionMenuItem, Select, Switch } from '@/shared/ui';
 
 /**
- * The board's one row of chrome: which board you are looking at, how it stands in six counts,
- * whether it is running itself, and the two things you can do to the board you are on.
+ * The board's one row of chrome: which board you are looking at, how it stands in five counts,
+ * whether it is running itself, and the three things you can do to the board you are on.
  *
  * MAKING A BOARD IS THE SWITCHER'S, NOT THE MENU'S. It used to sit in the `…` beside Rename and
  * Archive, and the operator's report of it was "no way to select or create other boards": the
- * glyph carries no word, sits at the far end of the row past two switches, and holds two verbs
+ * glyph carries no word, sits at the far end of the row past the switch, and holds verbs
  * that act on the CURRENT board — so nothing about it says a new one starts there. The moment a
  * reader wants a board that does not exist is the moment they have the switcher open and cannot
  * find it, which is exactly where the row now is.
@@ -32,23 +32,13 @@ import { ActionMenu, type ActionMenuItem, LLMProviderLogo, Select, Switch, Toolt
  *
  * "Autonomy" is spelled out beside the switch rather than left to the toggle alone, because the
  * word is the only thing that says which of two boards you are about to get: with it off the
- * faces are title, priority and tags; with it on they carry leases, questions, issues, checklist
+ * faces are title, priority and tags; with it on they carry questions, issues, steps, holds
  * and spend. A bare toggle is a switch whose two positions the reader has to discover by pressing
  * it.
  *
- * The DeepSeek switch beside it wears the whale rather than a colour of its own. Two bare
- * switches in one cramped edge are two identical tracks a reader has to label by position, and a
- * second accent for the second one would be a second palette. The mark is the whole distinction:
- * the same whale, at the same size, that the composer's Flash chip carries while it is on — so the
- * two are learned once. The word rides beside it from `sm` up and stands down on a phone, exactly as
- * that chip's does, because the mark alone is what a reader who has met it once actually reads
- * and the board's name must keep its width. "Autonomy" keeps its word at every width: it has no
- * mark, and a switch with neither is a switch whose positions have to be discovered by pressing.
- *
- * The two switches are PAIRED with their labels by proximity, not by punctuation: each label and
- * its track sit at `gap-1.5`, the pairs at `gap-3`. At one uniform gap the eye read
- * `[switch] · [whale]` as a pair as readily as `[whale] · [switch]`, and a divider between them
- * would say the two are different kinds of thing when they are the same kind — a per-board mode.
+ * IT IS THE BOARD'S ONE SWITCH. Which model a walk rides is the house's setting and not a board's,
+ * so nothing else stands beside it. What a self-running board is built IN is its repositories,
+ * which are not a mode and so are not a switch: they are a row of the `…`, beside Rename.
  */
 
 type KanbanBoardHeaderProps = {
@@ -58,17 +48,15 @@ type KanbanBoardHeaderProps = {
   currentBoardId: string | null;
   /** The selected board's own setting. It gates the UI only; no write is ever skipped. */
   autonomy: boolean;
-  /** The board row's `deepseek_flash`: where this board's Metis, and every plan runner she
-   *  starts, are billed. It moves nothing already running — a child reads it at its next spawn. */
-  deepseekFlash: boolean;
   /** Boards are GLOBAL: selecting one is never scoped to the open project. */
   onSelectBoard: (boardId: string) => void;
   onToggleAutonomy: (next: boolean) => void;
-  onToggleDeepseekFlash: (next: boolean) => void;
-  /** Raised from the switcher's own action row. The panel holds the name surface and the hook
-   *  that writes it, so both name-entry rows are raised rather than handled here. */
+  /** Raised from the switcher's own action row. The panel holds the board's dialog and the hook
+   *  that writes it, so every row that opens it is raised rather than handled here. */
   onNewBoard: () => void;
   onRenameBoard: () => void;
+  /** Opens the board's repositories: where the cards of a self-running board are built. */
+  onEditRepos: () => void;
   onArchiveBoard: () => void;
 };
 
@@ -77,12 +65,11 @@ export function KanbanBoardHeader({
   boards,
   currentBoardId,
   autonomy,
-  deepseekFlash,
   onSelectBoard,
   onToggleAutonomy,
-  onToggleDeepseekFlash,
   onNewBoard,
   onRenameBoard,
+  onEditRepos,
   onArchiveBoard,
 }: KanbanBoardHeaderProps) {
   const { t } = useTranslation();
@@ -90,12 +77,14 @@ export function KanbanBoardHeader({
   const options = boards.map((board) => ({ value: board.id, label: board.name }));
   const hasBoard = currentBoardId !== null;
 
-  // The two verbs that act on the board you are ALREADY on. Making a new one is not among them:
+  // The three verbs that act on the board you are ALREADY on. Making a new one is not among them:
   // it rides in the switcher, which is where a reader looking for a board they cannot find goes.
-  // Archiving hides a board and deletes nothing, which is why it is not marked as danger.
+  // Archiving hides a board and deletes nothing, which is why it is not marked as danger, and it
+  // stands apart behind a rule because it is the one row that takes the board out of sight.
   const items: ActionMenuItem[] = [
     { key: 'rename-board', label: t('kanban.board.rename'), disabled: !hasBoard, onSelect: onRenameBoard },
-    { key: 'archive-board', label: t('kanban.board.archive'), disabled: !hasBoard, onSelect: onArchiveBoard },
+    { key: 'board-repos', label: t('kanban.board.repos'), disabled: !hasBoard, onSelect: onEditRepos },
+    { key: 'archive-board', label: t('kanban.board.archive'), disabled: !hasBoard, showDividerBefore: true, onSelect: onArchiveBoard },
   ];
 
   return (
@@ -115,7 +104,7 @@ export function KanbanBoardHeader({
           // New board lives HERE and not behind the `…`, because the question it answers is the
           // switcher's own: a reader opens this list to find a board, and when the one they want
           // is not in it the way to make it must be under their hand — not behind an unlabelled
-          // glyph at the far end of the row, past two switches.
+          // glyph at the far end of the row, past the switch.
           action={{ label: t('kanban.board.newBoard'), onSelect: onNewBoard }}
         />
       </div>
@@ -152,51 +141,6 @@ export function KanbanBoardHeader({
           />
         </div>
 
-        {/* The tooltip hangs off the LABEL — the mark and the word — and not off the track. The kit
-            centres a bubble on its anchor and clamps it to nothing, and this pair sits at the
-            right edge: measured at 390px, a bubble centred on the whole pair ran 37px past the
-            viewport, while one centred on the mark has 118px to either side. `w-56` is a WIDTH
-            and not a cap, because the kit's bubble is a fixed box with no width of its own, and
-            a fixed box shrinks to fit the room between its anchor's centre and the viewport's
-            right edge BEFORE it is translated back over the anchor — under `max-w-56` the same
-            sentence came out 118px wide and eight lines tall on a phone. At 224px it is three
-            lines and fits both widths, so the sentence behind it has to stay short — about
-            eighty characters. It sits BELOW, over the lanes:
-            above is the top of the viewport on a desktop, and to the LEFT a bubble centred on a
-            48px row clips at the top the moment it is more than two lines. The kit's default is
-            one unbroken line, which is why it is told to wrap. The label runs the row's full
-            height so a phone reader, who sees the mark alone, has something to long-press —
-            that is the only way a phone can learn what this switches. The mark comes through the
-            shared provider logo rather than DeepSeekLogo directly: it is the door that branches on
-            a provider name, and the mark's own file records it as the only one. It is hidden from
-            the accessibility tree: the svg names itself "DeepSeek" through `role="img"`, and beside
-            a visible word and a track whose accessible name both already say "DeepSeek Flash", a
-            screen reader heard the name three times where Autonomy's is heard twice. With no board
-            the track is disabled exactly as Autonomy's is, and for the same reason: there is no
-            row for the setting to live on. */}
-        <div className="flex items-center gap-1.5">
-          <Tooltip
-            content={t('kanban.board.deepseekFlashTooltip')}
-            position="bottom"
-            className="w-56 whitespace-normal"
-          >
-            <div className="flex h-12 items-center gap-1.5">
-              <span aria-hidden="true" className="flex shrink-0">
-                <LLMProviderLogo provider="deepseek" className="h-4 w-4 shrink-0" />
-              </span>
-              <span className="hidden text-xs font-medium text-muted-foreground sm:inline">
-                {t('kanban.board.deepseekFlash')}
-              </span>
-            </div>
-          </Tooltip>
-          <Switch
-            checked={deepseekFlash}
-            onChange={onToggleDeepseekFlash}
-            label={t('kanban.board.deepseekFlash')}
-            disabled={!hasBoard}
-          />
-        </div>
-
         <ActionMenu
           label={t('kanban.board.actions')}
           ariaLabel={t('kanban.board.actions')}
@@ -205,7 +149,12 @@ export function KanbanBoardHeader({
           iconOnly
           variant="ghost"
           size="icon"
-          triggerClassName="h-7 w-7"
+          // Under a finger the `…` and every row it opens are 44 px (INV-10275): it is the one
+          // standing door to a board's repositories, and a door a thumb misses is no door. The
+          // rows are sized from here, through the menu's own class, because the kit's row is 36 px
+          // for every menu in the app and that is not this header's to change.
+          triggerClassName="h-7 w-7 finger:h-11 finger:w-11"
+          menuClassName="finger:[&_[role=menuitem]]:min-h-11 finger:[&_[role=menuitem]]:items-center"
         />
       </div>
     </header>

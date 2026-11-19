@@ -204,11 +204,11 @@ export const kanbanQuestionsDb = {
     return row?.open ?? 0;
   },
 
-  /** Writes the decision an answer became, and returns it as stored. */
+  /** Writes one decision — an answer's, or a choice noted with no question behind it — and returns it as stored. */
   insertDecision(input: {
     id: string;
     cardId: string;
-    questionId: string;
+    questionId: string | null;
     question: string;
     choice: string[];
     tags: string[];

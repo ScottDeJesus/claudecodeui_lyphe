@@ -26,6 +26,7 @@ type KanbanBoardRow = {
   autonomy: number;
   deepseek_flash: number;
   concurrency: number;
+  repos: string;
   sort_order: number;
   archived: number;
   created_at: string;
@@ -34,7 +35,22 @@ type KanbanBoardRow = {
 
 /** Every column of a board, in one spelling, so no query is the odd one out. */
 const BOARD_COLUMNS =
-  'id, name, project_id, autonomy, deepseek_flash, concurrency, sort_order, archived, created_at, updated_at';
+  'id, name, project_id, autonomy, deepseek_flash, concurrency, repos, sort_order, archived, created_at, updated_at';
+
+/** A corrupt repos column reads as no repos, so one bad row cannot fail the list of every board. */
+function parseRepos(value: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(`[Kanban] a board's repos column is not the JSON array it should be: ${reason}`);
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((item: unknown): item is string => typeof item === 'string');
+}
 
 /**
  * One SQLite row to the `KanbanBoard` the rest of the server speaks.
@@ -57,6 +73,7 @@ function toKanbanBoard(row: KanbanBoardRow): KanbanBoard {
     autonomy: row.autonomy === 1,
     deepseekFlash: row.deepseek_flash === 1,
     concurrency: clampKanbanConcurrency(row.concurrency),
+    repos: parseRepos(row.repos),
     sortOrder: row.sort_order,
     archived: row.archived === 1,
     createdAt: row.created_at,
@@ -70,6 +87,7 @@ const BOARD_PATCH_COLUMNS = {
   autonomy: 'autonomy',
   deepseekFlash: 'deepseek_flash',
   concurrency: 'concurrency',
+  repos: 'repos',
   projectId: 'project_id',
   archived: 'archived',
 } as const;
@@ -81,6 +99,7 @@ export type KanbanBoardUpdatePatch = {
   autonomy?: boolean;
   deepseekFlash?: boolean;
   concurrency?: number;
+  repos?: string[];
   projectId?: string | null;
   archived?: boolean;
 };
@@ -115,16 +134,25 @@ export const kanbanBoardsDb = {
     name: string;
     projectId: string | null;
     autonomy: boolean;
+    repos: string[];
   }): KanbanBoard {
     const db = getConnection();
     const now = new Date().toISOString();
     const row = db
       .prepare(
-        `INSERT INTO kanban_boards (id, name, project_id, autonomy, sort_order, archived, created_at, updated_at)
-         VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(existing.sort_order), 0) + 1000 FROM kanban_boards AS existing), 0, ?, ?)
+        `INSERT INTO kanban_boards (id, name, project_id, autonomy, repos, sort_order, archived, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(existing.sort_order), 0) + 1000 FROM kanban_boards AS existing), 0, ?, ?)
          RETURNING ${BOARD_COLUMNS}`
       )
-      .get(input.id, input.name, input.projectId, input.autonomy ? 1 : 0, now, now) as
+      .get(
+        input.id,
+        input.name,
+        input.projectId,
+        input.autonomy ? 1 : 0,
+        JSON.stringify(input.repos),
+        now,
+        now
+      ) as
       | KanbanBoardRow
       | undefined;
 
@@ -207,7 +235,13 @@ export const kanbanBoardsDb = {
       const value = patch[field as keyof typeof BOARD_PATCH_COLUMNS];
       if (value === undefined) continue;
       assignments.push(`${column} = ?`);
-      values.push(typeof value === 'boolean' ? (value ? 1 : 0) : value);
+      if (Array.isArray(value)) {
+        values.push(JSON.stringify(value));
+      } else if (typeof value === 'boolean') {
+        values.push(value ? 1 : 0);
+      } else {
+        values.push(value);
+      }
     }
 
     assignments.push('updated_at = ?');

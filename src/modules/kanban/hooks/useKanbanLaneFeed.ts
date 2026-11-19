@@ -61,7 +61,7 @@ export type KanbanLaneFeed = {
  *
  * ONE SLOT, because one board is open at a time, TAGGED with the id it belongs to. A board switch
  * that leaves the old reading standing for a moment is then refused by IDENTITY and not by timing:
- * six counts belong to a board, and the one thing the strip must never do is draw the last board's
+ * five counts belong to a board, and the one thing the strip must never do is draw the last board's
  * numbers against this board's name.
  *
  * AND NOTHING PUBLISHES FOR A BOARD NOBODY HAS OPEN. A read is asked about one board and the server
@@ -73,7 +73,7 @@ export type KanbanLaneFeed = {
  *
  * The value deliberately does NOT become this hook's returned state. A vitals read lands on the
  * frame of every board write — a card moved, a question answered, a lesson reviewed — and a
- * `setState` here would repaint the panel, the rail and every card on screen for six numbers that
+ * `setState` here would repaint the panel, the rail and every card on screen for five numbers that
  * only the strip draws.
  */
 type PublishedVitals = { boardId: string; vitals: KanbanVitals | null; loading: boolean };
@@ -178,7 +178,7 @@ export function useKanbanLaneFeed(boardId: string | null, specs: KanbanLaneSpec[
   /**
    * The board's vitals, read beside the counts above and PUBLISHED rather than held (see the store
    * at the top of this file): the strip in the header listens to them, and this hook's own state
-   * would repaint the whole board for six numbers it does not draw.
+   * would repaint the whole board for five numbers it does not draw.
    *
    * ONE READ IN FLIGHT AT A TIME, and a frame that arrives during one leaves a mark instead of
    * opening a second. A busy board emits its frames in bursts, and a burst must cost the read
@@ -208,7 +208,7 @@ export function useKanbanLaneFeed(boardId: string | null, specs: KanbanLaneSpec[
 
   const readVitals = useCallback(async (id: string) => {
     vitalsReadingRef.current = id;
-    // Reading, with whatever was already known about THIS board still on screen: six counts that
+    // Reading, with whatever was already known about THIS board still on screen: five counts that
     // flickered to em-dashes on every frame would be a strip nobody could read.
     const held = publishedVitals;
     const known = held && held.boardId === id ? held.vitals : null;
@@ -393,7 +393,7 @@ export function useKanbanLaneFeed(boardId: string | null, specs: KanbanLaneSpec[
 
   const applyCounts = useCallback((rows: KanbanLaneCount[]) => {
     setCounts(rows);
-    // A frame is the ONLY signal the six registers can have moved, and it arrives AFTER the write
+    // A frame is the ONLY signal the five registers can have moved, and it arrives AFTER the write
     // that moved them: the card that changed may have left `building` and moved work into a
     // person's queue, and the two estate counts move whenever anybody reviews a lesson or a
     // memory. So the vitals are read again behind it — coalesced, and never on a timer, because

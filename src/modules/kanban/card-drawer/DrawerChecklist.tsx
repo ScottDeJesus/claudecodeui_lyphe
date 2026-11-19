@@ -2,7 +2,10 @@ import { CheckCircle2, Circle, CircleDot, StickyNote } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { DrawerStepStages } from '@/modules/kanban/card-drawer/DrawerStepStages';
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
+import { FAKE_STEP_OF } from '@/modules/kanban/utils/walkFixtures';
+import type { KanbanWalk, KanbanWalkStage } from '@/modules/kanban/utils/walkModel';
 import type { KanbanCardDetail, KanbanChecklistItem } from '@/shared/kanban-types';
 import { Button, Input, Meter } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -29,6 +32,15 @@ import { cn } from '@/shared/utils';
  * unfinished step is not a warning and a note is not a verdict. What a finished row loses is ink,
  * not hue — struck through and muted, so a glance down the list reads as a front line rather than
  * a colour chart.
+ *
+ * A NOTE IS DRAWN WHOLE, LINE BY LINE. A walk writes what it found under the step that found it,
+ * and the root-cause step's note is four lines: the cause, then what was searched for the same
+ * cause elsewhere, for similar cards and for an earlier fix, each with what turned up. One
+ * paragraph would run them together into a sentence nobody wrote.
+ *
+ * UNDER A STEP, THE SITTINGS THAT DID IT (`DrawerStepStages`): who, how it ended, what it spent
+ * and the press that opens its transcript. A sitting no step of this card's list claims is drawn
+ * under the list, so no transcript is ever unreachable because a card changed flow mid-walk.
  */
 
 type DrawerChecklistProps = {
@@ -36,6 +48,10 @@ type DrawerChecklistProps = {
   detail: KanbanCardDetail;
   /** The board's verbs, from the shell. This section reaches the network through none of its own. */
   writes: KanbanMutations;
+  /** The card's walk, or `null` for a card the dispatcher is not walking: steps and no sittings. */
+  walk: KanbanWalk | null;
+  /** Opens one sitting's transcript. The shell owns where it is read. */
+  onReadStage: (stage: KanbanWalkStage) => void;
 };
 
 type ChecklistState = KanbanChecklistItem['state'];
@@ -51,7 +67,7 @@ const STATES = {
 const NEXT_STATE = { pending: 'active', active: 'done', done: 'pending' } satisfies Record<ChecklistState, ChecklistState>;
 
 /** Rendered by KanbanCardDrawer while autonomy is on. Nothing else mounts it. */
-export function DrawerChecklist({ detail, writes }: DrawerChecklistProps) {
+export function DrawerChecklist({ detail, writes, walk, onReadStage }: DrawerChecklistProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const addId = useId();
@@ -59,6 +75,19 @@ export function DrawerChecklist({ detail, writes }: DrawerChecklistProps) {
 
   const total = detail.checklist.length;
   const done = detail.checklist.filter((item) => item.state === 'done').length;
+
+  // FILL: stagesByStep — which of the walk's sittings are drawn under which step, by the stage's
+  // name and the card's flow. A bug and a change: `diagnose` under the second step, `scenarios`
+  // the third, `builder` and every `fix-pass` the fourth, every `athena-<n>` the fifth, the docs
+  // sitting the sixth. A tweak: `tweak` and `tweak-undo` under the second. A sitting no step of
+  // THIS list claims (a tweak's, on a card that moved to the full flow) is `unplaced`.
+  const stepOf = (stage: KanbanWalkStage): number | null => {
+    const index = FAKE_STEP_OF[stage.name];
+    return index !== undefined && index < total ? index : null;
+  };
+  const stages = walk?.stages ?? [];
+  const stagesOf = (index: number) => stages.filter((stage) => stepOf(stage) === index);
+  const unplaced = stages.filter((stage) => stepOf(stage) === null);
 
   const add = async () => {
     const next = draft.trim();
@@ -92,10 +121,23 @@ export function DrawerChecklist({ detail, writes }: DrawerChecklistProps) {
         <p className="text-sm text-muted-foreground">{t('kanban.checklist.none')}</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {detail.checklist.map((item) => (
-            <ChecklistRow key={item.id} item={item} updateChecklistItem={writes.updateChecklistItem} />
+          {detail.checklist.map((item, index) => (
+            <ChecklistRow
+              key={item.id}
+              item={item}
+              updateChecklistItem={writes.updateChecklistItem}
+              stages={stagesOf(index)}
+              onReadStage={onReadStage}
+            />
           ))}
         </ul>
+      )}
+
+      {unplaced.length > 0 && (
+        <div className="flex flex-col gap-1 pl-6" data-unplaced-stages>
+          <span className="text-xs text-muted-foreground">{t('kanban.stages.earlier')}</span>
+          <DrawerStepStages stages={unplaced} onRead={onReadStage} />
+        </div>
       )}
 
       <div className="flex gap-2">
@@ -127,9 +169,13 @@ export function DrawerChecklist({ detail, writes }: DrawerChecklistProps) {
 function ChecklistRow({
   item,
   updateChecklistItem,
+  stages,
+  onReadStage,
 }: {
   item: KanbanChecklistItem;
   updateChecklistItem: KanbanMutations['updateChecklistItem'];
+  stages: KanbanWalkStage[];
+  onReadStage: (stage: KanbanWalkStage) => void;
 }) {
   const { t } = useTranslation();
   const [note, setNote] = useState(item.note);
@@ -196,9 +242,17 @@ function ChecklistRow({
           </div>
         ) : (
           item.note.trim().length > 0 && (
-            <p className="text-xs leading-snug text-muted-foreground">{item.note}</p>
+            // One block per line the note was written on. An empty line keeps its height, so a
+            // note written in two parts is still read in two parts.
+            <p className="flex flex-col gap-0.5 text-xs leading-snug text-muted-foreground" data-step-note>
+              {item.note.split('\n').map((line, index) => (
+                <span key={index} className="block min-h-[1em] break-words">{line}</span>
+              ))}
+            </p>
           )
         )}
+
+        <DrawerStepStages stages={stages} onRead={onReadStage} />
       </div>
 
       {/* One affordance on the row, and no delete: `api.kanban` carries no checklist removal —

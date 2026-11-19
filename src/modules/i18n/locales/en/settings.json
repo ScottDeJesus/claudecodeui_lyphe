@@ -715,6 +715,24 @@
       "all": "{{percent}}% (all cores)",
       "unreadable": "The setting could not be read from the server, so its value is unknown. It is retried whenever this page regains focus."
     },
+    "bugBoard": {
+      "unreadable": "The setting could not be read from the dispatcher, so its value is unknown. It is retried whenever this page regains focus.",
+      "width": {
+        "label": "Cards walked at once",
+        "description_one": "The dispatcher works on {{count}} board card at a time, across every self-running board. The rest wait in To Do: high priority first, then the oldest. A card already being worked on is never stopped. Takes effect at the next card.",
+        "description_other": "The dispatcher works on {{count}} board cards at a time, across every self-running board. The rest wait in To Do: high priority first, then the oldest. A card already being worked on is never stopped. Takes effect at the next card.",
+        "option_one": "{{count}} card",
+        "option_other": "{{count}} cards",
+        "selectLabel": "Board cards walked at once"
+      },
+      "threshold": {
+        "label": "Sort confidence",
+        "description": "A new card is sorted as a bug, a UI change or a tweak when Jev, or failing that Haiku, is at least {{threshold}} sure. Below that it is worked as a bug: confirmed and traced to its cause before anything is changed. Each card’s Sort step says how sure they were. Takes effect at the next card.",
+        "field": "{{min}} to {{max}}",
+        "fieldLabel": "Sort confidence, from {{min}} to {{max}}",
+        "outOfBounds": "Not saved: use {{min}} to {{max}}."
+      }
+    },
     "weeklyStop": {
       "label": "Weekly stop",
       "description": "Plans stop starting when the week is on course to pass {{percent}}% of its limit. Set it at or under what the week has already used and no plan starts until you raise it or the week resets; the same line decides when this account counts as full for the automatic account switch. Plans already running are never stopped. Takes effect at once.",

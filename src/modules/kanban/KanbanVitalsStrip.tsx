@@ -7,17 +7,17 @@ import { Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
- * The board's six counts, in the header, where the reader is already looking.
+ * The board's five counts, in the header, where the reader is already looking.
  *
- * SIX REGISTERS, ONE FIXED ORDER, left to right, with the claimable count last:
+ * FIVE REGISTERS, ONE FIXED ORDER, left to right, with queued work in the middle and the two estate backlogs last:
  * a register that moved with its value would have to be re-found on every glance. Each is a glyph
  * and a number and nothing else; the words ride in a tooltip (hover, or a long-press on a phone)
- * and in the accessible name, because six labels would cost the board's name its width.
+ * and in the accessible name, because five labels would cost the board's name its width.
  *
- * THREE VOICES, NEVER SIX COLOURS. Amber is for the two registers that mean A BUILD IS PARKED ON A
- * PERSON — a question unanswered, a plan unapproved — and only while they are not zero. Green is
- * for work under way. Everything else is ink: lessons, memories and claimable cards are a backlog,
- * and a backlog that shouted would teach the reader to ignore the two that matter. The tone comes
+ * THREE VOICES, NEVER FIVE COLOURS. Amber is for the one register that means work is parked on a
+ * person — a question unanswered — and only while it is not zero. Green is
+ * for work under way. Everything else is ink: queued cards, lessons and memories are a backlog,
+ * and a backlog that shouted would teach the reader to ignore the one that matters. The tone comes
  * through `data-tone` and the token it sets, never a colour named here (doctrine §5), and the glyph
  * beside every number is what still reads when the colour does not (doctrine §6).
  *
@@ -27,8 +27,8 @@ import { cn } from '@/shared/utils';
  * board is quiet, never that nobody asked.
  *
  * TWO FORMS, AND NO STATE OF EITHER IN WHICH AN ASK IS HIDDEN. Where the header has room the strip
- * stands IN THE ROW: all six registers from `xl`, and below that the two amber ones alone — the only
- * two that ask the reader to do something — in every state, a calm zero included. Where the header
+ * stands IN THE ROW: all five registers from `xl`, and below that the amber one alone — the only
+ * one that asks the reader to do something — in every state, a calm zero included. Where the header
  * has no room it leaves the row and becomes a BADGE on the board switcher's corner: one amber pill
  * carrying every register that is asking, glyph and count; or one calm em-dash for a reading nobody
  * has; or, read and nothing asking, nothing at all. Unknown and none never look alike in either.
@@ -46,7 +46,7 @@ import { cn } from '@/shared/utils';
  * The bands: the badge below `sm` and again from `md` to 900px; the row from `sm` to `md` and from
  * 900px. They are set for the rail OPEN, which is the narrowest the header gets — a collapsed rail
  * only ever shows the badge where the row would also have fitted. In the row's bands the header has
- * at least 199px for the name and the strip; two four-digit asks need 105.
+ * at least 199px for the name and the strip; one four-digit ask fits with room to spare.
  *
  * IT READS NOTHING OF ITS OWN. The board's one feed makes the reading; the strip is told which
  * board, and listens.
@@ -66,7 +66,7 @@ type VitalRegister = {
   words: string;
   /** The voice a NON-ZERO count speaks in. A zero and an unknown are always calm. */
   tone: Tone;
-  /** One of the two that park a build on a person: the row keeps it below `xl`, the badge is it. */
+  /** The register that parks work on a person: the row keeps it below `xl`, the badge is it. */
   loud: boolean;
 };
 
@@ -80,11 +80,10 @@ const BAND_BADGE = 'block sm:hidden md:block min-[900px]:hidden';
  *  `▶` carries U+FE0E so a phone draws it as text in the register's ink, never as a blue emoji tile. */
 const REGISTERS: VitalRegister[] = [
   { key: 'building', glyph: '▶\uFE0E', wordsKey: 'kanban.vitals.building', words: 'building now', tone: 'positive', loud: false },
-  { key: 'awaitingAnswer', glyph: '?', wordsKey: 'kanban.vitals.awaitingAnswer', words: 'waiting for your answer', tone: 'warn', loud: true },
-  { key: 'awaitingApprove', glyph: '✋', wordsKey: 'kanban.vitals.awaitingApprove', words: 'waiting for your approval', tone: 'warn', loud: true },
+  { key: 'awaitingAnswer', glyph: '?', wordsKey: 'kanban.vitals.awaitingAnswer', words: 'waiting on your answer', tone: 'warn', loud: true },
+  { key: 'queued', glyph: '◇', wordsKey: 'kanban.vitals.queued', words: 'queued in To Do', tone: 'neutral', loud: false },
   { key: 'lessonsPendingEstate', glyph: '💡', wordsKey: 'kanban.vitals.lessonsPending', words: 'lessons to review, across every board', tone: 'neutral', loud: false },
   { key: 'memoryPendingEstate', glyph: '✎', wordsKey: 'kanban.vitals.memoryPending', words: 'memories to review, across every board', tone: 'neutral', loud: false },
-  { key: 'claimable', glyph: '◇', wordsKey: 'kanban.vitals.claimable', words: 'ready to be claimed', tone: 'neutral', loud: false },
 ];
 
 /** Rendered by KanbanBoardHeader, between the board switcher and the switches. Nothing else mounts it. */
@@ -92,6 +91,8 @@ export function KanbanVitalsStrip({ boardId }: KanbanVitalsStripProps) {
   const { t } = useTranslation();
 
   // ── The wires: the two lines that carry data. Everything around them is composition. ──
+  // FILL: vitals — the five counts as the server now sends them (`building`, `awaitingAnswer`,
+  // `queued`, and the two estate counts), read through the hook below as it stands.
   // The reading is keyed by `boardId` and is the board feed's — what `useKanbanLaneFeed` reads for
   // the open board, and publishes for this strip to listen to. Nothing reaches the strip down a
   // prop chain: the header calls no hook, and the panel hands it no counts. `null` is no reading:
@@ -141,7 +142,7 @@ export function KanbanVitalsStrip({ boardId }: KanbanVitalsStripProps) {
                 data-tone={reading === null ? undefined : 'warn'}
                 className={cn(
                   // `gap-1 px-1`, not the row's roomier pill: on a 320px phone the switcher under it is 50px
-                  // wide, and a three-digit ask beside a two-digit one must still end on-screen.
+                  // wide, and a three-digit ask must still end on-screen.
                   'vv-tabular flex h-4 items-center gap-1 whitespace-nowrap rounded px-1 text-[10px] font-medium leading-none ring-2 ring-background',
                   reading === null ? 'bg-muted text-muted-foreground' : 'bg-[color:var(--tone-soft)] text-[color:var(--tone-ink)]',
                   loading && 'vv-pulse',
@@ -195,7 +196,7 @@ export function KanbanVitalsStrip({ boardId }: KanbanVitalsStripProps) {
                   register.speaking && register.tone === 'warn' && 'bg-[color:var(--tone-soft)] text-[color:var(--tone-ink)]',
                 )}
               >
-                {/* Two of the six glyphs are emoji and paint in their own colours whatever the ink
+                {/* One of the five glyphs is an emoji and paints in its own colours whatever the ink
                     is, so a calm register greys its glyph: beside a muted zero, a lit bulb would be
                     the loudest thing on a strip with nothing to say. Greyed and never faded — the
                     glyph is all that says WHICH register a `0` or a `—` belongs to, and at the

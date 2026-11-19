@@ -6,9 +6,9 @@ import type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/
  * nowhere else — the panel, the lane rail and the drawer all call this, so two faces can never
  * disagree about what a signal means.
  *
- * WHAT IT DECIDES, AND WHAT IT REFUSES TO. It reads the lease STATE the server computed and
- * never `buildLeaseAt`: two clocks deriving one truth is a badge that disagrees with the API.
- * It formats spend into the string the card PAINTS, so the card never does token math. And it
+ * WHAT IT DECIDES, AND WHAT IT REFUSES TO. It formats spend into the string the card PAINTS, so
+ * the card never does token math. What a card's WALK adds to the face — the flow's word, the hold
+ * and the links — is laid over this model by `withWalkFace` (`utils/walkModel`). And it
  * drops every signal entirely when autonomy is off, which is the whole mechanism behind an
  * autonomy-off face being title, priority and tags — not a second render path in the component.
  */
@@ -42,17 +42,13 @@ function formatTokens(total: number): string | undefined {
 }
 
 /**
- * The counts and states a face may report, folded from the summary's four rollups and its lease.
+ * The counts a face may report, folded from the summary's four rollups.
  *
  * A zero count is ABSENT rather than zero: the card reads `signals.openIssues` as a flag and a
  * word, and `0 issues` is a badge saying there is nothing to say.
  */
 function signalsFor(summary: KanbanCardSummary): KanbanCardSignals {
-  const signals: KanbanCardSignals = {
-    // Both states travel; the card paints only the unapproved one. Sending the flag rather than
-    // a "should shout" boolean is what keeps the shouting a property of the face, not the wire.
-    approval: summary.approved ? 'approved' : 'unapproved',
-  };
+  const signals: KanbanCardSignals = {};
 
   if (summary.openQuestions > 0) signals.openQuestions = summary.openQuestions;
   if (summary.openIssues > 0) signals.openIssues = summary.openIssues;
@@ -62,9 +58,6 @@ function signalsFor(summary: KanbanCardSummary): KanbanCardSignals {
 
   const tokens = formatTokens(summary.buildTokens);
   if (tokens) signals.tokens = tokens;
-
-  // 'none' means the server sent no lease signal at all — not a lease that has expired.
-  if (summary.leaseState === 'held' || summary.leaseState === 'stale') signals.lease = summary.leaseState;
 
   return signals;
 }

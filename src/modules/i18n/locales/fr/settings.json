@@ -348,6 +348,24 @@
       "all": "{{percent}} % (tous les cœurs)",
       "unreadable": "Le réglage n'a pas pu être lu depuis le serveur, sa valeur est donc inconnue. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus."
     },
+    "bugBoard": {
+      "unreadable": "Le réglage n'a pas pu être lu depuis le dispatcher, sa valeur est donc inconnue. Une nouvelle lecture est tentée dès que cette page retrouve le focus.",
+      "width": {
+        "label": "Cartes traitées en même temps",
+        "description_one": "Le dispatcher traite {{count}} carte à la fois, sur tous les tableaux autonomes. Les autres attendent dans À faire : priorité haute d'abord, puis la plus ancienne. Une carte déjà en cours n'est jamais arrêtée. Prend effet à la prochaine carte.",
+        "description_other": "Le dispatcher traite {{count}} cartes à la fois, sur tous les tableaux autonomes. Les autres attendent dans À faire : priorité haute d'abord, puis la plus ancienne. Une carte déjà en cours n'est jamais arrêtée. Prend effet à la prochaine carte.",
+        "option_one": "{{count}} carte",
+        "option_other": "{{count}} cartes",
+        "selectLabel": "Cartes de tableau traitées en même temps"
+      },
+      "threshold": {
+        "label": "Confiance du tri",
+        "description": "Une nouvelle carte est triée comme bug, changement d'interface ou retouche quand Jev, ou à défaut Haiku, en est sûr à au moins {{threshold}}. En dessous, elle est traitée comme un bug : confirmé et remonté à sa cause avant toute modification. L'étape de tri de chaque carte indique leur degré de certitude. Prend effet à la prochaine carte.",
+        "field": "{{min}} à {{max}}",
+        "fieldLabel": "Confiance du tri, de {{min}} à {{max}}",
+        "outOfBounds": "Non enregistré : utilisez {{min}} à {{max}}."
+      }
+    },
     "weeklyStop": {
       "label": "Arrêt hebdomadaire",
       "description": "Les plans cessent de démarrer lorsque la semaine est en passe de dépasser {{percent}} % de sa limite. Réglé à un niveau égal ou inférieur à ce que la semaine a déjà consommé, aucun plan ne démarre tant que vous ne le relevez pas ou que la semaine n'est pas réinitialisée ; ce même niveau décide aussi quand ce compte est considéré comme plein pour le changement de compte automatique. Les plans déjà en cours ne sont jamais arrêtés. Effet immédiat.",

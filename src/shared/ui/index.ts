@@ -140,6 +140,7 @@ export { HowOften } from '@/shared/ui/HowOften';
 export { Input } from '@/shared/ui/Input';
 export { KanbanCard } from '@/shared/ui/KanbanCard';
 export type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/ui/KanbanCard';
+export type { KanbanCardLink } from '@/shared/ui/KanbanCardLinks';
 export { KanbanLane } from '@/shared/ui/KanbanLane';
 export { Lightbox } from '@/shared/ui/Lightbox';
 export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';

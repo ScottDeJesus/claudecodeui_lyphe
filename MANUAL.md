@@ -385,7 +385,7 @@ An error thrown outside these branches goes to the app's error handler.
 
 `AgentLaunchDefaultsChange` = `{model?, effort?, deepseek_effort?, dactyl_model?, dactyl_effort?, summarizer_model?, summarizer_effort?}`; the argv flags are `--dactyl-model` / `--dactyl-effort` and `--summarizer-model` / `--summarizer-effort`.
 
-The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort` included), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
+The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort`, `choices.sorter_models`, `choices.tweak_models` included; row `kind` adds `sorter` and `tweak`, lane adds `sorter`), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts
 
@@ -3953,6 +3953,9 @@ Consumers (each owns its allowlist, id rules and image type; none owns a transpo
 | `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas`, the Tours lane | `affected-areas` |
 | `server/modules/carrier-bulletins/` (MAN-8909) | `/api/carrier-bulletins`, the bulletins lane | `carrier-bulletins` |
 | `server/modules/upload-runs/` (MAN-9897) | `/api/upload-runs`, the upload runs' lane (the first with event streams) | `upload-runs` |
+| `server/modules/scheduling-report/` (MAN-9996) | `/api/scheduling-report`, the scheduling record's lane — the first that points at the eis backend (`:8004`, base URL `EIS_BACKEND_URL`, secret file `EIS_BACKEND_ENV_FILE`), not at `:8001` | `scheduling-report` |
+
+A lane may point at either service: `baseUrl` and `envFile` are the lane module's own, and the forwarder reads the file the lane names. `:8004`'s internal gate (`routes/internal_gate.py`) compares the same `EIS_INTERNAL_SECRET` class.
 
 | export | does |
 |---|---|
@@ -17801,6 +17804,74 @@ The Scheduling view of the Cerberus tab: what happens when someone schedules in 
 - The `undone` reason is worded as what the server saw: chip "Undo pressed", sentence "An Undo was pressed right after." True for a failed Undo too.
 - `isUndoPress(entry)` (no form, Undo surface) is the test for an entry that is itself an Undo: its row hides the `undone` chip and its sheet says "This press was an Undo."
 - Open server question: a booking or change whose Undo failed still reads "then undone" and leaves Booked/Changed, since an overview entry carries no acts; the verdict rule or wire (seam 4) must say whether the Undo ended ok.
-- `agoWord`, `durationWord`, `clockWord`, `dayClockWord`, `whoWord` are copies of the Uploads words (a module may not deep-import another's utils); lifting them to shared is a follow-up. `useSchedulingOverview` is the second copy of Uploads' `useOverviewRead` shape; a third lifts it to `@/shared/hooks`.
+- `agoWord`, `durationWord`, `clockWord`, `dayClockWord`, `whoWord` are copies of the Uploads words (a module may not deep-import another's utils); lifting them to shared is a follow-up. `durationWord` takes MILLISECONDS of elapsed time ("form open 9 s"); a visit's length is whole MINUTES and goes through `lengthWord` ("30 m", "10 h", never seconds) — `EntryChosen`'s Length line once read "30 m 0 s" through the elapsed word. `useSchedulingOverview` is the second copy of Uploads' `useOverviewRead` shape; a third lifts it to `@/shared/hooks`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/ActLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryBumps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryChosen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryOffered.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntrySheetHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntrySheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryVisitNow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/FactList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/hooks/useEntrySheet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/hooks/useSchedulingOverview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/hooks/useSchedulingRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/MachineCallsChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingKindList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingOpeners.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingPills.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/TroubleBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/utils/entriesToBuckets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/utils/schedulingModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/utils/schedulingWords.ts
+
+## MAN-9996 — The scheduling-report lane — /api/scheduling-report forwarded to the eis backend's scheduling record (:8004; the first lane that does not point at :8001)
+
+`server/modules/scheduling-report/` is the fourth lane between the browser and an internal-caller gate, in the upload-runs lane's shape (MAN-9897), and the FIRST that points at the eis backend (`:8004`, `eis_backend/`) instead of shadow-connector's `:8001` engine. It relays three GET routes of `/api/eis/internal/scheduling-report` (MAN-9995) and nothing else. Mounted in `server/index.ts` at `/api/scheduling-report` behind `authenticateToken`, after the upload-runs lane. The browser never holds the secret. Its client is `api.schedulingReport` (MAN-9997), for the Cerberus tab's Scheduling view (MAN-9992).
+
+**Why a lane to :8004.** `:8004` serves its internal surface behind the same `EIS_INTERNAL_SECRET` class the `:8001` surfaces use (the shared gate `routes/internal_gate.py`, INV-3519). A hop through `:8001` would be one service relaying a third for nothing. The shared forwarder (MAN-8863) takes any base URL, so a lane may point at either; the secret is read from the env file named for that lane.
+
+| File | Holds |
+|---|---|
+| `scheduling-report.module.ts` | `createSchedulingReportModule()`; the ONLY reader of the environment for this lane |
+| `scheduling-report.routes.ts` | `createSchedulingReportRouter({ forward, stream })`: the three-row table and the rules; the shared router (MAN-8908) does the rest |
+| `index.ts` | barrel the entrypoint imports |
+
+## Configuration (the lane adds two variables)
+| Variable | Default | Meaning |
+|---|---|---|
+| `EIS_BACKEND_URL` | `http://127.0.0.1:8004` | the eis backend's origin |
+| `EIS_BACKEND_ENV_FILE` | `/opt/shadow-connector/.eis_backend.env` | file holding the backend's `EIS_INTERNAL_SECRET=` (the file `eis-app.service` loads) |
+The forwarder is built with `label: 'scheduling-report'`: log warnings read `[scheduling-report] no usable internal secret in <file>: <cause>`. This lane never reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE`; the other lanes never read these two.
+
+## Allowlist (3 rows in `ALLOWLIST`, GET only)
+A method+path not in the table is the lane's own 404 `{ error: 'not a route of the scheduling-report lane' }`; it never reaches :8004. A query key that is not a row's is dropped, so an EventSource's `?token=` never leaves.
+| Method path | Query keys, each held to its rule | Bound | Reply |
+|---|---|---|---|
+| `GET /overview` | `days` 7\|30\|90; `by` `^[a-z_]+:[^\s]{1,160}$`; `machines` 0\|1; `account` lowercase uuid | 30 s | json |
+| `GET /entries/:id` | none; `:id` lowercase uuid | 30 s | json |
+| `GET /feed` | `account` lowercase uuid | 10 s to connect | stream |
+A failed check is the lane's 422 `{ error: '<name> must be <expects>' }`, nothing sent. An upstream answer passes through with its status and JSON untouched (the overview, an entry whole, the backend's 404 `{ detail: 'no such entry' }`, its 404 `{ error: 'unknown_account' }` and 503 feed-full on the stream); the lane's own faults are `{ error }`: unreachable 503, unreadable 502, no secret 503 (MAN-8908 rule 4).
+
+## Rules an editor must not break
+1. **GET only.** No verb row books, edits or cancels a visit: the view takes no action.
+2. **An id is checked before a byte leaves** (`LOWERCASE_UUID_RULE`).
+3. **The secret is not read here.** It stays in the forwarder (INV-8633); this module only names the file.
+4. **No timer, no cache, no model call.** The only socket the lane keeps is the open feed, one per watching browser, closed with it.
+5. **The feed row's bound is its connect.** The backend writes `: connected` at once; an open feed outlasts any overall timeout.
+6. **Do not point this lane at `:8001`**: that surface is the engine's; the backend's feed, entries and secret file are :8004's.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduling-report/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduling-report/scheduling-report.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduling-report/scheduling-report.routes.ts
+
+## MAN-9997 — Scheduling-report client wire — src/shared/scheduling-report-types.ts and api.schedulingReport
+
+The browser's typed view of the scheduling-report lane (`/api/scheduling-report`, the Scheduling view of the Cerberus tab): one wire-type file and one `api` block, on the upload-runs precedent (MAN-9882). The one home of every body is shadow-connector's `eis_backend/scheduling_report/` (MAN-9995, MAN-9994); the types follow it key for key, and a word added there needs `contracts.py`, migration 356 and this file together. The lane forwards every body untouched, so there is no third copy. Imports nothing from `server/`.
+
+## Files
+| file | holds |
+|---|---|
+| `src/shared/scheduling-report-types.ts` | the vocabularies (`SchedulingWindowDays`, `SchedulingEntryKind`, `…Result`, `…State`, `SchedulingVerdict`, `SchedulingTone`, `SchedulingReasonTone`, `SchedulingReasonCode` (the 20 reason codes), `SchedulingActKind`, `SchedulingOutcome`, `SchedulingCalendar`, `SchedulingSurface`, `SchedulingOpener`, `SchedulingActorKind`, `SchedulingSessionMode`) and the bodies (`SchedulingReason`, `SchedulingPerson`, `SchedulingJob`, `SchedulingPresses`, `SchedulingEntry`, `SchedulingKindCounts`, `SchedulingOverview`, `SchedulingAct`, `SchedulingProposal`, `SchedulingOffered`, `SchedulingChosen`, `SchedulingSession`, `SchedulingVisitNow`, `SchedulingEntryWhole`, `SchedulingFeedFrame`) |
+| `src/shared/api.ts` | `api.schedulingReport`, 3 verbs, after `api.uploadRuns` |
+| `.oxlintrc.json` | the types file in the `frontend-shared-file` list (INV-5890) |
+| `src/shared/types.ts` | `CerberusView` gains `'scheduling'` (MAN-7891) |
+
+## Verbs (every one a GET: the view is read-only)
+| verb | route | answer |
+|---|---|---|
+| `schedulingReport.overview({ days?, by?, machines?, account? }, options?)` | `GET /api/scheduling-report/overview` | `SchedulingOverview`; `days` 7·30·90 (30 left out); `by` one actor stamp `eis:<login>`; `machines: true` goes out as `machines=1` and brings machine calls in |
+| `schedulingReport.entry(id, options?)` | `GET …/entries/:id` | `SchedulingEntryWhole`; 404 no such entry; `id` through `encodeURIComponent` |
+| `schedulingReport.feedUrl()` | `GET …/feed` | a URL for `EventSource` carrying the stored token as `?token=` (`authenticateToken` reads it; the lane never forwards it): a `SchedulingFeedFrame` `{ type: 'changed' }` per `message` event |
+A failure arrives as `{ error }` from the lane, or `{ detail }` passed through from the backend.
+
+## Rules an editor must not break
+- A body changes in the backend first; the mirror moves in the same change. why: a key renamed on one side is a screen that stops reading.
+- Keys are the wire's snake_case; datetimes are ISO text; ids are lowercase uuid text. A body field is always present (`null` for none); a reason's `count` and `detail` are the exception.
+- The feed frame carries nothing: it says "re-read". Never read a row, id or account from it.
+- Closed unions: verdict, tone, reason tone, reason code, kind, result, state, outcome, calendar, surface, opener. A word a screen does not know is drawn neutral, the word as data.
+- A person's `name` is `null` for an id the roster no longer holds (`technician_people()` lists active people only): draw the id's absence, never the id.
+- `src/modules/scheduling-report` (MAN-9992) is the only caller of `api.schedulingReport` and, beside `api.ts`, the only importer of the wire types.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/scheduling-report-types.ts

@@ -75,9 +75,14 @@ function parseEventLimit(value: unknown): number {
   return Math.min(parsed, EVENT_LIMIT_MAX);
 }
 
+/** Only a real array of strings passes; a bare string is refused rather than wrapped into a one-item list. */
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item: unknown) => typeof item === 'string');
+}
+
 /**
  * The board routes: the board list, its create, update and select, its per-status counts, its
- * claimable count, the six registers of its vitals strip, the lookup that resolves a project to
+ * claimable count, the five registers of its vitals strip, the lookup that resolves a project to
  * its board, and the board's audit log.
  *
  * Auth is the mount's (`authenticateToken` in `server/index.ts`, `kanbanMetisSecretGuard` for
@@ -102,7 +107,7 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
   router.post(
     '/boards',
     handle((request, response) => {
-      const body = (request.body ?? {}) as { name?: unknown; projectId?: unknown };
+      const body = (request.body ?? {}) as { name?: unknown; projectId?: unknown; repos?: unknown };
       // The type check is the route's, the emptiness check is the service's: a blank name is a
       // 400 either way, and only one of the two is a transport concern.
       if (typeof body.name !== 'string') {
@@ -113,10 +118,14 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
         response.status(400).json({ error: 'projectId must be a string or null' });
         return;
       }
+      if (body.repos !== undefined && !isStringArray(body.repos)) {
+        response.status(400).json({ error: 'repos must be an array of strings' });
+        return;
+      }
 
       response.json({
         board: boards.createBoard(
-          { name: body.name, projectId: body.projectId ?? null },
+          { name: body.name, projectId: body.projectId ?? null, repos: body.repos },
           kanbanWriteContext(response)
         ),
       });
@@ -134,6 +143,7 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
         concurrency?: number;
         projectId?: string | null;
         archived?: boolean;
+        repos?: string[];
       } = {};
 
       if (body.name !== undefined) {
@@ -184,6 +194,14 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
         }
         patch.archived = body.archived;
       }
+      if (body.repos !== undefined) {
+        // The type check is the route's; what each path must be is the service's, and it answers 400 too.
+        if (!isStringArray(body.repos)) {
+          response.status(400).json({ error: 'repos must be an array of strings' });
+          return;
+        }
+        patch.repos = body.repos;
+      }
 
       response.json({
         board: boards.updateBoard(request.params.boardId, patch, kanbanWriteContext(response)),
@@ -217,9 +235,9 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
   router.get(
     '/boards/:boardId/vitals',
     handle<{ boardId: string }>((request, response) => {
-      // Six counts, never the rows behind them: the header draws six numbers, and the lists they
+      // Five counts, never the rows behind them: the header draws five numbers, and the lists they
       // summarise are a click away. `memoryPending()` is read here — at the request — rather than
-      // captured, so the register is as fresh as the statement that answers the other five.
+      // captured, so the register is as fresh as the statement that answers the other four.
       response.json({
         vitals: vitalsCounts(request.params.boardId, { memoryPending: memoryPending() }),
       });

@@ -6,10 +6,17 @@ name = "lyphecli"
 timeout_s = 120
 width = 4
 build_max = 40
+shared_max = 25
 
 [run.commands]
 ".mjs" = ["node"]
 ".ts" = ["cloudcli-tsx"]
+
+# Who imports whom (cases.users): each directory read -> the tsconfig its aliases come from.
+[users]
+[users.js]
+"src" = "tsconfig.json"
+"server" = "server/tsconfig.json"
 
 [areas]
 client = "the browser app's code with no screen (src/shared/), imported by a .ts case under node with the browser globals it reads stubbed"

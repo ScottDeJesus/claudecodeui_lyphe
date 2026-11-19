@@ -59,7 +59,7 @@ export type SchedulingReasonCode =
   | 'visit_unreadable' // warn; the edit form could not read the visit
   | 'no_open_times' // warn; open times were on, none came back, and somebody was offered
   // From the ending.
-  | 'gave_up' // warn; nothing was done after a press that was refused or failed
+  | 'gave_up' // warn; a form's newest press did not end ok (verdict.py: form entry, state reported or not_reported)
   | 'undone' // warn; an Undo inside the entry, or as the very next act on the same visit
   | 'not_reported' // warn; the form's report never arrived
   // Shown, never a hiccup.

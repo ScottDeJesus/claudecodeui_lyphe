@@ -67,6 +67,12 @@ export type KanbanBoard = {
    *  board spawns NOTHING. Read from the row at CALL time — by the driver's tick and by the
    *  spawner's gate alike — so moving it moves the board without a restart. */
   concurrency: number;
+  /** The absolute paths of the git repositories this board's cards are built in, each a directory
+   *  inside a git work tree (checked at the PATCH, `kanban-board-repos.ts`). The dispatcher walks a
+   *  card in them, the first being where the walk runs. A board whose autonomy is on names at least
+   *  one: turning autonomy on with none is a 409 `KANBAN_BOARD_NEEDS_REPOS`. Stored as JSON text in
+   *  `kanban_boards.repos`. */
+  repos: string[];
   sortOrder: number;
   archived: boolean;
   createdAt: string;
@@ -101,8 +107,8 @@ export const KANBAN_LEASE_STALE_SECONDS = 40;
 /** The tag that puts a To-do card in the operator's own court: the Metis orient read lists it under
  *  `awaiting_you`, never as work to claim, so the board's claimable count must not count it either —
  *  a board whose only To-do cards are tagged is a board with nothing for a session to do. Compared
- *  trimmed and lower-cased. Consumers: `kanban-boards.db.ts` (`countClaimable`),
- *  `kanban-vitals.service.ts` (the `claimable` register) and the Metis MCP's orient projection. */
+ *  trimmed and lower-cased. Consumers: `kanban-boards.db.ts` (`countClaimable`) and the Metis MCP's
+ *  orient projection. */
 export const KANBAN_OPERATOR_SCHEDULED_TAG = 'operator-scheduled';
 
 /** How many cards a lane page holds when the caller names no limit. The ONE home for the number.
@@ -231,6 +237,7 @@ export type KanbanEventKind =
   | 'tag.removed'
   | 'question.added'
   | 'question.answered'
+  | 'decision.noted'
   | 'issue.filed'
   | 'issue.resolved'
   | 'checklist.added'
@@ -507,17 +514,16 @@ export type KanbanSessionUsage = {
 };
 
 /**
- * Six counts the board header shows as a strip of registers, read in one request rather than
- * derived by the panel from six lists it would otherwise have to fetch whole.
+ * Five counts the board header shows as a strip of registers, read in one request rather than
+ * derived by the panel from five lists it would otherwise have to fetch whole.
  *
- * FOUR of them are BOARD-scoped, because they are counts of THIS board's cards: `building` (cards in
+ * THREE of them are BOARD-scoped, because they are counts of THIS board's cards: `building` (cards in
  * the Building lane — `status = 'active'` — which is where a build lease puts them and where they
  * stay until the builder moves them on, lease live or not), `awaitingAnswer` (cards with a question
- * still unanswered),
- * `awaitingApprove` (cards whose plan is written and waiting on an approve) and `claimable` (cards
- * a Metis may claim right now). TWO are ESTATE-wide, because the rows behind them belong to no
- * board at all: `lessonsPendingEstate` counts staged lessons and `memoryPendingEstate` counts
- * pending memory candidates across the whole install.
+ * still unanswered) and `queued` (cards in To Do — `status = 'todo'` — waiting for the dispatcher to
+ * take them up). TWO are ESTATE-wide, because the rows behind them belong to no board at all:
+ * `lessonsPendingEstate` counts staged lessons and `memoryPendingEstate` counts pending memory
+ * candidates across the whole install.
  *
  * THE SUFFIX IS THE CONTRACT, not decoration: a count not scoped to the board in the URL carries
  * the word `Estate` in its own name, so no caller can read one as a board-scoped number. Every value
@@ -529,8 +535,7 @@ export type KanbanSessionUsage = {
 export type KanbanVitals = {
   building: number;
   awaitingAnswer: number;
-  awaitingApprove: number;
+  queued: number;
   lessonsPendingEstate: number;
   memoryPendingEstate: number;
-  claimable: number;
 };

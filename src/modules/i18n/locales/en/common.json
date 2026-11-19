@@ -441,7 +441,7 @@
       "title": "The launch table could not be read",
       "retry": "Try again"
     },
-    "reach": "Chains, the dispatcher and Metis take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only.",
+    "reach": "Chains, the dispatcher, Metis and a board card’s sorter take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only.",
     "defaults": {
       "title": "Defaults",
       "hint": "what a launch runs at when its row pins nothing",
@@ -481,9 +481,14 @@
     "metis": {
       "title": "Metis"
     },
+    "cards": {
+      "title": "Board cards"
+    },
     "row": {
       "model": "Model",
       "effort": "Effort",
+      "effortFollows": "{{effort}} · {{model}}’s default",
+      "effortOwnPin": "{{effort}} · Hephaestus’s own pin",
       "pinned": "pinned",
       "defaultOf": "Default · {{value}}",
       "noFlag": "no flag",
@@ -500,6 +505,7 @@
       "dispatcher": "Dispatcher",
       "chain": "Chain",
       "metis": "Metis",
+      "sorter": "Card sort",
       "newSession": "new session",
       "claude": "Claude",
       "deepseek": "DeepSeek"
@@ -691,13 +697,14 @@
       "actions": "Board actions",
       "noBoard": "No board",
       "autonomy": "Autonomy",
-      "deepseekFlash": "DeepSeek Flash",
-      "deepseekFlashTooltip": "Puts this board's Metis, and every runner Metis starts, on DeepSeek Flash.",
+
       "newBoard": "New board",
       "rename": "Rename",
       "archive": "Archive",
       "newTitle": "New board",
       "renameTitle": "Rename board",
+      "repos": "Repositories",
+      "reposTitle": "Board repositories",
       "archiveTitle": "Archive this board?",
       "archiveMessage": "It leaves the switcher and every card stays where it is. Nothing is deleted.",
       "nameLabel": "Board name",
@@ -759,7 +766,8 @@
       "moveTo": "Move to {{lane}}",
       "archive": "Archive",
       "untitled": "Untitled card",
-      "moved": "{{title}} moved to {{lane}}, position {{position}} of {{total}}"
+      "moved": "{{title}} moved to {{lane}}, position {{position}} of {{total}}",
+      "held": "Held — {{why}}"
     },
     "priority": {
       "low": "Low",
@@ -827,14 +835,53 @@
       "resolvedBy": "Resolved by {{who}}, {{when}}",
       "someone": "someone"
     },
-    "approve": {
-      "approve": "Approve",
-      "unapprove": "Withdraw approval",
-      "approved": "Approved {{when}}",
-      "needed": "Needs approval",
-      "blockedByQuestions_one": "{{count}} question is still unanswered.",
-      "blockedByQuestions_other": "{{count}} questions are still unanswered.",
-      "blockedByEmptiness": "This card says nothing yet — a plan, a body or a description is what approval is for."
+    "flow": {
+      "bug": "Bug",
+      "change": "UI change",
+      "tweak": "Tweak"
+    },
+    "links": {
+      "title": "Linked cards",
+      "duplicateOf": "Duplicate of",
+      "regressionOf": "Regression of",
+      "from": "Split from",
+      "related": "Related to",
+      "unread": "a card this board has not read yet",
+      "gone": "a card that is no longer on this board"
+    },
+    "stages": {
+      "working": "Working",
+      "endedEarly": "Ended early: {{status}}",
+      "transcript": "Transcript",
+      "transcriptOf": "Transcript of {{soul}}, {{stage}}",
+      "earlier": "Earlier sittings"
+    },
+    "decisions": {
+      "title_one": "Decided for you · {{count}}",
+      "title_other": "Decided for you · {{count}}"
+    },
+    "scenarios": {
+      "title": "Scenarios",
+      "none": "No scenario written yet.",
+      "words": {
+        "holding": "Holding",
+        "broken": "Broken",
+        "regressed": "Regressed",
+        "cantRun": "Can't run",
+        "notRun": "Not run",
+        "draft": "Draft",
+        "retired": "Retired"
+      }
+    },
+    "repos": {
+      "label": "Repositories",
+      "helper": "The git repositories this board's cards are built in. A walk starts in the first.",
+      "none": "No repository yet. A board cannot run itself until it names one.",
+      "first": "Starts here",
+      "pick": "Pick a project",
+      "typePlaceholder": "/absolute/path/to/a/repository",
+      "add": "Add",
+      "remove": "Remove {{path}}"
     },
     "tokens": {
       "title": "Spend",
@@ -3295,7 +3342,9 @@
       "duration": {
         "s": "{{s}} s",
         "ms": "{{m}} m {{s}} s",
-        "hm": "{{h}} h {{m}} m"
+        "hm": "{{h}} h {{m}} m",
+        "h": "{{h}} h",
+        "m": "{{m}} m"
       },
       "span": {
         "none": "no time set",
