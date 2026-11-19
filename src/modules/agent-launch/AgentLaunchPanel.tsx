@@ -6,7 +6,7 @@ import { AgentLaunchDefaults } from '@/modules/agent-launch/AgentLaunchDefaults'
 import { AgentLaunchNotices } from '@/modules/agent-launch/AgentLaunchNotices';
 import { AgentLaunchRowItem } from '@/modules/agent-launch/AgentLaunchRowItem';
 import { useAgentLaunch } from '@/modules/agent-launch/hooks/useAgentLaunch';
-import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
+import type { AgentLaunchDefaultsChange, AgentLaunchRow, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import { Badge, Banner, Button, Card, ScrollArea, Spinner } from '@/shared/ui';
 
 /** What `saving` holds while the Defaults block, and not a row, is being written. */
@@ -14,6 +14,59 @@ const DEFAULTS_SAVING = '@defaults';
 
 /** What `last` holds after the reader pressed reload: an error that follows it is a read that failed, not a save that was refused. */
 const RELOADED = '@reload';
+
+/**
+ * STAND-INS, drawn until the two `FILL:` markers below them are filled: the `sorter` and the `tweak` rows in the shape
+ * `launch-table show` prints them and at the words the table ships with, and the model words each of them accepts.
+ */
+const STAND_IN_CARD_ROWS: AgentLaunchRow[] = [
+  {
+    name: 'sorter',
+    kind: 'sorter',
+    description: "The dispatcher's card sorter: one tool-less Claude child that sorts a board card into bug, change or tweak when Jev is not sure",
+    model: 'claude-haiku-5-5',
+    model_pinned: true,
+    effort: 'low',
+    effort_pinned: true,
+    lanes: [
+      {
+        lane: 'sorter',
+        reach: 'next-launch',
+        note: 'a Claude child: the DeepSeek switch does not reach it',
+        sides: [
+          { when: 'claude', model: 'claude-haiku-5-5', effort: 'low' },
+          { when: 'deepseek', model: 'claude-haiku-5-5', effort: 'low' },
+        ],
+      },
+    ],
+    shim: null,
+  },
+  {
+    name: 'tweak',
+    kind: 'tweak',
+    description: "The quick tweak walk's one builder stage, worn by Hephaestus: this row names its model; its effort is Hephaestus's own effort pin when that model is his own, else the table's default for that model",
+    model: 'sonnet',
+    model_pinned: true,
+    effort: 'high',
+    effort_pinned: false,
+    lanes: [
+      {
+        lane: 'chain',
+        reach: 'next-launch',
+        note: 'the tweak stage of a card walk; the DeepSeek switch rides it as every builder',
+        sides: [
+          { when: 'claude', model: 'sonnet', effort: 'high' },
+          { when: 'deepseek', model: 'deepseek-flash', effort: 'max' },
+        ],
+      },
+    ],
+    shim: null,
+  },
+];
+const STAND_IN_CARD_MODELS: Record<string, string[]> = {
+  sorter: ['claude-haiku-5-5', 'haiku'],
+  tweak: ['opus', 'fable', 'sonnet'],
+};
 
 type AgentLaunchPanelProps = {
   /** Given by the window the panel sits in: the header then draws a close button that calls it. */
@@ -23,8 +76,8 @@ type AgentLaunchPanelProps = {
 };
 
 /**
- * Agent Chains — Settings → Agents → Edit Agent Chains: the model and effort every soul, and Metis, launches
- * at — one table, edited where it is read.
+ * Agent Chains — Settings → Agents → Edit Agent Chains: the model and effort every soul, Metis, and a board
+ * card's sorter and tweak builder launch at — one table, edited where it is read.
  *
  * Rendered by the settings module's AgentChainsContent, as the whole body of the window its "Edit Agent
  * Chains" button opens. It takes no size of its own: the window gives it a definite height and it fills it.
@@ -37,7 +90,11 @@ type AgentLaunchPanelProps = {
  * itself wears the same mark.
  * Then the body: what is wrong with the table (if anything), the one notice that qualifies every
  * change, the DEFAULTS (the spine every unpinned soul falls back to), and the rows — the souls, then
- * Metis. A pinned row is the exception, so a pin is what stands out down the list.
+ * Metis, then BOARD CARDS: the two rows a self-running board's card launches at, the sorter that reads a new
+ * card and the builder of a quick tweak. They are last because they are the newest question and the rarest
+ * to change, and they are the same row item every soul is drawn with, with less to choose: their words always
+ * stand in the table, so neither wears a pin nor offers a Default, and the tweak's effort is not its row's to set.
+ * A pinned row is the exception, so a pin is what stands out down the list.
  *
  * A WIDE PANEL IS A TABLE AND A NARROW ONE IS A STACK. The query is the panel's own width
  * (`container-type` on the root), as the Heal panel's is: a row is three columns — who, what it
@@ -84,6 +141,15 @@ export function AgentLaunchPanel({ onClose, titleId }: AgentLaunchPanelProps) {
   const souls = census?.rows.filter((row) => row.kind === 'soul') ?? [];
   const metis = census?.rows.filter((row) => row.kind === 'metis') ?? [];
   const pinnedSouls = souls.filter((row) => row.model_pinned || row.effort_pinned).length;
+  // FILL: cardRows — the census's own rows of kind `sorter` then `tweak` (`census.rows`, as `souls` and `metis` above); an older
+  // CLI's census holds neither, and then the section is not drawn.
+  const cardRows = STAND_IN_CARD_ROWS;
+  // FILL: cardModels — `{ sorter: census.choices.sorter_models, tweak: census.choices.tweak_models }`; the hook's `isCensus` must
+  // hold both lists to be arrays first, because the row item maps them (the blank window of a census missing `dactyl_models`).
+  const cardModels = STAND_IN_CARD_MODELS;
+  // FILL: onSaveCardRow — the panel's own `onSaveRow`: a sorter change is `{ model }` or `{ effort }`, a tweak change `{ model }`
+  // alone, and neither ever carries `null`.
+  const onSaveCardRow = async (): Promise<void> => {};
 
   return (
     <div className="flex h-full flex-col [container-type:inline-size]" data-agent-launch-panel data-agent-state={census ? 'ready' : error ? 'unreadable' : 'loading'}>
@@ -184,6 +250,24 @@ export function AgentLaunchPanel({ onClose, titleId }: AgentLaunchPanelProps) {
                 <AgentLaunchSection id="agent-metis" title={t('agentLaunch.metis.title')}>
                   {metis.map((row) => (
                     <AgentLaunchRowItem key={row.name} row={row} census={census} held={saving === row.name} refused={error !== null && last === row.name} onSave={onSaveRow} />
+                  ))}
+                </AgentLaunchSection>
+              )}
+
+              {cardRows.length > 0 && (
+                <AgentLaunchSection id="agent-cards" title={t('agentLaunch.cards.title')}>
+                  {cardRows.map((row) => (
+                    <AgentLaunchRowItem
+                      key={row.name}
+                      row={row}
+                      census={census}
+                      models={cardModels[row.kind]}
+                      required
+                      effortFollows={row.kind === 'tweak'}
+                      held={saving === row.name}
+                      refused={error !== null && last === row.name}
+                      onSave={onSaveCardRow}
+                    />
                   ))}
                 </AgentLaunchSection>
               )}

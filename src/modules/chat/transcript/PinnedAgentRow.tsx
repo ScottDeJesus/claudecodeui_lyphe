@@ -1,14 +1,15 @@
 import { memo, type KeyboardEvent } from 'react';
-import { Bot, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
-import { LLMProviderLogo } from '@/shared/ui';
+import { SubagentCore } from '@/modules/chat/transcript/SubagentCore';
+import type { CoreDoing } from '@/modules/chat/utils/coreDoing';
 import { cn } from '@/shared/utils';
 import { describeSubagentUsage, formatSubagentFinishTime, type SubagentMarkProvider, type SubagentSummary } from '@/modules/chat/utils/subagentSummary';
 
 /**
  * One `Agent`-tool subagent as a row.
  *
- * Read by the chat module's pinned strip (`PinnedSubagents.tsx`), which draws it above the chat box.
+ * Read by the chat module's `PinnedSubagents.tsx`, which draws it as the card a press on a helper's dot opens.
  *
  * Extracted verbatim from the strip that used to draw it inline (`PinnedSubagents.tsx`), when that
  * strip grew a SECOND kind of pin beside it. The move is pure: same markup, same classes, same
@@ -21,8 +22,12 @@ type PinnedAgentRowProps = {
   id: string;
   latest: string;
   summary: SubagentSummary;
-  /** The provider it ran on: its mark is the row's, Claude's being the mascot the chat draws. The robot stands in only when none is known. */
+  /** The provider it ran on, kept on the row for a reader of the page (`data-provider`); its mark is its core now. */
   provider?: SubagentMarkProvider;
+  /** The model it runs on, as its record names it: what its core is made of. Empty while it names none. */
+  model: string;
+  /** What it is doing, for the form its core takes while it runs. */
+  doing: CoreDoing;
   /** The name a person calls the model it runs on (`Opus 5.5`), drawn after the agent's name. Absent while its record names no model, or one nothing names. */
   modelLabel?: string | null;
   onDismiss: (id: string) => void;
@@ -32,7 +37,7 @@ type PinnedAgentRowProps = {
   openLabel: string;
 };
 
-function PinnedAgentRow({ id, latest, summary, provider, modelLabel, onDismiss, onOpen, openLabel }: PinnedAgentRowProps) {
+function PinnedAgentRow({ id, latest, summary, provider, model, doing, modelLabel, onDismiss, onOpen, openLabel }: PinnedAgentRowProps) {
   const running = summary.status === 'running';
   const tokens = describeSubagentUsage(summary.usage);
   // How far a running agent has got. Beside the status on a wide card; on a phone, where the status chip leaves the
@@ -64,16 +69,8 @@ function PinnedAgentRow({ id, latest, summary, provider, modelLabel, onDismiss, 
       // The mark sits beside BOTH lines, centred on the row's height; the lines stack to its right.
       className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs text-muted-foreground"
     >
-      {/* Defensive: every normalized message carries a provider today. Keep the branch —
-        * `LLMProviderLogo` defaults to Claude, so passing an unknown provider straight in would
-        * dress it in Claude's mark instead of the neutral robot. */}
-      {provider ? (
-        // The mascot for Claude, as the chat's own assistant turns wear it: this row is the same
-        // agent at work, drawn again while it runs.
-        <LLMProviderLogo provider={provider} claudeMark="mascot" className="h-4 w-4 flex-shrink-0" />
-      ) : (
-        <Bot className={`h-4 w-4 flex-shrink-0 ${running ? 'text-[var(--info-ink)]' : 'text-muted-foreground/70'}`} />
-      )}
+      {/* Its own core: its model's material, in the form of what it is doing; a still ring once it is done (`SubagentCore`). */}
+      <SubagentCore model={model} doing={running ? doing : null} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* Wraps rather than clips the description: it keeps a floor of `basis-40` (10rem), so on a phone,
           * where the name, the model and the status leave it less, it takes a line of its own beside the

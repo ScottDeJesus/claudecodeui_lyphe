@@ -1,0 +1,23 @@
+<!-- @dsCard group="Controls" height=140 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fader — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function useTicker(ms, n) { var s = React.useState(0); React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % n; }); }, ms); return function () { clearInterval(id); }; }, []); return s[0]; }
+  function Demo() {
+    var t = useTicker(1500, 4), a = React.useState(1.0);
+    return h('div', { style: { display: 'flex', gap: 40, padding: '28px 32px', flexWrap: 'wrap' } },
+      h('div', { style: { flex: '1 1 240px' } }, h(A.Fader, { label: 'Voice speed', value: a[0], min: 0.5, max: 2, step: 0.05, detents: [0.5, 0.75, 1, 1.25, 1.5, 2], onChange: a[1], format: function (x) { return x.toFixed(2) + '\u00d7'; } })),
+      h('div', { style: { flex: '1 1 240px' } }, h(A.Fader, { label: 'Chat text', value: [14, 16, 19, 15][t], min: 12, max: 22, step: 1, unit: 'px', decimals: 0, detents: [14, 16, 19], onChange: function () {} })));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

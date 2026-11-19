@@ -46,6 +46,11 @@ export type UiPreferences = {
   hideFilesTab: boolean;
   hideGitTab: boolean;
   hideBrowserTab: boolean;
+  /**
+   * Draws a chat's next steps beside it at a desk (the side column, under its core). Default ON, as they have always stood
+   * there; the checklist button in the chat's head turns it. A phone opens them as a window instead and keeps no such state.
+   */
+  showChatFollowups: boolean;
 };
 
 export type UiPreferenceKey = keyof UiPreferences;
@@ -67,6 +72,7 @@ const DEFAULTS: UiPreferences = {
   hideFilesTab: false,
   hideGitTab: false,
   hideBrowserTab: false,
+  showChatFollowups: true,
 };
 
 const PREFERENCE_KEYS = Object.keys(DEFAULTS) as UiPreferenceKey[];

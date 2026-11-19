@@ -1,7 +1,8 @@
 import { sessionsDb } from '@/modules/database/index.js';
-import type { DispatcherArc, DispatcherDaemon, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherCard, DispatcherDaemon, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types.js';
 
 import { arcsOf } from './dispatcher-arc.reader.js';
+import { cardsOf } from './dispatcher-card.reader.js';
 import { epicsOf } from './dispatcher-epics.reader.js';
 import { paceSince } from './dispatcher-pace.reader.js';
 import { planOf, type DocumentPlan } from './dispatcher-plan.reader.js';
@@ -53,6 +54,8 @@ const PROVIDERS: readonly DispatcherRoute['provider'][] = ['claude', 'deepseek']
  * name would hide exactly the case the badge above the decks exists for, so the whole list goes on
  * the wire and the client decides what has a home to be drawn in.
  *
+ * `cards` travels whole too: the board's card walks (`report_cards.py`), each matched to its board card on the client by board and card id; the dispatcher already drops an ending older than a day, so this server cuts nothing from it.
+ *
  * Consumed by `dispatcher-watcher.service.ts` (which wraps it as the `dispatcher_state` frame,
  * adding exactly `kind` and the frame's own `at`) and by `dispatcher.routes.ts` (`GET /plans`). The
  * client never sees this type: it sees the frame.
@@ -61,6 +64,7 @@ export type DispatcherPicture = {
   plans: DispatcherPlan[];
   arcs: DispatcherArc[];
   planners: DispatcherPlanner[];
+  cards: DispatcherCard[];
   route: DispatcherRoute;
   daemon: DispatcherDaemon;
   offpeak_at: string;
@@ -141,6 +145,9 @@ function storeOf(body: unknown): DispatcherStore {
     // is refused at the same moment a malformed plan is, and never in the middle of a render. Absent
     // from a dispatcher build older than the key, which reads as no badges anywhere (`plannersOf`).
     planners: plannersOf(field(document, 'planners')),
+    // Every card walk the dispatcher holds (`report_cards.cards`), read with the rest so a malformed one is refused at the same moment.
+    // Absent from a build older than the key, which reads as no walks (`cardsOf`).
+    cards: cardsOf(field(document, 'cards')),
     route: routeOf(field(document, 'route')),
     daemon: daemonOf(field(document, 'daemon')),
     offpeak_at: need(field(document, 'offpeak_at'), isText, 'offpeak_at'),
@@ -212,6 +219,7 @@ export function lanePictureOf(store: DispatcherStore): DispatcherPicture {
     plans,
     arcs: arcsOnLane(store.arcs, plans),
     planners: store.planners,
+    cards: store.cards,
     route: store.route,
     daemon: store.daemon,
     offpeak_at: store.offpeak_at,

@@ -7,6 +7,7 @@ import {
 } from '@/modules/database/index.js';
 import type {
   KanbanCardSummary,
+  KanbanDecision,
   KanbanQuestion,
   KanbanWriteContext,
 } from '@/shared/kanban-types.js';
@@ -93,7 +94,7 @@ function requireApprovable(row: KanbanCardRow): void {
 }
 
 /**
- * The questions a card asks, the decisions their answers become, and the gate that holds a card
+ * The questions a card asks, the decisions it records, answered or noted, and the gate that holds a card
  * back until both are settled.
  *
  * EVERY write here goes through `writeKanban` — no verb in this file opens a transaction, appends
@@ -202,6 +203,49 @@ export const kanbanQuestionsService = {
 
         return requireQuestion(questionId);
       }
+    );
+  },
+
+  /**
+   * Notes one decision that no question asked for: a choice taken for the operator and said, so his
+   * record of a card reads the same whether he answered or the choice was made for him.
+   *
+   * One row, one `decision.noted` event, one frame. There is no question id, because there was no
+   * question; the row keeps the words the caller gave for both the question and the choice.
+   */
+  noteDecision(
+    cardId: string,
+    input: { question: string; choice: string },
+    context?: KanbanWriteContext
+  ): KanbanDecision {
+    const question = input.question.trim();
+    const choice = input.choice.trim();
+    if (question.length === 0 || choice.length === 0) {
+      throw new AppError('A noted decision needs its question and its choice.', {
+        code: 'KANBAN_DECISION_TEXT_REQUIRED',
+        statusCode: 400,
+      });
+    }
+    // Read before the write, for the same reason as addQuestion: the 404, and the board the audit row names.
+    const card = requireCardRow(cardId);
+
+    return writeKanban(
+      {
+        kind: 'decision.noted',
+        cardId,
+        boardId: card.board_id,
+        actor: context?.actor,
+        payload: (decision) => ({ decision_id: decision.id }),
+      },
+      () =>
+        kanbanQuestionsDb.insertDecision({
+          id: kanbanIdsDb.mintId('d'),
+          cardId,
+          questionId: null,
+          question,
+          choice: [choice],
+          tags: [],
+        })
     );
   },
 

@@ -1,11 +1,11 @@
 import { useReducer } from 'react';
 
-import { useFeedEvents } from '@/modules/upload-runs/hooks/useRunsFeed';
 import type { RunsFeed } from '@/modules/upload-runs/hooks/useRunsFeed';
 import { useRunStream } from '@/modules/upload-runs/hooks/useRunStream';
 import { lastSeqOf } from '@/modules/upload-runs/utils/lastSeq';
 import type { LiveStep } from '@/modules/upload-runs/utils/uploadsModel';
 import { AWAITING } from '@/modules/upload-runs/utils/uploadsWords';
+import { useFeedEvents } from '@/shared/hooks/useEventFeed';
 import type { UploadRunEvent, UploadRunSummary } from '@/shared/upload-runs-types';
 import { firstLine } from '@/shared/utils';
 

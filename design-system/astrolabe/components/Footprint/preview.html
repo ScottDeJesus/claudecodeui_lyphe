@@ -1,0 +1,17 @@
+<!-- @dsCard group="Companion" height=88 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Footprint — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'flex', gap: 32, alignItems: 'center', padding: 28, flexWrap: 'wrap' } },
+    h(A.Footprint, { by: 'Kaylee' }), h(A.Footprint, { by: 'Kaylee' }, 'Answered'), h(A.Footprint, { by: 'Kaylee' }, 'Sent'), h(A.Footprint, { by: 'Kaylee' }, 'Kept'), h(A.Footprint, { by: 'Kaylee', size: 20 }, 'Prepared')));
+</script>
+</body>
+</html>

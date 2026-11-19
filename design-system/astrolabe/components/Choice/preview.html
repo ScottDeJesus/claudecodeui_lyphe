@@ -1,0 +1,30 @@
+<!-- @dsCard group="Companion" height=440 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Choice — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function useTicker(ms, n) { var s = React.useState(0); React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % n; }); }, ms); return function () { clearInterval(id); }; }, []); return s[0]; }
+  function Demo() {
+    var t = useTicker(2300, 3), box = React.useRef(null), done = t === 2;
+    var steps = ['Read the test', 'Find the race', 'Fix it or retry', 'Run the checks', 'Report'].map(function (l, i) { return { id: i, label: l, state: i < 2 ? 'done' : i === 2 ? (done ? 'live' : 'waiting') : 'next' }; });
+    function point() { var el = box.current && box.current.querySelectorAll('.ast-track-step')[2]; if (!el) return null; var rc = el.getBoundingClientRect(); return { x: rc.left + rc.width / 2, y: rc.top + rc.height / 2 }; }
+    return h('div', { style: { position: 'relative', height: 440 } },
+      h('div', { ref: box, 'data-ast-keeps-opening': '', style: { position: 'absolute', left: 40, right: 40, top: 26 } }, h(A.Track, { steps: steps, label: 'Bugfixes', value: 2 })),
+      h(A.Opening, { open: true, anchor: point, side: 'below', width: 400, onClose: function () {}, source: 'Chat \u00b7 Bugfixes', title: 'Fix it or retry', status: done ? 'Answered' : 'Needs you', tone: done ? 'positive' : 'warn' },
+        h(A.Choice, {
+          question: 'The upload test races the mock clock. Fix it now?', by: 'Kaylee', likely: 'timer',
+          options: [{ value: 'timer', label: 'Install the timer first', detail: 'one line in upload.test.ts' }, { value: 'retry', label: 'Retry the test' }, { value: 'leave', label: 'Leave it for now' }],
+          value: done ? 'timer' : null, words: done ? 'do the first one' : null, via: 'spoken', onPick: function () {},
+        })));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

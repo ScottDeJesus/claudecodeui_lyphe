@@ -13,6 +13,7 @@ import { fileWords, pageSplitWords, pullCommand, standingWords } from '@/modules
 import type { BulletinPage, OverviewRow } from '@/shared/carrier-bulletins-types';
 import type { AffectedAreasTrouble } from '@/shared/types';
 import { Banner, Button, Card } from '@/shared/ui';
+import { WAY_BACK } from '@/shared/ui/overlayEscape';
 
 type CarrierPagesProps = {
   /** The carrier as the overview listed it: the header is drawn from it at once, while its pages are read. */
@@ -95,7 +96,7 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button variant="ghost" size="sm" className="-ml-3 max-md:h-11" onClick={onBack}>
+          <Button variant="ghost" size="sm" className="-ml-3 max-md:h-11" onClick={onBack} {...WAY_BACK}>
             <ChevronLeft aria-hidden="true" />
             {t('cerberus.bulletins.carrier.back')}
           </Button>

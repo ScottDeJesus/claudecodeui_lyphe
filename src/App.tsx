@@ -24,10 +24,13 @@ import { StationLayer } from '@/modules/station';
 import { i18n } from '@/modules/i18n';
 import { routerBasename } from '@/shared/cloudcliDoors';
 import { SESSIONS_HOME_PATH, STATION_PATH } from '@/shared/constants';
+import { useEscapeBack } from '@/shared/hooks/useEscapeBack';
 
 /** Rendered by main.tsx; mounts the shared providers, the auth gate and the app's one layout: the project workspace with Kaylee Station drawn over it. */
 export default function App() {
   const basename = routerBasename();
+  // Escape is the way back, on every page that has one.
+  useEscapeBack();
 
   return (
     <I18nextProvider i18n={i18n}>

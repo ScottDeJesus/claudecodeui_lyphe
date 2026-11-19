@@ -1,0 +1,100 @@
+<!-- @dsCard page group="Objects" height=660 width=1200 subtitle="Docked beside your work: it asks, you open, your word settles it" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AtWork — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var CHATS = [
+    { id: 'sched', label: 'Scheduling', detail: 'Working', state: 'working' },
+    { id: 'uploads', label: 'Uploads', detail: 'Idle' },
+    { id: 'pm', label: 'PM flow', detail: 'Idle' },
+    { id: 'bugs', label: 'Bugfixes', detail: 'Idle' },
+    { id: 'backend', label: 'Backend', detail: 'Idle' },
+  ];
+  var RUNS = [
+    { id: 'scheduling', label: 'restorly-scheduling', detail: '14 / 26', progress: 14 / 26, state: 'working', steps: 26, agents: 2 },
+    { id: 'sweeps', label: 'api-sweeps', detail: 'Done · 9 / 9', state: 'done', steps: 9 },
+    { id: 'pmflow', label: 'pm-flow', detail: 'Waiting for your start', state: 'waiting', steps: 6 },
+    { id: 'nightly', label: 'nightly-4', detail: 'Done · 212 checks', state: 'done', steps: 9 },
+    { id: 'water', label: 'water-uploads', detail: 'Failed at 4 / 9', progress: 4 / 9, state: 'failed', steps: 9 },
+    { id: 'arrival', label: 'arrival-physics', detail: 'Not started', steps: 12 },
+  ];
+  var ROAD = ['Accounts', 'Jobs and visits', 'Technician profiles', 'Scheduling', 'Uploads', 'PM flow', 'Billing', 'Reports', 'Release candidate'].map(function (l, i) {
+    return { id: 'm' + (i + 1), label: l, detail: i < 3 ? 'Shipped' : i === 3 ? 'In progress' : 'Milestone ' + (i + 1), state: i < 3 ? 'done' : i === 3 ? 'working' : 'idle', progress: i === 3 ? 0.56 : 0 };
+  });
+  var STEP_NAMES = ['The account table', 'One writer for the lead flag', 'The sign-up sheet, fetched and read', 'Skills on the technician profile', 'Recommendations ranked by skill', 'The visit form picks from the ranking', 'Checks for the ranking', 'Notes for the scheduler', 'Release notes'];
+  function stepsOf(run) {
+    var n = run.steps || 9, done = Math.round((run.state === 'done' ? 1 : run.progress || 0) * n), out = [];
+    for (var i = 0; i < n; i++) out.push({ id: i, label: STEP_NAMES[i % STEP_NAMES.length], state: i < done ? 'done' : i > done ? 'next' : run.state === 'working' ? 'live' : run.state === 'failed' ? 'failed' : run.state === 'waiting' ? 'waiting' : 'next' });
+    return out;
+  }
+  var TONE = { working: ['Working', 'info'], waiting: ['Needs you', 'warn'], done: ['Done', 'positive'], failed: ['Failed', 'danger'] };
+  function Work() {
+    return h('div', { style: { minHeight: '100%', display: 'grid', placeItems: 'center', padding: '32px 64px', boxSizing: 'border-box' } },
+      h('div', { style: { maxWidth: 520 } },
+        h('div', { className: 'caption-caps', style: { color: 'var(--ink-muted)', textTransform: 'uppercase', marginBottom: 14 } }, 'Chat · Scheduling'),
+        h('div', { style: { fontFamily: 'var(--font-sans)', fontWeight: 300, fontSize: 28, lineHeight: 1.2, letterSpacing: '-0.015em', marginBottom: 12, color: 'var(--ink)' } }, 'Skills drive the recommendations'),
+        h('p', { className: 'field-text', style: { color: 'var(--ink-quiet)', margin: 0 } }, 'A technician is recommended for a visit when their skills match the job. The ranking is computed once, when the visit is created, and again whenever a profile changes.')));
+  }
+  function Detail(p) {
+    var it = p.item, ring = p.ring;
+    if (ring.id === 'runs') return h(React.Fragment, null,
+      h(A.Track, { steps: stepsOf(it), label: it.label }),
+      h(A.KeyValueList, { items: [['Steps', it.detail], ['Route', 'Claude · round 3'], ['Helpers', it.agents ? String(it.agents) : '\u2014'], ['Spent', '2 h 24 m']] }),
+      h('div', { style: { display: 'flex', gap: 8 } },
+        it.state === 'waiting' || !it.state ? h(A.Button, { variant: 'primary', icon: 'play', onClick: function () { p.onStart(it); } }, 'Start')
+          : it.state === 'working' ? h(React.Fragment, null, h(A.Button, null, 'Pause'), h(A.Button, null, 'Stop'))
+          : it.state === 'failed' ? h(A.Button, { variant: 'primary', onClick: function () { p.onStart(it); } }, 'Retry') : null));
+    if (ring.id === 'chats') return it.state === 'waiting'
+      ? h(A.Choice, { question: 'Water uploads: path A or B?', options: [{ value: 'a', label: 'Path A', detail: 'Resize on the phone' }, { value: 'b', label: 'Path B', detail: 'Resize on the server' }], likely: 'a', by: 'Kaylee', value: p.picked, words: p.picked ? 'path A' : undefined, via: 'spoken', at: '09:41', onPick: p.onPick })
+      : h('p', { className: 'field-text', style: { color: 'var(--ink-quiet)' } }, it.state === 'working' ? 'Building the ranking for technician skills.' : 'Nothing running. Last touched yesterday.');
+    return h(A.KeyValueList, { items: [['Milestone', it.id.slice(1) + ' / 9'], ['State', it.detail], ['Runs', it.state === 'working' ? '1 live' : '\u2014']] });
+  }
+  var STEPS = [
+    { at: 0, word: 'Rest' },
+    { at: 3200, word: 'A chat needs you', ask: true, say: true },
+    { at: 6000, word: 'The instrument leans in', ask: true, say: true, near: true },
+    { at: 7200, word: 'The ring turns to it', ask: true, near: true, turn: true },
+    { at: 8800, word: 'Its question opens from the mark', ask: true, near: true, turn: true, open: true },
+    { at: 12200, word: 'Your word', ask: true, near: true, turn: true, open: true, picked: true },
+    { at: 14600, word: 'It folds back', near: true, turn: true },
+    { at: 15800, word: 'Back to the foot', turn: true },
+    { at: 17400, word: 'Rest' },
+  ];
+  var CYCLE = 19400;
+  function useStep() {
+    var s = React.useState(0);
+    React.useEffect(function () {
+      var t0 = performance.now(), id = setInterval(function () { var t = (performance.now() - t0) % CYCLE, i = 0; for (var k = 0; k < STEPS.length; k++) if (STEPS[k].at <= t) i = k; s[1](i); }, 100);
+      return function () { clearInterval(id); };
+    }, []);
+    return s[0];
+  }
+  function Demo() {
+    var rings = React.useRef(null), i = useStep(), st = STEPS[i], ps = React.useState(13), k = ps[0];
+    React.useEffect(function () { var id = setInterval(function () { ps[1](function (v) { return v >= 25 ? 9 : v + 1; }); }, 2200); return function () { clearInterval(id); }; }, []);
+    var chats = CHATS.map(function (c) { return c.id === 'pm' && st.ask ? Object.assign({}, c, { state: 'waiting', detail: 'Asks you' }) : c; });
+    var runs = RUNS.map(function (r) { return r.id === 'scheduling' ? Object.assign({}, r, { progress: k / 26, detail: k + ' / 26' }) : r; });
+    var RINGS = [{ id: 'chats', label: 'Chats', items: chats, value: st.turn ? 'pm' : 'sched' }, { id: 'runs', label: 'Runs', items: runs, defaultValue: 'scheduling' }, { id: 'road', label: 'Roadmap', items: ROAD, defaultValue: 'm4' }];
+    var pm = chats[2];
+    return h('div', { style: { position: 'relative', height: 660 } },
+      h(A.Scene, {
+        work: h(Work), near: st.near ? true : undefined,
+        instrument: h(A.Rings, { ref: rings, rings: RINGS, hold: !!st.open, label: 'Workspace', gauge: { value: 0.62, label: 'Context', detail: '124k of 200k' } }, h(A.Core, { state: st.say ? 'speaking' : st.picked ? 'writing' : st.open ? 'listening' : 'idle', signal: 'demo', azimuth: st.open && rings.current ? rings.current.azimuthOf('chats', 'pm') : undefined })),
+        held: h(A.Arrival, { when: !!st.say, from: 'core', spring: 'lobe', linger: 300 }, h('div', { style: { textAlign: 'center' } }, h(A.Stream, { text: 'PM flow has a question for you.', live: !!st.say }))),
+        controls: h(A.Composer, { value: '', placeholder: 'To this chat · describe what you want next', label: 'Message this chat', style: { flex: '1 1 320px', maxWidth: 440 } }),
+        opening: h(A.Opening, { open: !!st.open, anchor: function () { return rings.current ? rings.current.pointOf('chats', 'pm') : null; }, onClose: function () {}, source: 'Chats', title: 'PM flow', status: st.picked ? 'Answered' : 'Needs you', tone: st.picked ? 'positive' : 'warn' },
+          h(Detail, { item: pm, ring: RINGS[0], picked: st.picked ? 'a' : undefined, onPick: function () {} })),
+      }),
+      h('div', { className: 'telemetry', style: { position: 'absolute', right: 28, top: 24, color: 'var(--ink-muted)', textTransform: 'uppercase', pointerEvents: 'none' } }, String(i + 1).padStart(2, '0') + ' / ' + STEPS.length + ' \u00b7 ' + st.word));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

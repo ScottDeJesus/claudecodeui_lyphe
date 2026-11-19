@@ -265,8 +265,20 @@ export const kanbanCardsService = {
   ): KanbanCardSummary {
     const title = patch.title === undefined ? undefined : requireTitle(patch.title);
 
+    // Named in the audit row: which of the patch's fields this write set, so a listener can tell a
+    // person's edit of the card's words from a walk writing its plan.
+    const changedFields = Object.entries(patch)
+      .filter(([, value]) => value !== undefined)
+      .map(([name]) => name);
+
     return writeKanban(
-      { kind: 'card.updated', cardId, actor: context?.actor, boardId: (card) => card.boardId },
+      {
+        kind: 'card.updated',
+        cardId,
+        actor: context?.actor,
+        payload: { fields: changedFields },
+        boardId: (card) => card.boardId,
+      },
       () => {
         const changed = kanbanCardsDb.updateCard({
           id: cardId,

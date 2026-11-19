@@ -5283,12 +5283,12 @@ column's rename to `legacy_id`, is that pattern's first instance).
 
 | Table | What it holds |
 |---|---|
-| `kanban_boards` | A board: its name, the project it is ABOUT (`project_id` — never a lane filter, but no longer inert either: it resolves to the ONE `--add-dir` this board's Metis is given, and a board with a null `project_id` gives her none, so she works only inside her own session directory — §"A board's Metis, launched"), `autonomy` (the driver's governor — §"The driver"), `deepseek_flash` (the board's own switch — §"The two switches"), `concurrency` (the board's own Metis dial — §"The driver"), `sort_order`, `archived`, `legacy_id`. |
+| `kanban_boards` | A board: its name, the project it is ABOUT (`project_id` — never a lane filter, but no longer inert either: it resolves to the ONE `--add-dir` this board's Metis is given, and a board with a null `project_id` gives her none, so she works only inside her own session directory — §"A board's Metis, launched"), `autonomy` (the driver's governor — §"The driver"), `deepseek_flash` (the board's own switch — §"The two switches"), `concurrency` (the board's own Metis dial — §"The driver"), `repos` (TEXT JSON array of absolute git work-tree paths, default `'[]'`; a board with `autonomy = 1` always holds at least one — §"The services"), `sort_order`, `archived`, `legacy_id`. |
 | `kanban_cards` | The card: title, `status` with a five-value CHECK, `priority` with a three-value CHECK, description, `closing_remarks`, `plan`, `body`, approval, `archived`, `sort_order`, the four token counters (`build_tokens_in`, `_out`, `_cache_read`, `_cache_create` — accumulated by the token watcher, §"The token watcher"), both leases (`build_lease_at`/`build_owner`, `plan_lease_at`/`plan_owner`), and the timestamps. |
 | `kanban_card_tags` | The card/tag join. There is no tag entity: `(card_id, tag)` is the primary key and a tag exists only as a name attached to a card. |
 | `kanban_questions` | A card's questions: `text`, `multi`, `options` and `selected` as JSON text arrays, the free-text `other`, and `answered`. |
 | `kanban_issues` | Issues filed against a card, with `filed_at`, `resolved`, and who resolved it. |
-| `kanban_decisions` | The record of an answer — what was asked, what was chosen, its tags. `card_id` and `question_id` are both nullable and both may name rows that are gone; a decision outlives what it decided. |
+| `kanban_decisions` | The record of an answer — what was asked, what was chosen, its tags. `card_id` and `question_id` are both nullable and both may name rows that are gone; a decision outlives what it decided. `question_id` is NULL for a decision noted with no question behind it (`noteDecision`). |
 | `kanban_checklist_items` | `pending` / `active` / `done`, with a note and their own `sort_order`. |
 | `kanban_attachments` | The row beside the bytes — filename, mime, size — never the bytes themselves. The file lives at a path DERIVED from the row's own id and mime, under `attachmentsRoot()` (§"The services", `kanban-attachments.service.ts`); a row whose file is missing answers 404 rather than a zero-length download. |
 | `kanban_events` | The audit log: `ts`, `kind`, `board_id`, `card_id`, `actor`, `payload` as a JSON object. It is the table the write seam writes (§"The one write seam"), and one request reads it (`GET /events`). |
@@ -5384,9 +5384,17 @@ write that then rolls back. One place to be right. The order is fixed:
    cannot be rolled back on its own (a file written to disk) lands only once the audit row is in.
 5. COMMIT.
 6. **Outside** the transaction: read the affected card's FRESH summary and the board's lane counts
-   AFTER the write, build the frame, and broadcast it. A throw here is caught and logged — the
-   write has already committed, and a dead socket must not turn it into a 500.
+   AFTER the write, build the frame, and broadcast it; then call every write listener, each in its
+   own try. A throw here, a listener's included, is caught and logged — the write has already
+   committed, and a dead socket or a faulty listener must not turn it into a 500.
 7. Return `mutate`'s value to the verb.
+
+**Write listeners.** `onKanbanWrite(listener) -> unsubscribe` (re-exported from `server/modules/kanban/index.ts`,
+with `KanbanWriteEvent`) is how another module hears a committed write without the board importing it. The
+listener gets `{ kind, boardId, cardId, actor, payload, card }` — `payload` as the audit row holds it, `card`
+the summary read once after the commit and shared with the frame (null for a write with no card, or when the
+read failed). Listeners are called after the commit, never inside the transaction, so none sees a rolled-back
+write; the list is copied before the loop, so a listener that unsubscribes mid-loop skips nobody.
 
 A verb that needs two writes to be atomic does both inside ONE `mutate` callback — never two
 `writeKanban` calls. That is what makes `approveCard` promote a `not_ready` card to `todo` AND
@@ -5406,7 +5414,7 @@ a function rather than written by hand.
 
 The event kinds are exactly: `board.created`, `board.updated`, `board.selected`, `board.archived`,
 `card.created`, `card.updated`, `card.moved`, `card.archived`, `card.restored`, `card.approved`,
-`card.unapproved`, `tag.added`, `tag.removed`, `question.added`, `question.answered`, `issue.filed`,
+`card.unapproved`, `tag.added`, `tag.removed`, `question.added`, `question.answered`, `decision.noted`, `issue.filed`,
 `issue.resolved`, `checklist.added`, `checklist.updated`, `checklist.removed`, `attachment.added`,
 `attachment.removed`, `lease.build_claimed`, `lease.build_refreshed`, `lease.build_released`, `lease.plan_claimed`,
 `lease.plan_released`, `lesson.staged`, `lesson.reviewed`, `metis.nudged`.
@@ -5422,16 +5430,30 @@ concept from an event actor, and both ride on the summary.
 `kanban-boards.service.ts`
 
 ```
-createBoard(input: { name, projectId? }, context?) -> KanbanBoard
+createBoard(input: { name, projectId?, repos? }, context?) -> KanbanBoard
 listBoards(options?: { includeArchived? }) -> { boards, currentBoardId }
 getBoard(boardId) -> KanbanBoard | null
-updateBoard(boardId, patch: { name?, autonomy?, deepseekFlash?, concurrency?, projectId?, archived? }, context?) -> KanbanBoard
+updateBoard(boardId, patch: { name?, autonomy?, deepseekFlash?, concurrency?, projectId?, repos?, archived? }, context?) -> KanbanBoard
 selectBoard(boardId, context?) -> { currentBoardId }
 boardForProject(projectId) -> KanbanBoard | null
 laneCounts(boardId) -> KanbanLaneCount[]
 claimableCount(boardId) -> number
 listEvents(options: { boardId?, cardId?, limit? }) -> KanbanEventRow[]
 ```
+
+**Board repos** (`kanban-board-repos.ts`, `requireBoardRepos(paths) -> string[]`). `repos` on create and
+update is normalised before the write transaction opens (it runs `git rev-parse --is-inside-work-tree`
+per path, cwd = the path, no shell, 5 s timeout): absolute paths only, trailing slash dropped, duplicates
+removed, at most `KANBAN_BOARD_REPOS_MAX` (16). A refused path answers 400 `KANBAN_BOARD_REPO_INVALID`
+naming the path and the reason (relative, does not exist, cannot be read by the server, not a valid path,
+not inside a git work tree). The routes answer 400 `repos must be an array of strings` for a non-array.
+
+| when | answer |
+|---|---|
+| `autonomy` set true, or `repos` changed, on a board that would run itself with `repos` empty | 409 `KANBAN_BOARD_NEEDS_REPOS` |
+| `PATCH {"repos":[]}` on an autonomous board | 409 `KANBAN_BOARD_NEEDS_REPOS` |
+
+The check reads the board inside the transaction, so the autonomy and repos it judges are the ones stored.
 
 `selectBoard` is a write to `kanban_settings.current_board` and takes the seam like any other.
 `laneCounts`, `claimableCount` and `listEvents` are the only three reads the whole module exposes
@@ -5471,11 +5493,12 @@ one audit row whose payload is `{ tokens: delta }` and one `kanban_event` frame.
 card moving. A card deleted between the watcher's read and this write answers the same 404 every
 card verb does, and the seam rolls the audit row back with it.
 
-`kanban-questions.service.ts` — questions, the decisions they write, and the approve gate
+`kanban-questions.service.ts` — questions, the decisions they write and note, and the approve gate
 
 ```
 addQuestion(cardId, input: { text, options?, multi?, otherOn? }, context?) -> KanbanQuestion
 answerQuestion(questionId, input: { selected, other? }, context?) -> KanbanQuestion
+noteDecision(cardId, input: { question, choice }, context?) -> KanbanDecision   // question_id NULL, event `decision.noted`
 approveCard(cardId, context?) / unapproveCard(cardId, context?) -> KanbanCardSummary
 ```
 
@@ -5508,7 +5531,13 @@ attachmentsRoot() -> string                              // KANBAN_ATTACHMENTS_R
 addAttachment(cardId, { filename, mime, bytes: Buffer }, context?) -> KanbanAttachment
 resolveAttachmentFile(cardId, attachmentId) -> { path, mime, filename } | null
 removeAttachment(cardId, attachmentId, context?) -> boolean
+addAttachmentFromPath(cardId, filePath, context?) -> KanbanAttachment
 ```
+
+`addAttachmentFromPath` is the in-process twin of the upload: absolute path only (400
+`KANBAN_ATTACHMENT_PATH_REFUSED`), a missing file is 404, other path-caused read errors are 400, an
+extension outside the allowlist is 422 (`jpeg` reads as `jpg`); then the same size cap, sniff, row and
+`attachment.added` event as `addAttachment`. No route reaches it.
 
 The on-disk layout is `<root>/<cardId>/<attachmentId>.<ext>`, the extension taken from a CLOSED mime
 allowlist (`png`, `jpg`, `gif`, `webp`, `pdf` — no SVG, unlike
@@ -5670,7 +5699,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
 section: kanban/008 The panel
 
 `src/modules/kanban/` composes the tab's pane, its header — which mounts `KanbanVitalsStrip`, the
-board's six counts, its design carried in its own docstring, wired through `useBoardVitals` off a
+board's five counts, its design carried in its own docstring, wired through `useBoardVitals` off a
 publish/subscribe store the lane feed keeps rather than a prop the header would have to carry — the
 card drawer under
 `card-drawer/`, six hooks — `useKanbanMetis` is the newest, reading the board's own Metis fleet —
@@ -5693,6 +5722,11 @@ returns four lanes and To Do carries TWO statuses; with autonomy ON it returns f
 
 Backlog is the leftmost lane: work enters at the left edge and flows right.
 
+`KanbanLaneSpec.canAdd` (the lane's `+`): To Do always; Backlog only with autonomy OFF (a self-running
+board takes new work through To Do alone, so a Backlog `+` would strand its card); no other lane.
+`KanbanLaneSpec.showsHold` is set on To Do only: a card prints why the dispatcher holds it only while
+it waits to be taken up.
+
 **When autonomy is off, a card waiting on an answer shows in To Do.** Its status is never rewritten
 to make the board simpler and the card is never hidden — it sits in To Do wearing its own chip. The
 server stores five statuses and counts them five ways; the kit renders a title, a count and cards
@@ -5708,26 +5742,27 @@ it flips an integer, maps it back to a boolean on the way out, and stores it. Wh
 what the reader sees: the `questions` lane (folded into To Do when off, with a banner saying why),
 every signal on a card face (`toCardModel` returns no `signals` when autonomy is off — that single
 early return is the whole mechanism, not a second render path), and in the drawer the questions,
-the checklist, the issues, the token ledger, the closing remarks and the approve control. Turning
+the checklist, the issues, the token ledger and the closing remarks. Turning
 it off hides nothing on the server and skips no write: the same routes answer, the same rows are
 there, and switching it back on shows the same data.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
+
+## MAN-10001 — The panel — A second board column, `deepseekFlash`, round-trips beside `autonomy`.
+section: kanban/008 The panel/001 A second board column, `deepseekFlash`, round-trips beside `autonomy`.
 
 **A second board column, `deepseekFlash`, round-trips beside `autonomy`.** It reached
 `kanban_boards` in the same phase as `claimableCount` (§"The services") — the board's own
 DeepSeek Flash switch, mirroring the host-wide flag file the plan runner polls
-([docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch") but scoped to one board. The header row
-now draws it too, beside Autonomy: a second `Switch` wearing the DeepSeek mark
-(`LLMProviderLogo`) rather than a colour of its own, with a `Tooltip` naming what the switch
-moves. That composition is now WIRED, not a scaffold: `useKanbanBoards` reads `deepseekFlash`
-off the current board the same way it reads `autonomy` (`?? false`, so a board that is gone or a
-server too old to answer with the field reads as off), and `KanbanBoardHeader`'s two FILL markers
-are gone — `checked` takes that value and `onChange` calls `onToggleDeepseekFlash`, which
-`KanbanPanel` guards on `currentBoardId` before sending `updateBoard(currentBoardId,
-{ deepseekFlash: next })`, the same `PATCH` and the same post-write re-read `autonomy`'s own
-toggle takes. That value is read for a decision at every spawn now, by the driver in
+([docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch") but scoped to one board. The
+board's header draws no switch for it: Autonomy is the header's only switch. `useKanbanBoards`
+still reads `deepseekFlash` off the current board (`?? false`, so a board that is gone or a
+server too old to answer with the field reads as off). That value is read for a decision at every spawn now, by the driver in
 `server/modules/kanban-metis/` — and by nothing in this module: it decides which endpoint and which
 model that board's Metis opens on, and it reaches every plan-runner she starts (§"The two
 switches").
+
+**A card's face carries a note and links.** `KanbanCardModel` (`src/shared/ui/KanbanCard.tsx`) has `note` (one sentence printed whole, in calm ink — a To Do card's hold, "Held — …", the feed's `hold` with its leading class word dropped) and `links` (`KanbanCardLink[]`: `id` or `null`, `word`, `title`). `KanbanCardLinks.tsx` draws up to two link rows (the word and the linked card's title, never the id) and counts the rest; a link press goes through the card's own `onOpen`, and a link with a `null` id is words with no press. The face carries no lease or approval signal: the lane title and the steps meter say a card is building. `src/modules/kanban/utils/walkModel.ts` holds the walk's stage-to-step rule.
 
 **Boards are GLOBAL, not per project.** The selected board is the single `kanban_settings` row
 `current_board`, so switching projects does NOT change the selected board, and no board is
@@ -5752,21 +5787,21 @@ repeats after every lane-counts write that lands — coalesced behind one in-fli
 a timer of its own — and reaches the strip through the small publish/subscribe store that file keeps,
 never through this hook's own returned state; the shape is in the file's own docstring.
 
-**The vitals strip's six registers, in ONE round trip.** `vitalsCounts`
-(`kanban-vitals.service.ts`) answers the header's strip from five scalar sub-SELECTs in one
-statement, every one of them excluding archived cards:
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
+
+## MAN-10002 — The panel — The vitals strip's five registers, in ONE round trip.
+section: kanban/008 The panel/002 The vitals strip's five registers, in ONE round trip.
+
+**The vitals strip's five registers, in ONE round trip.** `vitalsCounts`
+(`kanban-vitals.service.ts`) answers the header's strip from four scalar sub-SELECTs in one
+statement, every card count excluding archived cards:
 
 - `building` — cards in the Building lane (`status = 'active'`), where a build lease puts them and
   where they stay until the builder moves them on.
 - `awaitingAnswer` — cards with at least one question nobody has answered: the operator's turn, and
   the panel's own `needsAnswer`.
-- `awaitingApprove` — the SAFE approve subset: not yet approved, no
-  open question, sitting in a claimable/staging lane (`todo`/`questions`/`not_ready`), and
-  content-complete — a non-blank plan, body or description, because an intake card carries its intent
-  in `description` with `body` empty.
-- `claimable` — the same predicate and the same staleness window the driver's own green light uses
-  (`kanbanBoardsDb.countClaimable`: a To-do card tagged `operator-scheduled` is the operator's and
-  does not count), so this register and the driver can never disagree.
+- `queued` — cards in To Do (`status = 'todo'`): the To Do lane's own count, so the strip and the
+  lane never disagree.
 - `lessonsPendingEstate` — STAGED lessons awaiting a person's review. It reads the board's own lesson
   table and is NOT board-scoped: a lesson belongs to the estate and its card is provenance, so there
   is no board filter here to get wrong.
@@ -5853,7 +5888,7 @@ section: kanban/010 The driver
 
 `server/modules/kanban-metis/` is the machine that drives the verbs above: it launches one Metis
 per board, keeps a registry of them, reaps what has died, and feeds the panel. It reaches the board
-only through `server/modules/kanban/index.ts`'s barrel (`kanbanBoardsService`, `kanbanCardsService`)
+only through `server/modules/kanban/index.ts`'s barrel (`kanbanBoardsService`, `kanbanCardsService`, and `onKanbanWrite` for the write-listener seam, §"The one write seam")
 — never a route, a repository or an internal service. `metis-driver.service.ts` runs the tick, and
 `metis-liveness.ts` holds the `_reapable` / `stalled` pair — kept as pure arithmetic over four facts
 the caller gathers — the session's age, `child.log`'s mtime, whether the child is still alive, and whether its
@@ -10682,7 +10717,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /hom
 
 ## MAN-7417 — Agent Chains — what the panel shows, its states and layout, and the doors that are gone
 
-Agent Chains: the panel where the operator reads and changes the model and effort every soul, and Metis, launches at, and the `/api/agent-launch` relay behind it. It opens from Settings → Agents → Edit Agent Chains, in a window above Settings (MAN-7427). The table is `charters/launch.toml` (MAN-7407); `~/.claude/scripts/launch-table` is its one reader and writer (MAN-7415). The panel and the relay open no file: the census the CLI prints is the panel's whole data.
+Agent Chains: the panel where the operator reads and changes the model and effort every soul, Metis, and a board card's sorter and tweak builder launch at, and the `/api/agent-launch` relay behind it. It opens from Settings → Agents → Edit Agent Chains, in a window above Settings (MAN-7427). The table is `charters/launch.toml` (MAN-7407); `~/.claude/scripts/launch-table` is its one reader and writer (MAN-7415). The panel and the relay open no file: the census the CLI prints is the panel's whole data.
 
 The data path, the hook and the rules that bite: MAN-7420. The window, its stand-ins and the row: MAN-7427. The routes, `LAUNCH_TABLE_BIN` and Metis's resolve: MAN-7418.
 
@@ -10698,14 +10733,24 @@ Every choice list is `census.choices`; the panel spells no model or effort word.
 
 | block | shows | a change sends |
 |---|---|---|
-| reach notice | info banner: "Chains, the dispatcher and Metis take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only." (INV-27) | — |
+| reach notice | info banner: "Chains, the dispatcher, Metis and a board card’s sorter take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only." (INV-27) | — |
 | Defaults · model | one chip per `choices.models`; `defaults.model` selected | `{model}` |
 | Defaults · effort | one list per model: `none` + `choices.efforts`; `none` = no `--effort` flag, labelled "None · the CLI’s own (<`cli_effort`>)", bare when `cli_effort` is null | `{effort: {<model>: word\|null}}` |
 | Defaults · DeepSeek effort | one list over `choices.efforts`; hint "DeepSeek maps xhigh to high; only max raises it" (INV-4899) | `{deepseek_effort}` |
 | Defaults · Dactyls | `AgentLaunchDactylField`: the runner's Dactyls switch at its head (`~/.claude/state/dactyls.flag`, Hephaestus alone — MAN-8059; its own hook `useDactylsSwitch`, never the census's save; Try again in the switch's slot while the position is unknown; a warn Waiting line when the next Hephaestus launch would not carry dactyls — the installed Claude Code cannot serve the model chosen, or he does not launch on Opus — re-asked when a save of the words lands or his model word changes: `AgentLaunchDefaults` passes it down from his soul row as `hephaestusModel`), then two lists: the model over `choices.dactyl_models` (no Default, no `none`: neither word can be cleared) and the effort over `choices.efforts`; hint "A model id runs only once the installed Claude Code knows it; haiku is the CLI’s own alias and always runs. The same words serve Dactyls for the main session, on the Settings → Agents card" (the words serve both switches: MAN-8149) | the switch: `PUT /api/settings/dactyls`; the words: `{dactyl_model}` / `{dactyl_effort}`, one word at a time; the word already in force writes nothing |
 | Defaults · Summarizer | the Dactyls field's twin, `AgentLaunchSummarizerField`: the model over `choices.summarizer_models` (no Default, no `none`) and the effort over `choices.efforts`; hint "The model that writes a chat’s compaction while Custom compaction is on; a model id runs only once the installed Claude Code knows it, and the Custom compaction row in Settings → Agents says whether this one does" | `{summarizer_model}` / `{summarizer_effort}`, one word at a time; the word already in force writes nothing |
 | Souls | one row per `kind: "soul"`, census order (by name); count badge and "N pinned" | — |
-| Metis | the `kind: "metis"` row, last, in its own section | — |
+| Metis | the `kind: "metis"` row, in its own section | — |
+| Board cards | section `agent-cards`, title `agentLaunch.cards.title` ("Board cards"), after Metis: the `sorter` and `tweak` rows through `AgentLaunchRowItem` with `models` / `required` / `effortFollows` (below); drawn only when `cardRows` is non-empty | scaffold: nothing (`onSaveCardRow` is a no-op); filled: sorter `{model}` / `{effort}`, tweak `{model}` alone, never `null` |
+
+**Board cards — scaffold state.** `AgentLaunchPanel.tsx` draws `STAND_IN_CARD_ROWS` and `STAND_IN_CARD_MODELS` (the shipped values: sorter `claude-haiku-5-5`·`low`, tweak `sonnet`) until its three `FILL:` markers (`cardRows`, `cardModels`, `onSaveCardRow`) are filled from `census.rows` and `census.choices.sorter_models` / `tweak_models`; every press on them does nothing. The hook's `isCensus` must require both lists to be arrays first (MAN-7420).
+
+**Row item props for these rows** (all optional on `AgentLaunchRowItem`):
+| prop | effect |
+|---|---|
+| `models` | the model list for this row, replacing `census.choices.models` |
+| `required` | the lists offer no `Default · <value>` choice and wear no `pinned` mark: the row's words always stand in the table, `launch-table` refuses `null` |
+| `effortFollows` | the effort slot holds words, not a list: `agentLaunch.row.effortFollows` ("<effort> · <model>’s default") when `effort_pinned` is false, `agentLaunch.row.effortOwnPin` ("<effort> · Hephaestus’s own pin") when true; for the tweak, whose row holds a model alone |
 
 **A row** = name, the description beneath (two lines; "Show more" / "Show less" past `DESCRIPTION_CLAMP_CHARS` = 70, `aria-expanded`), a Model and an Effort control, its lanes.
 - Each control reads `pinned` (badge: the row's own table entry) or "Default · <value>". Its first choice is `Default · <value>`; choosing it clears the pin (`null`). The effort default is `defaults.effort[row.model]`, else "no flag".
@@ -10737,7 +10782,7 @@ Every choice list is `census.choices`; the panel spells no model or effort word.
 ## draw order and layout
 1. Header: mark, title "Agent Chains" (the `<h2>` carries `titleId` when the window gives one), `census.file` (≥ 48rem), reload button (`data-agent-reload`; a native `title`, no `Tooltip`), and — only when the window gives `onClose` — a close button (`data-agent-close`, `autoFocus`).
 2. Refusal banner, outside the scroll.
-3. Body: warnings, reach notice, Defaults, Souls, Metis. The scroll body carries 16rem bottom padding for the last row's open list.
+3. Body: warnings, reach notice, Defaults, Souls, Metis, Board cards. The scroll body carries 16rem bottom padding for the last row's open list.
 
 | panel width | row columns |
 |---|---|
@@ -10802,9 +10847,9 @@ The Agent Chains panel's data path, its hook and the rules a change to either mu
 |---|---|
 | panel | `src/modules/agent-launch/AgentLaunchPanel.tsx`, re-exported lazily by `index.ts`, rendered only by `AgentChainsContent` (MAN-7427) |
 | panel props | `onClose?: () => void` (draws the header's close button) · `titleId?: string` (the id the `<h2>` carries, so the window is named by it) |
-| parts | `AgentLaunchNotices` (warnings, reach notice) · `AgentLaunchDefaults` (mounts `AgentLaunchDactylField` and `AgentLaunchSummarizerField`, twins: a model list and an effort list each) · `AgentLaunchRowItem` · `AgentLaunchLanes` · `AgentLaunchChoice` |
+| parts | `AgentLaunchNotices` (warnings, reach notice) · `AgentLaunchDefaults` (mounts `AgentLaunchDactylField` and `AgentLaunchSummarizerField`, twins: a model list and an effort list each) · `AgentLaunchRowItem` · `AgentLaunchLanes` · `AgentLaunchChoice` (a slot is a list, or `said` words with no list, as the tweak's effort) |
 | hook | `useAgentLaunch()` → `{ census, error, saving, refresh, saveRow, saveDefaults }` |
-| types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading |
+| types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading. Row `kind` is `'soul' \| 'metis' \| 'sorter' \| 'tweak'`; lane `'agent' \| 'dispatcher' \| 'chain' \| 'metis' \| 'sorter'`; `choices.sorter_models` / `choices.tweak_models` are the two board-card model lists |
 
 ## hook contract
 - `census` is `null` until read; a failed call keeps the census already held.
@@ -14778,3 +14823,50 @@ The CPU limit and the wait for CPU in CloudCLI (the operator, 2026-11-11): the s
 **Not here.** How the gate measures, books and waits: the runner's. The usage pacer's hold and its Override (`PaceOverride`, `dispatcher override`) are a different hold on a different subject and are untouched; a plan can carry both lines.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/cpu-wait.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatch-souls.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/cpu-limit.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/CpuWaitOverride.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useCpuLimit.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerCpuLimitRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCpuRelease.ts
+
+## MAN-9985 — The Kanban intake door — POST /api/kanban-intake/cards, a machine door for eis_backend's problem reports
+
+`server/modules/kanban-intake/` — one route by which a trusted machine puts a card on a board. Its one caller is eis_backend's `POST /api/eis/problem-reports` (Restorly's "Something not working?" panel, the owner's account only). Mounted in `server/index.ts` at `/api/kanban-intake` with NO `authenticateToken` — the caller holds no user JWT. It sits after `app.use('/api', validateApiKey)`: a no-op while `API_KEY` is unset (2026-11-18: unset); set it and every eis_backend call is 401 `Invalid API key`, because eis_backend sends no `x-api-key`.
+
+- **The guard** is the router's first middleware: header `X-Kanban-Intake-Secret`, compared constant-time (`secretsMatch`) with `KANBAN_INTAKE_SECRET` read from eis_backend's env file — `KANBAN_INTAKE_ENV_FILE`, default `/opt/shadow-connector/.eis_backend.env` — at call time, its parse cached by the file's mtime and size so a rotation needs no restart. No usable secret in the file → 503; a missing or wrong header → 401 (one sentence for both). A path spelled in another case reaches the same guard (a prefix mount).
+- **The verb:** `POST /cards` `{ boardId, title, description?, tags?, priority? }` (title ≤ 200, description ≤ 8000, ≤ 8 tags of ≤ 40 characters, duplicates collapse; `priority` one of `KANBAN_PRIORITIES` — `low` | `medium` | `high`, trimmed, `medium` when absent or null, anything else a 400; other keys ignored) → 201 `{ card }`; the first bad field → 400 `{ error: <sentence naming it> }`. It goes through `kanbanCardsService.createCard` (status `not_ready`, the parsed priority) then `addTag` per tag, every write with actor `restorly` — so ids, `card.created` / `tag.added` events and the board broadcasts are the service's own. An unknown board is the service's 404.
+- **Proof:** `curl -X POST :3011/api/kanban-intake/cards` with no header and with a wrong one → 401; a real card filed through eis_backend lands on `b-143` tagged `bug` with both events by `restorly`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-intake/
+
+## MAN-10000 — Board cards settings — the two Settings → Agents rows (scaffold): files, handles, hook contract, FILL markers
+
+`RunnerBugBoardRow.tsx` (Settings → Agents, drawn by `RunnerModelContent.tsx` directly under `RunnerCpuLimitRow`) is the operator's view of the dispatcher's two board-card numbers in `~/.claude/charters/cards.toml`. The launch rows a card walk uses: MAN-7417.
+
+## Status
+- Scaffold, drawn live from stand-ins: `useBugBoardSettings` answers `width` 1 and `threshold` 0.8 and every act does nothing. Each act carries a `FILL:` marker (7 in the hook; `useBugBoardSettings`, `onRetry`, `onWidthChange`, `onThresholdType`, `onThresholdEnter`, `onThresholdLeave` in the row).
+- `GET` / `PUT /api/kanban-dispatch/settings` does not exist yet; it comes with `board-dispatch`.
+
+## Rows
+Two `SettingRow`s in one file, one hook; each has its own sentence and control. Strings: `agents.bugBoard.*` in `en/settings.json` (`fr` too), each call with a `defaultValue`.
+| row | handle | control | icon |
+|---|---|---|---|
+| Cards walked at once | `data-runner-bug-board-width="unknown\|<n>"` | `Select`, `BUG_BOARD_WIDTH_CHOICES` = 1–4, each said with its noun (`option_one` / `option_other`) | `KanbanSquare` |
+| Sort confidence | `data-runner-bug-board-threshold="unknown\|<n>"` | number `Input` `#runner-bug-board-threshold`, step 0.01, `min`/`max` = `BUG_BOARD_THRESHOLD_MIN` 0.5 / `BUG_BOARD_THRESHOLD_MAX` 0.99, shown at two decimals (the notation of a card's Sort step), bounds as the `Field` caption | `Tags` |
+
+- Both controls sit in a `w-44` block wrapper (the CPU limit's width). why: at `w-32` they stayed beside the text on a phone and squeezed it to a nine-line column.
+- Under a finger (`finger:`) the field is `h-11` and the retry 44×44; the shared `Input` is 36 px at every width and the shared kit's list options are 31–39 px: both are the kit's to change.
+- The confidence description is `#runner-bug-board-threshold-about`, the field's `aria-describedby`.
+- Unknown is never the default: while `width` / `threshold` is `null` the description says loading or `agents.bugBoard.unreadable` and the control slot holds a retry on both rows.
+- A number outside the bounds snaps back and says `agents.bugBoard.threshold.outOfBounds` under the field until it is typed in again; a blank draft sends and says nothing.
+- No control is `disabled` mid-write; the wrapper carries `aria-busy`.
+- The copy says "self-running board" and never quotes the switch's label.
+
+## Hook contract — `useBugBoardSettings()`
+Returns `{width, threshold, unreadable, saving, thresholdText, thresholdOutOfBounds, setWidth, typeThreshold, leaveThreshold, refresh}`; the shape is the row's contract and the fill does not change it. The hook owns the confidence draft, so the row holds no state.
+- `width` / `threshold` `null` = no read has succeeded; a body that is not the two numbers inside their bounds is `unreadable`, never a default.
+- `thresholdText`: the draft while one is open, else `threshold.toFixed(2)`; a read never overwrites a draft.
+- `leaveThreshold`: no draft sends nothing; blank drops the draft; a non-number or out-of-bounds drops it and raises `thresholdOutOfBounds`; else `PUT {threshold}` rounded to two decimals.
+- `setWidth`: `PUT {width}`, corrected by the read-back; a pick during a write folds into the next write.
+- Reads at mount and when the page regains focus or becomes visible (`useCpuLimit`'s shape); nothing polls.
+
+## Verify
+`node .verify/bug-board-settings-shots.mjs <out dir> <light|dark> <width> <height> [ready|loading|unreadable]` photographs Settings → Agents and Edit Agent Chains on :5183; read-only. `loading` / `unreadable` rewrite the stub's constants through a route, so they work only while the hook is the stub. Runs with `project: false`: `selectFirstProject` in `.verify/lib/console.mjs` fails on today's Home screen.
+- 2026-11-18: 1440×900 and 390×844, light and dark: no horizontal overflow, no console errors from the rows; new presses ≥ 44 px under a finger except the kit's list options.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useBugBoardSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugBoardRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/bug-board-settings-shots.mjs

@@ -20,6 +20,7 @@ The Cerberus tab: the fleet's health, on the views rail's house run. One provide
 | Tours, the strip's fourth view, after History: the code is the module `src/modules/affected-areas` (`cloudcli:src/modules/affected-areas`), which the root imports through its barrel; drawn once center's overview has answered, mounted on its first show and kept `hidden` after | MAN-8575 (row map and numbers MAN-8576, rules MAN-8577); the root's side MAN-7891 | `CerberusPanel.tsx` (`VIEWS`, `KeptView`), `src/modules/affected-areas/*` |
 | the Bulletins view, the strip's fifth view, after Tours: the code is the module `src/modules/carrier-bulletins` (`cloudcli:.`), which the root imports through its barrel; read-only; drawn once center's overview has answered, mounted on its first show and kept `hidden` after, as Tours is | MAN-8880 (its wire MAN-8865; the root's side MAN-7891; the surround both views share MAN-8917) | `CerberusPanel.tsx` (`VIEWS`, `KeptView`), `src/modules/carrier-bulletins/*` |
 | the Uploads view, the strip's sixth view, after Bulletins: the code is the module `src/modules/upload-runs` (`cloudcli:.`), which the root imports through its barrel; read-only; mounted on its first show inside a `KeptView` and kept `hidden` after, as Bulletins is; it reads on show and on a press and, while shown, when its feed tells that a run moved | MAN-9891 (its rules INV-11822; its wire MAN-9882, the heal pieces it draws MAN-9881; the root's side MAN-7891) | `CerberusPanel.tsx` (`VIEWS`, `KeptView`), `src/modules/upload-runs/*` |
+| the Scheduling view, the strip's seventh view, after Uploads: the code is the module `src/modules/scheduling-report` (`cloudcli:.`), which the root imports through its barrel; read-only; mounted on its first show inside a `KeptView` and kept `hidden` after; it reads on show and on a press and, while shown, when its feed tells that a scheduling act or session was recorded | MAN-9992 (the kept views MAN-8918) | `CerberusPanel.tsx` (`VIEWS`, `KeptView`), `src/modules/scheduling-report/*` |
 | the Mute and Enroll dialogs | MAN-7884 (Mute MAN-7892, Enroll MAN-7893, install step MAN-7894) | `modals/*.tsx`, `hooks/useEnrollmentStatus.ts`, `utils/enrollAsk.ts` |
 | the slots later plans fill, and the `FILL:` markers a scaffolded screen leaves for its fill | MAN-7867 | `SLOT:` and `FILL:` comments, `VIEWS` in `CerberusPanel.tsx` |
 | the fixes screen, live: Catalog view, a Needs-you card's fix, Fix output, the sheet's fixes, the run reads | MAN-7906 | `catalog/CatalogView.tsx`, `fleet/NeedFix.tsx`, `sheet/FixOutput.tsx`, `sheet/CheckFixes.tsx`, `hooks/useRunOutput.ts`, `hooks/useRunLastLine.ts`, `hooks/useCatalogRead.ts` |
@@ -37,7 +38,7 @@ The Cerberus tab: the fleet's health, on the views rail's house run. One provide
 - Layout of the module: `context/` (provider), `hooks/`, `utils/` (pure), `fleet/`, `sheet/`, `history/`, `catalog/` (the Catalog view), `modals/` (the dialogs).
 - Colour: no hex, `rgba(` or `var(--` in a className or style under `src/modules/cerberus/` (2026-10-06: none outside one comment). Tone reaches paint only as `data-tone` plus a `tone-*` name (MAN-739 rule 3); the set stays five, so denied is `danger` (MAN-739 rule 4).
 - A status is painted from one table, `STATUS_TABLE` (MAN-7873), and a state that speaks in colour also carries its icon or word (MAN-578).
-- Words: every sentence is a `cerberus.*` key through `t()`, English only; a label, reason, node name or description is data, never a key (MAN-7870). The Tours strip's two words are `cerberus.*` (`cerberus.tours.tab`, `cerberus.tours.tabHint`); the Tours view's own are `affectedAreas.*` (MAN-8575). The Uploads view's, its strip name included, are `cerberus.uploads.*` (MAN-9891).
+- Words: every sentence is a `cerberus.*` key through `t()`, English only; a label, reason, node name or description is data, never a key (MAN-7870). The Tours strip's two words are `cerberus.*` (`cerberus.tours.tab`, `cerberus.tours.tabHint`); the Tours view's own are `affectedAreas.*` (MAN-8575). The Uploads view's, its strip name included, are `cerberus.uploads.*` (MAN-9891); the Scheduling view's, its strip name (`cerberus.scheduling.tab`, `cerberus.scheduling.tabHint`) included, are `cerberus.scheduling.*` (MAN-9992). A login, a customer, a person's name, a code and a reason's detail are data, never keys.
 - No unit tests: each seam is shown on the real app against the live center.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/
@@ -76,7 +77,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/Comm
 
 ## MAN-7867 — Cerberus — the slots later plans fill: every `SLOT:` and `FILL:` comment, the `VIEWS` table and `activityEvents`
 
-Where a plan plugs into the tab (the fixes plan's places are filled and live: MAN-7906, and so are the updates plan's: MAN-7934, the diagnosis plan's: MAN-7932, the auto-diagnosis plan's: MAN-9535, the tours plan's: MAN-8575, the bulletins plan's: MAN-8880, and the uploads plan's: MAN-9891). No `FILL:` comment stands in `src/modules/cerberus`: the Uploads view's `VIEWS` row and its `KeptView` are filled in `CerberusPanel.tsx`. The rings-key row below is the one `SLOT:` left. A plan whose screen is scaffolded and not yet filled marks its places `FILL:` (`grep -rn "FILL:" src/modules/cerberus`): each names what its fill mounts there, and the fill replaces it. Row map: MAN-7868.
+Where a plan plugs into the tab (the fixes plan's places are filled and live: MAN-7906, and so are the updates plan's: MAN-7934, the diagnosis plan's: MAN-7932, the auto-diagnosis plan's: MAN-9535, the tours plan's: MAN-8575, the bulletins plan's: MAN-8880, the uploads plan's: MAN-9891, and the scheduling plan's: MAN-9992). No `FILL:` comment stands in `src/modules/cerberus`. The rings-key row below is the one `SLOT:` left. A plan whose screen is scaffolded and not yet filled marks its places `FILL:` (`grep -rn "FILL:" src/modules/cerberus`): each names what its fill mounts there, and the fill replaces it. Row map: MAN-7868.
 
 ## Rules
 - A slot is a comment (or a table row) and draws nothing: no placeholder, no empty container, no flag.
@@ -150,6 +151,7 @@ section: The Cerberus screen's words — the cerberus block of en/common.json/00
 | `tours` | 2 | the strip's name and hint for Tours, `tab` and `tabHint`, which `CerberusPanel.tsx` reads; the view's own words are `affectedAreas.*` (MAN-8575) |
 | `bulletins` | 187 | the Bulletins view's words, read by `src/modules/carrier-bulletins`, bar `tab` and `tabHint`, which `CerberusPanel.tsx` reads for the strip (MAN-8880) |
 | `uploads` | 343 | the Uploads view's words, read by `src/modules/upload-runs`, bar `tab` and `tabHint`, which `CerberusPanel.tsx` reads for the strip (the `VIEWS` row and the `KeptView` label): groups and counts in MAN-9891 |
+| `scheduling` | 354 | the Scheduling view's words, read by `src/modules/scheduling-report` (scaffold; its `tab` and `tabHint` are read by the fill's `VIEWS` row): groups `head` 31, `pills` 13, `sections` 10, `kinds` 10, `often` 16, `openers` 11, `starts` 8, `sessions` 18, `result` 10, `surface` 5, `reasons` 60, `acts` 32, `sheet` 100, `trouble` 10, `empty` 4, the rest ≤3: the view's row is its own manual |
 | `time` | 13 | spans and relative times |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
@@ -1064,7 +1066,7 @@ The Cerberus tab's root and header, live: the root reads the one overview throug
 | `src/modules/cerberus/CerberusHeader.tsx` | `CerberusHeader({ overview, stale, wardens, onEnroll, onUpdateWardens })` and `ClockPill`: eyebrow, headline, summary, clock pill, the update button, Enroll a node |
 | `src/modules/cerberus/hooks/useClock.ts` | `useClock(tickMs = 1000)`: the browser's clock as epoch ms, read again each tick on the host window |
 | `src/modules/cerberus/hooks/useCountTo.ts` | `useCountTo(target)`: the passing count as drawn |
-| `src/shared/types.ts` | `CerberusView = 'fleet' | 'catalog' | 'history' | 'tours' | 'bulletins' | 'uploads'` |
+| `src/shared/types.ts` | `CerberusView = 'fleet' | 'catalog' | 'history' | 'tours' | 'bulletins' | 'uploads' | 'scheduling'` |
 
 `index.ts` exports `CerberusPanel` as a `lazy` import (its own chunk, loaded on the tab's first open); `WorkspaceMain` renders it with its `projectChoices`, which it only does once the workspace's projects have been read.
 
@@ -1087,7 +1089,7 @@ section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`
 | — | "Loading Cerberus…" (`cerberus.loading`, `vv-fade` held back 150 ms) | `overview === null && !unreachable` |
 | — | `UnreachableBanner` (no `detail`), keyed by `attempt` | `overview === null && unreachable` |
 
-- `VIEWS` is one table (`id`, `labelKey`, `hintKey`), in strip order: Fleet, Catalog, History, Tours, Bulletins, Uploads.
+- `VIEWS` is one table (`id`, `labelKey`, `hintKey`), in strip order: Fleet, Catalog, History, Tours, Bulletins, Uploads, Scheduling.
 - Catalog (`cerberus.catalog.tab` / `cerberus.catalog.tabHint`), between Fleet and History, is mounted only while shown like History: it holds no place of its own, so its entrance plays each time. View: MAN-7906.
 
 - Root: `[container-type:inline-size]`; `data-cerberus-panel="narrow|wide"` carries the flag for a verify script.
@@ -1379,13 +1381,13 @@ The diagnosis screen's buttons and reads, live: `DiagnoseButton` (the Needs-you 
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/DiagnoseButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosis.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosisVerbs.ts
 
-## MAN-8918 — Cerberus — the kept views: KeptView and useKeptViews (Tours, Bulletins and Uploads stay mounted, hidden once left, with their scroll)
+## MAN-8918 — Cerberus — the kept views: KeptView and useKeptViews (Tours, Bulletins, Uploads and Scheduling stay mounted, hidden once left, with their scroll)
 
-The one small piece the Cerberus tab's three kept-mounted views share (Tours: MAN-8575; Bulletins: MAN-8880; Uploads: MAN-9891), so `CerberusPanel.tsx` holds no second copy of any view's mount, hide or scroll lines. The panel's side: MAN-7891 (layout, state, and the rule for why the views share one scroller).
+The one small piece the Cerberus tab's four kept-mounted views share (Tours: MAN-8575; Bulletins: MAN-8880; Uploads: MAN-9891; Scheduling: MAN-9992), so `CerberusPanel.tsx` holds no second copy of any view's mount, hide or scroll lines. The panel's side: MAN-7891 (layout, state, and the rule for why the views share one scroller).
 
 | file | what it is |
 |---|---|
-| `hooks/useKeptViews.ts` | `useKeptViews(view, scrollerRef)` → `{ shownOnce, leaving }`. `shownOnce` is state: the views shown at least once, with the current view added while rendering (React renders again at once, before anything is drawn, so a view's first frame is already mounted). `leaving(next)` is called by the strip's press before the view changes and writes the scroller's offset for the kept view being left; a layout effect on the view writes that offset back as the view returns (a first show starts at the top). `KEPT_VIEWS` (`tours`, `bulletins`, `uploads`) is the list of views whose offset is kept |
+| `hooks/useKeptViews.ts` | `useKeptViews(view, scrollerRef)` → `{ shownOnce, leaving }`. `shownOnce` is state: the views shown at least once, with the current view added while rendering (React renders again at once, before anything is drawn, so a view's first frame is already mounted). `leaving(next)` is called by the strip's press before the view changes and writes the scroller's offset for the kept view being left; a layout effect on the view writes that offset back as the view returns (a first show starts at the top). `KEPT_VIEWS` (`tours`, `bulletins`, `uploads`, `scheduling`) is the list of views whose offset is kept |
 | `KeptView.tsx` | `<KeptView id view shownOnce label>{lazy view}</KeptView>`: renders nothing until `id` is in `shownOnce`, then a `role="tabpanel"` named `label`, `hidden` unless `view === id`, around `<ViewBoundary view={label}>` (MAN-8917). Nothing on the wrapper sets a display, so `hidden` takes it out of layout |
 
 ## Rules
@@ -1393,7 +1395,7 @@ The one small piece the Cerberus tab's three kept-mounted views share (Tours: MA
 - The offset is written in the press (`leaving`), not in an effect or a render: the panel of the view being left is `hidden` by the commit that follows the press, and the browser then clamps the scroller to the shorter content, so an effect reads the clamped offset. Reading a ref during render is the other way to get it, and the house lint (`react(refs)`) flags it.
 - The strip scrolls with the content (the header, the strip and the view are one scroller), so a person leaves a view from an offset at which the strip is on screen: that is the offset that is kept, and a probe that scrolls past the strip must scroll back to it before it presses (a Playwright click scrolls the strip into view first and moves the offset it is meant to find).
 - A kept view reads on open and on a press and never on a timer or while hidden, so kept mounted it costs nothing; a view that must read of its own accord while hidden does not belong here.
-- Uploads adds a THIRD trigger: an event it is told while it is shown (the runs feed's frames, and a live run's own stream: MAN-9911). It holds those streams only while shown: hidden, it closes the feed and every stream and reads again on its return, so kept mounted it still costs nothing. A kept view that must be told takes these three and no fourth: on show, on a press, on an event told while shown.
+- Uploads and Scheduling add a THIRD trigger: an event told while shown (Uploads: the runs feed's frames and a live run's own stream, MAN-9911; Scheduling: the scheduling record's `changed` frames, MAN-9992). Each holds its streams only while shown: hidden, it closes the feed and every stream and reads again on its return, so kept mounted it still costs nothing. A kept view that must be told takes these three and no fourth: on show, on a press, on an event told while shown.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useKeptViews.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/KeptView.tsx
 

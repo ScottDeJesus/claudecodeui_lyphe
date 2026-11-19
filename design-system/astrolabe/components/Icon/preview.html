@@ -1,0 +1,17 @@
+<!-- @dsCard group="Controls" height=240 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Icon — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Cell(p) { return h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 64, color: 'var(--ink)' } }, h(A.Icon, { name: p.n }), h('span', { className: 'caption-caps', style: { color: 'var(--ink-muted)' } }, p.n)); }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(React.Fragment, null, ['play', 'stop', 'mic', 'plus', 'upload', 'back', 'close', 'trash', 'send', 'chevron', 'pin', 'chat', 'speaker', 'speaker-off', 'ear', 'ear-off', 'panel', 'lines', 'menu', 'settings', 'terminal', 'file', 'pencil', 'search', 'globe', 'tool', 'thought', 'question', 'copy', 'check', 'more'].map(function (n) { return h(Cell, { key: n, n: n }); })));
+</script>
+</body>
+</html>

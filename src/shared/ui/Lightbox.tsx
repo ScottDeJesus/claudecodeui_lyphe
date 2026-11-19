@@ -81,7 +81,7 @@ export function Lightbox({ label, children, onClose }: LightboxProps) {
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
-        // Marked from window capture, as the shared Dialog does, so closing never stops the run.
+        // Marked from window capture, as the shared Dialog does, so closing never also leaves the page.
         event.preventDefault();
         event.stopPropagation();
         onClose();

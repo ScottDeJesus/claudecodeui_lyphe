@@ -26,6 +26,8 @@ import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
 import { NOTES_CLIENT_KEY_INDEX_SQL, NOTES_SCHEMA_SQL } from '@/modules/database/notes-schema.js';
 import { NOTIFICATION_HISTORY_SCHEMA_SQL } from '@/modules/database/notification-history-schema.js';
 import { migrateProvenanceColumnToLegacyId } from '@/modules/database/migrations-legacy-id.js';
+import { addColumnToTableIfNotExists, getTableInfo, tableExists } from '@/modules/database/migrations-columns.js';
+import { migrateKanbanBoardRepos } from '@/modules/database/migrations-board-dispatch.js';
 import { visibleProjectPathSql } from '@/shared/hidden-project-paths.js';
 
 const SQLITE_UUID_SQL = `
@@ -35,34 +37,6 @@ lower(hex(randomblob(2))) || '-' ||
 lower(hex(randomblob(2))) || '-' ||
 lower(hex(randomblob(6)))
 `;
-
-type TableInfoRow = {
-  name: string;
-  pk: number;
-};
-
-const addColumnToTableIfNotExists = (
-  db: Database,
-  tableName: string,
-  columnNames: string[],
-  columnName: string,
-  columnType: string
-) => {
-  if (!columnNames.includes(columnName)) {
-    console.log(`Running migration: Adding ${columnName} column to ${tableName} table`);
-    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnType}`);
-  }
-};
-
-const tableExists = (db: Database, tableName: string): boolean =>
-  Boolean(
-    db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
-      .get(tableName)
-  );
-
-const getTableInfo = (db: Database, tableName: string): TableInfoRow[] =>
-  db.prepare(`PRAGMA table_info(${tableName})`).all() as TableInfoRow[];
 
 const migrateLegacySessionNames = (db: Database): void => {
   const hasLegacySessionNamesTable = tableExists(db, 'session_names');
@@ -979,6 +953,7 @@ export const runMigrations = (db: Database) => {
     // After the projects rebuild above: the boards table references projects(project_id).
     db.exec(KANBAN_SCHEMA_SQL);
     migrateKanbanBoardsColumns(db);
+    migrateKanbanBoardRepos(db);
     // The memory lane's own table, in its own script — it is not a board table, so it is not in
     // KANBAN_SCHEMA_SQL above. It sits here, after the projects rebuild, for the same reason the
     // board's script does: nothing in this lane references `projects`.

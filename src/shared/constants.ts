@@ -801,8 +801,23 @@ export const MAX_ATTACHMENT_COUNT = 10;
 
 /**
  * Matches an open layer that dismisses itself on Escape: a menu, a modal dialog, or any panel that states it owns
- * Escape while it is open (`OWNS_ESCAPE`, the `data-owns-escape` marker of `shared/ui/overlayEscape`). The chat's
- * page-wide Escape that stops a running turn (`useEscapeToAbortSession`) checks for it with `querySelector` on the
- * document the chat is drawn in, and steps aside while one is open, so dismissing the layer is all that Escape does.
+ * Escape while it is open (`OWNS_ESCAPE`, the `data-owns-escape` marker of `shared/ui/overlayEscape`). The page's
+ * own Escape, the way back (`useEscapeBack`), checks for it with `querySelector` on the document, and steps aside
+ * while one is open, so dismissing the layer is all that Escape does.
  */
 export const ESCAPE_LAYER_SELECTOR = '[data-owns-escape], [aria-modal="true"], [role="menu"]';
+
+/**
+ * A CORE DRAWN ALONE (the instrument's `body` tier: a chat's core, a helper's): how much of its square its body's RADIUS is. The
+ * instrument draws the body this large and lets its forms (a tendril, spikes, the dish's rings) reach past the square; whoever
+ * draws rings round such a core (the chat's `ChatCore`) measures them from the body, so they sit close on it at any size. One
+ * figure for both, because the two live in modules that cannot import each other.
+ */
+export const CORE_BODY_SHARE = 0.35;
+
+/**
+ * The rings a lone core wears as its gauges (a chat's context, then its account's week): how far outside the body each one's orbit
+ * runs, in px, the inner first, round the small core beside the line. A larger body carries them further out and heavier
+ * (`coreGaugeScale` in `shared/utils`); the instrument draws them there and the chat's core puts the outer one's press there.
+ */
+export const CORE_GAUGE_GAPS: readonly [number, number] = [6, 13];

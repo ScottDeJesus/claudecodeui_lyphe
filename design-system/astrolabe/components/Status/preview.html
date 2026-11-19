@@ -1,0 +1,19 @@
+<!-- @dsCard group="Companion" height=96 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Status — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h(React.Fragment, null,
+    ['idle', 'thinking', 'speaking', 'listening'].map(function (s) { return h('div', { key: s, style: { minWidth: 104 } }, h(A.Status, { state: s })); }),
+    h('div', { style: { minWidth: 96 } }, h(A.Status, { dot: false, tone: 'accent', label: 'Acquired' })),
+    h('div', null, h(A.Status, { dot: false, tone: 'quiet', label: 'Slewing' }))));
+</script>
+</body>
+</html>

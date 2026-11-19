@@ -1,0 +1,26 @@
+<!-- @dsCard group="Places" height=84 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Key — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function useTicker(ms, n) { var s = React.useState(0); React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % n; }); }, ms); return function () { clearInterval(id); }; }, []); return s[0]; }
+  function Demo() {
+    var t = useTicker(700, 4);
+    function Pair(p) { return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--ink-muted)' }, className: 'telemetry' }, p.children, h('span', null, p.word)); }
+    return h('div', { style: { display: 'flex', gap: 28, alignItems: 'center', padding: 28, flexWrap: 'wrap' } },
+      h(Pair, { word: 'Call up' }, h(A.Key, { pressed: t === 1 }, '\u2318'), h(A.Key, { pressed: t === 1 }, 'K')),
+      h(Pair, { word: 'Open' }, h(A.Key, { pressed: t === 2 }, '\u21b5')),
+      h(Pair, { word: 'Close' }, h(A.Key, { pressed: t === 3 }, 'Esc')),
+      h(Pair, { word: 'Pick' }, h(A.Key, null, '1'), h(A.Key, null, '2'), h(A.Key, null, '3')));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

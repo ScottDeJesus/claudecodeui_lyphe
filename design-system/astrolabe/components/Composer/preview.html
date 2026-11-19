@@ -1,0 +1,25 @@
+<!-- @dsCard group="Controls" height=232 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Composer — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var LINE = 'queue it for tonight\nand tell me when it lands';
+  function Demo() {
+    var s = React.useState(0), k = s[0];
+    React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % 96; }); }, 120); return function () { clearInterval(id); }; }, []);
+    var typing = k < 46, sent = k >= 52 && k < 84, text = typing ? LINE.slice(0, k) : k < 52 ? LINE : '';
+    var files = k >= 20 && k < 52 ? [{ id: 1, name: 'trace.log', size: 48213 }, { id: 2, name: 'screen.png', size: 1280044 }] : [];
+    var talk = { state: k >= 84 && k < 91 ? 'listening' : k >= 91 ? 'transcribing' : 'idle', onToggle: function () {}, name: 'Kaylee', binding: 'F8' };
+    return h('div', { style: { maxWidth: 620, margin: '0 auto', padding: '36px 24px' } }, h(A.Composer, { value: text, files: files, busy: sent ? 'Working' : false, progress: sent && k >= 60 ? (k - 60) / 23 : undefined, placeholder: sent ? 'Say more while it works' : undefined, talk: talk, signal: A.demoSignal, onChange: function () {}, onSend: function () {}, onFiles: function () {}, onRemoveFile: function () {}, onStop: function () {} }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

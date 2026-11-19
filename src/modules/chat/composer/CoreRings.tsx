@@ -24,7 +24,7 @@ export type CoreRing = {
 const TAU = Math.PI * 2;
 
 /** Where each ring runs, as a share of the disc's radius: a lone ring, and two with the first inside. */
-const RING_SHARE: Record<number, readonly number[]> = { 1: [0.7], 2: [0.56, 0.84] };
+const RING_SHARE: Record<number, readonly number[]> = { 1: [0.66], 2: [0.56, 0.8] };
 
 /** A press that moved less than this, in px, is a press on a mark and not a turn. */
 const TURN_SLOP = 4;
@@ -223,8 +223,8 @@ function RingDial({ ring, radius, onPreview }: RingDialProps) {
           const at = index === facing;
           return (
             <g key={stop.value} transform={`rotate(${index * stepDeg})`}>
-              <line className={cn('core-ring__mark', at && 'core-ring__mark--at')} y1={-(radius - (at ? 4 : 0))} y2={-(radius + (at ? 10 : 6))} />
-              <circle className="core-ring__stop" data-ring-stop={stop.value} data-ring-index={index} cy={-radius} r={11}>
+              <line className={cn('core-ring__mark', at && 'core-ring__mark--at')} y1={-(radius - (at ? 5 : 0))} y2={-(radius + (at ? 11 : 7))} />
+              <circle className="core-ring__stop" data-ring-stop={stop.value} data-ring-index={index} cy={-radius} r={13}>
                 <title>{stop.label}</title>
               </circle>
             </g>

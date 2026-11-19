@@ -1,15 +1,13 @@
 import { useAccountsContext } from '@/modules/accounts/context/AccountsContext';
-import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
+import { useAccountWeek } from '@/modules/accounts/hooks/useAccountWeek';
 import { ACCOUNT_PANEL_ID } from '@/modules/accounts/AccountPopover';
-import { accountInUse, accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
-import { WINDOW_NAMES, ringTone, windowPercent } from '@/modules/accounts/utils/usageWindows';
 import { cn } from '@/shared/utils';
 
 /** How far past the ring's line its press reaches, in px: the band a pointer lands on. */
 const REACH = 7;
 
 /** The ring's line, as thick as it is drawn: a hairline, a little heavier once the week runs high. */
-const LINE = { quiet: 1.5, high: 2 } as const;
+const LINE = { quiet: 2.5, high: 3 } as const;
 
 type AccountWeekRingProps = {
   /** The ring's radius in px, from the middle of the core it stands round. */
@@ -19,6 +17,11 @@ type AccountWeekRingProps = {
    * of its own, which the switcher is not drawn in): the ring is then a reading and nothing else.
    */
   pressable?: boolean;
+  /**
+   * Whether it draws its own line. Off where the core itself wears the week as a ring in orbit (the chat's): this is then the
+   * reading's name and its press, a clear band at the same radius.
+   */
+  drawn?: boolean;
   className?: string;
 };
 
@@ -34,27 +37,18 @@ type AccountWeekRingProps = {
  * barrel, by the chat module's `ChatCore` (outside the hairline that reads the context), the project-workspace module's `WorkspaceHome`
  * and the station module's `StationKaylee` (round Kaylee's core). It reads `AccountsProvider` and starts no read of its own.
  */
-export function AccountWeekRing({ radius, pressable = true, className }: AccountWeekRingProps) {
-  const { accounts, usage, switcher, toggleSwitcher } = useAccountsContext();
-  // A clock, not a read: it carries a week whose reset has just passed to the week that began there.
-  const now = useMinuteTick();
-  const reading = accountInUseUsage(usage, accounts, now);
-  const windows = reading !== null && reading.reachable && Array.isArray(reading.windows) ? reading.windows : [];
-  const week = windows.find((usageWindow) => usageWindow.key === 'seven_day') ?? null;
-  const percent = week === null ? null : windowPercent(week);
-  const tone = ringTone(percent);
-  const high = tone === 'warn' || tone === 'danger';
-  const inUse = accountInUse(accounts);
-  const owner = inUse?.email ?? inUse?.slug ?? null;
+export function AccountWeekRing({ radius, pressable = true, drawn = true, className }: AccountWeekRingProps) {
+  const { switcher, toggleSwitcher } = useAccountsContext();
+  const { percent, tone, words } = useAccountWeek();
+  const high = tone !== 'quiet';
 
   const side = 2 * (radius + REACH);
   const length = 2 * Math.PI * radius;
   const filled = percent === null ? 0 : Math.min(100, Math.max(0, percent)) / 100;
-  const words = `${owner === null ? 'Account' : `Account ${owner}`}. ${WINDOW_NAMES.seven_day} ${percent === null ? 'has no reading yet' : `${percent}%`}`;
 
-  const drawing = (
+  const drawing = drawn && (
     <svg aria-hidden="true" viewBox={`${-side / 2} ${-side / 2} ${side} ${side}`} className="pointer-events-none size-full -rotate-90">
-      <circle r={radius} fill="none" strokeWidth={1} style={{ stroke: 'var(--border)' }} />
+      <circle r={radius} fill="none" strokeWidth={1.5} style={{ stroke: 'var(--border)' }} />
       {percent !== null && (
         <circle
           r={radius}

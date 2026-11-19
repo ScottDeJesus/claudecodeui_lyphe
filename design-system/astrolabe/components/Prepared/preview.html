@@ -1,0 +1,33 @@
+<!-- @dsCard group="Companion" height=300 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Prepared — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Demo() {
+    var s = React.useState({ n: 0, st: 'holding' }), v = s[0];
+    /* even rounds: your word locks it. odd rounds: nobody answers, and it runs out */
+    React.useEffect(function () {
+      var id;
+      if (v.st === 'holding' && v.n % 2 === 0) id = setTimeout(function () { s[1]({ n: v.n, st: 'locked' }); }, 2800);
+      else if (v.st !== 'holding') id = setTimeout(function () { s[1]({ n: v.n + 1, st: 'holding' }); }, v.st === 'locked' ? 2600 : 1500);
+      return function () { clearTimeout(id); };
+    }, [v.n, v.st]);
+    return h('div', { style: { height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 0, paddingBottom: 8, boxSizing: 'border-box', overflow: 'hidden' } },
+      h('div', { style: { width: 'min(440px, calc(100% - 48px))', minHeight: 150, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' } },
+        h(A.Arrival, { when: v.st !== 'gone', from: 'core', spring: 'lobe' },
+          h(A.Prepared, { key: v.n, action: 'Queue', target: 'Roadmap \u00b7 Arrival physics', hold: 5200, state: v.st === 'locked' ? 'locked' : 'holding', words: 'queue it for tonight', via: 'spoken', at: '09:31', by: 'Kaylee',
+            onLock: function () { s[1]({ n: v.n, st: 'locked' }); }, onDismiss: function () { s[1]({ n: v.n, st: 'gone' }); }, onExpire: function () { s[1]({ n: v.n, st: 'gone' }); }, onTarget: function () {} },
+            'Queue the feature for tonight\u2019s run, after the migration.'))),
+      h('div', { style: { width: 96, height: 96, flex: 'none' } }, h(A.Core, { state: v.st === 'locked' ? 'listening' : 'idle', signal: 'demo' })));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

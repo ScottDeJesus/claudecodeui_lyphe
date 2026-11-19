@@ -1,0 +1,58 @@
+<!-- @dsCard group="Objects" height=470 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rings — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var CHATS = [
+    { id: 'sched', label: 'Scheduling', detail: 'Working', state: 'working' },
+    { id: 'uploads', label: 'Uploads', detail: 'Idle' },
+    { id: 'pm', label: 'PM flow', detail: 'Idle' },
+    { id: 'bugs', label: 'Bugfixes', detail: 'Idle' },
+    { id: 'backend', label: 'Backend', detail: 'Idle' },
+  ];
+  var RUNS = [
+    { id: 'scheduling', label: 'restorly-scheduling', detail: '14 / 26', progress: 14 / 26, state: 'working', steps: 26, agents: 2 },
+    { id: 'sweeps', label: 'api-sweeps', detail: 'Done · 9 / 9', state: 'done', steps: 9 },
+    { id: 'pmflow', label: 'pm-flow', detail: 'Waiting for your start', state: 'waiting', steps: 6 },
+    { id: 'nightly', label: 'nightly-4', detail: 'Done · 212 checks', state: 'done', steps: 9 },
+    { id: 'water', label: 'water-uploads', detail: 'Failed at 4 / 9', progress: 4 / 9, state: 'failed', steps: 9 },
+    { id: 'arrival', label: 'arrival-physics', detail: 'Not started', steps: 12 },
+  ];
+  var ROAD = ['Accounts', 'Jobs and visits', 'Technician profiles', 'Scheduling', 'Uploads', 'PM flow', 'Billing', 'Reports', 'Release candidate'].map(function (l, i) {
+    return { id: 'm' + (i + 1), label: l, detail: i < 3 ? 'Shipped' : i === 3 ? 'In progress' : 'Milestone ' + (i + 1), state: i < 3 ? 'done' : i === 3 ? 'working' : 'idle', progress: i === 3 ? 0.56 : 0 };
+  });
+  var STEP_NAMES = ['The account table', 'One writer for the lead flag', 'The sign-up sheet, fetched and read', 'Skills on the technician profile', 'Recommendations ranked by skill', 'The visit form picks from the ranking', 'Checks for the ranking', 'Notes for the scheduler', 'Release notes'];
+  function stepsOf(run) {
+    var n = run.steps || 9, done = Math.round((run.state === 'done' ? 1 : run.progress || 0) * n), out = [];
+    for (var i = 0; i < n; i++) out.push({ id: i, label: STEP_NAMES[i % STEP_NAMES.length], state: i < done ? 'done' : i > done ? 'next' : run.state === 'working' ? 'live' : run.state === 'failed' ? 'failed' : run.state === 'waiting' ? 'waiting' : 'next' });
+    return out;
+  }
+  var TONE = { working: ['Working', 'info'], waiting: ['Needs you', 'warn'], done: ['Done', 'positive'], failed: ['Failed', 'danger'] };
+  var RINGS = [{ id: 'chats', label: 'Chats', items: CHATS, defaultValue: 'sched' }, { id: 'runs', label: 'Runs', items: RUNS, defaultValue: 'scheduling' }, { id: 'road', label: 'Roadmap', items: ROAD, defaultValue: 'm4' }];
+  function Demo() {
+    var rings = React.useRef(null), o = React.useState(null), open = o[0], t = open && open.item ? TONE[open.item.state] : null, g = React.useState(0.58), used = Math.round(g[0] * 200);
+    React.useEffect(function () { var id = setInterval(function () { g[1](function (v) { return v >= 0.9 ? 0.58 : +(v + 0.04).toFixed(2); }); }, 1800); return function () { clearInterval(id); }; }, []);
+    return h('div', { style: { position: 'relative', height: 470, display: 'grid', placeItems: 'center' } },
+      h('div', { 'data-ast-keeps-opening': '', style: { width: 430, height: 430 } },
+        h(A.Rings, { ref: rings, rings: RINGS, hold: !!open, label: 'Workspace', gauge: [{ value: g[0], label: 'Context', detail: used + 'k of 200k' }, { value: 0.63, label: 'This week', detail: '63%', warn: 0.75, danger: 0.9 }],
+          onGauge: function (pt) { o[1](function (cur) { return cur && cur.gauge ? null : { gauge: true, point: pt }; }); },
+          onChange: function () { o[1](null); },
+          onOpen: function (item, ring) { o[1](function (cur) { return cur && cur.item && cur.item.id === item.id ? null : { item: item, ring: ring }; }); } },
+          h(A.Core, { state: 'idle', signal: 'demo' }))),
+      h(A.Opening, { key: open && open.gauge ? 'gauge' : 'mark', open: !!open, anchor: function () { return !open ? null : open.gauge ? open.point : rings.current ? rings.current.pointOf(open.ring.id, open.item.id) : null; }, onClose: function () { o[1](null); },
+        source: open ? (open.gauge ? 'Core' : open.ring.label) : '', title: open ? (open.gauge ? 'Context' : open.item.label) : '', status: open && open.gauge ? (g[0] >= 0.8 ? 'Running high' : undefined) : t ? t[0] : undefined, tone: open && open.gauge ? 'warn' : t ? t[1] : undefined },
+        open && open.gauge ? h(A.KeyValueList, { items: [['Used', used + 'k'], ['Window', '200k'], ['Compacts at', '180k']] }) : null,
+        open && open.ring && open.ring.id === 'runs' ? h(A.Track, { steps: stepsOf(open.item), label: open.item.label }) : null,
+        open && open.item ? h('p', { className: 'telemetry', style: { color: 'var(--ink-muted)', textTransform: 'uppercase' } }, open.item.detail + (open.item.agents ? ' \u00b7 ' + open.item.agents + ' helpers' : '')) : null));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

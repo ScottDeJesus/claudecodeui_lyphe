@@ -33,6 +33,12 @@
 .chat-column[data-chat-core-apart] .chat-composer-shell { padding-left: calc(1rem + 28px); }
 .chat-column[data-chat-core-apart] .chat-line__rail { position: absolute; right: 100%; bottom: 0; display: flex; width: 28px; }
 .chat-column[data-chat-core-apart] .chat-talk { max-width: calc(var(--chat-measure, 54.25rem) + 28px + 2rem); padding-left: calc(1rem + 28px); }
+/* THE SAME AIR AT BOTH SIDES. The talk and the line start 44 px in (the rail's 28 px and the column's 1rem); they end 44 px in too.
+ * The scroll bar stands 8 px clear of the surface's edge instead of on it, and the talk's own end is the rest of the 44 px less
+ * the bar (a thin one, about 10 px), so the words and the line still end together. */
+.chat-column[data-chat-core-apart] .chat-messages-pane { margin-right: 8px; scrollbar-width: thin; scrollbar-gutter: stable; }
+.chat-column[data-chat-core-apart] .chat-talk { padding-right: 26px; }
+.chat-column[data-chat-core-apart] .chat-composer-shell { padding-right: calc(1rem + 28px); }
 
 /* ---------- the core in its dock, and risen into its disc ----------
  * The dock keeps the core's place beside the line. Everything the core is made of hangs on one point at the dock's middle
@@ -95,12 +101,12 @@
 .core-rings .core-ring[data-ring-held] { cursor: grabbing; }
 .core-ring__turn { transition: transform var(--duration-lock) var(--ease-lock); }
 .core-ring__turn--held { transition: none; }
-.core-ring__band { fill: none; stroke: transparent; stroke-width: 26px; pointer-events: stroke; }
-.core-ring__track { fill: none; stroke: var(--border-strong); stroke-width: 1px; opacity: 0.55; pointer-events: none; }
-.core-ring__lit { fill: none; stroke: var(--core-ink); stroke-width: 2px; pointer-events: none; transition: stroke-dasharray var(--dur-move) var(--ease-enter), stroke var(--dur-move) ease; }
+.core-ring__band { fill: none; stroke: transparent; stroke-width: 30px; pointer-events: stroke; }
+.core-ring__track { fill: none; stroke: var(--border-strong); stroke-width: 2.5px; opacity: 0.55; pointer-events: none; }
+.core-ring__lit { fill: none; stroke: var(--core-ink); stroke-width: 4px; pointer-events: none; transition: stroke-dasharray var(--dur-move) var(--ease-enter), stroke var(--dur-move) ease; }
 .core-ring[data-chat-ring='effort'] .core-ring__lit { stroke: color-mix(in oklab, var(--core-ink) 55%, var(--ink-strong)); }
-.core-ring__mark { stroke: var(--ink-muted); stroke-width: 1px; pointer-events: none; }
-.core-ring__mark--at { stroke: var(--ink-strong); stroke-width: 1.5px; }
+.core-ring__mark { stroke: var(--ink-muted); stroke-width: 1.5px; pointer-events: none; }
+.core-ring__mark--at { stroke: var(--ink-strong); stroke-width: 2.5px; }
 .core-ring__stop { fill: transparent; pointer-events: all; }
 /* A ring under the pointer shows its line whole; a ring that holds the keys shows the band it is taken hold of by. */
 .core-ring:hover .core-ring__track,
@@ -131,4 +137,143 @@
 .core-rings__plate[data-turning] { border-color: var(--core-ink); color: var(--ink-strong); }
 @media (prefers-reduced-motion: reduce) {
   .core-ring__turn { transition-duration: var(--duration-fade); transition-timing-function: ease; }
+}
+
+/* ---------- the chat's helpers ----------
+ * A dot for each subagent, on an arc over the core (`CoreHelperDots`). The layer is a point at the core's middle; each dot is
+ * placed from it. A dot's ink is its model's material, as a ring's is its chat's. */
+.core-helpers { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2; }
+.core-helper {
+  --helper-ink: var(--ink-strong);
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  outline: none;
+  cursor: pointer;
+}
+.core-helper[data-material='tube'] { --helper-ink: var(--tube); }
+.core-helper[data-material='wire'] { --helper-ink: var(--wire); }
+.core-helper[data-material='plasma'] { --helper-ink: var(--plasma); }
+.core-helper__dot {
+  position: relative;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--helper-ink);
+  /* A lit body, not a flat dot: a highlight toward the light, its own ink, and a darker far side. */
+  background: radial-gradient(circle at 34% 30%, color-mix(in oklab, var(--helper-ink) 30%, white) 0 16%, var(--helper-ink) 56%, color-mix(in oklab, var(--helper-ink) 60%, black) 100%);
+  transition: transform var(--dur-quick) var(--ease-enter), background-color var(--duration-fade) ease;
+}
+/* ITS OWN RING IN ORBIT: laid nearly flat and leaned, as the core's gauges are, with a bead that travels it, behind the body over
+   the far half and in front of it over the near half (the bead's layer steps as it passes the ring's two ends). How fast the bead
+   goes is what the helper is doing (`data-doing`). */
+.core-helper__orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 19px;
+  height: 19px;
+  margin: -9.5px 0 0 -9.5px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in oklab, var(--helper-ink) 42%, transparent);
+  transform: rotate(-24deg) scaleY(0.38);
+  pointer-events: none;
+}
+/* The bead: not a child of the flattened ring, so it stays round. It rides the same ellipse as a path in the button's own box. */
+.core-helper::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--helper-ink) 40%, white);
+  offset-path: path('M -0.68 11.86 A 9.5 3.6 -24 1 1 16.68 4.14 A 9.5 3.6 -24 1 1 -0.68 11.86');
+  offset-rotate: 0deg;
+  pointer-events: none;
+  animation: core-helper-orbit var(--helper-turn, 3.2s) linear infinite;
+  /* Each a little further round than the one before it, so no two beads keep step. */
+  animation-delay: calc(var(--i, 0) * -0.53s);
+}
+.core-helper[data-doing='reading'] { --helper-turn: 2s; }
+.core-helper[data-doing='writing'] { --helper-turn: 1.4s; }
+.core-helper[data-doing='speaking'] { --helper-turn: 1s; }
+/* At work the body is lit and breathes; reaching (a change, an agent sent on) and answering it flares instead. Held back it is
+   pale and its bead stands still. Ended, it is a ring with no orbit: its own ink when it finished, the danger ink when it failed,
+   the warn ink when it was stopped. */
+.core-helper[data-core-helper='running'] .core-helper__dot {
+  box-shadow: 0 0 7px color-mix(in oklab, var(--helper-ink) 55%, transparent);
+  animation: core-helper-breathe 2.4s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -0.37s);
+}
+.core-helper[data-doing='reading'] .core-helper__dot { animation-duration: 1.6s; }
+.core-helper[data-doing='writing'] .core-helper__dot,
+.core-helper[data-doing='speaking'] .core-helper__dot { animation-name: core-helper-flare; animation-duration: 1.2s; }
+.core-helper[data-doing='speaking'] .core-helper__dot { animation-duration: 0.7s; }
+.core-helper[data-core-helper='held'] { opacity: 0.5; }
+.core-helper[data-core-helper='held']::before { animation-play-state: paused; }
+.core-helper[data-core-helper='finished'] .core-helper__dot,
+.core-helper[data-core-helper='failed'] .core-helper__dot,
+.core-helper[data-core-helper='stopped'] .core-helper__dot { background: transparent; }
+.core-helper[data-core-helper='finished'] .core-helper__orbit,
+.core-helper[data-core-helper='failed'] .core-helper__orbit,
+.core-helper[data-core-helper='stopped'] .core-helper__orbit,
+.core-helper[data-core-helper='finished']::before,
+.core-helper[data-core-helper='failed']::before,
+.core-helper[data-core-helper='stopped']::before,
+.core-helper--more::before { display: none; }
+.core-helper[data-core-helper='failed'] .core-helper__dot { border-color: var(--danger-ink); }
+.core-helper[data-core-helper='stopped'] .core-helper__dot { border-color: var(--warn-ink); }
+.core-helper:hover .core-helper__dot,
+.core-helper:focus-visible .core-helper__dot,
+.core-helper[data-picked] .core-helper__dot { transform: scale(1.35); }
+.core-helper:focus-visible,
+.core-helper[data-picked] { box-shadow: 0 0 0 1px var(--helper-ink); }
+.core-helper--more { width: auto; min-width: 16px; padding: 0 3px; font: 500 10px/16px var(--font-mono); color: var(--ink-muted); }
+.core-helper--more:hover, .core-helper--more:focus-visible { color: var(--ink-strong); }
+/* The arc sways a little round the core while any helper works, and holds still under a pointer or the keyboard. */
+.core-helpers[data-working] { animation: core-helpers-sway 11s ease-in-out infinite; }
+.core-helpers:hover, .core-helpers:focus-within { animation-play-state: paused; }
+/* Sent out: from the core's middle to its place. */
+.core-helper--out { animation: core-helper-out 520ms var(--ease-lock) both; }
+@keyframes core-helper-out {
+  from { transform: translate(calc(-50% - var(--hx)), calc(-50% - var(--hy))) scale(0.2); opacity: 0.2; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+@keyframes core-helper-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.8); }
+}
+@keyframes core-helper-flare {
+  0%, 100% { transform: scale(0.92); box-shadow: 0 0 4px color-mix(in oklab, var(--helper-ink) 45%, transparent); }
+  50% { transform: scale(1.12); box-shadow: 0 0 11px color-mix(in oklab, var(--helper-ink) 80%, transparent); }
+}
+/* The far half first (behind the body), then the near half (in front of it). */
+@keyframes core-helper-orbit {
+  0% { offset-distance: 0%; z-index: 0; opacity: 0.55; }
+  49.9% { z-index: 0; opacity: 0.55; }
+  50% { offset-distance: 50%; z-index: 2; opacity: 1; }
+  99.9% { z-index: 2; opacity: 1; }
+  100% { offset-distance: 100%; z-index: 0; opacity: 0.55; }
+}
+@keyframes core-helpers-sway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+/* Under a finger a dot's press is as wide as its pitch allows and reaches outward, away from the core's own press. */
+@media (hover: none) and (pointer: coarse) {
+  .core-helper::after { content: ''; position: absolute; inset: -8px -0px; border-radius: 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .core-helper--out, .core-helper[data-core-helper='running'] .core-helper__dot, .core-helper::before, .core-helpers[data-working] { animation: none; }
+}
+/* Beside the line, where the rail of turns stands over the core, the rail starts above the helpers' arc. */
+@container chat (min-width: 44rem) {
+  .chat-column:not([data-chat-core-apart]) .chat-line:has([data-core-helpers]) .chat-line__rail { bottom: calc(50% + 62px); }
 }

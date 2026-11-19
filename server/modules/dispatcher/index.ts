@@ -10,3 +10,8 @@ export type { DispatcherPicture } from './dispatcher-state.service.js';
 // DispatcherCardText: used by the companion's house (`house.ts`, as `HouseText`) for what `createDispatcherModule().cardText`
 // answers — a card's design text whole, or the dispatcher's own first line.
 export type { DispatcherCardText } from './dispatcher-card-text.service.js';
+// runDispatcherCommand, firstLine and their types: used by the board-dispatch module (`server/modules/kanban-dispatch/`), which
+// runs `dispatcher card told|notes|applied|config` through the same subprocess transport the ask lane runs `dispatcher ask` with —
+// argv only, stdin fed, the home directory as cwd, never a throw.
+export { firstLine, runDispatcherCommand } from './dispatcher-ask.transport.js';
+export type { CommandDependencies, DispatcherCommandResult } from './dispatcher-ask.transport.js';

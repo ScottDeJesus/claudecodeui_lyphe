@@ -1,16 +1,16 @@
 import { useTranslation } from 'react-i18next';
 
-import { useCoalescedCall } from '@/modules/upload-runs/hooks/useCoalescedCall';
 import { useHealSessions } from '@/modules/upload-runs/hooks/useHealSessions';
 import { useHealSignature } from '@/modules/upload-runs/hooks/useHealSignature';
 import { useRunEvents } from '@/modules/upload-runs/hooks/useRunEvents';
-import { useFeedEvents } from '@/modules/upload-runs/hooks/useRunsFeed';
 import type { RunsFeed } from '@/modules/upload-runs/hooks/useRunsFeed';
 import { useRunStream } from '@/modules/upload-runs/hooks/useRunStream';
 import { sessionIdsOf } from '@/modules/upload-runs/utils/healAnswer';
 import type { RunSheetRead } from '@/modules/upload-runs/utils/uploadsModel';
 import { troubleSentence } from '@/modules/upload-runs/utils/uploadsWords';
 import { api } from '@/shared/api';
+import { useCoalescedCall } from '@/shared/hooks/useCoalescedCall';
+import { useFeedEvents } from '@/shared/hooks/useEventFeed';
 import { useLaneRead } from '@/shared/hooks/useLaneRead';
 import type { UploadRunWhole } from '@/shared/upload-runs-types';
 

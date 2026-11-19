@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { DrawerDecisions } from '@/modules/kanban/card-drawer/DrawerDecisions';
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
 import type { KanbanCardDetail, KanbanQuestion } from '@/shared/kanban-types';
 import { Badge, Button, Chip, Input } from '@/shared/ui';
@@ -8,10 +9,12 @@ import { Badge, Button, Chip, Input } from '@/shared/ui';
 /**
  * WHAT THE RUN IS WAITING TO BE TOLD, and the one control that unblocks it.
  *
- * THIS IS THE SECTION THAT UNLOCKS APPROVAL. A card cannot be approved while anybody is still
- * waiting on an answer, so the count at the top of this section is the same number the approve
- * control reads further down — one truth, `answered = 0`, spelled in two places that cannot
- * disagree because both come off the one fetch.
+ * AN ANSWER IS WHAT SENDS THE CARD BACK OUT. A walk that stops to ask leaves its card in Open
+ * questions, and it is taken up again the moment no question on it is left open — so the count at
+ * the top of this section is how many answers stand between this card and its next step.
+ *
+ * UNDER THE QUESTIONS, THE DECISIONS TAKEN WITHOUT ASKING (`DrawerDecisions`), newest first: the
+ * choices that were obvious enough not to stop for, on record where the ones that did stop are.
  *
  * UNANSWERED IS THE LOUD STATE. An open question is amber and never red: nothing is broken, a
  * decision is simply owed. Answered rows keep their place and go quiet — they are the record of
@@ -63,6 +66,8 @@ export function DrawerQuestions({ detail, writes }: DrawerQuestionsProps) {
           ))}
         </ul>
       )}
+
+      <DrawerDecisions detail={detail} />
     </section>
   );
 }
@@ -85,9 +90,13 @@ function QuestionRow({
 
   const [selected, setSelected] = useState<string[]>(question.selected);
   const [other, setOther] = useState(question.other);
-  // Seeded from the question's own text rather than from `otherOn`: `otherOn` says the asker
-  // ALLOWED a free answer, this says the reader is giving one.
-  const [usingOther, setUsingOther] = useState(question.other.trim().length > 0);
+  // A question that offers nothing to pick ("What are the exact steps?") is answered in the
+  // reader's own words and no other way: its field stands open, and there is no "Something else"
+  // to press, because there is nothing for it to be other than.
+  const freeOnly = question.otherOn && question.options.length === 0;
+  // Otherwise seeded from the question's own text rather than from `otherOn`: `otherOn` says the
+  // asker ALLOWED a free answer, this says the reader is giving one.
+  const [usingOther, setUsingOther] = useState(freeOnly || question.other.trim().length > 0);
   const [changing, setChanging] = useState(false);
 
   /** Single-select replaces, multi toggles. View state only — nothing is sent from here. */
@@ -134,7 +143,7 @@ function QuestionRow({
             <p className="text-xs text-muted-foreground">{t('kanban.questions.multiHint')}</p>
           )}
 
-          <div className="flex flex-wrap gap-2" role="group" aria-label={question.text}>
+          <div className={`flex flex-wrap gap-2${freeOnly ? ' hidden' : ''}`} role="group" aria-label={question.text}>
             {question.options.map((option) => (
               <Chip
                 key={option}
@@ -148,7 +157,7 @@ function QuestionRow({
 
             {/* Offered only when the asker allowed it. A free-text answer nobody asked for is a
                 decision recorded in a vocabulary the run cannot read. */}
-            {question.otherOn && (
+            {question.otherOn && !freeOnly && (
               <Chip
                 size="sm"
                 selected={usingOther}
@@ -165,7 +174,8 @@ function QuestionRow({
               value={other}
               onChange={(event) => setOther(event.target.value)}
               placeholder={t('kanban.questions.otherPlaceholder')}
-              aria-label={t('kanban.questions.other')}
+              // With nothing else to pick, the field IS the question's answer and is named for it.
+              aria-label={freeOnly ? question.text : t('kanban.questions.other')}
               className="h-8"
             />
           )}
@@ -181,7 +191,7 @@ function QuestionRow({
                   // opens what is stored rather than the draft the reader walked away from.
                   setSelected(question.selected);
                   setOther(question.other);
-                  setUsingOther(question.other.trim().length > 0);
+                  setUsingOther(freeOnly || question.other.trim().length > 0);
                   setChanging(false);
                 }}
               >

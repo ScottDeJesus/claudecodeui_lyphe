@@ -4,7 +4,11 @@
 // archive, restore, tags, questions and their answers, issues, checklist, attachments, approval
 // and the two leases, and the lessons: the staged corpus, its by-id read and the two reviews.
 export { createKanbanModule } from './kanban.module.js';
-// The seven verb surfaces, exported so an in-process caller names a service once instead of
+// The write-listener seam: `onKanbanWrite(listener)` is told of every committed board write, after its commit and
+// beside its frame, and returns the unsubscribe. It is how the board-dispatch module hears a card created or moved
+// without the board importing it.
+export { onKanbanWrite, type KanbanWriteEvent } from './kanban-write.service.js';
+// The eight verb surfaces, exported so an in-process caller names a service once instead of
 // reaching into its file. Their own consumers today are the routes, which import the files. Each
 // service lands here as its phase does, so the barrel never drifts a phase behind the module.
 // The MCP program is NOT an in-process caller: it is a leaf that reaches the board over HTTP
@@ -23,3 +27,7 @@ export { kanbanLeasesService } from './kanban-leases.service.js';
 // both mounts and refused at the child's door (`kanbanMetisSecretGuard`), never here.
 export { kanbanLessonsService } from './kanban-lessons.service.js';
 export { kanbanQuestionsService } from './kanban-questions.service.js';
+// The board's roster: every card of one board, archived and done ones included, read whole for the board-dispatch
+// module, which answers the dispatcher's `board` note with it.
+export { kanbanRosterService } from './kanban-roster.service.js';
+export type { KanbanRosterCard } from '@/modules/database/index.js';

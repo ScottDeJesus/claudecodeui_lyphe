@@ -1,0 +1,32 @@
+<!-- @dsCard group="Places" height=420 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Summon — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var ALL = [
+    { id: 1, source: 'Chat', label: 'Bugfixes', hint: 'asks you' },
+    { id: 2, source: 'Run', label: 'nightly-4 \u00b7 212 checks', hint: '09:12' },
+    { id: 3, source: 'Roadmap', label: 'Arrival physics', hint: 'queued' },
+    { id: 4, source: 'File', label: 'src/upload/upload.test.ts' },
+    { id: 5, source: 'History', label: 'Everything since this morning' },
+    { id: 6, source: 'Settings', label: 'Core material' },
+  ];
+  var SCRIPT = ['', 'u', 'up', 'upl', 'uplo', 'upload', 'upload', 'upload', '', '', 'r', 'ru', 'run', 'run', 'run'];
+  function Demo() {
+    var s = React.useState(0), i = s[0];
+    React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % SCRIPT.length; }); }, 420); return function () { clearInterval(id); }; }, []);
+    var q = SCRIPT[i], items = ALL.filter(function (it) { return !q || (it.source + ' ' + it.label).toLowerCase().indexOf(q) >= 0; });
+    return h('div', { style: { height: 420, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 24px 28px', boxSizing: 'border-box' } },
+      h(A.Summon, { open: true, query: q, onQuery: function () {}, items: q ? items : ALL.slice(0, 4), by: 'Kaylee', onPick: function () {}, onClose: function () {} }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

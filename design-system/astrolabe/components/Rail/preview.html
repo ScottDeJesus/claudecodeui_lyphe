@@ -1,0 +1,22 @@
+<!-- @dsCard group="Objects" height=250 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rail — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var h = React.createElement, A = window.Astrolabe;
+  function Demo() {
+    var s = React.useState(6), items = [{ id: 1, kind: 'you', label: 'Pick up Reminders where we left off.' }, { id: 2, kind: 'reply', label: 'The first pass is in.' }, { id: 3, kind: 'you', label: 'Close the two edge cases.' }, { id: 4, kind: 'reply', label: 'Both edge cases are closed.' }, { id: 5, kind: 'break' }, { id: 6, kind: 'you', label: 'Add refunds.' }, { id: 7, kind: 'reply', label: 'Refunds need one decision before I go on.', tone: 'accent' }];
+    var cur = items.filter(function (x) { return x.id === s[0]; })[0];
+    return h('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 20, height: 190, padding: '30px 40px' } }, h(A.Rail, { items: items, at: s[0], onGo: s[1], style: { height: '100%' } }), h('p', { className: 'field-text', style: { margin: 0, color: 'var(--ink-quiet)' } }, cur.label));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

@@ -3,20 +3,19 @@ import type { ReactNode, Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useStepPhrase } from '@/modules/roadmap/hooks/useStepPhrase';
+import { StackAct } from '@/modules/roadmap/stack/StackAct';
 import { createStackPainter } from '@/modules/roadmap/utils/stackPainter';
-import { ROADMAP_FEATURE_WORD_KEYS, ROADMAP_MILESTONE_WORD_KEYS } from '@/shared/constants';
-import type { Roadmap } from '@/shared/roadmap-types';
+import { ROADMAP_FEATURE_WORD_KEYS } from '@/shared/constants';
 import type { RoadmapStackHandle, RoadmapStackRest, RoadmapStackTarget, RoadmapStackTier, RoadmapStackWall } from '@/shared/types';
 import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { cn } from '@/shared/utils';
 
 type RoadmapStackProps = {
-  roadmap: Roadmap;
-  /** The roadmap laid out (`layoutStack`): one ring per milestone. */
+  /** What is in flight, laid out (`layoutStack`): its one ring. */
   tiers: RoadmapStackTier[];
-  /** The ring a first picture opens on (`arrivalTier`). */
+  /** The ring a first picture opens on: the first, there being one ring. */
   arrival: number;
-  /** The card that is open, so the stack can hang it from its wall or its thread; `null` for none. */
+  /** The card that is open, so the stack can hang it from its wall; `null` for none. */
   open: RoadmapStackTarget | null;
   /** A press that opens a card, or `null` for a press that opens nothing (which closes the one that is open). */
   onOpen: (target: RoadmapStackTarget | null) => void;
@@ -64,11 +63,11 @@ function groundBehind(element: HTMLElement): string {
 
 const EYEBROW = 'text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground';
 
-/** One line of the reading: it never wraps, so the three lines keep the room the painter leaves them; the card says a long title whole. */
+/** One line of the reading: it never wraps, so the lines keep the room the painter leaves them; the card says a long title whole. */
 const LINE = 'block max-w-full truncate';
 
-/** The facing wall in words: where it lives, its title, and where it stands, in the roadmap's own words. */
-function WallReading({ tier, wall }: { tier: RoadmapStackTier; wall: RoadmapStackWall }) {
+/** The facing wall in words: its title, then the project it belongs to (the ring holds every project's) and where it stands, in the roadmap's own words. */
+function WallReading({ wall }: { wall: RoadmapStackWall }) {
   const { t } = useTranslation();
   const { feature } = wall;
   const phrase = useStepPhrase(feature);
@@ -76,10 +75,10 @@ function WallReading({ tier, wall }: { tier: RoadmapStackTier; wall: RoadmapStac
   const tone = wall.tone === 'danger' ? 'danger' : wall.tone === 'warn' ? 'warn' : wall.unseen ? 'positive' : null;
   return (
     <>
-      <span className={cn(EYEBROW, LINE)}>{`${tier.n} · ${tier.milestone.title} › ${wall.epic.title}`}</span>
       <span className={cn('font-mono text-sm uppercase tracking-wide text-foreground', LINE)}>{feature.title}</span>
       <span data-tone={tone ?? undefined} data-roadmap-stack-words className={cn(EYEBROW, LINE, tone !== null && 'text-tone-ink')}>
         {[
+          feature.project || null,
           t('roadmap.stateLine', { word: t(ROADMAP_FEATURE_WORD_KEYS[feature.word]), phrase }),
           feature.tasks.length > 0 ? t('roadmap.panel.tasksDone', { done, count: feature.tasks.length }) : null,
         ].filter(Boolean).join(' · ')}
@@ -88,35 +87,17 @@ function WallReading({ tier, wall }: { tier: RoadmapStackTier; wall: RoadmapStac
   );
 }
 
-/** A ring he is pointing at, or has chosen with a first tap, in words: its place, its title, and how it stands. */
-function TierReading({ roadmap, tier }: { roadmap: Roadmap; tier: RoadmapStackTier }) {
-  const { t } = useTranslation();
-  const { milestone } = tier;
-  const asks = tier.walls.some((wall) => wall.attention >= 2);
-  const word = t(ROADMAP_MILESTONE_WORD_KEYS[milestone.word]);
-  return (
-    <>
-      <span className={cn(EYEBROW, LINE)}>{roadmap.title}</span>
-      <span className={cn('font-mono text-sm uppercase tracking-wide text-foreground', LINE)}>{`${tier.n} · ${milestone.title}`}</span>
-      <span data-tone={asks ? 'warn' : undefined} data-roadmap-stack-words className={cn(EYEBROW, LINE, asks && 'text-tone-ink')}>
-        {t('roadmap.tree.milestoneLine', { shipped: milestone.standing.shipped, count: milestone.standing.features, word })}
-      </span>
-    </>
-  );
-}
-
 /**
- * THE ROADMAP AS A STACK, on its canvas: one ring per milestone, the one in front standing open with a wall for each of
- * its features, what is reached closed under it and what is to come hanging over it (`utils/stackPainter` says how each
- * is drawn). Under it, in words, is what faces the pointer — or the ring being pointed at.
+ * WHAT IS IN FLIGHT AS ONE RING, on its canvas: a wall on its rim for each plan that is finished and not yet dismissed, being
+ * built, or held (`utils/stackLayout` says which, `utils/stackPainter` how each is drawn), whichever project it belongs to.
+ * Under it, in words, is the wall that faces the pointer, and what that wall offers (`StackAct`): to start it, queue it,
+ * hold it or put it away, by the plan card's own presses.
  *
- * IT TURNS AND IT IS WALKED. A drag, a flick, the wheel or the left and right keys turn the ring in front; a press on a
- * wall brings it round, and a press on the wall that already faces opens its card. Up and down, or a press on a band
- * below or a hoop above, change the ring in front; under a finger the first press on another ring only chooses it and
- * the second goes. Space goes to the next thing that asks for the operator.
+ * IT TURNS. A drag, a flick, the wheel or the left and right keys turn the ring; a press on a wall brings it round, and a
+ * press on the wall that already faces opens its card. Space goes to the next thing that asks for the operator.
  *
  * THE OPEN CARD HANGS FROM WHAT IT IS ABOUT. The owner draws the card (`card`); this places it each frame over the wall
- * or the thread it belongs to, inside the stack's own box, and at the foot of the box where the box is too narrow for
+ * it belongs to, inside the stack's own box, and at the foot of the box where the box is too narrow for
  * a card beside anything. No second panel, and nothing is dimmed. Turning the stack puts the card away.
  *
  * It is one focusable thing: a slider whose value is the wall in front, said as its words.
@@ -128,7 +109,7 @@ function TierReading({ roadmap, tier }: { roadmap: Roadmap; tier: RoadmapStackTi
  *
  * Used by `stack/StackOf`, for the Roadmap tab's Stack face and the sessions home's circle.
  */
-export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, handleRef, rest, standing = false, onStand, restLabel, arriveFrom, arrivals = 0, returns = 0 }: RoadmapStackProps) {
+export function RoadmapStack({ tiers, arrival, open, onOpen, card, handleRef, rest, standing = false, onStand, restLabel, arriveFrom, arrivals = 0, returns = 0 }: RoadmapStackProps) {
   const { t } = useTranslation();
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -293,12 +274,11 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
 
   const tier = tiers[reading.tier];
   const facing = tier?.walls.find((wall) => wall.feature.name === reading.facing) ?? null;
-  const pointed = reading.shown >= 0 ? tiers[reading.shown] ?? null : null;
 
   return (
     <div
       ref={boxRef}
-      data-roadmap-stack={tier?.milestone.name ?? ''}
+      data-roadmap-stack={tier?.name ?? ''}
       data-roadmap-stack-form={up ? 'standing' : 'small'}
       className={cn('relative h-full min-h-0 w-full overflow-hidden', !up && 'pointer-events-none')}
     >
@@ -316,7 +296,7 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
               'aria-valuemin': 1,
               'aria-valuemax': Math.max(1, tier?.walls.length ?? 1),
               'aria-valuenow': facing && tier ? tier.walls.indexOf(facing) + 1 : 1,
-              'aria-valuetext': facing && tier ? t('roadmap.stack.value', { feature: facing.feature.title, epic: facing.epic.title, n: tier.n, milestone: tier.milestone.title }) : undefined,
+              'aria-valuetext': facing ? facing.feature.title : undefined,
             }
           : { tabIndex: -1, 'aria-hidden': true })}
         data-roadmap-stack-facing={reading.facing ?? ''}
@@ -354,17 +334,25 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
         }}
       />
 
-      {/* What faces the pointer, in words; or the ring he is pointing at. Hidden from assistive tech: the slider's value says it. */}
+      {/* What faces the pointer, in words, and its one press under them. The words are hidden from assistive tech: the slider's value says them. */}
       {tier && (
         <div
           ref={readingRef}
-          aria-hidden="true"
           data-roadmap-stack-reading
-          // Three lines, where it is, what it is and how it stands; put away while a card is open, which says all three.
+          // Two lines, what it is and how it stands, then its presses; put away while a card is open, which says and offers all of it.
           className={cn('pointer-events-none absolute inset-x-0 flex flex-col items-center gap-0.5 px-4 text-center', open !== null && 'invisible')}
           style={{ top: reading.top }}
         >
-          {pointed ? <TierReading roadmap={roadmap} tier={pointed} /> : facing ? <WallReading tier={tier} wall={facing} /> : null}
+          <div aria-hidden="true" className="flex max-w-full flex-col items-center gap-0.5">
+            {facing
+              ? <WallReading wall={facing} />
+              : tier.walls.length === 0 && <span data-roadmap-stack-empty className={cn(EYEBROW, LINE)}>{t('roadmap.stack.empty')}</span>}
+          </div>
+          {facing && up && (
+            <div className="mt-1.5 flex min-h-8 items-center justify-center">
+              <StackAct key={facing.feature.name} wall={facing} onOpen={() => onOpen({ kind: 'feature', name: facing.feature.name })} />
+            </div>
+          )}
         </div>
       )}
 

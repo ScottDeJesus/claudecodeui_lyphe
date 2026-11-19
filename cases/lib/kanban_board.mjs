@@ -1,0 +1,141 @@
+// kanban_board.mjs — the Kanban board on a signed-in page, over one made-up self-running board that only this page sees.
+//
+// Usage (cases/shell/<name>.mjs):
+//   import { openBoard, CARDS, faceOf } from "../lib/kanban_board.mjs";
+//   const page = await withPage(t, { viewport });
+//   const { requests } = await openBoard(page);          // every /api/kanban* answer is this file's; the tab is the board
+//   await faceOf(page, CARDS.bug.id).waitFor();
+//
+// EVERY BOARD REQUEST IS ANSWERED HERE AND NOTHING REACHES THE SERVER: `/api/kanban/…`, `/api/kanban-metis/…` and
+// `/api/kanban-dispatch/…`, reads and writes alike. A read gets this file's board; a write gets `{}` and is counted in
+// `requests`, so a case can say a press wrote nothing. The live board, its cards and its database are never touched.
+//
+// THE BOARD is one board with autonomy on and one repo, holding one card per lane and one card per flow tag, and the
+// four link tags a walk writes (`from:`, `duplicate-of:`, `related:`, `regression-of:`), each naming another card of it
+// by id. The vitals are five distinct numbers, so a register drawn from the wrong key reads the wrong number.
+
+const WAIT_MS = 30000;
+// Read off src/ and the live page 2026-11-18: the rail's Kanban view, the home's Menu and its Kanban entry.
+const RAIL_KANBAN = 'nav[aria-label="Views"] button[aria-label="Kanban"]';
+const HOME_MENU = 'button[aria-label="Menu"]';
+const MENU_ENTRY = ':is([role="menu"], [role="dialog"]) :is(button, [role="menuitem"])';
+const KANBAN = /\/api\/kanban(-metis|-dispatch)?(\/|$|\?)/;
+const AT = "2026-11-18T12:00:00.000Z";
+
+export const BOARD = {
+  id: "case-board-0001", name: "Case board", projectId: null, autonomy: true, deepseekFlash: false, concurrency: 1,
+  repos: ["/home/lyphe/.claude"], sortOrder: 0, archived: false, createdAt: AT, updatedAt: AT,
+};
+
+/** The vitals, one number per register, all different: building 1, answer 2, queued 3, lessons 4, memories 5. */
+export const VITALS = { building: 1, awaitingAnswer: 2, queued: 3, lessonsPendingEstate: 4, memoryPendingEstate: 5 };
+
+const card = (id, title, status, tags, extra = {}) => ({
+  id, boardId: BOARD.id, title, status, priority: "medium", sortOrder: 0, tags,
+  openQuestions: 0, openIssues: 0, checklistDone: 1, checklistTotal: 3, buildTokens: 0,
+  approved: false, archived: false, buildLeaseAt: null, buildOwner: null, planLeaseAt: null, planOwner: null,
+  leaseState: "none", createdAt: AT, updatedAt: AT, ...extra,
+});
+
+/** The cards, by role. Ids are opaque on purpose: no word a reader should see is spelled in one. */
+export const CARDS = {
+  linked: card("case-card-7f3a", "Sweep refuses the path I gave", "not_ready", []),
+  bug: card("case-card-21c9", "Hint says its repo path", "todo", ["bug", "duplicate-of:case-card-7f3a"]),
+  change: card("case-card-5d02", "Only show five decisions", "active", ["ui-change", "related:case-card-7f3a"]),
+  tweak: card("case-card-9b14", "Rename the autonomy switch", "done", ["tweak", "from:case-card-7f3a"]),
+  regress: card("case-card-0e61", "The hint came back", "questions", ["bug", "regression-of:case-card-7f3a"], { openQuestions: 1 }),
+};
+
+/** The root-cause step's note: three lines, each a report line as the diagnosis writes it. */
+export const NOTE_LINES = [
+  "SAME CAUSE: the sweep's path check — 2 places",
+  "SIMILAR CARDS: open cards naming the hint — 1 card",
+  "BEFORE: done cards of the cases area — nothing similar",
+];
+
+/** The open card's detail: the summary and a ledger that would light every control the drawer ever drew. */
+export function detailOf(summary) {
+  return {
+    ...summary,
+    description: "The hint says its repo path where it means an absolute one.", body: "", plan: "Fix the hint.",
+    closingRemarks: "", approvedAt: null,
+    buildTokensIn: 1200, buildTokensOut: 340, buildTokensCacheRead: 9000, buildTokensCacheCreate: 450,
+    questions: [], issues: [], decisions: [], attachments: [],
+    checklist: [
+      { id: `${summary.id}-s1`, cardId: summary.id, text: "Sort", state: "done", sortOrder: 0, note: "bug — Jev, 0.93 sure", createdAt: AT, doneAt: AT },
+      { id: `${summary.id}-s2`, cardId: summary.id, text: "Confirm the bug and find the root cause", state: "done", sortOrder: 1,
+        note: NOTE_LINES.join("\n"), createdAt: AT, doneAt: AT },
+      { id: `${summary.id}-s3`, cardId: summary.id, text: "Fix", state: "active", sortOrder: 2, note: "", createdAt: AT, doneAt: null },
+    ],
+  };
+}
+
+const all = () => Object.values(CARDS);
+const json = (body, status = 200) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
+
+function answer(url, method) {
+  const { pathname, searchParams } = new URL(url);
+  if (method !== "GET") return {};
+  if (pathname === "/api/kanban/boards") return { boards: [BOARD], currentBoardId: BOARD.id };
+  if (/^\/api\/kanban\/projects\/[^/]+\/board$/.test(pathname)) return { board: BOARD };
+  if (pathname === `/api/kanban/boards/${BOARD.id}/lanes`) {
+    const totals = new Map();
+    for (const c of all()) totals.set(c.status, (totals.get(c.status) ?? 0) + 1);
+    return { lanes: [...totals].map(([status, total]) => ({ status, total })) };
+  }
+  if (pathname === `/api/kanban/boards/${BOARD.id}/vitals`) return { vitals: VITALS };
+  if (pathname === `/api/kanban/boards/${BOARD.id}/cards`) {
+    const statuses = (searchParams.get("status") ?? "").split(",");
+    return { cards: all().filter((c) => statuses.includes(c.status)), nextCursor: null };
+  }
+  const one = pathname.match(/^\/api\/kanban\/cards\/([^/]+)$/);
+  if (one) {
+    const found = all().find((c) => c.id === decodeURIComponent(one[1]));
+    return found ? { card: detailOf(found) } : null;
+  }
+  if (pathname === "/api/kanban-metis/sessions") return { sessions: [] };
+  if (/\/driver$/.test(pathname)) return { concurrency: 1, concurrencyMax: 4 };
+  if (pathname.startsWith("/api/kanban/lessons")) return { lessons: [] };
+  if (pathname.startsWith("/api/kanban/events")) return { events: [], nextCursor: null };
+  return {};
+}
+
+/**
+ * Route every board request to this file's board, open the Kanban view from the rail or the home's Menu, then wait for
+ * the board's header and its first card. Returns the board requests the page made, `{ method, path }`, oldest first.
+ */
+export async function openBoard(page) {
+  const requests = [];
+  await page.route(KANBAN, (route) => {
+    const request = route.request();
+    requests.push({ method: request.method(), path: new URL(request.url()).pathname });
+    const body = answer(request.url(), request.method());
+    return route.fulfill(body === null ? json({ error: "no such card" }, 404) : json(body));
+  });
+  await page.locator(`${RAIL_KANBAN}:visible, ${HOME_MENU}:visible`).first().waitFor({ timeout: WAIT_MS });
+  if ((await page.locator(`${RAIL_KANBAN}:visible`).count()) > 0) {
+    await page.locator(`${RAIL_KANBAN}:visible`).first().click({ timeout: WAIT_MS });
+  } else {
+    await page.locator(`${HOME_MENU}:visible`).first().click();
+    await page.locator(MENU_ENTRY, { hasText: /^\s*Kanban\s*$/ }).first().click({ timeout: WAIT_MS });
+  }
+  await page.getByRole("combobox", { name: "Board" }).or(page.getByRole("button", { name: "Board" })).first()
+    .waitFor({ timeout: WAIT_MS });
+  await faceOf(page, CARDS.bug.id).waitFor({ timeout: WAIT_MS });
+  return { requests };
+}
+
+/** The board's header: the one row that holds the board switcher. */
+export const headerOf = (page) => page.locator("header", { has: page.getByRole("combobox", { name: "Board" }).or(page.getByRole("button", { name: "Board" })) }).first();
+
+/** A card's face on its lane, by the kit's own `data-card-id`. */
+export const faceOf = (page, id) => page.locator(`[data-card-id="${id}"]`).first();
+
+/** Open a card's drawer by pressing its face, and wait for the drawer's dialog. */
+export async function openDrawer(page, id) {
+  await faceOf(page, id).click({ timeout: WAIT_MS });
+  const drawer = page.getByRole("dialog").first();
+  await drawer.waitFor({ timeout: WAIT_MS });
+  await drawer.getByText(NOTE_LINES[0], { exact: false }).first().waitFor({ timeout: WAIT_MS }).catch(() => {});
+  return drawer;
+}

@@ -14,12 +14,15 @@
 /**
  * The vocabulary the table accepts, and the ONLY source of every choice list the panel draws.
  * The panel never spells `opus` or `xhigh` itself: a word the Python side adds arrives here first.
+ * `sorter_models` and `tweak_models` are the model words the `sorter` and the `tweak` rows accept, each its own list.
  */
 export type AgentLaunchChoices = {
   models: string[];
   efforts: string[];
   dactyl_models: string[];
   summarizer_models: string[];
+  sorter_models: string[];
+  tweak_models: string[];
 };
 
 /**
@@ -64,7 +67,7 @@ export type AgentLaunchSide = {
  * own sentence about the lane, or null when it has nothing to add.
  */
 export type AgentLaunchLane = {
-  lane: 'agent' | 'dispatcher' | 'chain' | 'metis';
+  lane: 'agent' | 'dispatcher' | 'chain' | 'metis' | 'sorter';
   reach: 'new-session' | 'next-launch';
   note: string | null;
   sides: AgentLaunchSide[];
@@ -82,15 +85,21 @@ export type AgentLaunchShim = {
 };
 
 /**
- * One row of the launch table: a soul, or Metis (`kind: 'metis'`, always last, with no shim).
+ * One row of the launch table: a soul, Metis (`kind: 'metis'`, with no shim), or one of the two rows a board card's
+ * walk launches at — the card sorter (`kind: 'sorter'`) and the tweak builder (`kind: 'tweak'`), after her and with no shim.
  *
  * `model` and `effort` are what the row RESOLVES to; `model_pinned` and `effort_pinned` say whether
  * the row's own table entry set them (a pin) or they came from `defaults`. Clearing a pin is sending
  * `null` in an `AgentLaunchRowChange`.
+ *
+ * THE SORTER'S AND THE TWEAK'S WORDS ARE NOT PINS: both rows always stand in the table, so neither word can be cleared
+ * and `null` is refused. The sorter holds a model (one of `choices.sorter_models`) and an effort; the tweak holds a model
+ * alone (one of `choices.tweak_models`), and its `effort` is read and never sent: the table's default for that model, or,
+ * with `effort_pinned` true, Hephaestus's own effort pin, which the tweak launches at when its model is the one his row gives him.
  */
 export type AgentLaunchRow = {
   name: string;
-  kind: 'soul' | 'metis';
+  kind: 'soul' | 'metis' | 'sorter' | 'tweak';
   description: string;
   model: string;
   model_pinned: boolean;

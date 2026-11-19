@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { SubagentTranscriptTarget } from '@/shared/types';
 import { Badge, Button, Spinner } from '@/shared/ui';
+import { WAY_BACK } from '@/shared/ui/overlayEscape';
 import { useSubagentTranscript } from '@/modules/chat/hooks/useSubagentTranscript';
 import { SubagentNote } from '@/modules/chat/tools/SubagentNote';
 import { ToolRenderer } from '@/modules/chat/tools/ToolRenderer';
@@ -115,6 +116,8 @@ export function SubagentTranscriptView({
           variant="ghost"
           onClick={onBack}
           aria-label={t('gutters.subagents.back')}
+          // Escape presses it where the transcript is read in place; in a dialog the dialog's own Escape is the way back.
+          {...WAY_BACK}
         >
           <ArrowLeftIcon aria-hidden="true" />
         </Button>

@@ -1,0 +1,25 @@
+<!-- @dsCard group="Controls" height=96 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Switch — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function useTicker(ms, n) { var s = React.useState(0); React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % n; }); }, ms); return function () { clearInterval(id); }; }, []); return s[0]; }
+  function Demo() {
+    var t = useTicker(1300, 2), a = React.useState(true), b = React.useState(false);
+    return h('div', { style: { display: 'flex', gap: 36, padding: 32, alignItems: 'center', flexWrap: 'wrap' } },
+      h(A.Switch, { checked: t === 1, label: 'Live', showLabel: true }),
+      h(A.Switch, { checked: a[0], onChange: a[1], label: 'Follow sunset', showLabel: true }),
+      h(A.Switch, { checked: b[0], onChange: b[1], label: 'Speak answers', showLabel: true }),
+      h(A.Switch, { checked: true, disabled: true, label: 'Locked on', showLabel: true }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

@@ -94,8 +94,10 @@ export function RegionDrawLayer({ onDrawn, onCancel }: RegionDrawLayerProps) {
       }
       onCancel();
     }
-    window.addEventListener('keydown', cancelOnEscape);
-    return () => window.removeEventListener('keydown', cancelOnEscape);
+    // On the window's capture phase, as every panel that owns the key listens: marked here, the page's own Escape (the way back,
+    // `useEscapeBack`) stands down while a box is being drawn.
+    window.addEventListener('keydown', cancelOnEscape, true);
+    return () => window.removeEventListener('keydown', cancelOnEscape, true);
   }, [onCancel]);
 
   return (

@@ -1,0 +1,20 @@
+<!-- @dsCard group="Openings" height=144 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ReadoutRow — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 280 } },
+    h(A.ReadoutRow, { items: [{ label: 'RMS', value: '0.42' }, { value: '−12.3 dBFS', tone: 'muted' }] }),
+    h(A.ReadoutRow, { items: [{ label: 'Lookahead', value: '320 ms' }, { label: 'Clause', value: '2/3 · complex' }] }),
+    h(A.ReadoutRow, { spacing: 'wide', items: [{ value: 'x +0.412' }, { value: 'y −0.187' }, { value: 'z +0.891' }] }),
+    h(A.ReadoutRow, { items: [{ label: 'Az', value: '212.4°' }, { label: 'El', value: '+18.0°' }, { label: 'Lock', value: 'Acquired', tone: 'accent' }] })));
+</script>
+</body>
+</html>

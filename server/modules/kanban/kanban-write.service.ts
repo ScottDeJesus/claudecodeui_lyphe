@@ -1,7 +1,7 @@
 import type { Database } from 'better-sqlite3';
 
 import { getConnection, kanbanBoardsDb, kanbanCardsDb, kanbanEventsDb } from '@/modules/database/index.js';
-import type { KanbanEventKind, KanbanEventRow, KanbanLaneCount } from '@/shared/kanban-types.js';
+import type { KanbanCardSummary, KanbanEventKind, KanbanEventRow, KanbanLaneCount } from '@/shared/kanban-types.js';
 import type { KanbanBoardEvent } from '@/shared/types.js';
 
 import { broadcastKanbanEvent } from './kanban-broadcast.service.js';
@@ -43,6 +43,36 @@ export type KanbanWriteSpec<T> = {
 };
 
 /**
+ * One committed write as a listener sees it — the resolved board id and payload exactly as the audit
+ * row holds them, and the card's summary read after the commit (null for a write with no card, or
+ * when the read failed).
+ */
+export type KanbanWriteEvent = {
+  kind: KanbanEventKind;
+  boardId: string | null;
+  cardId: string | null;
+  actor: string;
+  payload: Record<string, unknown>;
+  card: KanbanCardSummary | null;
+};
+
+const listeners = new Set<(event: KanbanWriteEvent) => void>();
+
+/**
+ * Subscribes to every committed board write, and returns the function that unsubscribes.
+ *
+ * A listener rather than an import, because the board never learns who listens — the dispatch module
+ * subscribes from its own mount, and nothing here names it. A listener also cannot reach inside the
+ * transaction: it is told only after the commit, so it can never see a write that rolled back.
+ */
+export function onKanbanWrite(listener: (event: KanbanWriteEvent) => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/**
  * THE write seam: every write in this module goes through this function, and nothing else in it
  * ever opens a transaction, inserts a `kanban_events` row or sends a frame.
  *
@@ -58,19 +88,19 @@ export type KanbanWriteSpec<T> = {
  *   4. run the spec's `afterEvent`, if it has one — still in the transaction, so a side effect that
  *      cannot be rolled back on its own lands only after the audit row is in,
  *   5. commit,
- *   6. and only then — outside the transaction — read the affected card's fresh summary and the
- *      board's lane totals, build the frame and broadcast it.
+ *   6. and only then — outside the transaction — read the card's fresh summary once, build the frame
+ *      and broadcast it, then call every listener (`onKanbanWrite`), each in its own try.
  *
- * A throw in step 6 is caught and logged: the write has already committed, and a dead socket must
- * not turn a committed write into a 500. A verb that needs two writes to be atomic does both
- * inside ONE `mutate` callback — never two `writeKanban` calls.
+ * A throw in step 6 is caught and logged, listeners included: the write has already committed, and
+ * a dead socket or a faulty listener must not turn a committed write into a 500. A verb that needs
+ * two writes to be atomic does both inside ONE `mutate` callback — never two `writeKanban` calls.
  */
 export function writeKanban<T>(spec: KanbanWriteSpec<T>, mutate: (db: Database) => T): T {
   const db = getConnection();
   const actor = spec.actor ?? 'operator';
   const cardId = spec.cardId ?? null;
 
-  const commit = db.transaction((): { value: T; boardId: string | null; event: KanbanEventRow } => {
+  const commit = db.transaction((): { value: T; boardId: string | null; payload: Record<string, unknown>; event: KanbanEventRow } => {
     const value = mutate(db);
     // Resolved here, not before: a board create mints its id in this transaction, so the audit
     // row can only name the board from what the mutation returned.
@@ -83,14 +113,23 @@ export function writeKanban<T>(spec: KanbanWriteSpec<T>, mutate: (db: Database) 
     // back on its own (a file on disk) belongs after the audit row, so a failed append leaves
     // nothing behind it. A failure HERE still rolls the row and its event back.
     spec.afterEvent?.(value);
-    return { value, boardId, event };
+    return { value, boardId, payload, event };
   });
 
-  const { value, boardId, event } = commit();
+  const { value, boardId, payload, event } = commit();
+
+  // Read AFTER the commit, so the frame and the listeners carry what landed rather than what was
+  // intended. Read once and shared: the frame and every listener must describe the same card state.
+  let card: KanbanCardSummary | null = null;
+  try {
+    card = cardId === null ? null : kanbanCardsDb.getSummary(cardId);
+  } catch (error) {
+    console.error(
+      `[Kanban] committed ${spec.kind} but could not read card ${cardId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 
   try {
-    // Read AFTER the commit, so the frame carries what landed rather than what was intended.
-    const card = cardId === null ? null : kanbanCardsDb.getSummary(cardId);
     // A boardless write has no lane totals to read — and `laneCounts(null)` would ask a board
     // query for every card whose board is NULL, which is not a board at all. `[]` is the honest
     // answer: there are no lanes, and the frame still goes out so the write has a signal on the
@@ -110,6 +149,19 @@ export function writeKanban<T>(spec: KanbanWriteSpec<T>, mutate: (db: Database) 
     console.error(
       `[Kanban] committed ${spec.kind} but could not broadcast its frame: ${error instanceof Error ? error.message : String(error)}`
     );
+  }
+
+  // Each listener gets its own try so a faulty one cannot turn a committed write into a 500 or keep
+  // the listeners after it from hearing the write. The copy means a listener that unsubscribes
+  // mid-loop cannot make the loop skip the one after it.
+  for (const listener of [...listeners]) {
+    try {
+      listener({ kind: spec.kind, boardId, cardId, actor, payload, card });
+    } catch (error) {
+      console.error(
+        `[Kanban] committed ${spec.kind} but a write listener threw: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   return value;

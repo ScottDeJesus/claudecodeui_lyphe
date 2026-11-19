@@ -1,0 +1,21 @@
+<!-- @dsCard group="Objects" height=176 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SignalLoop — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Row(p) { return h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, height: 30 } }, h(A.SignalLoop, { state: p.state, signal: p.signal }), h('span', { className: 'field-text', style: { color: 'var(--ink)' } }, p.name), h('span', { className: 'telemetry', style: { color: 'var(--ink-muted)', textTransform: 'uppercase', marginLeft: 'auto' } }, p.word)); }
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { maxWidth: 420 } },
+    h(Row, { state: 'thinking', name: 'Fix the flaky upload test', word: 'Thinking' }),
+    h(Row, { state: 'working', name: 'Refactor the session store', word: 'Running tools' }),
+    h(Row, { state: 'working', signal: 'secondary', name: '↳ 2 helpers', word: 'Working' }),
+    h(Row, { state: 'idle', name: 'Release notes draft', word: 'Idle' })));
+</script>
+</body>
+</html>

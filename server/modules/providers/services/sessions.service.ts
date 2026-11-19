@@ -105,7 +105,11 @@ type SessionDetails = {
 
 const MAX_CLOUDCLI_SESSION_NAME_WORDS = 4;
 
-function buildCloudCliSessionName(initialMessage: string): string {
+/**
+ * The name a new app chat starts with — its first message's first four words,
+ * or "Untitled Session" when the message is empty.
+ */
+export function buildCloudCliSessionName(initialMessage: string): string {
   const words = initialMessage.trim().split(/\s+/).filter(Boolean);
   return words.slice(0, MAX_CLOUDCLI_SESSION_NAME_WORDS).join(' ') || 'Untitled Session';
 }

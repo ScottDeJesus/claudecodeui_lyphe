@@ -385,7 +385,7 @@ An error thrown outside these branches goes to the app's error handler.
 
 `AgentLaunchDefaultsChange` = `{model?, effort?, deepseek_effort?, dactyl_model?, dactyl_effort?, summarizer_model?, summarizer_effort?}`; the argv flags are `--dactyl-model` / `--dactyl-effort` and `--summarizer-model` / `--summarizer-effort`.
 
-The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort` included), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
+The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort`, `choices.sorter_models`, `choices.tweak_models` included; row `kind` adds `sorter` and `tweak`, lane adds `sorter`), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts
 
@@ -674,7 +674,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chat
 
 ## MAN-7451 — Kit and shared hooks follow the host window
 
-The kit's overlays and two shared hooks bind to `useHostWindow()` (MAN-7443), never the global `window`/`document`. At home the hook returns the page's own `window`: outside `ChatHostSlot`'s subtree there is no provider, and inside it (MAN-7464) the provider's `hostWindow` is that same `window`.
+The kit's overlays and four shared hooks bind to `useHostWindow()` (MAN-7443), never the global `window`/`document`. At home the hook returns the page's own `window`: outside `ChatHostSlot`'s subtree there is no provider, and inside it (MAN-7464) the provider's `hostWindow` is that same `window`.
 
 ## What binds to the host window
 
@@ -691,6 +691,8 @@ The kit's overlays and two shared hooks bind to `useHostWindow()` (MAN-7443), ne
 | `Tabs` | `src/shared/ui/Tabs.tsx` | indicator `ResizeObserver` via `resizeObserverIn` |
 | `useDeviceSettings` | `src/shared/hooks/useDeviceSettings.ts` | `hostWindow.innerWidth`; `resize` on `hostWindow` (narrow in a 420px window under a 1440px opener) |
 | `useElapsed` | `src/shared/hooks/useElapsed.ts` | tick `setInterval` on `hostWindow` |
+| `useCoalescedCall` | `src/shared/hooks/useCoalescedCall.ts` | the one coalescing `setTimeout`, armed and cleared on `hostWindow` |
+| `useEventFeed` | `src/shared/hooks/useEventFeed.ts` | the refused-dial re-dial `setTimeout`, armed and cleared on `hostWindow` |
 
 Every unit above has `hostWindow` in the dependency list of each effect that binds to it.
 
@@ -739,7 +741,7 @@ Every unit above has `hostWindow` in the dependency list of each effect that bin
 - Both exit 1 with the failed checks listed; neither sends a model turn or writes app data.
 - Sibling probes touched by the same change: `.verify/lightbox-zoom.mjs`, `.verify/export-menu-layer.mjs` (MAN-7426, INV-4356).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeviceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Dialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCoalescedCall.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeviceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useEventFeed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Dialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
 
 ## MAN-7452 — Chat state layer follows the host window
 
@@ -3951,6 +3953,9 @@ Consumers (each owns its allowlist, id rules and image type; none owns a transpo
 | `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas`, the Tours lane | `affected-areas` |
 | `server/modules/carrier-bulletins/` (MAN-8909) | `/api/carrier-bulletins`, the bulletins lane | `carrier-bulletins` |
 | `server/modules/upload-runs/` (MAN-9897) | `/api/upload-runs`, the upload runs' lane (the first with event streams) | `upload-runs` |
+| `server/modules/scheduling-report/` (MAN-9996) | `/api/scheduling-report`, the scheduling record's lane — the first that points at the eis backend (`:8004`, base URL `EIS_BACKEND_URL`, secret file `EIS_BACKEND_ENV_FILE`), not at `:8001` | `scheduling-report` |
+
+A lane may point at either service: `baseUrl` and `envFile` are the lane module's own, and the forwarder reads the file the lane names. `:8004`'s internal gate (`routes/internal_gate.py`) compares the same `EIS_INTERNAL_SECRET` class.
 
 | export | does |
 |---|---|
@@ -5543,21 +5548,21 @@ section: server/modules/companion/tools — read_session, list_followups and ask
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
 
-## MAN-9067 — server/modules/chat-names — the naming pass: the trigger, the five questions, the write, the Haiku call, the sayable rule
+## MAN-9067 — server/modules/chat-names — the naming pass: the trigger, the questions, the two kinds of chat, the write, the Haiku call, the sayable rule
 
-Gives an app chat a name a person could say aloud, once a turn of it has ended. Writes `sessions.custom_name`, never `name_given` (MAN-9060, INV-9787). Edits that break it: INV-9817. `server/index.ts` builds it (`createChatNamer()`), calls `chatNamer.start()` in the listen callback after `startRunStallWatchdog()`, and `await chatNamer.stop()` in `shutdownRuntimeServices`.
+Gives an app chat a name a person could say aloud, once a turn of it has ended, and — for a chat created at or after `RELABEL_CHATS_CREATED_FROM` (`2026-11-18T17:22:00.000Z`) — keeps its label in step with its subject at every turn until he names it. Writes `sessions.custom_name`, never `name_given` (MAN-9060, INV-9787). Edits that break it: INV-9817. `server/index.ts` builds it (`createChatNamer()`), calls `chatNamer.start()` in the listen callback after `startRunStallWatchdog()`, and `await chatNamer.stop()` in `shutdownRuntimeServices`.
 
 ## Files
 | file | owns |
 | --- | --- |
 | `index.ts` | exports `createChatNamer` only |
-| `chat-namer.service.ts` | `createChatNamer(): { start(): void; stop(): Promise<void> }` — the trigger, the five questions, the write |
-| `first-exchange.ts` | `readFirstExchange(sessionId)` → `ChatFirstExchange { ask, reply }` or `null` |
-| `haiku-name.ts` | `askHaikuForName(exchange, signal)` → a cleaned name or `null`; never rejects |
+| `chat-namer.service.ts` | `createChatNamer(): { start(): void; stop(): Promise<void> }` — the trigger, the questions, the two kinds of chat, the write |
+| `exchanges.ts` | `readFirstExchange(sessionId)` → `ChatExchange { ask, reply }` or `null`; `readFirstAndLatestExchange(sessionId)` → `{ first, latest }` or `null` |
+| `haiku-name.ts` | `askHaikuForName(exchange, signal)` → a cleaned name or `null`; `askHaikuToKeepOrRename(currentName, first, latest, signal)` → `ChatLabelVerdict` (`keep` / `rename` + name) or `null`; neither rejects |
 | `../../shared/sayable-name.ts` | `isSayableName(name)`, `countWords`, `hasScriptWithoutSpaces` — one rule, applied to the chat's current name and to Haiku's answer, and read by her memory's titles (MAN-9192) |
 
 ## Trigger — `chatRunRegistry.onRunCompleted`
-No timer, no boot sweep: a chat that already holds an unsayable name is named at its next turn. why: the house names its events, it does not poll.
+No timer, no boot sweep: a chat is considered at its next turn, not before. why: the house names its events, it does not poll.
 
 | completion | the namer |
 | --- | --- |
@@ -5567,41 +5572,54 @@ No timer, no boot sweep: a chat that already holds an unsayable name is named at
 
 `start()` twice is a no-op. `stop()` unsubscribes, aborts every pass in flight (the Haiku child ends with it) and awaits them with `Promise.allSettled`.
 
-## The five questions — cheapest first; Haiku is asked only when all pass
+## The questions every chat answers — cheapest first, all synchronous
 | # | question | read from |
 | --- | --- | --- |
 | 1 | an app chat, not archived | `sessionsDb.nameFactsOf`: `appCreated`, `isArchived`; `null` (no row) stops |
-| 2 | `name_given` still 0 | `nameFactsOf.nameGiven` |
-| 3 | the current name fails `isSayableName` | `nameFactsOf.customName` |
-| 4 | neither in flight nor already tried by this process | `inFlight` (`Map<sessionId, Promise<void>>`), `attempted` (`Set`) |
-| 5 | the transcript holds a first exchange | `readFirstExchange` non-`null` |
+| 2 | `name_given` still 0 — his rename ends the namer for good | `nameFactsOf.nameGiven` |
+| 3 | no pass in flight for it — a turn that ends during a pass is skipped | `inFlight` (`Map<sessionId, Promise<void>>`) |
 
-- Questions 1 to 4 are synchronous and claim the chat in one step (`inFlight.set`), so two completions never start two passes.
+- The questions and the claim (`inFlight.set`) are one synchronous step in `considerChat`, so two completions never start two passes.
 - A project's visibility is no question: a probe chat in `PROBE_PROJECT` (a hidden root under `/tmp`) is named like any other.
-- `attempted` is filled at question 5's yes: one Haiku try per chat per process, whatever the answer; a restart allows one more. A chat with nothing to read yet is asked again at its next turn.
 
-## The write
-1. `askHaikuForName` → `null`: log `[Chat names] <id> was not named this time; it keeps "<name>"`, write nothing.
-2. Re-read `nameFactsOf`, no `await` between this read and step 3:
+## Two kinds of chat — `nameFactsOf.createdAt` against `RELABEL_CHATS_CREATED_FROM`
+`createdAt` is `sessions.created_at` through `normalizeTimestamp` (stored rows hold both SQLite's `YYYY-MM-DD HH:MM:SS` UTC and ISO); a missing or unparseable value is an old chat. why the cutoff: the operator limited every-turn relabelling to chats created after it landed.
+
+| chat | at every turn that passes the questions |
+| --- | --- |
+| created at or after the cutoff | `relabelChat`: `readFirstAndLatestExchange` (null → log `has no exchange to read yet`). While the label is a placeholder (`isPlaceholderLabel`: it fails `isSayableName`, or equals `buildCloudCliSessionName(first.ask)` — the first four words a new chat starts with, from the providers barrel) → `askHaikuForName(first)`; `null` → log `was not named this time`; otherwise the write. Once it holds a name a pass gave → `askHaikuToKeepOrRename` at low effort. `keep` → log `kept <id> "<name>": Haiku answered KEEP`; a name equal to the current one, case-insensitive → log `kept … : Haiku answered the same name`; `null` → log `was not relabelled this time`; otherwise the write. No `attempted`. |
+| created before the cutoff | `nameChat`, unchanged: only while the name fails `isSayableName` and the chat is not in `attempted` (`Set`); `readFirstExchange` (null → asked again next turn); `attempted` filled at a readable first exchange — one try per chat per process, a restart allows one more; `askHaikuForName`. |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/exchanges.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
+
+## MAN-9986 — server/modules/chat-names — the naming pass: the trigger, the questions — The write
+section: server/modules/chat-names — the naming pass: the trigger, the questions, the two kinds of chat, the write, the Haiku call, the sayable rule/001 The write
+
+`writeName`, shared by both kinds; a keep, a same name or a refused answer never reaches it, so nothing is written or broadcast.
+1. Re-read `nameFactsOf`, no `await` between this read and step 2:
    - `null`: log `was deleted while Haiku was answering; "<name>" is not written`.
-   - `nameGiven` set or `customName` no longer the name that failed question 3: log `was renamed while Haiku was answering; "<name>" is not written`.
-3. `sessionsDb.updateSessionCustomName(id, name)` — never `renameByPerson`. Log `[Chat names] named <id> "<name>" (was "<old>")`.
-4. `broadcastSessionUpserted(id)` — the frame the sidebar, the simple list, the floating chat's picker, the notifications and Kaylee's roster redraw on. A send failure is logged; the name stays written.
+   - `nameGiven` set or `customName` no longer the name read before Haiku was asked: log `was renamed while Haiku was answering; "<name>" is not written`.
+2. `sessionsDb.updateSessionCustomName(id, name)` — never `renameByPerson`. Log `[Chat names] named <id> "<name>" (was "<old>")`.
+3. `broadcastSessionUpserted(id)` — the frame the sidebar, the simple list, the floating chat's picker, the notifications and Kaylee's roster redraw on. A send failure is logged; the name stays written.
 
 A pass that throws logs `the pass for <id> failed; the chat keeps its name: <reason>`.
 Read the log: `journalctl -u cloudcli-server-dev | grep '\[Chat names\]'`. Every line carries the session id.
 
-## `readFirstExchange`
-Reads `sessionsService.fetchHistory(id, { limit: null })` — the rows the person sees. Rejects when the chat is gone or its transcript cannot be read.
+## `readFirstExchange`, `readFirstAndLatestExchange`
+Each reads `sessionsService.fetchHistory(id, { limit: null })` once — the rows the person sees. Rejects when the chat is gone or its transcript cannot be read. His message: a user `text` row, non-empty, not starting `<system-reminder>` or `<task-notification>`; a slash command he typed counts. An answer: an assistant `text` row, non-empty, not `isCompactSummary`, not `isLocalCommandStdout`, not `model === '<synthetic>'`.
 
-| side | taken |
-| --- | --- |
-| `ask` | the first user `text` row he wrote: non-empty, not starting `<system-reminder>` or `<task-notification>`; a slash command he typed counts |
-| `reply` | the first assistant `text` row after it: non-empty, not `isCompactSummary`, not `isLocalCommandStdout`, not `model === '<synthetic>'` |
+| exchange | `ask` | `reply` |
+| --- | --- | --- |
+| first | his first message | the first answer after it |
+| latest | his last message before the reply | the last answer in the transcript — a turn's conclusion, not the preamble before its tool calls |
 
 Each side is cut to 2,000 characters (`MOST_CHARACTERS_PER_SIDE`) without splitting a surrogate pair. `null` when the transcript holds no such pair.
 
-## `askHaikuForName`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/exchanges.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
+
+## MAN-9987 — server/modules/chat-names — the naming pass: the trigger, the questions — `askHaikuForName`
+section: server/modules/chat-names — the naming pass: the trigger, the questions, the two kinds of chat, the write, the Haiku call, the sayable rule/002 `askHaikuForName`
+
 One `query()`, one turn, no session of its own.
 
 | option | value |
@@ -5614,9 +5632,23 @@ One `query()`, one turn, no session of its own.
 | `cwd` | `~/.claude/state/chat-names`, made on demand: a hidden root, so a stray launch is in no project list |
 | `env` | `userFacingEnv()` plus `launchAccountEnv().env` |
 | `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH)`, passed when it resolves |
-| prompt | `FIRST MESSAGE:\n<ask>\n\nFIRST REPLY:\n<reply>` |
 | bound | `NAMING_TIMEOUT_MS` = 30 s, and the namer's `signal` |
 | init check | the CLI's `system`/`init` message lists its `tools`; any entry ends the pass with `null` |
+| `effort` | none for `askHaikuForName`; `'low'` (`RELABEL_EFFORT`) for `askHaikuToKeepOrRename` — the SDK's `Options.effort`, passed to the CLI as `--effort` |
+
+Both questions share one private `askHaiku({ prompt, systemPrompt, effort? }, signal)` that answers Haiku's raw `result` or `null`.
+
+| question | prompt | system prompt |
+| --- | --- | --- |
+| `askHaikuForName` | `FIRST MESSAGE:\n<ask>\n\nFIRST REPLY:\n<reply>` | `NAMING_SYSTEM_PROMPT` |
+| `askHaikuToKeepOrRename` | `CURRENT LABEL:\n<name or (none)>\n\nFIRST MESSAGE:\n…\n\nLATEST MESSAGE:\n…\n\nLATEST REPLY:\n…` | `RELABEL_SYSTEM_PROMPT` |
+
+`askHaikuToKeepOrRename` reads `KEEP` (outer quotes and trailing punctuation dropped, any case) as `keep`; anything else goes through `cleanedName` and is `rename` or refused (`null`). It does not compare with the current name; the namer does.
+
+`RELABEL_SYSTEM_PROMPT`, verbatim — it leans to KEEP, because a label that moves at every turn is one he cannot find again. It is asked only about a label a pass already gave: whether a label is still a placeholder is decided by the namer from data (`isPlaceholderLabel`), because Haiku at low effort answered KEEP for "I have a series", "Can we hook in" and "Untitled Session" (measured 2026-11-18 on the operator's chats):
+```text
+You keep the label of a chat session for a person who refers to it aloud. You are given the chat's current label, the first message of the chat, and its latest exchange. Answer with the single word KEEP unless the subject of the chat has clearly moved to something the current label does not cover. Never rename for a rewording, a sharper phrasing or a sub-step of the same subject; when in doubt, answer KEEP. When you do rename, answer with a name of two to four plain words saying what the chat is about now, the way a person would call it in conversation, for example Kanban board, Login fix, Estimate drafts. No punctuation, no quotes, no emoji, no file names, no paths, no slash commands. Reply with KEEP or the name only.
+```
 
 `NAMING_SYSTEM_PROMPT`, verbatim:
 ```text
@@ -5629,6 +5661,11 @@ Returns `null` and writes nothing, each with one `[Chat names]` line, when: the 
 1. refuse a reply of several lines or holding an emoji (`\p{Extended_Pictographic}`);
 2. drop outer quote marks and trailing punctuation, repeatedly; collapse spaces; capitalize the first letter;
 3. accept only 2 to 4 words (`FEWEST_NAME_WORDS`, `MOST_NAME_WORDS`) that pass `isSayableName`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/exchanges.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
+
+## MAN-9988 — server/modules/chat-names — the naming pass: the trigger, the questions — `countWords(name)` (`server/shared/sayable-name.ts`) is the count: a token between spaces is one
+section: server/modules/chat-names — the naming pass: the trigger, the questions, the two kinds of chat, the write, the Haiku call, the sayable rule/003 `countWords(name)` (`server/shared/sayable-name.ts`) is the count: a token between spaces is one
 
 `countWords(name)` (`server/shared/sayable-name.ts`) is the count: a token between spaces is one word ("Login-fix" is 1), except a token holding Han, Kana, Thai, Lao, Khmer or Myanmar letters, which `Intl.Segmenter` (ICU's word dictionaries) divides ("看板ボード" is 2, "見積書の下書き" is 4). The dictionary divides finer than a reader hears ("数据库连接排查" counts 5 and reads as 3), so a name with a letter in such a script may count one over: `SEGMENT_COUNT_OVERRUN`, 2 to 5. `isSayableName` below is unchanged and still reads a current name by its whitespace tokens: a Japanese first message with no space in it is one token there, kept or replaced by its 40 characters alone.
 
@@ -5662,17 +5699,21 @@ The file is in `server/shared/` because two modules read it: this one (`chat-nam
 ## Prove it
 `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/chat-names-unspaced.mjs` → `ALL PASS`: `countWords` on twelve names, then `askHaikuForName` on a Japanese, a Chinese, a Thai and an English exchange (four Haiku calls, no chat made). 2026-10-28, 22 Haiku answers to Japanese, Chinese and Thai exchanges: before `countWords` every answer in those scripts was refused (Haiku answered in the chat's language for about half of the 22 and in English for the rest); after, 22 of 22 named, the longest counting 5.
 
-`node .verify/chat-namer-live.mjs` → `ALL PASS`. Every turn is on Haiku in `PROBE_PROJECT` (under `/tmp`, a hidden root), chats deleted after.
+`node .verify/chat-namer-live.mjs` → `ALL PASS`. One chat made with a first message in `PROBE_PROJECT` (under `/tmp`, a hidden root), put on Haiku through the picker's route, four short turns, deleted after. 2026-11-18:
 
-| leg | shows |
+| step | shows |
 | --- | --- |
-| A | first turn: "Untitled Session" becomes a name, `name_given` 0, unchanged 10 s later; renamed by hand: `name_given` 1, a second turn leaves it and logs no `[Chat names]` line |
-| B | a sayable `initialMessage`: no `[Chat names]` line for the id |
-| C | a rename sent at `complete` wins: `was renamed while Haiku was answering` |
+| turn 1, a birthday dinner menu | `named … "Birthday dinner menu" (was "Help me plan a")` — the opening-words name replaced |
+| turn 2, the same menu with a dessert | `kept … "Birthday dinner menu": Haiku answered KEEP`, name unchanged |
+| turn 3, a flat bicycle tyre | `named … "Bicycle tyre repair" (was "Birthday dinner menu")` |
+| renamed "probe dinner" by the sidebar's door, turn 4 | `name_given` 1, name unchanged, no further `[Chat names]` line |
+| a second chat renamed "raced rename" at its first turn's `complete` | the rename wins (`name_given` 1) and the journal says `was renamed while Haiku was answering` |
 
-A probe chat is in no sidebar list (`visibleProjectPathSql` leaves a hidden root out) and its `session_upserted` frame carries `project: null`, which the page's project store drops: the leg reads the frame off the page's websocket instead.
+The opening-words and "Untitled Session" placeholders: `cases/modules/a-new-chat-still-named-by-its-opening-words-gets-a-name-at-its-first-turn.ts` and `cases/modules/a-new-chat-whose-label-cannot-be-said-aloud-gets-a-sayable-name-at-its-first-turn.ts` (`cloudcli-tsx <case>` → `HELD`, one Haiku call each, scratch database).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/first-exchange.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
+A chat created before the cutoff with a sayable name is not considered: "Bugfixes" (created 2026-10-10, app chat, `name_given` 0) finished a turn on the new server and logged no `[Chat names]` line. A probe chat is in no sidebar list (`visibleProjectPathSql` leaves a hidden root out), so the probe reads the row, the journal (`journalctl -u cloudcli-server-dev`) and the page's socket.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/exchanges.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
 
 ## MAN-9072 — server/modules/companion — the send: `companion-send.ts` and `tools/send-options.ts`, what a draft checks, runs, records and clears
 
@@ -5780,7 +5821,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | `allowedTools` | each tool's name under `mcp__companion__` | exactly hers, so a tool is never one prompt away |
 | `includePartialMessages` | `true` | text deltas feed the sentence stream |
 | `maxTurns` | 30 | per turn of hers: one answer to him, every tool call inside it |
-| `effort` | `'max'` | the operator's ruling of 2026-11-09: the deepest reasoning the CLI offers, on every model she may run (each of `sonnet`, `fable`, `opus` and `haiku` lists `max` in the CLI's model list, read 2026-11-09). Fixed, not a setting; applies from her next launch. Held as `COMPANION_EFFORT` (`companion-launch.ts`), which `read_settings` says from the same constant: `Her effort: max, set at her launch, not in Settings.` |
+| `effort` | `'high'` | the operator's ruling of 2026-11-18. Fixed, not a setting; applies from her next launch. Held as `COMPANION_EFFORT` (`companion-launch.ts`), which `read_settings` says from the same constant: `Her effort: high, set at her launch, not in Settings.` |
 | `cwd` | `companionWorkingDirectory(userId)` | below |
 | `env` | `{ ...userFacingEnv(), ...(await launchAccountEnv()).env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '500000', DISABLE_COMPACT: '1' }` | the account the house chose, on the subscription. `DISABLE_COMPACT=1` is LAST so no account or house env turns it back on: her CLI never summarizes her conversation, automatic or manual, and no `compact_boundary` reaches her. Her own closing is her compaction (MAN-9455). The 500k window (`COMPANION_WINDOW_TOKENS`) is what her CLI's reading measures her against and her closing counts back from; it is NOT a refusal point: with compaction off the CLI sends past it and refuses only at the model's own limit (measured 2026-11-01 on a 100,000 window: messages read at 99,982 and 100,122 tokens were both sent). The CLI reads its env at launch: a change applies from her next launch |
 | `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(CLAUDE_CLI_PATH)`; key absent when it does not resolve | |
@@ -6452,7 +6493,7 @@ A probe that makes her think, or that makes a chat think through her, spends a r
 |---|---|
 | Her model is Haiku | set it before talking to her: the panel's model picker, or `PUT /api/companion/settings` `{"model":"haiku"}`. Never Sonnet or Opus for a probe. A switch with no message after it only switches the running process |
 | Probe chats live in `PROBE_PROJECT` | `/tmp/cloudcli-probe-chat` (`.verify/lib/probe-project.mjs`; `ensureProbeProject()` makes the folder: the turn's launch falls back to `$HOME` when it is missing). Every chat she sends to, steers, stops, answers or creates during a probe lives there, never in a real project. Why: the heal files a typed turn as the operator's unless the chat's project sits in a hidden root (`HIDDEN_PROJECT_ROOTS`, INV-4352) |
-| Every probe chat sends with `model: 'haiku'` | the composer's own model chip (`.verify/lib/scratch-chat.mjs`: `createScratchChat`, `MODEL_CHIP`) |
+| Every probe chat sends with `model: 'haiku'` | `openScratchChatOnHaiku` (`.verify/lib/scratch-chat.mjs`) sets it through the model picker's route, `POST /api/providers/claude/sessions/<id>/active-model` `{"model":"haiku"}`, and reads it back from `GET` on the same route before any turn; a model that does not read Haiku throws |
 | Turns are short and few | one line, one word back |
 | A changed tool schema or prompt is shown after her first message of the fresh start | the CLI keeps the tools and prompt of the conversation it began with; her first message after the change is refused and starts fresh (MAN-9209). Ask her to name the changed parameter after that message; before it she answers from the old shape. That message costs one summarizer call and up to 90 s of wake (the fresh-start handover, MAN-9210): say nothing to the other account's Kaylee while it runs |
 | A hidden chat or project is resolved only when named EXACTLY | below |
@@ -11259,7 +11300,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/cardLabel.ts
 
 ## MAN-9262 — src/modules/station — PageStage: a DocSpace page, or one block, on the stage with its link
 
-`PageStage` (`PageStage.tsx`): a DocSpace page, or one block of it, on the stage. Registered for `page` in `STAGE_VIEWS` (`stageViews.ts`). The stage frame, whose head already names the page (glyph + word over `focus.label`): MAN-9228. The link's one builder: `docSpacePageUrl` (MAN-485). Touch law: INV-10275.
+`PageStage` (`PageStage.tsx`): a DocSpace page, or one block of it, on the stage, drawn live in `EmbedUrlFrame` (`@/modules/widgets`, `fill`, in a box of `100dvh - 14rem`, never under 420 px) under one slim row carrying "Open in DocSpace" as a new-tab link (operator, 2026-11-18: embed it, not only a button). Registered for `page` in `STAGE_VIEWS` (`stageViews.ts`). The stage frame, whose head already names the page (glyph + word over `focus.label`): MAN-9228. The link's one builder: `docSpacePageUrl` (MAN-485). Touch law: INV-10275.
 
 ## Props
 | prop | type | meaning |
@@ -17227,19 +17268,18 @@ The Uploads view of the Cerberus tab: what happens when a person uses Restorly's
 | `UploadsHead.tsx` | eyebrow, headline with a tone accent, scope line and the press that lifts it, summary, window switch (7, 30, 90), Refresh |
 | `UploadsPills.tsx` | five pills: Runs, Hiccups, Live now, Last run, Healed; each carries the reader to a section |
 | `LiveNow.tsx` | the one live run: working or waiting on a person, the Test run mark when it is a dry run, its newest step, turns and tool calls, Open |
-| `UploadsBody.tsx` | the two columns once the view itself is 48rem wide (it is a size container; the window never decides): By upload type and How often, then Runs. Section ids `uploads-types`, `uploads-often`, `uploads-runs` |
+| `UploadsBody.tsx` | the two columns once the view itself is 48rem wide (it is a size container; the window never decides): By upload type and How often (the shared `HowOften` of `@/shared/ui`, handed `words="cerberus.uploads.often"`; MAN-9989), then Runs. Section ids `uploads-types`, `uploads-often`, `uploads-runs` |
 | `UploadTypeList.tsx` | Initial and Final, one row each in the heal tab's kind-row anatomy: clean, hiccups, trend (`trendMark`, `src/shared/trend.ts`), regression mark; a row opens to its runs, hiccups first |
-| `HowOften.tsx` | by day (a column for each day the window touches, today last) and by hour (24 cells) |
 | `RunList.tsx` | Runs: chips (people, Hiccups only, Test runs, accounts once two have runs), the list's states, 25 rows then Show more |
 | `TestRunsChip.tsx` | the Test runs toggle: among `RunList`'s chips, or alone under the empty state of a window with no run (MAN-9916) |
 | `RunRow.tsx` | one run as one `<li>`; the caller owns the `<ul>` |
 | `RunSheet.tsx` | one run in the shared `Sheet`, five sections in order; drawn only while the view is shown |
 | `RunSheetHead.tsx` | the sheet's head: verdict, ending sentence, facts, a strip of three steps (walked for real, confirmed, pressed) |
 | `RunBumps.tsx`, `RunEvents.tsx`, `RunWalks.tsx`, `RunAfter.tsx`, `RunFrictionSection.tsx` | the five sections: Speed bumps, Inside the run (its pane is the one `useFollowNewest` keeps: INV-11831), The flow it walked, After the run, The agent's own friction (`HealItemRow` and `HealCardView` through `@/modules/heal`) |
-| `hooks/` | 13 hooks: the reads, the two streams, the clock and the pane's follow (MAN-9911, MAN-9913) |
-| `utils/uploadsModel.ts` | the contract, types only: `UploadsWindow`, `UploadsFilters`, `RunFriction`, `DayBucket`, `LiveStep`, `UploadsRead`, `RunSheetRead`, `LiveStatus`, `UploadsPillKey`, `UploadsTally` |
+| `hooks/` | 12 hooks: the reads, the two streams, the clock and the pane's follow (MAN-9911, MAN-9913) |
+| `utils/uploadsModel.ts` | the contract, types only: `UploadsWindow`, `UploadsFilters`, `RunFriction`, `LiveStep`, `UploadsRead`, `RunSheetRead`, `LiveStatus`, `UploadsPillKey`, `UploadsTally` |
 | `utils/uploadsWords.ts` | pure words, each taking `t` and data: a verdict's look, the Test run mark (`testLook`), ages, durations, a reason's sentence, the ending sentence, an event's line, a lane fault's sentence (`troubleSentence`) |
-| `utils/joinFriction.ts`, `typeRegression.ts`, `bucketDays.ts`, `bucketHours.ts`, `healAnswer.ts`, `readEventsPage.ts`, `lastSeq.ts`, `uploadsFrames.ts` | the pure fills and the edges where wire text is read (MAN-9912) |
+| `utils/joinFriction.ts`, `typeRegression.ts`, `healAnswer.ts`, `readEventsPage.ts`, `lastSeq.ts`, `uploadsFrames.ts` | the pure fills and the edges where wire text is read (MAN-9912); the day and hour bucketing and `DayBucket` are the shared `@/shared/dayBuckets` (MAN-9989), fed by `useUploadsRead`'s run-to-item mapping |
 
 ## The root and what it is handed
 - The root holds the window (`UploadsWindow`, 30 at first), the filters (`UploadsFilters`), the open run's session id and the pill last pressed. `RunList` holds one more, how many rows are drawn; `RunEvents` holds the open line by its event id.
@@ -17476,23 +17516,22 @@ section: The boot reporter — how a page that did not draw tells the server why
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/index.html, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/boot-report/, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/request-source.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/AppErrorBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/boot-reporter.mjs
 
-## MAN-9911 — src/modules/upload-runs/hooks — the reads: the 13 hooks, what makes a read, the four timers and the rules
+## MAN-9911 — src/modules/upload-runs/hooks — the reads: the 12 hooks, what makes a read, the four timers and the rules
 
-The Uploads view's data layer, `src/modules/upload-runs/hooks/`: one read or one stream each. The root calls three (`useUploadsRead`, `useRunSheet`, `useUploadsClock`); the rest are theirs. The module: MAN-9891. What each read keeps, drops and counts: MAN-9913. The pure parts they call: MAN-9912. Wire: MAN-9882. Shared read: `useLaneRead` (MAN-8917).
+The Uploads view's data layer, `src/modules/upload-runs/hooks/`: one read or one stream each. The root calls three (`useUploadsRead`, `useRunSheet`, `useUploadsClock`); the rest are theirs. The module: MAN-9891. What each read keeps, drops and counts: MAN-9913. The pure parts they call: MAN-9912. Wire: MAN-9882. Shared read: `useLaneRead` (MAN-8917). Two of its pieces are shared hooks in `src/shared/hooks/` (MAN-9989 is their row): `useCoalescedCall` and the feed's `useEventFeed` / `useFeedEvents`.
 
 ## The hooks
 | hook | gives | called by |
 |---|---|---|
 | `useUploadsRead({ shown, window, filters })` | `{ read, feed, readAt, refresh, retry }`; `read` is `UploadsRead`, made from the overview, the heal answer and the live step | `UploadsView` |
 | `useOverviewRead(shown, days, filters)` | `{ overview, trouble, readAt, reload, retry }`: `api.uploadRuns.overview` through `useLaneRead`, key `[days, by, tests, account]`, null while hidden | `useUploadsRead` |
-| `useRunsFeed(active)` | `RunsFeed` `{ subscribe, redial }`: the ONE `EventSource` on the feed, open only while `active`. `useFeedEvents(feed, listener)` hears `open` (each dial) and `frame` | `useUploadsRead` dials; `useLiveRun`, `useRunSheet` listen |
+| `useRunsFeed(active)` | `RunsFeed` = `EventFeed<UploadRunsFrame>` `{ subscribe, redial }`: the ONE `EventSource` on the feed, open only while `active` — the shared `useEventFeed` handed `api.uploadRuns.feedUrl`, `parseFrame` and the name `upload runs`. The shared `useFeedEvents(feed, listener)` hears `open` (each dial) and `frame` | `useUploadsRead` dials; `useLiveRun`, `useRunSheet` listen |
 | `useHealSessions(ids, active, trigger)` | `{ answer, failed, retry }`: the heal ledger's answer for the runs' Claude sessions | `useUploadsRead`, `useRunSheet` |
 | `useHealSignature()` | a line of the app's heals (id, status, `ended_at`) from `useHeal()`: the `trigger` of the heal reads | `useUploadsRead`, `useRunSheet` |
 | `useLiveRun(live, feed)` | `LiveStep` or null: the live run's newest step, from its own stream and the feed's walk frames | `useUploadsRead` (`read.live`) |
 | `useRunSheet(sid, feed)` | `{ sheet, showEarlier, retry }`: the open run, its events and its heal answer | `UploadsView` |
 | `useRunEvents(sid, run)` | a run's events: the newest 500, Show earlier, the lines a stream appends | `useRunSheet` |
 | `useRunStream(sid, reader)` | one `EventSource` on a live run's stream; closed when `sid` clears, the run ends or the caller goes | `useLiveRun`, `useRunSheet` |
-| `useCoalescedCall(run, windowMs, active)` | many asks, one call: the first arms a `windowMs` timeout and the latest `run` fires once | `useUploadsRead`, `useRunSheet` |
 | `useThrottledCall(run, gapMs)` | the first ask runs now; asks inside the gap become ONE more call at its end | `useUploadsRead` (Refresh) |
 | `useUploadsClock(shown, ticking, readAt)` | `now`, epoch ms | `UploadsView` |
 | `useFollowNewest(newestKey)` | `{ paneRef, onScroll }` for the events pane | `RunEvents` |
@@ -17514,9 +17553,9 @@ The Uploads view's data layer, `src/modules/upload-runs/hooks/`: one read or one
 All on the host window (`useHostWindow`, MAN-7443). None polls: each is armed by an event or a live run, and cleared on hide or unmount.
 | timer | where | length | armed by | ends |
 |---|---|---|---|---|
-| frame debounce | `useCoalescedCall`, `FRAME_COALESCE_MS` in `useUploadsRead` and `useRunSheet` | 1 s | the first frame of a burst | when it fires |
+| frame debounce | the shared `useCoalescedCall` (many asks, one call: the first arms a `windowMs` timeout and the latest `run` fires once), `FRAME_COALESCE_MS` in `useUploadsRead` and `useRunSheet` | 1 s | the first frame of a burst | when it fires |
 | Refresh gap | `useThrottledCall`, `REFRESH_GAP_MS` | 1 s | a press of Refresh | when no press waited inside it |
-| feed re-dial | `useRunsFeed` | 1 s, doubling to 30 s | a dial the lane REFUSED (the browser never re-dials those: the lane's 503 while the engine boots, a 401); an `open` resets it | when it fires; Refresh and Try again dial at once |
+| feed re-dial | the shared `useEventFeed`, through `useRunsFeed` | 1 s, doubling to 30 s | a dial the lane REFUSED (the browser never re-dials those: the lane's 503 while the engine boots, a 401); an `open` resets it | when it fires; Refresh and Try again dial at once |
 | clock tick | `useUploadsClock` | 1 s | a live run and the view shown | when the run ends or the view hides |
 
 ## Rules an editor must not break
@@ -17537,13 +17576,13 @@ The Uploads view's pure parts, `src/modules/upload-runs/utils/`: the fills made 
 |---|---|---|
 | `joinFriction.ts` | `joinFriction(answer)`, `healedCounts(answer)` | `joinFriction`: per Claude session `{ rows, healed, open }` from the answer's rows. An `ignored` row is left out. A row is healed only when its `claimed_by` is a heal with status `done`; a row a `running` or `blocked` heal claimed is open. A session with no row has no entry: "no mark", never zero. `healedCounts`: `{ landed, running }` over the answer's heals (a heal that claimed or cured a row of the sessions asked for), `blocked` in neither: the Healed pill's two figures |
 | `typeRegression.ts` | `typeRegression(answer, runs)` | `{ initial, final }`, true when an armed run of that type ran in a session holding a row whose `regression` is not null. A test run, a run with no type and one with no Claude session name nothing to join on |
-| `bucketDays.ts` | `bucketDays(runs, days, now)` | `DayBucket[]` in the browser's local time, oldest first: one bucket for EVERY local day from the day the window opens (`now` less `days` × 24 h) through today, so a 7-day window has 8. Stepped by the calendar, not by 24 h. A run lands on the local day of its `started_at`; armed runs split `clean` and `hiccup`, a test run is `test`, a live run is in none, a run outside the buckets is left out. `days` is `overview.window.days` and `now` is `overview.generated_at` as epoch ms |
-| `bucketHours.ts` | `bucketHours(runs)` | 24 counts by local hour, midnight first: armed runs, the live one included; test runs in none; a `started_at` that cannot be read is left out |
 | `healAnswer.ts` | `readSessionsAnswer(body)`, `sessionIdsOf(runs)`, `chunkSessionIds(ids)`, `mergeAnswers(parts)`, `NO_SESSIONS_ANSWER` | `readSessionsAnswer` reads the worker's answer where it enters, or throws naming what was wrong: a wrong shape thrown while the sheet draws would blank the workspace's main region. A row needs `id`, `ts` (numbers), `session` (text), `claimed_by` (null or text) and `regression` null or whole (`heal_id`, `signature` text, `since` number); a heal needs `id`, `status`, `started_at`, `signatures_claimed` (array), `athena`, `claimed_here` (a number array) and `cured_here` (a number array, or null for a heal whose cure the ledger never recorded: MAN-9879). `sessions` keeps its text entries. `sessionIdsOf`: each run's Claude session once, in the runs' order, lowercase uuids only. `chunkSessionIds`: reads of at most 200. `mergeAnswers`: one part is returned as it is; a heal that appears in two reads is made one card, its `claimed_here` joined and its `cured_here` joined, null when either read says null (it is one column, so one silence); rows stay newest first |
 | `readEventsPage.ts` | `readEventsPage(sid, after, limit)`, `EventsReadFault` | one page of a run's events, or a throw of `EventsReadFault` (carries `trouble`, an `AffectedAreasTrouble`, as `useLaneRead` reads a fault): the lane's refusal, no answer, or an answer that is not a page with `events` and `next` |
 | `lastSeq.ts` | `lastSeqOf(run)` | `counts.events` plus the `events_not_kept` reason's `count` (0 when there is none). `last_seq` is not on the wire; the engine defines that reason's count as `last_seq` less the events held (`runs_shapes.py`), so the two add up to it. Used to open the live stream a little behind the newest event, to tell the bubbles the row has not counted, and to place the newest events page |
 | `uploadsFrames.ts` | `parseFrame(data)`, `parseBubble(data)` | the two streams' edge. `parseFrame`: a `run` frame (`session_id`, `at`, `state` text, `edge` of `opened`, `state`, `ended`) or a `walk` frame (`walk_id` text, `step_cursor` and `outcome` text or null), else null. `parseBubble`: needs `seq` an integer from 0, `ts`, `kind`, `role` text; carries `text`, `truncated` (only `true`), `tool` (needs a `summary`) and `meta` when they are there and shaped. Text that is not JSON or not these shapes is skipped with a console line naming the stream |
 | `uploadsWords.ts` (two additions) | `troubleSentence(t, trouble, subject)`, `AWAITING` | `troubleSentence`: the sentence for a lane fault, `cerberus.uploads.trouble.cause.<trouble>` with `subject` (`overview` or `run`) as the i18next `context`. `AWAITING` (`awaiting_input`), the state a live run waits on a person in, is exported for `useLiveRun` |
+
+The day and hour bucketing is the shared `src/shared/dayBuckets.ts` (MAN-9989). `useUploadsRead` maps each run to `{ at: started_at, part }`: a test run `test`, an armed run its verdict (`clean`, `hiccup`), a run with no verdict yet `null` (in no column, in the hour strip).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/utils/
 
@@ -17615,7 +17654,7 @@ node .verify/uploads-fill-states.mjs <out dir> <width> <stage>     # stages: fol
 | script | stage | proves | stands in, or launches |
 |---|---|---|---|
 | gate | every run, before the stages | the 30-day window holds no armed run and says so, with the way to 90 days | none |
-| gate | `history` | 90 days with Test runs on and off: both types with their counts, 90 day columns and 24 hour cells, no sideways pan, `tests=1` asked and test runs listed, then gone | none |
+| gate | `history` | 90 days with Test runs on and off: both types with their counts, 91 day columns (a 90-day window touches 91 local dates) and 24 hour cells, no sideways pan, `tests=1` asked and test runs listed, then gone | none |
 | gate | `run1007` | the 2026-10-07 run (`241c09797b5b`): "4 m 48 s", 56 events in one page, its one tool-error row and `heal-tool-error-20261008-030237-22b0`; Escape closes the sheet | none |
 | gate | `live` | the dry run appears in Live now with no reload (1.2 to 1.5 s after the launch, measured 2026-11-13), its sheet streams and follows, and both end with the run | launches a run |
 | gate | `tap` | after a switch to Fleet no request from the view in 6 s; back on Uploads the overview is read and the feed dialled again | none |
@@ -17704,3 +17743,136 @@ A press moves the chip between homes when its answer lands, and the button that 
 - The `empty` and `person` stages of `.verify/uploads-whole.mjs` (MAN-9915): at 1440 and 390 px the chip stood under the empty state and the press listed the proof admin's dry run.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/TestRunsChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/UploadsView.tsx
+
+## MAN-9989 — src/shared — the pieces Cerberus's views share: the event feed, the coalesced call, How often and the day and hour bucketing
+
+The pieces Cerberus's views share: the Uploads view composes them, and the Scheduling view composes the same ones. One copy each: a second copy would be two feeds and two pictures to keep right.
+
+| file | gives | rules |
+|---|---|---|
+| `src/shared/hooks/useEventFeed.ts` | `useEventFeed<F>({ url, parse, active, name })` → `EventFeed<F>` `{ subscribe, redial }`; `FeedEvent<F>` = `{ kind: 'open' } \| { kind: 'frame'; frame: F }`; `useFeedEvents<F>(feed, listener)` | ONE `EventSource` per view, open only while `active`. Each (re)dial is told as `open` (the feed keeps no history, so a reader reads again). `url` and `parse` are held by ref, read at every dial, so inline functions never re-dial. A dial the lane REFUSES (a status: 503 while the engine boots, 401) is dialled again after 1 s doubling to 30 s — the browser never re-dials those and the backend offers no "I am back" event; `redial` dials a refused feed at once (Refresh, Try again). A listener that throws is isolated and logged. `name` fills the two console lines (`upload runs` for the Uploads view). |
+| `src/shared/hooks/useCoalescedCall.ts` | `useCoalescedCall(run, windowMs, active)` → the request | Many asks, one call: the first arms ONE timeout, the latest `run` fires once. Armed only by an event, never re-armed by itself, cleared when `active` goes false or the caller goes. |
+| `src/shared/ui/HowOften.tsx` (from `@/shared/ui`) | `<HowOften days hours words />` | `words` is the i18n key prefix whose leaves it reads (`noDay`, `busiestDay`, `daysLabel`, `dayTitle`, `dayTitleTests`, `legend.clean`/`.hiccup`/`.test`, `today`, `noHour`, `busiestHour`, `hoursLabel`, `hourTitle`); the Uploads view hands `cerberus.uploads.often`. Data attributes: `data-how-often` (root), `data-how-often-day`, `data-how-often-hour` (`.verify/uploads-fill-gate.mjs` selects the last two). Paints by tone names only; colour never stands alone. |
+| `src/shared/dayBuckets.ts` | `DayBucket`, `DayBucketItem` = `{ at, part: 'clean' \| 'hiccup' \| 'test' \| null }`, `bucketDays(items, days, now)`, `bucketHours(items)` | In the BROWSER's local time. Days: the window opens at `now` less `days` × 24 h, so it touches one local day more than `days` (a 7-day window has 8 buckets, a 90-day one 91), stepped by the calendar, today last (the day `now` falls on); an item counts in its `part`, a `null` part in no column, and an item older than the window or after `now` is in no day's column. A caller hands the window as the server answered it: the Uploads view passes `days` = `overview.window.days` and `now` = `overview.generated_at` as epoch ms, so the last column is the day its newest runs fell on. Hours: 24 counts, midnight first; every item but a `test` (a `null` included); an unreadable `at` is left out. A caller maps its own rows to items (the Uploads view: `useUploadsRead`'s `dayItemOf`). Listed in `.oxlintrc.json`'s `frontend-shared-file` boundaries element. |
+
+The Uploads view's use of them: MAN-9911 (hooks), MAN-9891 (the module), MAN-9912 (utils).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/dayBuckets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCoalescedCall.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useEventFeed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HowOften.tsx
+
+## MAN-9992 — src/modules/scheduling-report — the Scheduling view: live state, files, reads and the rules an edit keeps
+
+The Scheduling view of the Cerberus tab: what happens when someone schedules in Restorly, session by session, read-only. Plan `scheduling-in-cerberus`. The tab's seventh view and fourth kept view, after Uploads (MAN-9891, MAN-8918). Lane: `server/modules/scheduling-report` → :8004 `/api/eis/internal/scheduling-report`.
+
+## State — 2026-11-18
+| fact | holds |
+|---|---|
+| mounted | YES. `CerberusPanel.tsx` has the `VIEWS` row `scheduling` and `<KeptView id="scheduling">` after Uploads; `KEPT_VIEWS` holds `scheduling` |
+| reads | live, through `api.schedulingReport` (`overview`, `entry`, `feedUrl`); no fixture is left (`scheduling-fake.ts` and `fake/` were deleted by the fill) |
+| wire types | `@/shared/scheduling-report-types`; day buckets `@/shared/dayBuckets` |
+| words | `cerberus.scheduling.*` (MAN-9893) |
+| proven | the real app on :5183 at 1440 and 390: Machine calls off and on, the booked-then-undone session's sheet, a booking and its cancel made through :5190 appearing with no reload, no request in 6 s after switching to Fleet |
+
+## Files — `src/modules/scheduling-report/`
+| file | draws or holds |
+|---|---|
+| `index.ts` | barrel: `SchedulingView`, `lazy`, its own chunk |
+| `SchedulingView.tsx` | root `SchedulingView({ shown })`: holds window (7/30/90, default 30), `SchedulingFilters`, `openId`, `activePill`; calls the two read hooks; `const now = readAt`; draws every state; the handlers (`onPill` scrolls via `PILL_TARGET`; a Machine calls press moves focus to the chip's new home) |
+| `hooks/useSchedulingRead.ts` | `({ shown, window, filters }) → { read, feed, readAt, refresh, retry }`; opens the feed (`useEventFeed`, name `scheduling report`, `active: shown`), reads on `open` at once and on a frame coalesced over 1 s; exports `SchedulingFeed` |
+| `hooks/useSchedulingOverview.ts` | the overview through `useLaneRead`, key `[days, by, machines]` (null while hidden); keeps the last good answer across a changed key and a hidden view, drops it when the changed key's read fails; `readAt` moves on a failed read too |
+| `hooks/useEntrySheet.ts` | `(shown ? openId : null, feed) → { sheet, retry }`; the entry whole on open and again 1 s after any feed event while open; a failed re-read keeps the entry on screen |
+| `utils/entriesToBuckets.ts` | pure: the overview's entries → `{ days, hours }` (a machine's entry the `test` part, a person's its verdict) |
+| `SchedulingHead.tsx`, `SchedulingPills.tsx` | headline, summary, window switch, Refresh; five pills `sessions`/`bumps`/`booked`/`closed`/`last` |
+| `SchedulingBody.tsx` | By what was done (`SchedulingKindList`), How often, Where it starts (`SchedulingOpeners`), then Sessions (`EntryList`, `EntryRow`) |
+| `MachineCallsChip.tsx`, `TroubleBanner.tsx` | the chip (two homes: Sessions list head and empty state); the failed-read banner and stale strip |
+| `EntrySheet.tsx`, `EntrySheetHead.tsx`, `EntryBumps.tsx`, `EntryOffered.tsx`, `EntryChosen.tsx`, `EntryPresses.tsx`, `EntryVisitNow.tsx`, `ActLine.tsx`, `FactList.tsx` | one session's sheet; a form with no report draws three sections, not five |
+| `utils/schedulingModel.ts` | types only: `SchedulingWindow`, `SchedulingFilters`, `SchedulingRead`, `EntrySheetRead`, `SchedulingPillKey`, `SchedulingTally` |
+| `utils/schedulingWords.ts` | pure word and look helpers (`resultWord`, `reasonWords`, `wasUndone`, `isUndoPress`, `troubleSentence`, …) |
+
+## Reads (MAN-8918's three triggers, no fourth)
+- On every show: the overview (the key returns from null), and the feed opens; its `open` reads the overview again.
+- While shown: each `changed` frame, coalesced over 1 s, re-reads the overview and the open entry. The frame carries nothing; the backend writes `: connected` at once so the browser's `open` comes at connect even through a proxy that holds headers until the first byte (Vite's on :5183, measured 2026-11-18).
+- On a press: Refresh (reload + redial a refused feed), the window, `by` and Machine calls. Speed bumps only reads nothing.
+- Hidden: the feed is closed, nothing is read, no sheet is raised; the open entry returns with the view. No timer anywhere; the feed's one retry is `useEventFeed`'s redial.
+
+## Rules an edit keeps
+- Read-only: no press books, changes or cancels a visit.
+- A machine's entry is listed only behind Machine calls and counts in no figure; drawn grey, it is How often's `test` part.
+- One word per thing: an entry is a "session", a hiccup a "speed bump".
+- "Nothing" is four results: "Closed without booking" (booking form; the only one the Closed pill counts), "Closed without a change" (form opened on a visit), "Did not go through" (direct change refused or failed), "Undone" (direct Undo that worked).
+- A neutral reason is the grey badge; only warn and danger reasons get the toned ring.
+- A chosen person always has a chip: `EntryList` draws it with a zero when the answer no longer lists them.
+- `wasUndone` is true only for a booked or changed result; never widen it to cancelled. Only the result word and the Booked/Changed counts say "then undone".
+- The `undone` reason is worded as what the server saw: chip "Undo pressed", sentence "An Undo was pressed right after." True for a failed Undo too.
+- `isUndoPress(entry)` (no form, Undo surface) is the test for an entry that is itself an Undo: its row hides the `undone` chip and its sheet says "This press was an Undo."
+- Open server question: a booking or change whose Undo failed still reads "then undone" and leaves Booked/Changed, since an overview entry carries no acts; the verdict rule or wire (seam 4) must say whether the Undo ended ok.
+- `agoWord`, `durationWord`, `clockWord`, `dayClockWord`, `whoWord` are copies of the Uploads words (a module may not deep-import another's utils); lifting them to shared is a follow-up. `durationWord` takes MILLISECONDS of elapsed time ("form open 9 s"); a visit's length is whole MINUTES and goes through `lengthWord` ("30 m", "10 h", never seconds) — `EntryChosen`'s Length line once read "30 m 0 s" through the elapsed word. `useSchedulingOverview` is the second copy of Uploads' `useOverviewRead` shape; a third lifts it to `@/shared/hooks`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/ActLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryBumps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryChosen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryOffered.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntrySheetHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntrySheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryVisitNow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/FactList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/hooks/useEntrySheet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/hooks/useSchedulingOverview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/hooks/useSchedulingRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/MachineCallsChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingKindList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingOpeners.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingPills.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/TroubleBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/utils/entriesToBuckets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/utils/schedulingModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/utils/schedulingWords.ts
+
+## MAN-9996 — The scheduling-report lane — /api/scheduling-report forwarded to the eis backend's scheduling record (:8004; the first lane that does not point at :8001)
+
+`server/modules/scheduling-report/` is the fourth lane between the browser and an internal-caller gate, in the upload-runs lane's shape (MAN-9897), and the FIRST that points at the eis backend (`:8004`, `eis_backend/`) instead of shadow-connector's `:8001` engine. It relays three GET routes of `/api/eis/internal/scheduling-report` (MAN-9995) and nothing else. Mounted in `server/index.ts` at `/api/scheduling-report` behind `authenticateToken`, after the upload-runs lane. The browser never holds the secret. Its client is `api.schedulingReport` (MAN-9997), for the Cerberus tab's Scheduling view (MAN-9992).
+
+**Why a lane to :8004.** `:8004` serves its internal surface behind the same `EIS_INTERNAL_SECRET` class the `:8001` surfaces use (the shared gate `routes/internal_gate.py`, INV-3519). A hop through `:8001` would be one service relaying a third for nothing. The shared forwarder (MAN-8863) takes any base URL, so a lane may point at either; the secret is read from the env file named for that lane.
+
+| File | Holds |
+|---|---|
+| `scheduling-report.module.ts` | `createSchedulingReportModule()`; the ONLY reader of the environment for this lane |
+| `scheduling-report.routes.ts` | `createSchedulingReportRouter({ forward, stream })`: the three-row table and the rules; the shared router (MAN-8908) does the rest |
+| `index.ts` | barrel the entrypoint imports |
+
+## Configuration (the lane adds two variables)
+| Variable | Default | Meaning |
+|---|---|---|
+| `EIS_BACKEND_URL` | `http://127.0.0.1:8004` | the eis backend's origin |
+| `EIS_BACKEND_ENV_FILE` | `/opt/shadow-connector/.eis_backend.env` | file holding the backend's `EIS_INTERNAL_SECRET=` (the file `eis-app.service` loads) |
+The forwarder is built with `label: 'scheduling-report'`: log warnings read `[scheduling-report] no usable internal secret in <file>: <cause>`. This lane never reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE`; the other lanes never read these two.
+
+## Allowlist (3 rows in `ALLOWLIST`, GET only)
+A method+path not in the table is the lane's own 404 `{ error: 'not a route of the scheduling-report lane' }`; it never reaches :8004. A query key that is not a row's is dropped, so an EventSource's `?token=` never leaves.
+| Method path | Query keys, each held to its rule | Bound | Reply |
+|---|---|---|---|
+| `GET /overview` | `days` 7\|30\|90; `by` `^[a-z_]+:[^\s]{1,160}$`; `machines` 0\|1; `account` lowercase uuid | 30 s | json |
+| `GET /entries/:id` | none; `:id` lowercase uuid | 30 s | json |
+| `GET /feed` | `account` lowercase uuid | 10 s to connect | stream |
+A failed check is the lane's 422 `{ error: '<name> must be <expects>' }`, nothing sent. An upstream answer passes through with its status and JSON untouched (the overview, an entry whole, the backend's 404 `{ detail: 'no such entry' }`, its 404 `{ error: 'unknown_account' }` and 503 feed-full on the stream); the lane's own faults are `{ error }`: unreachable 503, unreadable 502, no secret 503 (MAN-8908 rule 4).
+
+## Rules an editor must not break
+1. **GET only.** No verb row books, edits or cancels a visit: the view takes no action.
+2. **An id is checked before a byte leaves** (`LOWERCASE_UUID_RULE`).
+3. **The secret is not read here.** It stays in the forwarder (INV-8633); this module only names the file.
+4. **No timer, no cache, no model call.** The only socket the lane keeps is the open feed, one per watching browser, closed with it.
+5. **The feed row's bound is its connect.** The backend writes `: connected` at once; an open feed outlasts any overall timeout.
+6. **Do not point this lane at `:8001`**: that surface is the engine's; the backend's feed, entries and secret file are :8004's.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduling-report/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduling-report/scheduling-report.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduling-report/scheduling-report.routes.ts
+
+## MAN-9997 — Scheduling-report client wire — src/shared/scheduling-report-types.ts and api.schedulingReport
+
+The browser's typed view of the scheduling-report lane (`/api/scheduling-report`, the Scheduling view of the Cerberus tab): one wire-type file and one `api` block, on the upload-runs precedent (MAN-9882). The one home of every body is shadow-connector's `eis_backend/scheduling_report/` (MAN-9995, MAN-9994); the types follow it key for key, and a word added there needs `contracts.py`, migration 356 and this file together. The lane forwards every body untouched, so there is no third copy. Imports nothing from `server/`.
+
+## Files
+| file | holds |
+|---|---|
+| `src/shared/scheduling-report-types.ts` | the vocabularies (`SchedulingWindowDays`, `SchedulingEntryKind`, `…Result`, `…State`, `SchedulingVerdict`, `SchedulingTone`, `SchedulingReasonTone`, `SchedulingReasonCode` (the 20 reason codes), `SchedulingActKind`, `SchedulingOutcome`, `SchedulingCalendar`, `SchedulingSurface`, `SchedulingOpener`, `SchedulingActorKind`, `SchedulingSessionMode`) and the bodies (`SchedulingReason`, `SchedulingPerson`, `SchedulingJob`, `SchedulingPresses`, `SchedulingEntry`, `SchedulingKindCounts`, `SchedulingOverview`, `SchedulingAct`, `SchedulingProposal`, `SchedulingOffered`, `SchedulingChosen`, `SchedulingSession`, `SchedulingVisitNow`, `SchedulingEntryWhole`, `SchedulingFeedFrame`) |
+| `src/shared/api.ts` | `api.schedulingReport`, 3 verbs, after `api.uploadRuns` |
+| `.oxlintrc.json` | the types file in the `frontend-shared-file` list (INV-5890) |
+| `src/shared/types.ts` | `CerberusView` gains `'scheduling'` (MAN-7891) |
+
+## Verbs (every one a GET: the view is read-only)
+| verb | route | answer |
+|---|---|---|
+| `schedulingReport.overview({ days?, by?, machines?, account? }, options?)` | `GET /api/scheduling-report/overview` | `SchedulingOverview`; `days` 7·30·90 (30 left out); `by` one actor stamp `eis:<login>`; `machines: true` goes out as `machines=1` and brings machine calls in |
+| `schedulingReport.entry(id, options?)` | `GET …/entries/:id` | `SchedulingEntryWhole`; 404 no such entry; `id` through `encodeURIComponent` |
+| `schedulingReport.feedUrl()` | `GET …/feed` | a URL for `EventSource` carrying the stored token as `?token=` (`authenticateToken` reads it; the lane never forwards it): a `SchedulingFeedFrame` `{ type: 'changed' }` per `message` event |
+A failure arrives as `{ error }` from the lane, or `{ detail }` passed through from the backend.
+
+## Rules an editor must not break
+- A body changes in the backend first; the mirror moves in the same change. why: a key renamed on one side is a screen that stops reading.
+- Keys are the wire's snake_case; datetimes are ISO text; ids are lowercase uuid text. A body field is always present (`null` for none); a reason's `count` and `detail` are the exception.
+- The feed frame carries nothing: it says "re-read". Never read a row, id or account from it.
+- Closed unions: verdict, tone, reason tone, reason code, kind, result, state, outcome, calendar, surface, opener. A word a screen does not know is drawn neutral, the word as data.
+- A person's `name` is `null` for an id the roster no longer holds (`technician_people()` lists active people only): draw the id's absence, never the id.
+- `src/modules/scheduling-report` (MAN-9992) is the only caller of `api.schedulingReport` and, beside `api.ts`, the only importer of the wire types.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/scheduling-report-types.ts

@@ -48,6 +48,10 @@ export { diagnoseProjectFolder } from './list/claude/claude-project-folder.js';
 // edited message's resume point, which only the providers module can read.
 export { sessionsService } from './services/sessions.service.js';
 
+// buildCloudCliSessionName: used by the chat-names module, which reads a label still equal to a new chat's starting name
+// (its first message's first four words, or "Untitled Session") as a placeholder to be named, not a label to keep or replace.
+export { buildCloudCliSessionName } from './services/sessions.service.js';
+
 // sessionUserStateService: used by the companion module's `pin_session`, which pins a chat through the very write the sidebar's
 // Pin item makes (`PUT /sessions/:sessionId/pinned`), so a pin from her and one from his hand leave the same mark.
 export { sessionUserStateService } from './services/session-user-state.service.js';

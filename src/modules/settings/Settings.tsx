@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { announceAccountsChanged } from '@/modules/accounts';
 import { ProviderLoginModal } from '@/modules/provider-auth';
 import { Button } from '@/shared/ui';
+import { WAY_BACK } from '@/shared/ui/overlayEscape';
 import SettingsSidebar from '@/modules/settings/SettingsSidebar';
 import AgentsSettingsTab from '@/modules/settings/tabs/agents-settings/AgentsSettingsTab';
 import AppearanceSettingsTab from '@/modules/settings/tabs/AppearanceSettingsTab';
@@ -177,6 +178,9 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
               size="sm"
               onClick={onClose}
               aria-label={t('close')}
+              // Escape presses it (`useEscapeBack`): Close is Settings' way back, and it is the last one in the document while
+              // Settings is up. A form of its own opened over it covers this button, and the key then does nothing here.
+              {...WAY_BACK}
               className="h-10 w-10 touch-manipulation p-0 text-muted-foreground hover:text-foreground active:bg-accent/50"
             >
               <X className="h-5 w-5" />

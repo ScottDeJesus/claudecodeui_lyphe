@@ -1,0 +1,16 @@
+# Rings
+
+Sets of things you turn through, as rings around the core. Each ring is a way in, a measure and a sign at once: where you are, how far each thing has got, and what it is doing.
+
+- **Provide** `rings`, inside out, one to five. Each is `{ id, label, items, value }`, and an item is `{ id, label, detail, progress, state }`. `value` is the item that faces you. `onChange(item, ring)` fires when another one locks in; `onOpen(item, ring, point)` when the one facing you is clicked. A Core passed as `children` sits in the middle, and `onCore` is a press on it.
+- **Where.** The mark at the pointer is where you are. Turn the ring and the next mark comes to you.
+- **How far.** Each thing owns the span from its mark to the next, and the span lights with its `progress`.
+- **What state.** `working` crawls dashes ahead of a bead; `waiting` turns the mark `accent` and holds a gate open; `done` rests fully lit; `failed` stops in `danger-dot`; anything else stays a hairline.
+- **Mechanics.** Drag a ring and the mark under your finger stays under it. Flick it and it glides for `duration-glide`, then the nearest mark catches it on the lock spring. Tap a mark and it comes round in `duration-jump`; tap the one facing you and it opens. The pointer lifts while a ring turns and drops in when it locks. Two fingers turn two rings. The scroll wheel turns the ring under the cursor. It takes hold within `size-grab` of the line, `size-grab-touch` under a finger.
+- **Who is on it.** A working item's `agents` is the number of helpers at work on it: one small bead each rides behind the head, up to five. No roster on screen.
+- **One measure, worn by the core, or two.** `gauge` is `{ value, label, detail, warn, danger }`: a quantity that fills, such as context used, as a hairline round the core. Pass a list of two and the second is worn just outside the first: the thing itself closest (this chat's context), what it draws on outside (the account's week). Each is thin and `ink-muted` until it passes `warn` (0.8), then `warn-dot`, then `danger-dot` from `danger` (full, unless you say). Point at one and a plate names it. Never more than two, and no gauge panel on screen. `onGauge(point, index)` is a press on one: 0 the inner, 1 the outer, so each can open its own detail (the context of a chat; the account it runs on).
+- **No words until you touch it.** At rest a ring shows no text. In use, a plate beside the pointer names what faces you: the ring's `label`, the item's `detail`, then its `label`. Under a mouse, the mark you point at names itself.
+- **It drifts when left alone** and holds still the moment you touch it. Pass `hold` while an Opening hangs from it. Three rings are the rig's own: `signal-b` inside, `signal-a` in the middle, the flat `signal-loop` outside.
+- **Where a mark is.** Pass a ref: `pointOf(ring, item)` is the mark's place on screen, for an Opening to hang from; `azimuthOf(ring, item)` is its direction from the core, for the Core's `azimuth`, so the core can read from a thing or write to it.
+- **Keys.** Each ring is a slider: arrows turn it a mark at a time, Home and End go to the first and last, Enter opens what faces you.
+- Use it for sets of two to twenty-four things. Never label the marks, never put a legend beside it, and never pair it with a list of the same things.

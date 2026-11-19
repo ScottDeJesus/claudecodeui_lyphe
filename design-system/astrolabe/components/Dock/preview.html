@@ -1,0 +1,25 @@
+<!-- @dsCard group="Controls" height=168 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dock — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Demo() {
+    var a = React.useState(false), b = React.useState(false), m = React.useState('short');
+    return h(A.Dock, null,
+      h(A.TextField, { label: 'Line for the voice to speak', placeholder: 'Give it a line to speak…' }),
+      h(A.Button, { variant: 'primary', icon: a[0] ? 'stop' : 'play', active: a[0], onClick: function () { a[1](!a[0]); } }, a[0] ? 'Stop' : 'Speak'),
+      h(A.ToggleButton, { icon: 'mic', pressed: b[0], onPressedChange: b[1] }, b[0] ? 'Stop' : 'Listen'),
+      h(A.FileButton, { accept: 'audio/*' }, 'Audio file'),
+      h(A.SegmentedControl, { label: 'Answer length', options: [{ value: 'short', label: 'Short' }, { value: 'full', label: 'Full' }], value: m[0], onChange: m[1] }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

@@ -1207,6 +1207,12 @@ export type AstrolabeVoiceFrame = { rms: number; low: number; mid: number; high:
 export type AstrolabeTier = 'disc' | 'core' | 'dial' | 'body';
 
 /**
+ * One measure a lone core wears as a ring in orbit round it: how full it is (0 to 1, or null while nobody has measured it: the ring
+ * is then its track alone) and what it says in colour (`quiet` until it runs high, then `warn`, then `danger`).
+ */
+export type AstrolabeGauge = { value: number | null; tone: 'quiet' | 'warn' | 'danger' };
+
+/**
  * What her face's instrument draws one frame from, as CompanionAvatar builds it from her presence: the instrument's own `state` (her
  * fourteen presence words fold into these six: the body has a form for each), what her voice is doing (`voice`, null while nothing sounds), where she looks
  * (`azimuth`, degrees counter-clockwise from the right; null lets the pointer drift), the reticle's words (`label`), the walk she is on
@@ -1225,6 +1231,8 @@ export type AstrolabeFrameInput = {
   material: CompanionMaterial;
   /** How hard it is driven, 0 to 1 (a chat's effort): it stirs the surface and widens the glow. Absent is 0, at rest. */
   drive?: number;
+  /** The measures a lone core wears as orbiting rings (the `body` tier), the inner first, at most two; absent or empty, it wears none. */
+  gauges?: readonly AstrolabeGauge[];
 };
 
 /**
@@ -3296,10 +3304,10 @@ export type CerberusEnrollRefusal =
 // What the Cerberus tab's root (`src/modules/cerberus/CerberusPanel.tsx`) holds between presses.
 
 /**
- * The Cerberus tab's views, in the order its strip offers them: Fleet, Catalog, History, Tours, Bulletins, then Uploads. The
- * root's view table gives each its name and its hint.
+ * The Cerberus tab's views, in the order its strip offers them: Fleet, Catalog, History, Tours, Bulletins, Uploads, then
+ * Scheduling. The root's view table gives each its name and its hint.
  */
-export type CerberusView = 'fleet' | 'catalog' | 'history' | 'tours' | 'bulletins' | 'uploads';
+export type CerberusView = 'fleet' | 'catalog' | 'history' | 'tours' | 'bulletins' | 'uploads' | 'scheduling';
 
 // ---------------------------
 
@@ -3635,6 +3643,14 @@ export type DispatcherPhase = { key: string; position: number; title: string; as
 export type DispatcherEvent = { id: number; at: string; phase: string | null; kind: string; detail: string | null };
 /** ONE planner outing: the soul the dispatcher's daemon has out on one piece of work, on one model, for one stretch of time — `store_planners`' row as `report_planners._entry` reads it. A planner is NOT a phase and not a stage: nothing in a session dispatches it, it rides the operator's Claude subscription (so `tokens` is the figure and `cost_usd` is `0`), and its liveness is the store's own `state` rather than a column a card has to derive. `target` is the bare name the outing is FOR — a plan's, or an ARC's for the arc's own design, its cut and its judgment — and `plan` is the name it lands in, equal to `target` except for a judgment, which targets its arc and lands in `<arc>--judgment`. `verb` is the work it is doing and `state` is the row's own: `queued` and `out` are LIVE (the rule owes each something), `ended` is the record that the child is gone. `stalled` is the document's ONE derived word and is true on exactly the endings whose work is still unfinished — every `ended` entry the document carries is one, so a reader never re-asks the question to tell them apart. `outcome` is what an ending left behind: `done` when it did what it was for, else the crash the launch's own `result.json` carried. `launch_id` names the launch, and `tokens`/`cost_usd` are read off that launch's result at report time and never stored (INV-172). `paid_vendor` is the label of those dollars, off the launch's own bill word. */
 export type DispatcherPlanner = { id: number; target: string; plan: string; soul: string; verb: 'design' | 'judge' | 'tell' | 'cut'; model: string; state: 'queued' | 'out' | 'ended'; stalled: boolean; launch_id: string | null; created_at: string; launched_at: string | null; ended_at: string | null; outcome: string | null; tokens: number; cost_usd: number; paid_vendor: string | null; /** The pacer's clause on THIS queued outing, with its `pace:` lead, or `''` (`report.snapshot` → `pace_report.mark_outings`, off the document's one walk): the words `dispatcher`'s `held planner …` line prints for it. The board draws it with an Override on the outing's Planning line only while its subject has neither a plan card nor a deck drawn on the screen (`PlanningCard`, `PlanningLine.drawn`: an epic's design before any plan of it exists, or a feature or epic the operator has put away); an outing whose card or deck is drawn is held on it (`plan.pace_hold`, `arc.pace_hold`), so each hold has one press. `''` against a dispatcher build older than the key (read tolerantly, `plannerOf`). */ pace_hold: string; /** Whether the outing's target carries the operator's override (`dispatcher override <name>`, a plan's or an epic's) — a lifted outing reads `pace_hold` `''` and a Planning line whose subject has no card or deck drawn then draws `Override on` with its Turn off. `false` against a build older than the key. */ overridden: boolean; /** The agent THIS outing is out on, waiting for CPU (`report.snapshot` → `cpu_report.mark_outings`): `{launch, since, words}`, or `null`. The Planning line draws it with an Override that lets THAT agent start now only while the outing's subject has neither a plan card nor a deck on screen — a drawn card or deck carries it (`plan.cpu_wait`, `arc.cpu_wait`), so each wait has one press. `null` against a build older than the key (read tolerantly, `cpuWaitSince`). */ cpu_wait: DispatcherCpuWait | null; /** Whether a standing planning pause HOLDS this outing — the feature's own or its epic's (`report_planners.mark_paused`, by `store_planning.holder`) — whatever the outing's `state`: queued, out, or the ENDED entry the pause itself left. The pause ends the outing in flight, and the ending stays in the document as a stalled entry while its work is short, so a loose Planning line (an epic's design with no feature yet, no epic on the lane to read its own `planning_paused` from) reads its own flag here: `true` draws Resume planning, `false` Pause planning (`loosePress`). `false` against a dispatcher build older than the key (read tolerantly, `plannerOf`). */ planning_paused: boolean; /** Why a QUEUED outing has not been launched (`planner_holds.hold_of`, put on the list by `planner_holds.mark_waiting` off the document's one read-only pace context): the take-up's own reason for passing the row over, in the words its `held planner …` line ends with — `planning paused`, `queue: Pause all is on`, the pacer's clause with its `pace:` lead, `waits for its own outing to end`, `a launch of it is being recorded` — so a queued outing is never one a reader cannot account for. `''` for an outing that is not queued, for one nothing holds (the daemon takes it up at once), and against a dispatcher build older than the key (read tolerantly, `plannerOf`). The pacer's clause is also this outing's `pace_hold`, which the card draws with its Override: the badge says it there once and leaves it out of its own line. */ waiting: string; /** The sentence of the house's open `no-run` record for this outing (`report_planners._entry`, `run_record.open_alert`): the house could not get a run behind it — it could not heal the claim, or the launch was refused outright — and the sentence says what it tried and why, in plain words with no row or launch id. `''` while no record stands since the outing's latest stamp, and against a dispatcher build older than the key (read tolerantly, `plannerOf`). Read at every report and never stored (INV-172), so a later outing of the same work starts clean; the endings notifier pushed the same sentence once, as `dispatcher.no_run`, when the record was written. The badge draws it in the `danger` tone, in place of the outing's own state word. */ no_run: string };
+/** A card row's state in the dispatcher's store. */
+export type DispatcherCardState = 'told' | 'queued' | 'walking' | 'asking' | 'done' | 'handed-back' | 'stopped' | 'withdrawn';
+/** One case a card's walk wrote or ran, with its word as the dispatcher derived it at its read. */
+export type DispatcherCardCase = { suite: string; name: string; word: string };
+/** One stage of the card's walk; `launch_id` opens its transcript (`SubagentTranscriptTarget` kind `soul`), `cost_usd` is paid dollars. */
+export type DispatcherCardStage = { name: string; soul: string | null; launch_id: string | null; status: string | null; verdict: string | null; cost_usd: number };
+/** One board card the dispatcher walks, as the `dispatcher_state` frame's `cards` carries it; matched to a board card by `board` and `card` (the board's own ids); `hold` is the sentence a queued card waits on, null otherwise. */
+export type DispatcherCard = { board: string; card: string; title: string; state: DispatcherCardState; flow: 'bug' | 'change' | 'tweak' | null; part: 'whole' | 'fix' | 'change'; sorted_by: string | null; confidence: number | null; hold: string | null; waits_on: number | null; chain_id: string | null; cases: DispatcherCardCase[]; stages: DispatcherCardStage[] };
 /** The two causes a phase's or a plan's `stalled` word carries (`report_stall`): `dispatcher_down` when no daemon holds the home, so nothing can record anything, and `ended_unrecorded` when one does and has not. Both are answered by Resume, which wakes or starts the daemon. */
 export type DispatcherStall = 'dispatcher_down' | 'ended_unrecorded';
 /** The plan's word, in ONE precedence: `complete`, `hidden`, `scheduled`, `paused`, `queued`, `stalled`, `live`, `parked`, else `idle`. `hidden` is a plan the operator hid (`DispatcherPlan.hidden` says since when): held out of the queue and paused until he Shows it, and it outranks every word below it — an hour armed for it fires into a refusal, so a card reading `scheduled` over it would promise a start nothing makes. `stalled` is a released plan (approved, unpaused) whose only running work has ENDED with nothing to record it — never `live`, because nothing is moving it; `DispatcherPlan.stalled` says why. `scheduled` outranks the pause flag on purpose — a paused plan with an hour set is going to start by itself, and calling it merely `paused` would hide the one fact the operator needs. `paused` and `queued` are told apart by whether a walk ever launched: a paused plan that has run is stopped mid-plan, one that never launched is still waiting at the gate. */
@@ -3673,8 +3689,8 @@ export type DispatcherPace = { account: string; reading: DispatcherPaceReading; 
 export type DispatcherRoute = { provider: 'claude' | 'deepseek'; word: string; park_at_peak: boolean; peak_until: string | null; /** The pacer's picture (`route.pace`, interface VI), or `null`/absent while no picture is drawn: the master controller's pace line reads only `words`, and draws nothing without them. */ pace?: DispatcherPace | null; /** How many plans the board's one Start (`dispatcher start`) would let go now — the plans held for their FIRST Start (`first_start.held`: approved, paused, never launched, and an epic's waiting judgment), counted by the dispatcher so the button is drawn for exactly the plans its press reaches. `undefined` against a build older than the field, which draws no Start. */ waiting?: number; /** The EPIC QUEUE's census (`route.epics`, `line_gate.census`): `paused` whether Pause all is on (no epic starts; an outing already out finishes), `planning_through` whether the operator has let PLANNING through the pause (`dispatcher epics run-planning`: planner outings launch while every phase and the queue stay held — true only under a pause, and `false` against a build older than the key, which holds planning under Pause all), and `running` how many epics of the queue have STARTED. The queue runs top down; no limit is drawn. `null` against a dispatcher build older than the field, where the controls are not drawn (the key is absent: another build talking, never a torn document); a key that IS there and does not read is refused by name — `paused` or `planning_through` not a flag, `running` not a whole count. */ epics: { paused: boolean; planning_through: boolean; running: number } | null };
 /** This home's daemon. `alive` is the LOCK, not the file: the daemon takes a blocking exclusive flock on `<home>/daemon.lock` before anything else, so an exclusive flock taken by a reader answers without blocking — refused means somebody holds it, and that somebody is the daemon. `pid` and `unit` are therefore only reported on the alive branch: a lock file nobody holds is a dead daemon's, whatever pid it still names, and the unit comes from `/proc/<pid>/cgroup` — the kernel's answer, the one thing the daemon's four-name environment cannot have been handed. */
 export type DispatcherDaemon = { alive: boolean; pid: number | null; unit: string | null };
-/** The whole picture, pushed on change over `/ws` by the dispatcher lane. It is the document's own keys — `plans`, `arcs`, `planners`, `route`, `daemon`, `offpeak_at`, `home`, `generated_at` — with the frame's clock added as `at`, epoch MILLISECONDS (`Date.now()`), unlike every time inside. `offpeak_at` is always a stamp — the next DeepSeek off-peak moment, and the literal `none` when the clock cannot answer — so it is a string and never null. */
-export type DispatcherStateEvent = { kind: 'dispatcher_state'; arcs: DispatcherArc[]; plans: DispatcherPlan[]; planners: DispatcherPlanner[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; home: string; generated_at: string; at: number };
+/** The whole picture, pushed on change over `/ws` by the dispatcher lane. It is the document's own keys — `plans`, `arcs`, `planners`, `cards`, `route`, `daemon`, `offpeak_at`, `home`, `generated_at` — with the frame's clock added as `at`, epoch MILLISECONDS (`Date.now()`), unlike every time inside. `offpeak_at` is always a stamp — the next DeepSeek off-peak moment, and the literal `none` when the clock cannot answer — so it is a string and never null. */
+export type DispatcherStateEvent = { kind: 'dispatcher_state'; arcs: DispatcherArc[]; plans: DispatcherPlan[]; planners: DispatcherPlanner[]; cards: DispatcherCard[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; home: string; generated_at: string; at: number };
 /** The verbs this server may relay: `stop`, `resume`, `schedule` (a stopped plan's Resume at a time — `offpeak`, an ISO timestamp, or `none` to clear), `park` (a designed plan set aside), `unpark` (handed back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word; restarts nothing and wakes nobody — the word is read when a chain is launched), `drop` (a plan taken out of the store with everything it holds of it — refused while a phase of it walks or a planner outing for it or its arc is live; the one verb no press undoes), `planner-resume` (a plan's stalled planner outing put back to work through the verb the house already has for it — `cut`, `judge`, or a `tell` of `continue` — read fresh off the store at the press; refused when nothing of the plan ended short), `arm-accept` / `disarm-accept` (the operator's "Accept when cut" on a designed plan — or on every designed plan of an arc — and its Cancel; the press carries `--by app:card` and, on a plan, the design stamp it read), `queue` (an epic moved in the queue — `--before` another epic, `--last`, or `--at` a place; an epic's verb alone, relayed only through `POST /arcs/:name/queue`), `epics` (the epic dial's word — `pause` or `resume`; a BOARD verb that names no plan or arc, relayed only through `POST /epics`, so its answer carries `plan: ""`) `start` (the board's one Start — every plan held for its first Start let go at once, the queue and the dial then ordering them; a BOARD verb too, relayed only through `POST /start`, answered with `plan: ""`), `hide` (plans, or an epic's open plans, paused and held out of the queue until shown — relayed only through `POST /hide`) and `unhide` (Show: the hidden plans take their turn in the queue — relayed only through `POST /unhide`); both take plan or epic names in the request body, and their answers carry `plan: ""`. Beside them stands `override` (the operator's lift of the usage pacer's hold for ONE plan, and nothing else — the card's `Override`, and `Turn off` with `--off`; both carry `--by app:card`, and the dispatcher refuses the lift inside a Claude session, which this server's relay never is), and `pause-planning` / `resume-planning` (the operator's brake on ONE feature's or ONE epic's designing and planning, and its lift — the card's `Pause planning` and `Resume planning`; both carry `--by app:card`, the dispatcher resolves the name plan first and then epic, and it refuses `resume-planning` inside a Claude session too, which this server's relay never is; relayed under `/plans/:name` and `/arcs/:name`). */
 export type DispatcherVerb = 'stop' | 'resume' | 'schedule' | 'park' | 'unpark' | 'model' | 'drop' | 'planner-resume' | 'arm-accept' | 'disarm-accept' | 'queue' | 'epics' | 'start' | 'hide' | 'unhide' | 'override' | 'pause-planning' | 'resume-planning';
 /** What one relayed verb did. A refusal is a RESULT, not an error: the dispatcher prints its refusals on STDOUT (`REFUSED <verb> <name>: <reason>`, exit 2 — `REFUSED epics '<word>': <reason>` for the board's `epics`, which names no plan and whose answer carries `plan: ""`; a not-found line, exit 1 — `no plan <bare>`, or `no plan or arc <bare>` from one of the six verbs an arc's own name also reaches), so `stdout` carries the dispatcher's own first line whole and the reader never gets our paraphrase. `reason` is present only when the dispatcher never got to answer: it timed out, or its binary could not be spawned. */
@@ -4158,17 +4174,24 @@ export type SubagentDot = CompanionMaterial | null;
 //----------------- ROADMAP STACK: what the roadmap's stack, its painter and its face share ------------
 
 /**
- * One feature as a wall on its milestone's ring, laid out once by the roadmap module's `layoutStack` and read by the
- * stack's painter (`utils/stackPainter`), its canvas (`stack/RoadmapStack`) and its face (`RoadmapStackFace`). `at` and
+ * One plan in flight as a wall on the ring, laid out once by the roadmap module's `layoutStack` and read by the
+ * stack's painter (`utils/stackPainter`), its canvas (`stack/RoadmapStack`), its presses (`stack/StackAct`) and its card
+ * (`stack/StackCard`). `plan` is the dispatcher's own plan, which the presses turn on. `feature` is that plan in the
+ * roadmap's words: the feature it is on whichever roadmap holds it, with `epic` and `milestone` its own there, or a
+ * feature read off the plan with both `null` when no roadmap holds it. `kind` is which of the ring's three kinds it is. `at` and
  * `width` are its place and its room round the ring, in radians. `frame` is how tall it stands, as a share of a full wall:
  * how far along its path the feature is. `fill` is how much of that frame is built, the share of its tasks done. `tone` is
  * what it says in colour beside its form: `danger` when it is blocked (by its own, its epic's or its milestone's reason)
- * or stalled, `warn` when it waits on the operator. `unseen` is a feature that shipped since the operator last looked.
- * `attention` orders what asks for him: 3 a word he owes, 2 shipped unseen, 1 stalled, 0 nothing.
+ * or stalled, `warn` when it waits on the operator. `unseen` is a wall said in the positive colour, standing over the
+ * rest: a finished one, until it is dismissed. `attention` orders what asks for him: 3 a word he owes, 2 finished,
+ * 1 stalled, 0 nothing.
  */
 export type RoadmapStackWall = {
   feature: RoadmapFeature;
-  epic: RoadmapEpic;
+  epic: RoadmapEpic | null;
+  milestone: RoadmapMilestone | null;
+  plan: DispatcherPlan;
+  kind: RoadmapStackKind;
   at: number;
   width: number;
   frame: number;
@@ -4178,24 +4201,22 @@ export type RoadmapStackWall = {
   attention: 0 | 1 | 2 | 3;
 };
 
-/** One epic as its thread on the floor of its milestone's ring: the arc it runs (`from` to `to`, radians) over its own walls. */
-export type RoadmapStackEpic = { epic: RoadmapEpic; from: number; to: number; walls: RoadmapStackWall[] };
+/** The three kinds of plan the ring holds: finished and not yet dismissed, being built (at work, or stalled at it), and held (waiting for its Start or its turn, stopped, parked, or still being designed and cut). */
+export type RoadmapStackKind = 'finished' | 'building' | 'held';
 
 /**
- * One milestone as a ring of the stack: its 1-based place on the roadmap, its epics' threads, and every wall in ring order.
- * `span` is how much of the ring its walls take, in radians: a reached milestone fills its ring, and one that is not keeps
- * its walls to a readable width and leaves the rest of the rim bare.
+ * One ring of walls, in ring order. What is in flight is ONE ring (`layoutStack`); the painter lays out however many it is handed.
+ * `name` is the ring's key across pictures. `span` is how much of the ring its walls take, in radians:
+ * the walls keep a readable width and leave the rest of the rim bare.
  */
 export type RoadmapStackTier = {
-  milestone: RoadmapMilestone;
-  n: number;
-  epics: RoadmapStackEpic[];
+  name: string;
   walls: RoadmapStackWall[];
   span: number;
 };
 
-/** What a press on the stack asks its face to open: a feature's card or an epic's, by the item's name. */
-export type RoadmapStackTarget = { kind: 'feature' | 'epic'; name: string };
+/** What a press on the stack asks its face to open: a feature's card, by the feature's name. */
+export type RoadmapStackTarget = { kind: 'feature'; name: string };
 
 /**
  * What the stack's owner can ask of it: bring a feature's wall to the front, on whichever ring it stands. Handed out

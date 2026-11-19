@@ -1,0 +1,22 @@
+<!-- @dsCard group="Controls" height=152 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Select — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Demo() {
+    var s = React.useState('samantha');
+    return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 304 } },
+      h(A.Select, { label: 'Voice', value: s[0], onChange: s[1], options: [{ value: 'samantha', label: 'Samantha · en-US' }, { value: 'daniel', label: 'Daniel · en-GB' }, { value: 'moira', label: 'Moira · en-IE' }] }),
+      h(A.Select, { label: 'Voice', disabled: true, options: ['No speech engine'] }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

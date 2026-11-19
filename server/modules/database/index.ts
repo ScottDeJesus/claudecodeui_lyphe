@@ -111,6 +111,10 @@ export { kanbanLeasesDb } from '@/modules/database/repositories/kanban-leases.db
 // A card's questions and the decisions their answers became. The two travel together because an
 // answer writes both in one mutate callback.
 export { kanbanQuestionsDb } from '@/modules/database/repositories/kanban-questions.db.js';
+// Every card of one board, archived and done ones included, newest change first: the board's roster, which the
+// kanban module's roster verb hands the dispatcher when it compares a card with the rest of its board.
+export { kanbanRosterDb } from '@/modules/database/repositories/kanban-roster.db.js';
+export type { KanbanRosterCard } from '@/modules/database/repositories/kanban-roster.db.js';
 // The memory-intake lane's own table: proposals to write a memory into one of five destinations,
 // each waiting on a person's approval. It is not a board table and no board reads it.
 export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candidates.db.js';

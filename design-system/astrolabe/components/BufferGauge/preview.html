@@ -1,0 +1,16 @@
+<!-- @dsCard group="Openings" height=96 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BufferGauge — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { maxWidth: 280 } }, h(A.BufferGauge, { value: 0.52, caption: '31 ph · 9 tok · 0.84 s ahead' })));
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<!-- @dsCard group="Openings" height=92 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Badge — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h(React.Fragment, null,
+    h(A.Badge, null, 'Draft'), h(A.Badge, { tone: 'info' }, 'Queued'), h(A.Badge, { tone: 'positive' }, 'Merged'), h(A.Badge, { tone: 'warn' }, 'Needs you'), h(A.Badge, { tone: 'danger' }, 'Denied')));
+</script>
+</body>
+</html>

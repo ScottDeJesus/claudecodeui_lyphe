@@ -9,9 +9,12 @@ export { SessionPanelProvider } from '@/modules/session-panel/SessionPanelProvid
 export { SessionPanelLayout } from '@/modules/session-panel/SessionPanelLayout';
 // SessionPanelSwitch: used by project-workspace's `ChatHead`, as the way between the talk and the panel.
 export { SessionPanelSwitch } from '@/modules/session-panel/SessionPanelSwitch';
-// SessionFollowups: the chat's follow-ups drawn apart from the panel. Its consumer is project-workspace's `ChatDesk`, which
-// stands them in the chat's side column at a desk.
+// SessionFollowups: the chat's follow-ups beside the talk. Its consumer is project-workspace's `ChatDesk`, which stands them in
+// the chat's side column at a desk.
 export { SessionFollowups } from '@/modules/session-panel/SessionFollowups';
+// SessionFollowupsSwitch: used by project-workspace's `ChatHead`, beside the panel's switch: it shows and hides the follow-ups
+// in that column, and opens them as a window where there is no column.
+export { SessionFollowupsSwitch } from '@/modules/session-panel/SessionFollowupsSwitch';
 // SessionPanelMark and panelShownIdOf: used by the chat module's transcript (`ChatMessagesPane`), which marks the turn where the
 // chat put a version on its panel.
 export { SessionPanelMark } from '@/modules/session-panel/SessionPanelMark';

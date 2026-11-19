@@ -170,7 +170,7 @@ function StationHeldAction() {
  * A LETTER TYPED WITH NOTHING IN FOCUS goes to the box: the field takes the focus on the key's way down, so the letter lands in it.
  */
 export function StationShell() {
-  const { tier, phone, sideways, focus, setFocus } = useStation();
+  const { tier, phone, sideways, focus, setFocus, canGoBack, back } = useStation();
   const doors = useStationDoors();
   const hostWindow = useHostWindow();
   const isPageHeld = useIsPageHeld();
@@ -197,11 +197,18 @@ export function StationShell() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || isPageHeld() || !doors.showing() || otherOverlayHoldsEscape(hostDocument)) return;
       if (event.key === 'Escape') {
+        // Something drawn over the station that states nothing about the key (Settings, opened from the menu by the companion's
+        // name): the key is that thing's, and the station under it is not walked away.
+        const shell = hostDocument.querySelector('[data-station-shell]');
+        const inFront = hostDocument.elementFromPoint(hostWindow.innerWidth / 2, hostWindow.innerHeight / 2);
+        if (shell !== null && inFront !== null && !shell.contains(inFront)) return;
         // A key typed into a field is the field's: `closest` is asked of the node itself, whichever window made it.
         const field = (event.target as Element | null)?.closest?.('input, textarea, select, [contenteditable="true"]') ?? null;
         if (field !== null) return;
         event.preventDefault();
-        if (staged) setFocus(null);
+        // The key is the way back: to what stood on the panel before this, as the panel's own arrow goes; then the panel put away; then home.
+        if (staged && canGoBack) back();
+        else if (staged) setFocus(null);
         else goHome();
         return;
       }
@@ -214,7 +221,7 @@ export function StationShell() {
     // is still there to be seen. It stops nothing: the key goes on to whoever owns it.
     hostWindow.addEventListener('keydown', onKeyDown, true);
     return () => hostWindow.removeEventListener('keydown', onKeyDown, true);
-  }, [staged, hostWindow, isPageHeld, doors, setFocus, goHome]);
+  }, [staged, canGoBack, back, hostWindow, isPageHeld, doors, setFocus, goHome]);
 
   return (
     <StationShellView

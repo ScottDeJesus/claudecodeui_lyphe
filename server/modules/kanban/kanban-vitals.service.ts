@@ -1,34 +1,25 @@
 import { getConnection } from '@/modules/database/index.js';
-import {
-  KANBAN_LEASE_STALE_SECONDS,
-  KANBAN_OPERATOR_SCHEDULED_TAG,
-  type KanbanVitals,
-} from '@/shared/kanban-types.js';
+import { type KanbanVitals } from '@/shared/kanban-types.js';
 
 import { requireBoard } from './kanban-cards.guards.js';
 
 /**
- * The board header's six counts, in ONE round trip.
+ * The board header's five counts, in ONE round trip.
  *
- * FIVE SCALAR SUB-SELECTS IN ONE STATEMENT, so the strip of registers costs one query rather than
- * six, and every one of them excludes archived cards. What a card IS, per register:
+ * FOUR SCALAR SUB-SELECTS IN ONE STATEMENT, so the strip of registers costs one query rather than
+ * five, and every card count excludes archived cards. What a card IS, per register:
  *
- * - `building` — cards in the Building lane (`status = 'active'`), which is where a build lease
- *   puts them and where they stay until the builder moves them on.
+ * - `building` — cards in the Building lane (`status = 'active'`), where a card goes when work on it
+ *   begins and where it stays until the builder moves it on.
  * - `awaitingAnswer` — cards with at least one question nobody has answered: the operator's turn,
  *   and the panel's own `needsAnswer`.
- * - `awaitingApprove` — the SAFE approve subset: not yet approved, no open question, sitting in a
- *   claimable/staging lane
- *   (`todo`/`questions`/`not_ready`), and content-complete — a non-blank plan, body or description,
- *   because an intake card carries its intent in `description` with `body` empty.
- * - `claimable` — the same predicate `kanbanBoardsDb.countClaimable` grants a claim by (a To-do card
- *   tagged `operator-scheduled` is the operator's, not claimable), read against the same staleness
- *   window, so the driver's green light and this register never disagree.
+ * - `queued` — cards in To Do (`status = 'todo'`): work told to the dispatcher and not yet taken up.
+ *   It is the To Do lane's own count, so the strip and the lane never disagree.
  * - `lessonsPendingEstate` — STAGED lessons awaiting a person's review. It is on the board's own
  *   lesson table and it is NOT board-scoped: a lesson belongs to the estate and its card is
  *   provenance, so there is no board filter here to get wrong.
  *
- * The sixth, `memoryPendingEstate`, is handed IN as `estate.memoryPending`, because the rows behind
+ * The fifth, `memoryPendingEstate`, is handed IN as `estate.memoryPending`, because the rows behind
  * it are `memory_candidates` and this module never imports memory-intake: the board cannot see that
  * lane's table, and a count it computed for itself would be the board reading a sibling's rows
  * sideways. The composition root reads it from the lane and passes it down (Interfaces §7).
@@ -44,7 +35,7 @@ import { requireBoard } from './kanban-cards.guards.js';
  * A FAULT IS NOT CAUGHT, and that is a ruling rather than an omission. Degrading to zeros is the
  * opposite ruling, and it belongs to a terminal status bar, which must never 500 or hang on a
  * board-count hiccup. This feeds an authenticated board header whose
- * siblings — `lanes`, `claimable`, every card read on the same panel — fail loudly through the
+ * siblings — `lanes`, every card read on the same panel — fail loudly through the
  * global handler, and zeros here would not be calm but WRONG: `src/shared/kanban-types.ts` states
  * the strip's rule in the client's own words, "Zero is a count; an unknown reading is not — the
  * strip draws it as an em-dash, never as 0", and the wire shape has no null to say "unknown" with.
@@ -62,9 +53,8 @@ export type KanbanEstateReadings = {
 type VitalsRow = {
   building: number;
   awaiting_answer: number;
-  awaiting_approve: number;
+  queued: number;
   lessons_pending_estate: number;
-  claimable: number;
 };
 
 /** A whole number off a COUNT column: SQLite hands back a number, and a missing row is nothing. */
@@ -74,15 +64,11 @@ function readCount(value: unknown): number {
 }
 
 /**
- * The six registers for one board. A board that is not there is a 404, thrown before any count is
+ * The five registers for one board. A board that is not there is a 404, thrown before any count is
  * taken so a stale tab naming a deleted board hears that rather than a board of zeros.
  */
 export function vitalsCounts(boardId: string, estate: KanbanEstateReadings): KanbanVitals {
   requireBoard(boardId);
-
-  // The same window `countClaimable` judges a build lease by, so a card stranded by a dead builder
-  // reads as claimable in both places at the same instant rather than one tick apart.
-  const staleBefore = new Date(Date.now() - KANBAN_LEASE_STALE_SECONDS * 1000).toISOString();
 
   const row = getConnection()
     .prepare(
@@ -94,34 +80,19 @@ export function vitalsCounts(boardId: string, estate: KanbanEstateReadings): Kan
             SELECT 1 FROM kanban_questions q
             WHERE q.card_id = c.id AND q.answered = 0)) AS awaiting_answer,
          (SELECT COUNT(*) FROM kanban_cards c
-          WHERE c.board_id = ? AND c.archived = 0 AND c.approved = 0
-            AND c.status IN ('todo', 'questions', 'not_ready')
-            AND NOT EXISTS (
-              SELECT 1 FROM kanban_questions q
-              WHERE q.card_id = c.id AND q.answered = 0)
-            AND (TRIM(COALESCE(c.plan, '')) != ''
-              OR TRIM(c.body) != ''
-              OR TRIM(c.description) != '')) AS awaiting_approve,
+          WHERE c.board_id = ? AND c.archived = 0 AND c.status = 'todo') AS queued,
          (SELECT COUNT(*) FROM kanban_lessons
-          WHERE status = 'staged') AS lessons_pending_estate,
-         (SELECT COUNT(*) FROM kanban_cards c
-          WHERE c.board_id = ? AND c.archived = 0
-            AND ((c.status = 'todo' AND NOT EXISTS (
-                   SELECT 1 FROM kanban_card_tags t
-                   WHERE t.card_id = c.id AND lower(trim(t.tag)) = ?))
-              OR (c.status = 'active'
-                AND (c.build_lease_at IS NULL OR c.build_lease_at < ?)))) AS claimable`
+          WHERE status = 'staged') AS lessons_pending_estate`
     )
-    .get(boardId, boardId, boardId, boardId, KANBAN_OPERATOR_SCHEDULED_TAG, staleBefore) as
+    .get(boardId, boardId, boardId) as
     | VitalsRow
     | undefined;
 
   return {
     building: readCount(row?.building),
     awaitingAnswer: readCount(row?.awaiting_answer),
-    awaitingApprove: readCount(row?.awaiting_approve),
+    queued: readCount(row?.queued),
     lessonsPendingEstate: readCount(row?.lessons_pending_estate),
     memoryPendingEstate: readCount(estate.memoryPending),
-    claimable: readCount(row?.claimable),
   };
 }

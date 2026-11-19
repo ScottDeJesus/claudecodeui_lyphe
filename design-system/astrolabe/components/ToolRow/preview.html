@@ -1,0 +1,27 @@
+<!-- @dsCard group="Companion" height=400 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ToolRow — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var h = React.createElement, A = window.Astrolabe;
+  var out = ['> vitest run', ' ✓ slots.test.ts (16 tests) 77 ms', ' ✓ rules.test.ts (23 tests) 114 ms', 'Test Files  14 passed (14)   Tests  212 passed (212)   38.21 s'].join('\n');
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 680, margin: '0 auto', padding: '24px' } },
+    h(A.ToolRow, { icon: 'thought', label: 'Thinking', title: 'The failures are all in the same two cases, so the rule is probably fine and its inputs are not.' }, h(A.Prose, { quiet: true, text: 'The failures are all in the same two cases, so the rule is probably fine and its inputs are not.' })),
+    h(A.ToolRow, { icon: 'file', label: 'Read', count: 2, title: 'rules.ts', mono: true, state: 'finished' },
+      h(A.ToolRow, { icon: 'file', label: 'Read', title: 'rules.ts', onTitle: function () {}, state: 'finished' }),
+      h(A.ToolRow, { icon: 'file', label: 'Read', title: 'scheduling.test.ts', onTitle: function () {}, state: 'finished' })),
+    h(A.ToolRow, { icon: 'pencil', label: 'Edit', diff: { added: 2, removed: 1 }, title: 'rules.ts', onTitle: function () {}, state: 'finished' },
+      h(A.Excerpt, { path: 'The change', by: false, lines: [{ n: 42, text: '  if (!input.length) return [];', kind: 'add' }, { n: 43, text: '  const sorted = input.sort(byStart);', kind: 'del' }, { n: 43, text: '  const sorted = [...input].sort(byStart);', kind: 'add' }] })),
+    h(A.ToolRow, { icon: 'terminal', label: 'Bash', title: 'Run the checks', command: 'npx vitest run', output: out, copy: 'npx vitest run', copyLabel: 'Copy command', state: 'finished', defaultOpen: true }),
+    h(A.ToolRow, { icon: 'terminal', label: 'Bash', title: 'Run the slow suite', command: 'npx vitest run --project slow', state: 'running' }),
+    h(A.ToolRow, { icon: 'globe', label: 'Fetch', title: 'status.example.com', mono: true, output: 'Request timed out after 30 s', state: 'error' })));
+</script>
+</body>
+</html>

@@ -17,6 +17,7 @@ import { PromoteDialog } from '@/modules/cerberus/modals/PromoteDialog';
 import { UpdateWardensDialog } from '@/modules/cerberus/modals/UpdateWardensDialog';
 import { CheckSheet } from '@/modules/cerberus/sheet/CheckSheet';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
+import { SchedulingView } from '@/modules/scheduling-report';
 import { UploadsView } from '@/modules/upload-runs';
 import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
@@ -47,6 +48,7 @@ const VIEWS: readonly { id: CerberusView; labelKey: string; hintKey: string }[] 
   { id: 'tours', labelKey: 'cerberus.tours.tab', hintKey: 'cerberus.tours.tabHint' },
   { id: 'bulletins', labelKey: 'cerberus.bulletins.tab', hintKey: 'cerberus.bulletins.tabHint' },
   { id: 'uploads', labelKey: 'cerberus.uploads.tab', hintKey: 'cerberus.uploads.tabHint' },
+  { id: 'scheduling', labelKey: 'cerberus.scheduling.tab', hintKey: 'cerberus.scheduling.tabHint' },
 ];
 
 /** A view arriving: Verve's page entrance at the prototype's .45 s. It plays again each time a view is shown. */
@@ -63,7 +65,8 @@ const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
  * 1. `CerberusHeader`: the headline, the summary, the clock pill, the update button and Enroll a node.
  * 2. Only while the fleet on screen is stale: "Cerberus can't be reached · Showing the last answer it
  *    gave." with Try again.
- * 3. The strip, Fleet · Catalog · History · Tours · Bulletins · Uploads, with a hint beside it saying how the view shown is read.
+ * 3. The strip, Fleet · Catalog · History · Tours · Bulletins · Uploads · Scheduling, with a hint beside it saying how the
+ *    view shown is read.
  * 4. The view shown.
  *
  * WHILE THERE IS NO FLEET, TWO STATES. Until the first read answers: "Loading Cerberus…", held back
@@ -86,11 +89,12 @@ const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
  * place in the fleet, and they come back as they were left, as the prototype keeps them. Fleet reads
  * nothing of its own, so hidden it costs nothing. Catalog holds no place of its own, and History reads its
  * index, its feed and a check every 30 s, so each is mounted only while it shows. A view shown again plays
- * its entrance again. Tours, Bulletins and Uploads are kept mounted for the same reason (`KeptView`): each mounts on its
- * first show and is `hidden` after, so the tour, pano and face, the carrier and page, or the window, filters and open run,
- * and the scroll a person left survive a visit to Fleet. Each reads on open and on a press and never on a timer or while
- * hidden (`src/modules/affected-areas`, `src/modules/carrier-bulletins`, `src/modules/upload-runs`), so kept mounted it
- * costs nothing; Uploads is also told by its feed that a run moved, and only while it is shown.
+ * its entrance again. Tours, Bulletins, Uploads and Scheduling are kept mounted for the same reason (`KeptView`): each
+ * mounts on its first show and is `hidden` after, so the tour, pano and face, the carrier and page, the window,
+ * filters and open run or entry, and the scroll a person left survive a visit to Fleet. Each reads on open and on a press
+ * and never on a timer or while hidden (`src/modules/affected-areas`, `src/modules/carrier-bulletins`,
+ * `src/modules/upload-runs`, `src/modules/scheduling-report`), so kept mounted it costs nothing; Uploads and Scheduling
+ * are also told by their feeds that something moved, and only while shown.
  *
  * THE PROJECTS A NODE CAN TAKE come in as a prop and reach the Fleet view through `ProjectChoicesContext`:
  * the workspace owns that list and imports this module, so the panel is handed it, never reads it.
@@ -243,10 +247,11 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
                 <HistoryView />
               </div>
             )}
-            {/* Tours, Bulletins and Uploads are `hidden` once left rather than unmounted, as Fleet is, and for the same reason:
-                the open tour, pano and face, the open carrier and page, or the window, filters and open run, and the scroll
-                are the person's place (MAN-7891). Each reads on open and on a press, never while hidden; Uploads is also told
-                by its feed while it is shown (MAN-8918). Each is its own chunk, loaded on its first show. */}
+            {/* Tours, Bulletins, Uploads and Scheduling are `hidden` once left rather than unmounted, as Fleet is, and for
+                the same reason: the open tour, pano and face, the open carrier and page, the window, filters and open run, or
+                the window, filters and open entry, and the scroll are the person's place (MAN-7891). Each reads on open and on
+                a press, never while hidden; Uploads and Scheduling are also told by their feeds while shown (MAN-8918). Each
+                is its own chunk, loaded on its first show. */}
             <KeptView id="tours" view={view} shownOnce={shownOnce} label={t('cerberus.tours.tab')}>
               <AffectedAreasView />
             </KeptView>
@@ -255,6 +260,9 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
             </KeptView>
             <KeptView id="uploads" view={view} shownOnce={shownOnce} label={t('cerberus.uploads.tab')}>
               <UploadsView shown={view === 'uploads'} />
+            </KeptView>
+            <KeptView id="scheduling" view={view} shownOnce={shownOnce} label={t('cerberus.scheduling.tab')}>
+              <SchedulingView shown={view === 'scheduling'} />
             </KeptView>
           </>
         )}

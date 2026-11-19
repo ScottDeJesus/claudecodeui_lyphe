@@ -42,6 +42,9 @@
     "station": "Open {{name}}'s station",
     "places": "Other screens"
   },
+  "places": {
+    "menu": "Menu"
+  },
   "rail": {
     "label": "Views",
     "settings": "Settings",
@@ -438,7 +441,7 @@
       "title": "The launch table could not be read",
       "retry": "Try again"
     },
-    "reach": "Chains, the dispatcher and Metis take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only.",
+    "reach": "Chains, the dispatcher, Metis and a board card’s sorter take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only.",
     "defaults": {
       "title": "Defaults",
       "hint": "what a launch runs at when its row pins nothing",
@@ -478,9 +481,14 @@
     "metis": {
       "title": "Metis"
     },
+    "cards": {
+      "title": "Board cards"
+    },
     "row": {
       "model": "Model",
       "effort": "Effort",
+      "effortFollows": "{{effort}} · {{model}}’s default",
+      "effortOwnPin": "{{effort}} · Hephaestus’s own pin",
       "pinned": "pinned",
       "defaultOf": "Default · {{value}}",
       "noFlag": "no flag",
@@ -497,6 +505,7 @@
       "dispatcher": "Dispatcher",
       "chain": "Chain",
       "metis": "Metis",
+      "sorter": "Card sort",
       "newSession": "new session",
       "claude": "Claude",
       "deepseek": "DeepSeek"
@@ -688,13 +697,14 @@
       "actions": "Board actions",
       "noBoard": "No board",
       "autonomy": "Autonomy",
-      "deepseekFlash": "DeepSeek Flash",
-      "deepseekFlashTooltip": "Puts this board's Metis, and every runner Metis starts, on DeepSeek Flash.",
+
       "newBoard": "New board",
       "rename": "Rename",
       "archive": "Archive",
       "newTitle": "New board",
       "renameTitle": "Rename board",
+      "repos": "Repositories",
+      "reposTitle": "Board repositories",
       "archiveTitle": "Archive this board?",
       "archiveMessage": "It leaves the switcher and every card stays where it is. Nothing is deleted.",
       "nameLabel": "Board name",
@@ -756,7 +766,8 @@
       "moveTo": "Move to {{lane}}",
       "archive": "Archive",
       "untitled": "Untitled card",
-      "moved": "{{title}} moved to {{lane}}, position {{position}} of {{total}}"
+      "moved": "{{title}} moved to {{lane}}, position {{position}} of {{total}}",
+      "held": "Held — {{why}}"
     },
     "priority": {
       "low": "Low",
@@ -824,14 +835,53 @@
       "resolvedBy": "Resolved by {{who}}, {{when}}",
       "someone": "someone"
     },
-    "approve": {
-      "approve": "Approve",
-      "unapprove": "Withdraw approval",
-      "approved": "Approved {{when}}",
-      "needed": "Needs approval",
-      "blockedByQuestions_one": "{{count}} question is still unanswered.",
-      "blockedByQuestions_other": "{{count}} questions are still unanswered.",
-      "blockedByEmptiness": "This card says nothing yet — a plan, a body or a description is what approval is for."
+    "flow": {
+      "bug": "Bug",
+      "change": "UI change",
+      "tweak": "Tweak"
+    },
+    "links": {
+      "title": "Linked cards",
+      "duplicateOf": "Duplicate of",
+      "regressionOf": "Regression of",
+      "from": "Split from",
+      "related": "Related to",
+      "unread": "a card this board has not read yet",
+      "gone": "a card that is no longer on this board"
+    },
+    "stages": {
+      "working": "Working",
+      "endedEarly": "Ended early: {{status}}",
+      "transcript": "Transcript",
+      "transcriptOf": "Transcript of {{soul}}, {{stage}}",
+      "earlier": "Earlier sittings"
+    },
+    "decisions": {
+      "title_one": "Decided for you · {{count}}",
+      "title_other": "Decided for you · {{count}}"
+    },
+    "scenarios": {
+      "title": "Scenarios",
+      "none": "No scenario written yet.",
+      "words": {
+        "holding": "Holding",
+        "broken": "Broken",
+        "regressed": "Regressed",
+        "cantRun": "Can't run",
+        "notRun": "Not run",
+        "draft": "Draft",
+        "retired": "Retired"
+      }
+    },
+    "repos": {
+      "label": "Repositories",
+      "helper": "The git repositories this board's cards are built in. A walk starts in the first.",
+      "none": "No repository yet. A board cannot run itself until it names one.",
+      "first": "Starts here",
+      "pick": "Pick a project",
+      "typePlaceholder": "/absolute/path/to/a/repository",
+      "add": "Add",
+      "remove": "Remove {{path}}"
     },
     "tokens": {
       "title": "Spend",
@@ -961,10 +1011,13 @@
       "inFlight": "In flight"
     },
     "stack": {
-      "label": "Roadmap stack",
-      "value": "{{feature}}, {{epic}}, milestone {{n}}: {{milestone}}",
+      "label": "In flight",
       "back": "Back",
-      "open": "Open the roadmap: {{title}}"
+      "openInFlight_one": "In flight: {{count}} feature",
+      "openInFlight_other": "In flight: {{count}} features",
+      "empty": "Nothing in flight",
+      "dismiss": "Dismiss",
+      "review": "Review"
     },
     "loading": "Reading the roadmap…",
     "kind": {
@@ -1811,7 +1864,20 @@
       "failed": "Could not read the transcript",
       "live": "Live",
       "showEarlier": "Show earlier steps",
-      "openRow": "Read {{name}}'s transcript"
+      "openRow": "Read {{name}}'s transcript",
+      "open": "Open",
+      "previous": "Previous subagent",
+      "next": "Next subagent",
+      "more_one": "{{count}} more subagent",
+      "more_other": "{{count}} more subagents",
+      "dot": "{{name}}: {{state}}",
+      "state": {
+        "running": "running",
+        "held": "waiting for CPU",
+        "finished": "finished",
+        "failed": "failed",
+        "stopped": "stopped"
+      }
     },
     "embed": {
       "plainHttpBlocked": "This page is plain http, and a browser will not draw a plain-http page inside this app while it is open over https. Use the Open link to see it in its own tab."
@@ -1835,8 +1901,11 @@
       "widget": "Its own page"
     },
     "mark": "On the panel · V{{n}} · {{title}}",
-    "switchWithOpen_one": "Panel, {{count}} follow-up open",
-    "switchWithOpen": "Panel, {{count}} follow-ups open",
+    "followups": {
+      "name": "Next steps",
+      "nameWithOpen_one": "Next steps, {{count}} open",
+      "nameWithOpen_other": "Next steps, {{count}} open"
+    },
     "openPage": "Open the page",
     "enlarge": "Enlarge {{title}}",
     "reading": "Reading the panel",
@@ -3112,6 +3181,494 @@
         "title": "No upload ran in the last {{days}} days",
         "message": "Nobody pressed Start upload in this window.",
         "messageTests": "Nobody pressed Start upload in this window, and no test ran.",
+        "wider": "Look back {{days}} days"
+      }
+    },
+    "scheduling": {
+      "tab": "Scheduling",
+      "tabHint": "What happens when someone schedules a visit in Restorly",
+      "loading": "Reading the scheduling sessions…",
+      "head": {
+        "eyebrow": "Scheduling in Restorly",
+        "bumps_one": "One session",
+        "bumps_other": "{{count}} sessions",
+        "bumpsMore_one": "At least one session",
+        "bumpsMore_other": "At least {{count}} sessions",
+        "bumpsAccent_one": "hit a speed bump",
+        "bumpsAccent_other": "hit a speed bump",
+        "clean": "All",
+        "cleanMore": "The newest {{count}} are",
+        "cleanAccent": "clean",
+        "none": "Nothing scheduled",
+        "noneAccent": "yet",
+        "noneScopedAccent": "in this view",
+        "summary": {
+          "none": "Nobody scheduled a visit in the last {{days}} days.",
+          "noneScoped": "{{who}} scheduled nothing in the last {{days}} days.",
+          "sessions_one": "{{count}} session in {{days}} days",
+          "sessions_other": "{{count}} sessions in {{days}} days",
+          "sessionsMore_one": "more than {{count}} session in {{days}} days",
+          "sessionsMore_other": "more than {{count}} sessions in {{days}} days",
+          "booked": "{{count}} booked",
+          "bookedMore": "at least {{count}} booked",
+          "changed": "{{count}} changed",
+          "changedMore": "at least {{count}} changed",
+          "cancelled": "{{count}} cancelled",
+          "cancelledMore": "at least {{count}} cancelled",
+          "last": "last one {{ago}} by {{who}}"
+        },
+        "scope": "Only sessions by {{who}}",
+        "scopeClear": "Show everyone",
+        "window": "How far back",
+        "days": "{{count}} days",
+        "refresh": "Refresh"
+      },
+      "pills": {
+        "label": "Scheduling vitals",
+        "sessions": "Sessions",
+        "sessionsTitle": "Uses of the Schedule-a-visit form, and changes made on the grid or through the API, in this window. Machine calls are not counted.",
+        "bumps": "Speed bumps",
+        "bumpsTitle": "Sessions in this window that did not go clean",
+        "booked": "Booked",
+        "bookedTitle": "Sessions in this window that ended with a visit booked and not undone right after",
+        "closed": "Closed without booking",
+        "closedTitle": "Booking forms that were opened and closed with nothing booked",
+        "last": "Last session",
+        "lastNone": "none in this window",
+        "lastNoneTitle": "Nobody scheduled in this window",
+        "atLeast": "{{count}}+"
+      },
+      "sections": {
+        "kinds": "By what was done",
+        "kindsHint": "clean and bumped sessions, and which way speed bumps are heading",
+        "often": "How often",
+        "oftenHint": "sessions by day and by hour, in your own clock",
+        "starts": "Where it starts",
+        "startsHint": "the door the Schedule-a-visit form was opened from",
+        "sessions": "Sessions",
+        "sessionsHint": "newest first; press one to open it",
+        "sessionsWithMachines_one": "{{sessions}} + {{count}} machine call",
+        "sessionsWithMachines_other": "{{sessions}} + {{count}} machine calls"
+      },
+      "kind": {
+        "book": "Book a visit",
+        "change": "Change a visit",
+        "cancel": "Cancel a visit"
+      },
+      "kinds": {
+        "toggle": "Show the sessions of {{kind}}",
+        "none": "none in this window",
+        "clean": "{{count}} clean",
+        "bumps_one": "{{count}} speed bump",
+        "bumps_other": "{{count}} speed bumps",
+        "trendTitle": "Speed-bump sessions in the last 7 days against the 7 before",
+        "last": "last {{ago}}",
+        "noSessions": "No session of this kind in the window.",
+        "moreInSessions_one": "{{count}} more is in Sessions.",
+        "moreInSessions_other": "{{count}} more are in Sessions."
+      },
+      "often": {
+        "noDay": "No session on any day of this window.",
+        "busiestDay_one": "Busiest day: {{day}}, with {{count}} session.",
+        "busiestDay_other": "Busiest day: {{day}}, with {{count}} sessions.",
+        "daysLabel": "Sessions on each of the {{count}} days this window touches",
+        "dayTitle": "{{day}}: {{clean}} clean, {{hiccup}} with a speed bump",
+        "dayTitleTests": "{{day}}: {{clean}} clean, {{hiccup}} with a speed bump, {{test}} by a machine",
+        "legend": {
+          "clean": "clean",
+          "hiccup": "speed bump",
+          "test": "machine call"
+        },
+        "today": "today",
+        "noHour": "No session at any hour of this window.",
+        "busiestHour_one": "Busiest hour: {{hour}}, with {{count}} session.",
+        "busiestHour_other": "Busiest hour: {{hour}}, with {{count}} sessions.",
+        "hoursLabel": "Sessions by hour of the day",
+        "hourTitle_one": "{{hour}}: {{count}} session",
+        "hourTitle_other": "{{hour}}: {{count}} sessions"
+      },
+      "openers": {
+        "schedule_new": "The Schedule's New visit button",
+        "schedule_slot": "A time slot on the Schedule",
+        "schedule_drag": "A drag on the Schedule's grid",
+        "schedule_visit": "A visit on the Schedule",
+        "calendar_entry": "A calendar entry's Edit",
+        "unscheduled_list": "The Schedule's unscheduled list",
+        "job_schedule_band": "A job's schedule band",
+        "work_list": "A job's work list",
+        "call_script": "The customer call script",
+        "carrier_region": "A job's carrier region",
+        "unknown": "A door that gave no name"
+      },
+      "starts": {
+        "none": "No Schedule-a-visit form was opened in this window.",
+        "share": "{{count}} of {{total}}",
+        "direct_one": "{{count}} more session used no form: it was made on the grid, by Undo or through the API.",
+        "direct_other": "{{count}} more sessions used no form: they were made on the grid, by Undo or through the API.",
+        "directMachines_one": "{{count}} machine call used no form.",
+        "directMachines_other": "{{count}} machine calls used no form.",
+        "unreported_one": "{{count}} form has not said where it was opened: its report has not arrived.",
+        "unreported_other": "{{count}} forms have not said where they were opened: their reports have not arrived."
+      },
+      "sessions": {
+        "open": "Open the session: {{verdict}}, {{result}}, {{job}}, {{when}}",
+        "lead": "lead {{name}}",
+        "leadGone": "lead no longer on the roster",
+        "formOpen": "form open {{length}}",
+        "moreReasons": "+{{count}}",
+        "stillOpen": "form still open",
+        "stillOpenTitle": "The form has not been closed yet, so its report has not arrived",
+        "directTitle": "Made with no form",
+        "filters": "Narrow the sessions",
+        "everyone": "Everyone",
+        "bumpsOnly": "Speed bumps only",
+        "machines": "Machine calls",
+        "machinesTitle": "Also list what a machine scheduled. A machine call is never counted in a figure.",
+        "truncated": "This window holds more sessions than one answer carries. These are the newest {{count}}.",
+        "noMatch": "No session matches these filters",
+        "clear": "Show every session",
+        "more": "Show {{count}} more",
+        "moreOf": "Show {{count}} more of {{rest}}"
+      },
+      "verdict": {
+        "clean": "Clean",
+        "bump": "Speed bump",
+        "machine": "Machine call"
+      },
+      "who": {
+        "unknown": "nobody on record"
+      },
+      "job": {
+        "none": "No job named"
+      },
+      "duration": {
+        "s": "{{s}} s",
+        "ms": "{{m}} m {{s}} s",
+        "hm": "{{h}} h {{m}} m",
+        "h": "{{h}} h",
+        "m": "{{m}} m"
+      },
+      "span": {
+        "none": "no time set",
+        "fromTo": "{{from}} to {{to}}"
+      },
+      "result": {
+        "booked": "Booked",
+        "bookedUndone": "Booked, then undone",
+        "changed": "Changed",
+        "changedUndone": "Changed, then put back",
+        "cancelled": "Cancelled",
+        "nothingYet": "Nothing done yet",
+        "notDone": "Did not go through",
+        "undid": "Undone",
+        "closedWithoutBooking": "Closed without booking",
+        "closedWithoutChange": "Closed without a change"
+      },
+      "surface": {
+        "form": "In the form",
+        "grid_move": "Dragged on the grid",
+        "grid_resize": "Resized on the grid",
+        "undo": "Undo",
+        "api": "Through the API"
+      },
+      "reasons": {
+        "server_fault": {
+          "chip_one": "Server fault",
+          "chip_other": "Server fault {{count}}×",
+          "sentence_one": "The server failed on a press.",
+          "sentence_other": "The server failed on {{count}} presses."
+        },
+        "scheduling_unavailable": {
+          "chip_one": "Scheduling unavailable",
+          "chip_other": "Scheduling unavailable {{count}}×",
+          "sentence_one": "Scheduling was unavailable on a press.",
+          "sentence_other": "Scheduling was unavailable on {{count}} presses.",
+          "detail_one": "Scheduling was unavailable on a press: {{detail}}.",
+          "detail_other": "Scheduling was unavailable on {{count}} presses: {{detail}}."
+        },
+        "calendar_failed": {
+          "chip_one": "Calendar failed",
+          "chip_other": "Calendar failed {{count}}×",
+          "sentence_one": "The visit was saved, and the calendar did not take it.",
+          "sentence_other": "The visit was saved, and the calendar did not take it {{count}} times.",
+          "detail_one": "The visit was saved, and the calendar did not take it: {{detail}}.",
+          "detail_other": "The visit was saved, and the calendar did not take it {{count}} times: {{detail}}."
+        },
+        "no_answer": {
+          "chip_one": "No answer",
+          "chip_other": "No answer {{count}}×",
+          "sentence_one": "A press got no answer from the server.",
+          "sentence_other": "{{count}} presses got no answer from the server."
+        },
+        "crew_refused": {
+          "chip_one": "Crew refused",
+          "chip_other": "Crew refused {{count}}×",
+          "sentence_one": "Restorly refused the crew once: the lead is not confirmed for this type of job.",
+          "sentence_other": "Restorly refused the crew {{count}} times: the lead is not confirmed for this type of job."
+        },
+        "login_required": {
+          "chip": "Login required",
+          "sentence": "A press was refused: it needed a signed-in person."
+        },
+        "request_refused": {
+          "chip_one": "Refused",
+          "chip_other": "Refused {{count}}×",
+          "sentence_one": "Restorly refused a press.",
+          "sentence_other": "Restorly refused {{count}} presses.",
+          "detail_one": "Restorly refused a press: {{detail}}.",
+          "detail_other": "Restorly refused {{count}} presses: {{detail}}."
+        },
+        "nobody_offered": {
+          "chip": "Nobody offered",
+          "sentence": "Restorly offered nobody for the crew."
+        },
+        "availability_unread": {
+          "chip": "Calendars unread",
+          "sentence": "Restorly could not read who was free."
+        },
+        "visit_unreadable": {
+          "chip": "Visit unreadable",
+          "sentence": "The form could not read the visit it was opened on."
+        },
+        "no_open_times": {
+          "chip": "No open times",
+          "sentence": "Open times were on, and none came back."
+        },
+        "gave_up": {
+          "chip": "Gave up",
+          "sentence": "Nothing was done after a press was refused or failed."
+        },
+        "undone": {
+          "chip": "Undo pressed",
+          "sentence": "An Undo was pressed right after.",
+          "sentenceOwn": "This press was an Undo."
+        },
+        "not_reported": {
+          "chip": "No report",
+          "sentence": "The form's report never arrived."
+        },
+        "closed_without_booking": {
+          "chip": "Nothing pressed",
+          "sentence": "The form was closed with nothing pressed."
+        },
+        "calendar_paused": {
+          "chip": "Calendar paused",
+          "sentence_one": "The calendar is paused, so the visit was saved without a calendar event.",
+          "sentence_other": "The calendar is paused, so {{count}} presses were saved without a calendar event."
+        },
+        "crew_downgraded": {
+          "chip": "Lead only",
+          "sentence": "The visit was saved with the lead only."
+        },
+        "drive_times_not_checked": {
+          "chip": "Drive times not checked",
+          "sentence": "Drive times were not checked for the times offered."
+        },
+        "not_best_fit": {
+          "chip": "Not the best fit",
+          "sentence": "The lead chosen was not Restorly's best fit."
+        },
+        "own_time": {
+          "chip": "Own time",
+          "sentence": "Open times were offered, and a time of their own was chosen."
+        }
+      },
+      "acts": {
+        "pressed": {
+          "form": {
+            "create": "Pressed Save to book",
+            "edit": "Pressed Save to change",
+            "cancel": "Pressed Cancel visit"
+          },
+          "undo": {
+            "create": "Pressed Undo, booking it again",
+            "edit": "Pressed Undo, putting it back",
+            "cancel": "Pressed Undo, cancelling it"
+          },
+          "grid_move": {
+            "any": "Dragged the visit on the grid"
+          },
+          "grid_resize": {
+            "any": "Resized the visit on the grid"
+          },
+          "api": {
+            "create": "Asked to book, through the API",
+            "edit": "Asked to change, through the API",
+            "cancel": "Asked to cancel, through the API"
+          }
+        },
+        "answer": {
+          "ok": "Done",
+          "refused": "Refused",
+          "refusedWhy": "Refused: {{why}}",
+          "why": {
+            "crew": "the lead is not confirmed for this type of job",
+            "login": "a signed-in person was needed",
+            "notFound": "the visit or the job was not found"
+          },
+          "unavailable": "Scheduling was unavailable",
+          "unavailableWhy": "Scheduling was unavailable: {{why}}",
+          "fault": "The server failed"
+        },
+        "calendar": {
+          "paused": "Calendar paused",
+          "confirmed": "On the calendar",
+          "failed": "Calendar failed",
+          "failedWhy": "Calendar failed: {{why}}"
+        },
+        "status": "HTTP {{status}}",
+        "leadOnly": "Saved with the lead only",
+        "latency": "server took {{ms}} ms",
+        "by": "by {{who}}",
+        "lead": "lead {{name}}",
+        "leadGone": "lead no longer on the roster",
+        "support": "{{count}} support",
+        "touched": "changed"
+      },
+      "sheet": {
+        "heading": {
+          "reading": "Reading the session",
+          "machine": "A machine call",
+          "form": {
+            "clean": "This session went clean",
+            "hiccup": "This session hit a speed bump"
+          },
+          "direct": {
+            "clean": "This change went clean",
+            "hiccup": "This change hit a speed bump"
+          }
+        },
+        "ending": {
+          "booked": "A visit was booked.",
+          "bookedUndone": "A visit was booked, then undone.",
+          "changed": "A visit was changed.",
+          "changedUndone": "A visit was changed, then put back.",
+          "cancelled": "A visit was cancelled.",
+          "nothingYet": "Nothing has been done yet: the form is still open.",
+          "notDone": "It did not go through.",
+          "undid": "The change before it was undone.",
+          "closedWithoutBooking": "The form was closed without booking.",
+          "closedWithoutChange": "The form was closed without a change."
+        },
+        "facts": {
+          "who": "Who",
+          "job": "Job",
+          "door": "Started from",
+          "doorNone": "not reported",
+          "made": "Made",
+          "formOpen": "Form open",
+          "formOpenNone": "not reported",
+          "notYet": "not known yet"
+        },
+        "note": {
+          "machine": "A machine made this call. It is not counted in any figure of this view.",
+          "open": "The form has not been closed yet. What Restorly offered and what was chosen arrive when it closes.",
+          "notReported": "The form's report never arrived, so what Restorly offered and what was chosen are not known. The presses below are the server's own record."
+        },
+        "trouble": "This session can't be read",
+        "bumps": {
+          "title": "Speed bumps",
+          "none": "It went clean: nothing stands against it.",
+          "noneMachine": "Nothing stood against it.",
+          "noted": "Also noted"
+        },
+        "offered": {
+          "title": "What Restorly offered",
+          "people": "People",
+          "nobody": "nobody was offered",
+          "onList": "{{count}} on the list",
+          "free": "{{count}} free",
+          "freeUnread": "who was free could not be read",
+          "bestFit": "Best fit",
+          "bestFitNone": "none named",
+          "bestFitGone": "someone no longer on the roster",
+          "crewCheck": "Crew check",
+          "leftOutNone": "left nobody out",
+          "leftOut_one": "left {{count}} person out",
+          "leftOut_other": "left {{count}} people out",
+          "gateWarn": "its line was amber: nobody confirmed, or the check could not be read",
+          "times": "Open times",
+          "timesOff": "off",
+          "timesNone": "none came back",
+          "timesCount": "{{count}} offered",
+          "travel": "Drive times",
+          "travelChecked": "checked",
+          "travelNot": "not checked",
+          "hint": "Sizing hint",
+          "hintNone": "none",
+          "hintCrew_one": "{{count}} person",
+          "hintCrew_other": "{{count}} people",
+          "hintHours": "{{hours}} h"
+        },
+        "chosen": {
+          "title": "What was chosen",
+          "lead": "Lead",
+          "leadGone": "someone no longer on the roster",
+          "leadFree": "shown as free",
+          "leadBusy": "shown as not free",
+          "place": {
+            "none": "no lead was chosen",
+            "offList": "not on the list",
+            "best": "the best fit",
+            "nth_ordinal_one": "{{count}}st on the list",
+            "nth_ordinal_two": "{{count}}nd on the list",
+            "nth_ordinal_few": "{{count}}rd on the list",
+            "nth_ordinal_other": "{{count}}th on the list"
+          },
+          "crew": "Crew",
+          "crewNone": "no support and no temps",
+          "support": "{{count}} support",
+          "temps_one": "{{count}} temp",
+          "temps_other": "{{count}} temps",
+          "when": "When",
+          "whenNone": "no time was set",
+          "slotPicked": "one of the open times offered",
+          "slotOwn": "a time of their own",
+          "type": "Type",
+          "typeChanged": "changed from {{from}}, which the door proposed",
+          "typeChangedBare": "changed, and the door had proposed none",
+          "typeKept": "as the door proposed",
+          "length": "Length",
+          "lengthStepped": "stepped by hand",
+          "lengthKept": "as suggested",
+          "job": "Job",
+          "jobChanged": "changed from the one the door proposed"
+        },
+        "presses": {
+          "title": "Each press and its answer",
+          "none": "Nothing was pressed: no request reached the server.",
+          "unanswered_one": "{{count}} more press got no answer, so the server has no line for it.",
+          "unanswered_other": "{{count}} more presses got no answer, so the server has no line for them."
+        },
+        "visit": {
+          "title": "The visit now",
+          "none": "No visit was written.",
+          "statusTitle": "The visit's status, in Restorly's own word",
+          "noType": "no type",
+          "cancelledAt": "cancelled {{when}}",
+          "afterNone": "Nothing else has touched this visit since.",
+          "after_one": "Since then, {{count}} more press on this visit from elsewhere:",
+          "after_other": "Since then, {{count}} more presses on this visit from elsewhere:"
+        }
+      },
+      "trouble": {
+        "title": "Scheduling can't be read",
+        "stale": "Scheduling can't be read. Showing the last answer, from {{ago}}.",
+        "retry": "Try again",
+        "cause": {
+          "no_secret": "CloudCLI could not read Restorly's internal secret, so nothing here can be read until its env file holds it.",
+          "unreachable": "Restorly's server did not answer in time. It may be restarting.",
+          "unreadable": "Restorly's server sent an answer CloudCLI can't read. It may be part way through an update.",
+          "gone": "Restorly's server has no scheduling report to read. It may be part way through an update.",
+          "gone_entry": "This session is not on file any more.",
+          "failed": "Restorly's server refused the read. Try again in a moment; if it keeps failing, its log says why.",
+          "failed_entry": "Restorly's server refused to read this session. Try again in a moment; if it keeps failing, its log says why."
+        }
+      },
+      "empty": {
+        "title": "Nobody scheduled in the last {{days}} days",
+        "message": "Nobody booked, changed or cancelled a visit in this window. Machine calls are not listed.",
+        "messageMachines": "No person and no machine scheduled anything in this window.",
         "wider": "Look back {{days}} days"
       }
     },

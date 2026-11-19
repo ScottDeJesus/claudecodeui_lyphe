@@ -11,6 +11,7 @@ import { stampWords } from '@/modules/carrier-bulletins/utils/bulletinWords';
 import type { BulletinPage, OverviewRow, PageReading } from '@/shared/carrier-bulletins-types';
 import type { AffectedAreasTrouble } from '@/shared/types';
 import { Button } from '@/shared/ui';
+import { WAY_BACK } from '@/shared/ui/overlayEscape';
 
 type PageScreenProps = {
   /** The carrier as the overview listed it: the way back, and how many pages its file has. */
@@ -75,6 +76,7 @@ export function PageScreen({
             className="-ml-3 max-w-full max-md:h-11"
             aria-label={carrier === '' ? t('cerberus.bulletins.carrier.back') : t('cerberus.bulletins.page.back', { carrier })}
             onClick={onBack}
+            {...WAY_BACK}
           >
             <ChevronLeft aria-hidden="true" />
             <span className="truncate">{carrier === '' ? t('cerberus.bulletins.carrier.back') : carrier}</span>

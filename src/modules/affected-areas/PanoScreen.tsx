@@ -18,6 +18,7 @@ import { areaWords, faceCounts, kindName, roomWords } from '@/modules/affected-a
 import type { Codebook, Face, PanoDetail, PanoEntry, Region, RoomEntry, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, PanoPress, PanoShown, RegionLayer, RegionShape, SphereLook, TourReaderProgress } from '@/shared/types';
 import { Button, Card, EmptyState, Lightbox, RegionImage } from '@/shared/ui';
+import { WAY_BACK } from '@/shared/ui/overlayEscape';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
 type PanoScreenProps = {
@@ -176,7 +177,7 @@ export function PanoScreen({
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button variant="ghost" size="sm" className="-ml-3 max-w-full max-md:h-11" aria-label={t('affectedAreas.pano.back', { tour: tourName })} onClick={onBack}>
+          <Button variant="ghost" size="sm" className="-ml-3 max-w-full max-md:h-11" aria-label={t('affectedAreas.pano.back', { tour: tourName })} onClick={onBack} {...WAY_BACK}>
             <ChevronLeft aria-hidden="true" />
             <span className="truncate">{tourName}</span>
           </Button>

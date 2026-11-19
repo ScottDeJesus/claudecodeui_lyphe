@@ -6,16 +6,17 @@ import { useTranslation } from 'react-i18next';
 import { useCpuRelease } from '@/shared/hooks/useCpuRelease';
 import { useElapsed } from '@/shared/hooks/useElapsed';
 import { spendText } from '@/shared/spend';
-import { Button, LLMProviderLogo } from '@/shared/ui';
+import { Button } from '@/shared/ui';
 import type { SoulLaunchSnapshot } from '@/shared/types';
 import { cn } from '@/shared/utils';
 import { soulName } from '@/modules/chat/subagents/subagentRow';
+import { SubagentCore } from '@/modules/chat/transcript/SubagentCore';
 import { formatSubagentFinishTime } from '@/modules/chat/utils/subagentSummary';
 
 /**
  * One launcher soul as a row, drawn beside the `Agent`-tool agents.
  *
- * Read by the chat module's pinned strip (`PinnedSubagents.tsx`), which draws it above the chat box.
+ * Read by the chat module's `PinnedSubagents.tsx`, which draws it as the card a press on a helper's dot opens.
  *
  * It is a SECOND KIND OF ROW IN THE SAME STRIP, and it is drawn to be indistinguishable in shape
  * from the agent rows next to it — same centred mark, same two lines, the same place for the status
@@ -117,8 +118,9 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
       // The mark sits beside BOTH lines, centred on the row's height; the lines stack to its right.
       className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs text-muted-foreground"
     >
-      {/* The mascot for a soul that ran on Claude, as every other row in this strip wears it. */}
-      <LLMProviderLogo provider={launch.provider} claudeMark="mascot" className="h-4 w-4 flex-shrink-0" />
+      {/* Its own core, as every other row in this strip wears one: its model's material, thinking while it runs (a launch's record
+          says what it has spent, not what step it is on), at rest while it waits for the CPU, a still ring once it is done. */}
+      <SubagentCore model={launch.model ?? ''} doing={!running ? null : waiting !== null ? 'idle' : 'thinking'} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* Wraps rather than clips the role, as the agent rows do (`PinnedAgentRow.tsx`): it keeps a floor of
           * `basis-40` (10rem), so on a phone it takes a line of its own when the name and the model leave it

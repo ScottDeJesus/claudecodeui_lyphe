@@ -94,15 +94,14 @@
 }
 .vv-lane-card.vv-lane-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
 
-/* The 2px accent left edge, worn by a SELECTED card (the drawer is open on it) and by a LEASED
- * one (a builder holds it). Drawn as a background image rather than a border or an inset shadow,
+/* The 2px accent left edge, worn by a SELECTED card (the drawer is open on it). Drawn as a
+ * background image rather than a border or an inset shadow,
  * both of which were tried and both of which are wrong here: a real border widens the box and
  * shoves every card in the lane sideways the moment one is picked, and an inset shadow follows
  * the 12px radius and wraps the corners until the card reads as OUTLINED in green rather than
  * edged. A gradient strip inset 8px top and bottom is a bar, and only a bar. It also leaves both
  * pseudo-elements free for the insertion line, which a selected card can carry at the same time. */
-.vv-lane-card.vv-lane-card--selected,
-.vv-lane-card.vv-lane-card--leased {
+.vv-lane-card.vv-lane-card--selected {
   background-image: linear-gradient(var(--accent), var(--accent));
   background-repeat: no-repeat;
   background-size: 2px calc(100% - 16px);
@@ -110,7 +109,7 @@
 }
 /* The wash is the accent-soft HALF Phase 5 measured; the full strength read under AA on this ink.
  * The edge alone would be a bare mark, which doctrine §6 forbids as a whole signal — the drawer
- * is the word for selected, and the lease badge beside it is the word for leased. */
+ * is the word for selected. */
 .vv-lane-card.vv-lane-card--selected {
   background-color: color-mix(in srgb, var(--accent-soft) 50%, var(--surface));
 }
@@ -218,6 +217,13 @@
  * SHAPE is already `.vv-badge--outline`'s, which the component pairs this with, so only the ink
  * is spelled here — --ink-muted, 4.6:1 on a light card, so quiet is still read. */
 .vv-badge.vv-lane-card__signal--quiet { color: var(--ink-muted); }
+
+/* A link to another card: a press inside a card that is itself a press, so it has to say so
+ * without a fill at rest. The title is underlined on a hairline, and the row takes the hover fill
+ * the lane's own menu triggers take. `cursor: pointer` over the card's `grab`. */
+.vv-lane-card__link { cursor: pointer; }
+.vv-lane-card__link:hover { background: var(--surface2); }
+.vv-lane-card__link-title { text-decoration: underline; text-decoration-color: var(--ink-faint); text-underline-offset: 3px; }
 
 /* Two density overrides scoped to a card, which is a denser place than either component was
  * sized for. The inline meter's 4px track is one line among several on a face of four, and the

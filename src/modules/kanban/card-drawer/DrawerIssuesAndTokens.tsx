@@ -7,20 +7,15 @@ import { Badge, Button, Field, Input } from '@/shared/ui';
 import { cn, formatRelativeTime } from '@/shared/utils';
 
 /**
- * THE RUN'S LEDGER: what went wrong, what it cost, whether it may proceed, and what it had to say
- * at the end.
+ * THE RUN'S LEDGER: what went wrong, what it cost, and what it had to say at the end.
  *
- * FOUR BLOCKS IN THE ORDER A READER ACTS ON THEM. An open issue is the only thing on this screen
- * that is red, and it is first because red means act now. The approve control is second: it is the
- * one press here that changes what the run may do next. Spend is third — context, never a verdict,
- * so it carries no tone at all and is spelled in tabular figures a reader can compare down a
- * column. The closing remarks are last, because they are a record rather than a decision.
+ * THREE BLOCKS IN THE ORDER A READER ACTS ON THEM. An open issue is red, and it is first because
+ * red means act now. Spend is second — context, never a verdict, so it carries no tone at all and
+ * is spelled in tabular figures a reader can compare down a column. The closing remarks are last,
+ * because they are a record rather than a decision.
  *
- * THE APPROVE GATE IS THE SERVER'S, SHOWN EARLY. The server refuses approval with a 409 while any
- * question is unanswered or while the card says nothing at all; the same two conditions disable
- * the button here and say which one is holding it. That is the same verdict one round trip
- * earlier — never a second rule, and never a rule this screen invents: if the two ever disagree,
- * the server's is the one that decides and this one is the bug.
+ * NOTHING HERE LETS A RUN PROCEED OR HOLDS IT BACK. A card on a self-running board is walked the
+ * moment it is in To Do; what stops a walk is a question, and that is answered in its own section.
  *
  * SPEND IS NEVER A JUDGEMENT. Four counters and their sum, no bar, no colour, no threshold: this
  * board has no budget to be over, and painting a number amber invents one.
@@ -53,11 +48,6 @@ export function DrawerIssuesAndTokens({ detail, writes }: DrawerIssuesAndTokensP
   const [remarks, setRemarks] = useState(detail.closingRemarks);
 
   const open = detail.issues.filter((row) => !row.resolved).length;
-  const unanswered = detail.questions.filter((question) => !question.answered).length;
-  // The gate, spelled as the service spells it: nobody waiting on an answer, and the card says
-  // something — a plan, a body or a description.
-  const says = [detail.plan ?? '', detail.body, detail.description].some((text) => text.trim().length > 0);
-  const blocked = unanswered > 0 || !says;
 
   const spend = [
     { key: 'in', labelKey: 'kanban.tokens.in', value: detail.buildTokensIn },
@@ -76,15 +66,6 @@ export function DrawerIssuesAndTokens({ detail, writes }: DrawerIssuesAndTokensP
     void writes.resolveIssue(id);
   };
 
-  /**
-   * ONE PRESS, TWO VERBS, chosen by the state the button is in — which is the state the server last
-   * answered with, never a local guess. A 409 here is the GATE speaking: the hook carries its own
-   * sentence into the toast rather than replacing it with a generic failure, which is the whole
-   * reason the button's own disabled state is a courtesy and the server's verdict is the rule.
-   */
-  const approve = () => {
-    void (detail.approved ? writes.unapproveCard(detail.id) : writes.approveCard(detail.id));
-  };
 
   const saveRemarks = () => {
     if (remarks === detail.closingRemarks) return;
@@ -169,37 +150,6 @@ export function DrawerIssuesAndTokens({ detail, writes }: DrawerIssuesAndTokensP
         </div>
       </section>
 
-      {/* The one press on this screen that changes what the run may do. Its state is a word and
-          its refusal is a sentence: a disabled button with no reason beside it is a dead end. */}
-      <div className="flex flex-wrap items-center gap-2">
-        {detail.approved ? (
-          <Badge tone="positive" className="vv-badge--compact">
-            {t('kanban.approve.approved', { when: formatRelativeTime(detail.approvedAt) })}
-          </Badge>
-        ) : (
-          <Badge tone="warn" className="vv-badge--compact">
-            {t('kanban.approve.needed')}
-          </Badge>
-        )}
-
-        <Button
-          variant={detail.approved ? 'ghost' : 'default'}
-          size="sm"
-          className="ml-auto h-8"
-          disabled={!detail.approved && blocked}
-          onClick={approve}
-        >
-          {detail.approved ? t('kanban.approve.unapprove') : t('kanban.approve.approve')}
-        </Button>
-
-        {!detail.approved && blocked && (
-          <p className="w-full text-xs text-muted-foreground">
-            {unanswered > 0
-              ? t('kanban.approve.blockedByQuestions', { count: unanswered })
-              : t('kanban.approve.blockedByEmptiness')}
-          </p>
-        )}
-      </div>
 
       <section className="flex flex-col gap-2" aria-labelledby={spendHeadingId}>
         <h3 id={spendHeadingId} className="text-sm font-semibold text-foreground">

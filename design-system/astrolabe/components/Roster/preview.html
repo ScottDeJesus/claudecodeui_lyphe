@@ -1,0 +1,27 @@
+<!-- @dsCard group="Openings" height=170 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Roster — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var T0 = Date.now();
+  function Demo() {
+    var s = React.useState(0);
+    React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % 8; }); }, 1400); return function () { clearInterval(id); }; }, []);
+    var k = s[0];
+    return h('div', { style: { maxWidth: 520 } }, h(A.Roster, { agents: [
+      { id: 'k', name: 'Kaylee', state: k < 3 ? 'thinking' : 'working', activity: k < 3 ? 'Reading upload.test.ts' : 'Drafting the fix', since: T0 - 14000 },
+      { id: 'b', name: 'Bugfixes', state: 'working', activity: 'Running 38 upload tests', since: T0 - 96000 },
+      { id: 's', name: 'scout-2', helper: true, state: k % 4 === 3 ? 'idle' : 'working', activity: 'Searching for timer installs', since: T0 - 8000 },
+    ] }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

@@ -5,10 +5,9 @@ import { useSessionPanel } from '@/modules/session-panel/context/sessionPanelCon
 import { Button } from '@/shared/ui';
 
 /**
- * THE WAY TO THE PANEL: a switch in the chat's head between the talk and the panel, with how many of the chat's follow-ups are
- * open beside it. Where the follow-ups are drawn apart from the panel (the chat's side column at a desk) it is the way to what
- * the chat put there alone, and counts nothing. With no panel it is not drawn. Under a finger it is its mark and the count
- * alone, drawn 28 px tall to fit the chat's one-line head, with a transparent `::before` that keeps its catch at 44 px.
+ * THE WAY TO THE PANEL: a switch in the chat's head between the talk and what the chat put on its panel. With no panel it is not
+ * drawn. Under a finger it is its mark alone, drawn 28 px tall to fit the chat's one-line head, with a transparent `::before`
+ * that keeps its catch at 44 px. The chat's follow-ups have a switch of their own beside it (`SessionFollowupsSwitch`).
  *
  * Used by project-workspace's `ChatHead`, at the end of the head.
  */
@@ -18,8 +17,7 @@ export function SessionPanelSwitch() {
   if (panel === null || panel.form === 'none') return null;
 
   const front = panel.view === 'panel';
-  const open = panel.followupsApart ? 0 : panel.followups.openCount;
-  const name = open > 0 ? t('sessionPanel.switchWithOpen', { count: open }) : t('sessionPanel.name');
+  const name = t('sessionPanel.name');
   return (
     <Button
       data-session-panel-switch=""
@@ -33,7 +31,6 @@ export function SessionPanelSwitch() {
     >
       <PanelLeft aria-hidden="true" />
       <span className="finger:hidden">{t('sessionPanel.name')}</span>
-      {open > 0 && <span className="font-mono text-xs tabular-nums">{open}</span>}
     </Button>
   );
 }

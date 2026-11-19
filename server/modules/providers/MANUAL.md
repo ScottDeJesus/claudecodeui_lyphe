@@ -909,7 +909,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cl
 | `renameByPerson(sessionId, customName)` | `updateSessionCustomName` then `markNameGiven`, in one `db.transaction` | `sessionsService.renameSessionById`, reached by `PUT /api/providers/sessions/:sessionId` (`provider.routes.ts`: the sidebar's rename) and by `rename_session` (`companion/tools/act-tools.ts`: Kaylee's rename) |
 | `markNameGiven(sessionId)` | `name_given = 1` | `renameByPerson` only |
 | `updateSessionCustomName(sessionId, customName)` | writes the name, never the mark | a name the app derives: `codex-session-synchronizer.provider.ts` (the Codex thread name), `companion-send.ts` `sendToNewChat` (Kaylee's `create_session` title), `chat-namer.service.ts` (Haiku's name) |
-| `nameFactsOf(sessionId)` | `{ customName, nameGiven, appCreated, isArchived }`, or `null` when no row has the id | `chat-namer.service.ts` (chat-names module, MAN-9067): questions 1 to 3 of the naming pass (`appCreated` + `isArchived`; `nameGiven`; `customName`) and the re-read before its write |
+| `nameFactsOf(sessionId)` | `{ customName, nameGiven, appCreated, isArchived, createdAt }` (`createdAt`: `created_at` through `normalizeTimestamp`, ISO, `null` when absent), or `null` when no row has the id | `chat-namer.service.ts` (chat-names module, MAN-9067): the pass's questions (`appCreated` + `isArchived`; `nameGiven`), the chat's kind (`createdAt` against `RELABEL_CHATS_CREATED_FROM`), the name it reads (`customName`) and the re-read before its write |
 
 `appCreated` = `provider_session_id IS NULL OR session_id <> provider_session_id`: the app allocated the id. A chat discovered on disk holds one id in both columns.
 

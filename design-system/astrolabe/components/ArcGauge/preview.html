@@ -1,0 +1,24 @@
+<!-- @dsCard group="Objects" height=220 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ArcGauge — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function useTicker(ms, n) { var s = React.useState(0); React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return (v + 1) % n; }); }, ms); return function () { clearInterval(id); }; }, []); return s[0]; }
+  function Demo() {
+    var t = useTicker(1800, 3);
+    return h('div', { style: { display: 'flex', gap: 40, padding: '24px 32px', alignItems: 'flex-start', flexWrap: 'wrap' } },
+      h(A.ArcGauge, { label: 'Context', value: [0.42, 0.61, 0.68][t], unit: '%' }),
+      h(A.ArcGauge, { label: 'Budget', value: [0.74, 0.83, 0.86][t], unit: '%', warnAt: 0.8 }),
+      h(A.ArcGauge, { label: 'In phase', value: [0.55, 0.81, 0.93][t], format: function (x) { return x.toFixed(2); } }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

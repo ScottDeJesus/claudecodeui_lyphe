@@ -1,0 +1,21 @@
+<!-- @dsCard group="Voice" height=176 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Transcript — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root" class="ast-stage-col"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  function Demo() {
+    var s = React.useState({ a: -1, st: 'idle' });
+    React.useEffect(function () { var id = setInterval(function () { var F = A.demoSignal(); s[1]({ a: F.wordIndex, st: A.demoSignal.state() }); }, 40); return function () { clearInterval(id); }; }, []);
+    return h('div', { style: { maxWidth: 760, margin: '0 auto', width: '100%' } }, h(A.Transcript, { words: A.demoSignal.words, active: s[0].a, live: s[0].st === 'speaking', signal: A.demoSignal, label: 'Transcript · demo signal', hint: 'Press Speak, type a line, or drop in a voice recording.' }));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

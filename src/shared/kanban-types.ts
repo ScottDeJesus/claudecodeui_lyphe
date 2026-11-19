@@ -55,6 +55,10 @@ export type KanbanBoard = {
    *  the driver reading's `concurrencyMax`, never as a copy here. Zero is a real value and means the
    *  board spawns NOTHING, so the panel draws it as a number rather than as an absence. */
   concurrency: number;
+  /** The absolute paths of the git repositories the board's cards are built in. The server checks
+   *  each is a directory inside a git work tree, and refuses autonomy on for a board that names
+   *  none (409 `KANBAN_BOARD_NEEDS_REPOS`). */
+  repos: string[];
   sortOrder: number;
   archived: boolean;
   createdAt: string;
@@ -254,6 +258,7 @@ export type KanbanEventKind =
   | 'tag.removed'
   | 'question.added'
   | 'question.answered'
+  | 'decision.noted'
   | 'issue.filed'
   | 'issue.resolved'
   | 'checklist.added'
@@ -335,10 +340,10 @@ export type KanbanSessionUsage = {
 };
 
 /**
- * The board header's six counts, fetched in one request.
+ * The board header's five counts, fetched in one request.
  *
- * FOUR are scoped to the board in the URL: `building`, `awaitingAnswer`, `awaitingApprove` and
- * `claimable`. TWO are estate-wide and carry the word in their own names —
+ * THREE are scoped to the board in the URL: `building`, `awaitingAnswer` and `queued` (cards in To
+ * Do waiting for the dispatcher). TWO are estate-wide and carry the word in their own names —
  * `lessonsPendingEstate`, `memoryPendingEstate` — because the rows behind them belong to no board
  * at all. The suffix is the contract: it is what stops a reader mistaking one for a board's number.
  * Zero is a count; an unknown reading is not — the strip draws it as an em-dash, never as 0.
@@ -346,10 +351,9 @@ export type KanbanSessionUsage = {
 export type KanbanVitals = {
   building: number;
   awaitingAnswer: number;
-  awaitingApprove: number;
+  queued: number;
   lessonsPendingEstate: number;
   memoryPendingEstate: number;
-  claimable: number;
 };
 
 /**

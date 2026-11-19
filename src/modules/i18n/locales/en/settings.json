@@ -110,7 +110,7 @@
     "title": "Voice",
     "description": "Speech-to-text input through your home server (Gemini as the backup), and read-aloud through Gemini or an OpenAI-compatible audio backend.",
     "enable": "Enable voice",
-    "enableDescription": "Show the mic button and the read-aloud button on messages.",
+    "enableDescription": "Show the read-aloud button on messages. The talk button in a chat's line is always there.",
     "backendTitle": "Backend",
     "backendDescription": "Choose the service that speaks read-aloud. For an OpenAI-compatible one, point at OpenAI, Groq, or a local server (LocalAI, Speaches, Kokoro-FastAPI); leave blank to use the server default.",
     "baseUrl": "Base URL",
@@ -714,6 +714,24 @@
       "off": "Off",
       "all": "{{percent}}% (all cores)",
       "unreadable": "The setting could not be read from the server, so its value is unknown. It is retried whenever this page regains focus."
+    },
+    "bugBoard": {
+      "unreadable": "The setting could not be read from the dispatcher, so its value is unknown. It is retried whenever this page regains focus.",
+      "width": {
+        "label": "Cards walked at once",
+        "description_one": "The dispatcher works on {{count}} board card at a time, across every self-running board. The rest wait in To Do: high priority first, then the oldest. A card already being worked on is never stopped. Takes effect at the next card.",
+        "description_other": "The dispatcher works on {{count}} board cards at a time, across every self-running board. The rest wait in To Do: high priority first, then the oldest. A card already being worked on is never stopped. Takes effect at the next card.",
+        "option_one": "{{count}} card",
+        "option_other": "{{count}} cards",
+        "selectLabel": "Board cards walked at once"
+      },
+      "threshold": {
+        "label": "Sort confidence",
+        "description": "A new card is sorted as a bug, a UI change or a tweak when Jev, or failing that Haiku, is at least {{threshold}} sure. Below that it is worked as a bug: confirmed and traced to its cause before anything is changed. Each card’s Sort step says how sure they were. Takes effect at the next card.",
+        "field": "{{min}} to {{max}}",
+        "fieldLabel": "Sort confidence, from {{min}} to {{max}}",
+        "outOfBounds": "Not saved: use {{min}} to {{max}}."
+      }
     },
     "weeklyStop": {
       "label": "Weekly stop",

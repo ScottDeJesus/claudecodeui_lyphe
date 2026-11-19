@@ -8,7 +8,7 @@ import { RoadmapTreeFace } from '@/modules/roadmap/RoadmapTreeFace';
 import { RunnerPanel } from '@/modules/runner-tab';
 import { Spinner, Tabs } from '@/shared/ui';
 
-/** The tab's three faces: the roadmap as a tree from its goal, the roadmap as a stack of its milestones, and the live cards of what is in flight. */
+/** The tab's three faces: the roadmap as a tree from its goal, the ring of its features (finished, being built, ready to start), and the live cards of what is in flight. */
 type Face = 'path' | 'stack' | 'inFlight';
 
 type RoadmapTabProps = {
@@ -26,8 +26,8 @@ type RoadmapTabProps = {
 
 /**
  * The Roadmap tab: a segmented switch over its three faces. Roadmap is the tree from the goal
- * (`RoadmapTreeFace`, in viewport fit); Stack is the same roadmap as rings, one per milestone, the current one standing
- * open (`RoadmapStackFace`); In flight is the live cards (`RunnerPanel`, mounted whole beneath the switch with only a
+ * (`RoadmapTreeFace`, in viewport fit); Stack is one ring of the roadmap's features, the ones finished and not yet dismissed,
+ * being built, or ready to be started (`RoadmapStackFace`); In flight is the live cards (`RunnerPanel`, mounted whole beneath the switch with only a
  * reveal handed down). A visit opens on In flight (`startFace`); the Roadmap widget at full screen opens on Roadmap,
  * the face its column body was already showing. In flight carries a pill and the amber — the cards
  * drawn, and the sentence for the prompts waiting on the operator — so the switch says where the
