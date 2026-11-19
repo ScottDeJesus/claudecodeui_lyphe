@@ -134,6 +134,9 @@ export { Field } from '@/shared/ui/Field';
 export { Gallery } from '@/shared/ui/Gallery';
 // Holds a whole page of the app (the workspace, Kaylee Station) mounted and out of reach while the other page is on screen.
 export { HeldPage } from '@/shared/ui/HeldPage';
+// How often: a window's items by day (stacked clean / hiccup / test columns) and by local hour, each with its sentence. The
+// Cerberus tab's Uploads view draws it, handing in its own words as a key prefix.
+export { HowOften } from '@/shared/ui/HowOften';
 export { Input } from '@/shared/ui/Input';
 export { KanbanCard } from '@/shared/ui/KanbanCard';
 export type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/ui/KanbanCard';

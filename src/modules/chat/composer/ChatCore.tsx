@@ -347,13 +347,14 @@ export function ChatCore({
             aria-expanded={open}
             aria-controls={controls}
             onClick={onToggle}
-            className="chat-inst__press grid place-items-center rounded-full outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="chat-inst__press rounded-full outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             // The body alone where the instrument draws the rings round it, so each ring keeps its own press; the whole square otherwise.
             style={layered ? { width: bodyPress, height: bodyPress } : { width: corePx, height: corePx }}
           >
             {/* The core's own accessible name is the companion's; here the button speaks for it. The drawing keeps its own square,
-                centred on the press, whatever the press's size. */}
-            <span aria-hidden="true" className="pointer-events-none grid flex-none place-items-center" style={{ width: corePx, height: corePx }}>
+                pinned by its middle to the press's middle, whatever the press's size: at a desk the press is the body alone and smaller
+                than the square, and a grid item larger than its grid overflows from its start, not round its middle. */}
+            <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center" style={{ width: corePx, height: corePx }}>
               {draw !== null
                 ? draw({ material, state: FORM[state], drive, size: corePx, azimuth: place !== null ? TALK_FROM_PLACE : TALK_FROM_DOCK, gauges })
                 // No page gave the instrument (a surface that mounts the chat alone): the app's small loop stands in.

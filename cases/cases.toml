@@ -12,6 +12,7 @@ build_max = 40
 ".ts" = ["cloudcli-tsx"]
 
 [areas]
+client = "the browser app's code with no screen (src/shared/), imported by a .ts case under node with the browser globals it reads stubbed"
 server = "the API of the running server"
 shell = "the app frame in a browser"
 modules = "server code with no route, imported by a .ts case"

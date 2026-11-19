@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import type { DayBucket } from '@/modules/upload-runs/utils/uploadsModel';
+import type { DayBucket } from '@/shared/dayBuckets';
 import type { Tone } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
@@ -9,6 +9,8 @@ type HowOftenProps = {
   days: DayBucket[];
   /** 24 counts: the window's presses by local hour, midnight first. */
   hours: number[];
+  /** The i18n key prefix whose leaves the picture reads (noDay, busiestDay, daysLabel, dayTitle, dayTitleTests, legend.clean, legend.hiccup, legend.test, today, noHour, busiestHour, hoursLabel, hourTitle); the Uploads view hands it 'cerberus.uploads.often'. */
+  words: string;
 };
 
 /** The hours named under the strip, every sixth, so the eye places a cell without counting. */
@@ -24,7 +26,7 @@ const dayLabel = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString
 const hourLabel = (hour: number) => new Date(2000, 0, 1, hour).toLocaleTimeString([], { hour: 'numeric' });
 
 /**
- * HOW OFTEN: when the Uploads page is pressed. Two small pictures, each with its answer in words above it.
+ * HOW OFTEN: when a Cerberus view's subject happened (the Uploads page's presses, for one). Two small pictures, each with its answer in words above it.
  *
  * BY DAY: one column per day of the window, its height its runs against the busiest day's, the clean runs at the foot in
  * the positive tone and the hiccups stacked over them in the warn tone (test runs grey on top, when they are listed).
@@ -39,11 +41,11 @@ const hourLabel = (hour: number) => new Date(2000, 0, 1, hour).toLocaleTimeStrin
  * COLOUR NEVER STANDS ALONE: the legend under the columns names each tone, the order (clean under hiccup) holds in grey,
  * and both sentences carry the answer for a reader who sees neither picture.
  *
- * Used by this module's `UploadsBody`, under By upload type.
+ * Used by the upload-runs module's `UploadsBody`, under By upload type, which hands it the words of `cerberus.uploads.often`.
  */
-export function HowOften({ days, hours }: HowOftenProps) {
+export function HowOften({ days, hours, words }: HowOftenProps) {
   const { t } = useTranslation();
-  const o = 'cerberus.uploads.often';
+  const o = words;
   // A column's height counts everything it draws; the busiest day counts uploads alone, as every sentence of the view does.
   const uploads = (day: DayBucket) => day.clean + day.hiccup;
   const dayPeak = Math.max(0, ...days.map((day) => uploads(day) + day.test));
@@ -54,7 +56,7 @@ export function HowOften({ days, hours }: HowOftenProps) {
   const withTests = days.some((day) => day.test > 0);
 
   return (
-    <div className="flex min-w-0 flex-col gap-5" data-uploads-often>
+    <div className="flex min-w-0 flex-col gap-5" data-how-often>
       <figure className="m-0 flex min-w-0 flex-col gap-2">
         <figcaption className="text-[13px] text-foreground">
           {busiestCount === 0 || busiestDay === null ? t(`${o}.noDay`) : t(`${o}.busiestDay`, { day: dayLabel(busiestDay.day), count: busiestCount })}
@@ -65,7 +67,7 @@ export function HowOften({ days, hours }: HowOftenProps) {
               key={day.day}
               className={cn('flex h-full min-w-0 flex-1 flex-col-reverse gap-px rounded-sm', day.today && 'bg-muted')}
               title={t(day.test > 0 ? `${o}.dayTitleTests` : `${o}.dayTitle`, { day: dayLabel(day.day), clean: day.clean, hiccup: day.hiccup, test: day.test })}
-              data-uploads-day={day.day}
+              data-how-often-day={day.day}
               data-today={day.today || undefined}
             >
               {PARTS.map((part) => day[part.key] > 0 && (
@@ -94,7 +96,7 @@ export function HowOften({ days, hours }: HowOftenProps) {
         </figcaption>
         <div className="grid min-w-0 grid-cols-[repeat(24,minmax(0,1fr))] gap-px" role="img" aria-label={t(`${o}.hoursLabel`)} data-tone="info">
           {hours.map((count, hour) => (
-            <span key={hour} className="relative h-5 overflow-hidden rounded-sm bg-muted" title={t(`${o}.hourTitle`, { hour: hourLabel(hour), count })} data-uploads-hour={hour}>
+            <span key={hour} className="relative h-5 overflow-hidden rounded-sm bg-muted" title={t(`${o}.hourTitle`, { hour: hourLabel(hour), count })} data-how-often-hour={hour}>
               {/* The fill's strength is the hour's share of the busiest hour, never below a fifth, so one press still shows. */}
               {count > 0 && <span className="absolute inset-0 bg-tone-dot" style={{ opacity: 0.2 + 0.8 * (count / hourPeak) }} />}
             </span>

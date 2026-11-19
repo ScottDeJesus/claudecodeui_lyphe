@@ -12,6 +12,7 @@ import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
 import type { StationAskAnswer } from '@/shared/station-types';
 import type { UploadRunsWindowDays } from '@/shared/upload-runs-types';
+import type { SchedulingWindowDays } from '@/shared/scheduling-report-types';
 import { IS_PLATFORM, companionClientId, recordingFileName } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 import { synthesizeOnOwnEndpoint } from '@/shared/voiceDirect';
@@ -1266,6 +1267,27 @@ export const api = {
       `/api/upload-runs/runs/${encodeURIComponent(sid)}/stream${query({ from, token: getStoredAuthToken() })}`,
     // The feed, for `EventSource`: an `UploadRunsFrame` each time a run opens, moves or ends and each time a walk of one writes progress.
     feedUrl: () => `/api/upload-runs/feed${query({ token: getStoredAuthToken() })}`,
+  },
+
+  // The scheduling-report lane (the Scheduling view of the Cerberus tab; wire shapes in `@/shared/scheduling-report-types`): each
+  // visit booked, changed or cancelled — the form's session and the presses it made, with a verdict — forwarded to the :8004
+  // backend by CloudCLI. READ-ONLY: every verb is a GET, and nothing here books, changes or cancels a visit. Every JSON answer is
+  // its wire shape BARE, in snake_case. A failure arrives as `uploadRuns`' do: `{ error: string }` from the lane, `{ detail: string }`
+  // passed through from the backend (404: no such entry). The answer of each verb is named beside it. An entry id is encoded here,
+  // so a caller passes it as it holds it. The feed's URL is for `EventSource`, which cannot send an Authorization header, so the
+  // token rides along as a query parameter, as `uploadRuns.feedUrl`'s does; the lane never forwards it upstream.
+  schedulingReport: {
+    // → SchedulingOverview. `days` is the window (the lane takes 7, 30 or 90, and 30 when it is left out), `by` one actor stamp
+    // (`eis:<login>`), `account` one account id, and `machines` brings machine calls in, which the overview leaves out otherwise.
+    overview: (
+      { days, by, machines, account }: { days?: SchedulingWindowDays; by?: string; machines?: boolean; account?: string } = {},
+      options: ApiRequestOptions = {},
+    ) => get(`/api/scheduling-report/overview${query({ days, by, machines: machines ? 1 : undefined, account })}`, options),
+    // → SchedulingEntryWhole (404: no such entry). `id` is a session id for a form entry, an act id for a direct one.
+    entry: (id: string, options: ApiRequestOptions = {}) =>
+      get(`/api/scheduling-report/entries/${encodeURIComponent(id)}`, options),
+    // The feed, for `EventSource`: a `SchedulingFeedFrame` (`{ type: 'changed' }`) each time a visit write or a form's report is recorded.
+    feedUrl: () => `/api/scheduling-report/feed${query({ token: getStoredAuthToken() })}`,
   },
 
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the

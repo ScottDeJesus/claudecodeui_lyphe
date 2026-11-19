@@ -750,8 +750,14 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     return ctx;
   };
 
+  /**
+   * A canvas side near `reach` px that is centred on the square to the pixel: it differs from the square's side by an even count, so
+   * the canvas overhangs the square by whole px at each side. An odd difference would hang it half a px off the square's middle.
+   */
+  const centredSide = (reach: number) => size + 2 * Math.round((reach - size) / 2);
+
   /** The side of the two flat canvases, in px: the square, and for a lone body the wider reach its forms and its orbiting gauges have. */
-  const flatSide = () => (tier === 'body' ? Math.round(size * CORE_BODY_SHARE * 4.6) : size);
+  const flatSide = () => (tier === 'body' ? centredSide(size * CORE_BODY_SHARE * 4.6) : size);
 
   /** The geometry of the square: loop radius `Ro`, core radius `R` and the GL canvas's side, by tier. */
   const geometry = () => {
@@ -763,7 +769,6 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       const R = size / 5.4;
       return { Ro: 2.3 * R, R, glSide: 4.6 * R };
     }
-    // The body alone: the GL square is the whole square, so the body is as large as its forms' reach allows.
     // The body alone: `CORE_BODY_SHARE` of its square, on a canvas wide enough for its forms' reach (4.6 radii), which runs past the square.
     if (tier === 'body') return { Ro: size / 2, R: size * CORE_BODY_SHARE, glSide: size * CORE_BODY_SHARE * 4.6 };
     // The disc: the same body in the same square, with the loop drawn through the reach of its forms.
@@ -774,12 +779,12 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     size = Math.max(16, Math.round(next));
     const scale = dpr();
     const flat = flatSide();
-    const flatOffset = Math.round((size - flat) / 2);
+    const flatOffset = (size - flat) / 2;
     if (back) fit(back, flat, scale, flatOffset);
     fit(front, flat, scale, flatOffset);
     if (core) {
       const { glSide } = geometry();
-      const side = Math.round(glSide);
+      const side = centredSide(glSide);
       const px = Math.max(64, Math.round(side * Math.min(scale, 1.5) * quality));
       if (glCanvas.width !== px) {
         glCanvas.width = px;
@@ -787,8 +792,8 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       }
       glCanvas.style.width = `${side}px`;
       glCanvas.style.height = `${side}px`;
-      glCanvas.style.left = `${Math.round((size - side) / 2)}px`;
-      glCanvas.style.top = `${Math.round((size - side) / 2)}px`;
+      glCanvas.style.left = `${(size - side) / 2}px`;
+      glCanvas.style.top = `${(size - side) / 2}px`;
     }
   };
 

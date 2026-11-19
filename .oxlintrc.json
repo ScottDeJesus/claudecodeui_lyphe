@@ -141,6 +141,7 @@
           "src/shared/solarSchedule.ts",
           "src/shared/spend.ts",
           "src/shared/trend.ts",
+          "src/shared/dayBuckets.ts",
           "src/shared/modelLabels.ts",
           "src/shared/deepseekPeakHours.ts",
           "src/shared/syntaxHighlighter.ts",
@@ -158,6 +159,7 @@
           "src/shared/affected-areas-layout-types.ts",
           "src/shared/carrier-bulletins-types.ts",
           "src/shared/upload-runs-types.ts",
+          "src/shared/scheduling-report-types.ts",
           "src/shared/sessionRecency.ts",
           "src/shared/projectNameHints.ts"
         ],

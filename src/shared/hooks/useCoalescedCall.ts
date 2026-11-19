@@ -13,7 +13,7 @@ import { useHostWindow } from '@/shared/context/HostWindowContext';
  *
  * Returns the request. It is a new function when `active` changes, so a caller that reads it from a listener holds it by ref.
  *
- * Used by this module's `useUploadsRead` and `useRunSheet`.
+ * Used by the upload-runs module's `useUploadsRead` and `useRunSheet`.
  */
 export function useCoalescedCall(run: () => void, windowMs: number, active: boolean): () => void {
   const hostWindow = useHostWindow();

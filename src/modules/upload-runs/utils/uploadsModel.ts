@@ -1,4 +1,5 @@
 import type { HealSessionsAnswer } from '@/modules/heal';
+import type { DayBucket } from '@/shared/dayBuckets';
 import type { UploadRunEvent, UploadRunsOverview, UploadRunWhole } from '@/shared/upload-runs-types';
 
 /*
@@ -22,9 +23,6 @@ export type UploadsFilters = { by: string | null; tests: boolean; hiccupsOnly: b
 
 /** The heal answer's rows for one Claude session: how many friction rows the run's agent filed, how many a landed heal took, how many still stand open. */
 export type RunFriction = { rows: number; healed: number; open: number };
-
-/** One day of the window, in the browser's local time (`day` is local YYYY-MM-DD): its armed runs by verdict, its test runs, and whether it is today. */
-export type DayBucket = { day: string; clean: number; hiccup: number; test: number; today: boolean };
 
 /**
  * What the live run is doing right now, from its own stream: `words` is its newest step (the newest tool call's summary, or

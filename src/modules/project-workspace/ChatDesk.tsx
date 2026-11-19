@@ -1,16 +1,18 @@
 import '@/modules/project-workspace/chatDesk.css';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
 import { RoadmapCircle } from '@/modules/roadmap';
 import { SessionFollowups } from '@/modules/session-panel';
-import { SessionsHalo } from '@/modules/sidebar';
+import { haloHeightFor, haloMiddle, SessionsHalo } from '@/modules/sidebar';
 import { ChatCorePlaceProvider } from '@/shared/context/ChatCorePlaceContext';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 
-/** Where the roadmap's circle rests over the side column: its middle this far down, and its radius. The station's own two numbers. */
+/** Where the roadmap's circle rests over the side column: its middle at least this far down, and its radius. The station's own two numbers. */
 const CIRCLE_TOP = 66;
+/** How far the circle's middle stands above the core's centre, in px: the gap the two kept when the core stood at the column's top. */
+const CIRCLE_OVER_CORE = 191;
 const CIRCLE_RADIUS = 33;
 
 /** The air kept between the column's edges and the hoop of chats round the core, in px at each side. */
@@ -22,6 +24,9 @@ const CORE_RADIUS = 60;
  * for the chat's larger core with its rings and its helpers round it.
  */
 const HOOP_LEAN = 0.72;
+
+/** The hoop's reading line, drawn under its circle inside its box (`SessionsHalo`'s `data-halo-reading`, 28 px tall): it lifts the circle, and the core in it, by half as much. */
+const HOOP_READING = 28;
 
 type ChatDeskProps = {
   /** The side column's width in px, or 0 for none: a narrow screen, the chat floating, no project chosen (`useChatDeskSide`). */
@@ -55,17 +60,33 @@ export function ChatDesk({ side, sessionId, head, children }: ChatDeskProps) {
   const doors = useStationDoors();
   // The box the core is drawn into. State, not a ref: the core's portal is made when the box arrives and unmade when it leaves.
   const [corePlace, setCorePlace] = useState<HTMLDivElement | null>(null);
+  // The desk's own height, so the circle can stand over the core where the column puts it (level with the chat's middle).
+  const [desk, setDesk] = useState<HTMLDivElement | null>(null);
+  const [deskHeight, setDeskHeight] = useState(0);
+  useEffect(() => {
+    if (!desk) return undefined;
+    const observer = new ResizeObserver(([entry]) => setDeskHeight(entry.contentRect.height));
+    observer.observe(desk);
+    return () => observer.disconnect();
+  }, [desk]);
+  // The core's centre is the chat surface's middle: its 16 px of air above and 12 px below put that 2 px under the desk's.
+  const circleY = Math.max(CIRCLE_TOP, deskHeight / 2 + 2 - CIRCLE_OVER_CORE);
   const beside = side > 0;
+  // The hoop's box holds the core this many px above its own middle (the circle's middle, `haloMiddle`, and the reading line under the
+  // circle); the column lowers the hoop by as much, so the core's centre, not the hoop's, is level with the chat's (`--core-lift`).
+  const hoopWidth = side - 2 * HOOP_INSET;
+  const hoopHeight = haloHeightFor(hoopWidth, HOOP_LEAN);
+  const coreLift = beside ? HOOP_READING / 2 + hoopHeight / 2 - haloMiddle(hoopWidth, hoopHeight, HOOP_LEAN).y : 0;
 
   return (
     <ChatCorePlaceProvider value={beside ? corePlace : null}>
-      <div data-chat-desk={beside ? 'side' : 'plain'} className="chat-desk" style={{ '--chat-side': `${side}px` } as CSSProperties}>
+      <div ref={setDesk} data-chat-desk={beside ? 'side' : 'plain'} className="chat-desk" style={{ '--chat-side': `${side}px` } as CSSProperties}>
         {beside && (
-          <aside data-chat-side="" className="chat-desk__side">
+          <aside data-chat-side="" className="chat-desk__side" style={{ '--core-lift': `${coreLift}px` } as CSSProperties}>
             <div className="chat-desk__core">
               <SessionsHalo
                 enabled
-                width={side - 2 * HOOP_INSET}
+                width={hoopWidth}
                 lean={HOOP_LEAN}
                 names={false}
                 reading
@@ -85,7 +106,7 @@ export function ChatDesk({ side, sessionId, head, children }: ChatDeskProps) {
           {head}
           <div className="chat-desk__body">{children}</div>
         </div>
-        {beside && <RoadmapCircle rest={{ cx: side / 2, cy: CIRCLE_TOP, radius: CIRCLE_RADIUS }} />}
+        {beside && <RoadmapCircle rest={{ cx: side / 2, cy: circleY, radius: CIRCLE_RADIUS }} />}
       </div>
     </ChatCorePlaceProvider>
   );

@@ -1,21 +1,23 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useCoalescedCall } from '@/modules/upload-runs/hooks/useCoalescedCall';
 import { useHealSessions } from '@/modules/upload-runs/hooks/useHealSessions';
 import { useHealSignature } from '@/modules/upload-runs/hooks/useHealSignature';
 import { useLiveRun } from '@/modules/upload-runs/hooks/useLiveRun';
 import { useOverviewRead } from '@/modules/upload-runs/hooks/useOverviewRead';
-import { useFeedEvents, useRunsFeed } from '@/modules/upload-runs/hooks/useRunsFeed';
+import { useRunsFeed } from '@/modules/upload-runs/hooks/useRunsFeed';
 import type { RunsFeed } from '@/modules/upload-runs/hooks/useRunsFeed';
 import { useThrottledCall } from '@/modules/upload-runs/hooks/useThrottledCall';
-import { bucketDays } from '@/modules/upload-runs/utils/bucketDays';
-import { bucketHours } from '@/modules/upload-runs/utils/bucketHours';
 import { sessionIdsOf } from '@/modules/upload-runs/utils/healAnswer';
 import { healedCounts, joinFriction } from '@/modules/upload-runs/utils/joinFriction';
 import { typeRegression } from '@/modules/upload-runs/utils/typeRegression';
 import type { UploadsFilters, UploadsRead, UploadsWindow } from '@/modules/upload-runs/utils/uploadsModel';
 import { troubleSentence } from '@/modules/upload-runs/utils/uploadsWords';
+import { bucketDays, bucketHours } from '@/shared/dayBuckets';
+import type { DayBucketItem } from '@/shared/dayBuckets';
+import { useCoalescedCall } from '@/shared/hooks/useCoalescedCall';
+import { useFeedEvents } from '@/shared/hooks/useEventFeed';
+import type { UploadRunSummary } from '@/shared/upload-runs-types';
 
 /** Frames that come within this long of the first are one re-read: a walk writes a step every few seconds, a run edge comes in a burst. */
 const FRAME_COALESCE_MS = 1000;
@@ -24,6 +26,17 @@ const FRAME_COALESCE_MS = 1000;
 const REFRESH_GAP_MS = 1000;
 
 const NO_REGRESSION: UploadsRead['regression'] = { initial: false, final: false };
+
+/**
+ * A run as a day's bucket item, dated by when it started. A test run is the grey `test` part: it stands in its day's column and
+ * in no hour. An armed run is its verdict's part, `clean` or `hiccup`. A run with no verdict yet, still going, is `null`: it
+ * stands in no column, and in the hour strip it is counted as the press it was.
+ *
+ * Used by `useUploadsRead`, which maps the overview's runs through it for both the day columns and the hour strip.
+ */
+function dayItemOf(run: UploadRunSummary): DayBucketItem {
+  return { at: run.started_at, part: run.dry_run ? 'test' : run.verdict === 'clean' ? 'clean' : run.verdict === 'hiccup' ? 'hiccup' : null };
+}
 
 type UploadsAsk = {
   /** Whether the Cerberus tab is showing the view. Hidden, the feed is closed and nothing is read. */
@@ -101,12 +114,10 @@ export function useUploadsRead({ shown, window: days, filters }: UploadsAsk): Up
   const friction = useMemo(() => (answer === null ? null : joinFriction(answer)), [answer]);
   const healed = useMemo(() => (answer === null ? null : healedCounts(answer)), [answer]);
   const regression = useMemo(() => (answer === null || overview === null ? NO_REGRESSION : typeRegression(answer, overview.runs)), [answer, overview]);
+  const dayItems = useMemo(() => (overview === null ? [] : overview.runs.map(dayItemOf)), [overview]);
   // Counted from the day the answer was made, so the window's last column is the day its newest runs fell on.
-  const bucketsDays = useMemo(
-    () => (overview === null ? [] : bucketDays(overview.runs, overview.window.days, Date.parse(overview.generated_at))),
-    [overview],
-  );
-  const bucketsHours = useMemo(() => (overview === null ? [] : bucketHours(overview.runs)), [overview]);
+  const bucketsDays = useMemo(() => (overview === null ? [] : bucketDays(dayItems, overview.window.days, Date.parse(overview.generated_at))), [overview, dayItems]);
+  const bucketsHours = useMemo(() => (overview === null ? [] : bucketHours(dayItems)), [overview, dayItems]);
 
   const live = useLiveRun(shown ? overview?.live ?? null : null, feed);
 

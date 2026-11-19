@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { HowOften } from '@/modules/upload-runs/HowOften';
 import { RunList } from '@/modules/upload-runs/RunList';
 import { UploadTypeList } from '@/modules/upload-runs/UploadTypeList';
 import type { UploadsFilters, UploadsRead } from '@/modules/upload-runs/utils/uploadsModel';
 import type { UploadRunsOverview } from '@/shared/upload-runs-types';
-import { Badge } from '@/shared/ui';
+import { Badge, HowOften } from '@/shared/ui';
 
 type UploadsBodyProps = {
   /** The window as the server answered it. */
@@ -59,7 +58,7 @@ export function UploadsBody({ overview, read, filters, now, onFilter, onOpenRun,
           <UploadTypeList types={overview.types} runs={overview.runs} regression={read.regression} friction={read.friction} frictionFailed={read.frictionFailed} now={now} onOpenRun={onOpenRun} />
         </UploadsSection>
         <UploadsSection id="uploads-often" title={t(`${s}.often`)} hint={t(`${s}.oftenHint`)}>
-          <HowOften days={read.days} hours={read.hours} />
+          <HowOften days={read.days} hours={read.hours} words="cerberus.uploads.often" />
         </UploadsSection>
       </div>
       <UploadsSection id="uploads-runs" title={t(`${s}.runs`)} hint={t(`${s}.runsHint`)} badge={badge}>

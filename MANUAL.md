@@ -674,7 +674,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chat
 
 ## MAN-7451 — Kit and shared hooks follow the host window
 
-The kit's overlays and two shared hooks bind to `useHostWindow()` (MAN-7443), never the global `window`/`document`. At home the hook returns the page's own `window`: outside `ChatHostSlot`'s subtree there is no provider, and inside it (MAN-7464) the provider's `hostWindow` is that same `window`.
+The kit's overlays and four shared hooks bind to `useHostWindow()` (MAN-7443), never the global `window`/`document`. At home the hook returns the page's own `window`: outside `ChatHostSlot`'s subtree there is no provider, and inside it (MAN-7464) the provider's `hostWindow` is that same `window`.
 
 ## What binds to the host window
 
@@ -691,6 +691,8 @@ The kit's overlays and two shared hooks bind to `useHostWindow()` (MAN-7443), ne
 | `Tabs` | `src/shared/ui/Tabs.tsx` | indicator `ResizeObserver` via `resizeObserverIn` |
 | `useDeviceSettings` | `src/shared/hooks/useDeviceSettings.ts` | `hostWindow.innerWidth`; `resize` on `hostWindow` (narrow in a 420px window under a 1440px opener) |
 | `useElapsed` | `src/shared/hooks/useElapsed.ts` | tick `setInterval` on `hostWindow` |
+| `useCoalescedCall` | `src/shared/hooks/useCoalescedCall.ts` | the one coalescing `setTimeout`, armed and cleared on `hostWindow` |
+| `useEventFeed` | `src/shared/hooks/useEventFeed.ts` | the refused-dial re-dial `setTimeout`, armed and cleared on `hostWindow` |
 
 Every unit above has `hostWindow` in the dependency list of each effect that binds to it.
 
@@ -739,7 +741,7 @@ Every unit above has `hostWindow` in the dependency list of each effect that bin
 - Both exit 1 with the failed checks listed; neither sends a model turn or writes app data.
 - Sibling probes touched by the same change: `.verify/lightbox-zoom.mjs`, `.verify/export-menu-layer.mjs` (MAN-7426, INV-4356).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeviceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Dialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCoalescedCall.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeviceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useEventFeed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Dialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
 
 ## MAN-7452 — Chat state layer follows the host window
 
@@ -17262,19 +17264,18 @@ The Uploads view of the Cerberus tab: what happens when a person uses Restorly's
 | `UploadsHead.tsx` | eyebrow, headline with a tone accent, scope line and the press that lifts it, summary, window switch (7, 30, 90), Refresh |
 | `UploadsPills.tsx` | five pills: Runs, Hiccups, Live now, Last run, Healed; each carries the reader to a section |
 | `LiveNow.tsx` | the one live run: working or waiting on a person, the Test run mark when it is a dry run, its newest step, turns and tool calls, Open |
-| `UploadsBody.tsx` | the two columns once the view itself is 48rem wide (it is a size container; the window never decides): By upload type and How often, then Runs. Section ids `uploads-types`, `uploads-often`, `uploads-runs` |
+| `UploadsBody.tsx` | the two columns once the view itself is 48rem wide (it is a size container; the window never decides): By upload type and How often (the shared `HowOften` of `@/shared/ui`, handed `words="cerberus.uploads.often"`; MAN-9989), then Runs. Section ids `uploads-types`, `uploads-often`, `uploads-runs` |
 | `UploadTypeList.tsx` | Initial and Final, one row each in the heal tab's kind-row anatomy: clean, hiccups, trend (`trendMark`, `src/shared/trend.ts`), regression mark; a row opens to its runs, hiccups first |
-| `HowOften.tsx` | by day (a column for each day the window touches, today last) and by hour (24 cells) |
 | `RunList.tsx` | Runs: chips (people, Hiccups only, Test runs, accounts once two have runs), the list's states, 25 rows then Show more |
 | `TestRunsChip.tsx` | the Test runs toggle: among `RunList`'s chips, or alone under the empty state of a window with no run (MAN-9916) |
 | `RunRow.tsx` | one run as one `<li>`; the caller owns the `<ul>` |
 | `RunSheet.tsx` | one run in the shared `Sheet`, five sections in order; drawn only while the view is shown |
 | `RunSheetHead.tsx` | the sheet's head: verdict, ending sentence, facts, a strip of three steps (walked for real, confirmed, pressed) |
 | `RunBumps.tsx`, `RunEvents.tsx`, `RunWalks.tsx`, `RunAfter.tsx`, `RunFrictionSection.tsx` | the five sections: Speed bumps, Inside the run (its pane is the one `useFollowNewest` keeps: INV-11831), The flow it walked, After the run, The agent's own friction (`HealItemRow` and `HealCardView` through `@/modules/heal`) |
-| `hooks/` | 13 hooks: the reads, the two streams, the clock and the pane's follow (MAN-9911, MAN-9913) |
-| `utils/uploadsModel.ts` | the contract, types only: `UploadsWindow`, `UploadsFilters`, `RunFriction`, `DayBucket`, `LiveStep`, `UploadsRead`, `RunSheetRead`, `LiveStatus`, `UploadsPillKey`, `UploadsTally` |
+| `hooks/` | 12 hooks: the reads, the two streams, the clock and the pane's follow (MAN-9911, MAN-9913) |
+| `utils/uploadsModel.ts` | the contract, types only: `UploadsWindow`, `UploadsFilters`, `RunFriction`, `LiveStep`, `UploadsRead`, `RunSheetRead`, `LiveStatus`, `UploadsPillKey`, `UploadsTally` |
 | `utils/uploadsWords.ts` | pure words, each taking `t` and data: a verdict's look, the Test run mark (`testLook`), ages, durations, a reason's sentence, the ending sentence, an event's line, a lane fault's sentence (`troubleSentence`) |
-| `utils/joinFriction.ts`, `typeRegression.ts`, `bucketDays.ts`, `bucketHours.ts`, `healAnswer.ts`, `readEventsPage.ts`, `lastSeq.ts`, `uploadsFrames.ts` | the pure fills and the edges where wire text is read (MAN-9912) |
+| `utils/joinFriction.ts`, `typeRegression.ts`, `healAnswer.ts`, `readEventsPage.ts`, `lastSeq.ts`, `uploadsFrames.ts` | the pure fills and the edges where wire text is read (MAN-9912); the day and hour bucketing and `DayBucket` are the shared `@/shared/dayBuckets` (MAN-9989), fed by `useUploadsRead`'s run-to-item mapping |
 
 ## The root and what it is handed
 - The root holds the window (`UploadsWindow`, 30 at first), the filters (`UploadsFilters`), the open run's session id and the pill last pressed. `RunList` holds one more, how many rows are drawn; `RunEvents` holds the open line by its event id.
@@ -17511,23 +17512,22 @@ section: The boot reporter — how a page that did not draw tells the server why
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/index.html, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/boot-report/, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/request-source.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/AppErrorBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/boot-reporter.mjs
 
-## MAN-9911 — src/modules/upload-runs/hooks — the reads: the 13 hooks, what makes a read, the four timers and the rules
+## MAN-9911 — src/modules/upload-runs/hooks — the reads: the 12 hooks, what makes a read, the four timers and the rules
 
-The Uploads view's data layer, `src/modules/upload-runs/hooks/`: one read or one stream each. The root calls three (`useUploadsRead`, `useRunSheet`, `useUploadsClock`); the rest are theirs. The module: MAN-9891. What each read keeps, drops and counts: MAN-9913. The pure parts they call: MAN-9912. Wire: MAN-9882. Shared read: `useLaneRead` (MAN-8917).
+The Uploads view's data layer, `src/modules/upload-runs/hooks/`: one read or one stream each. The root calls three (`useUploadsRead`, `useRunSheet`, `useUploadsClock`); the rest are theirs. The module: MAN-9891. What each read keeps, drops and counts: MAN-9913. The pure parts they call: MAN-9912. Wire: MAN-9882. Shared read: `useLaneRead` (MAN-8917). Two of its pieces are shared hooks in `src/shared/hooks/` (MAN-9989 is their row): `useCoalescedCall` and the feed's `useEventFeed` / `useFeedEvents`.
 
 ## The hooks
 | hook | gives | called by |
 |---|---|---|
 | `useUploadsRead({ shown, window, filters })` | `{ read, feed, readAt, refresh, retry }`; `read` is `UploadsRead`, made from the overview, the heal answer and the live step | `UploadsView` |
 | `useOverviewRead(shown, days, filters)` | `{ overview, trouble, readAt, reload, retry }`: `api.uploadRuns.overview` through `useLaneRead`, key `[days, by, tests, account]`, null while hidden | `useUploadsRead` |
-| `useRunsFeed(active)` | `RunsFeed` `{ subscribe, redial }`: the ONE `EventSource` on the feed, open only while `active`. `useFeedEvents(feed, listener)` hears `open` (each dial) and `frame` | `useUploadsRead` dials; `useLiveRun`, `useRunSheet` listen |
+| `useRunsFeed(active)` | `RunsFeed` = `EventFeed<UploadRunsFrame>` `{ subscribe, redial }`: the ONE `EventSource` on the feed, open only while `active` — the shared `useEventFeed` handed `api.uploadRuns.feedUrl`, `parseFrame` and the name `upload runs`. The shared `useFeedEvents(feed, listener)` hears `open` (each dial) and `frame` | `useUploadsRead` dials; `useLiveRun`, `useRunSheet` listen |
 | `useHealSessions(ids, active, trigger)` | `{ answer, failed, retry }`: the heal ledger's answer for the runs' Claude sessions | `useUploadsRead`, `useRunSheet` |
 | `useHealSignature()` | a line of the app's heals (id, status, `ended_at`) from `useHeal()`: the `trigger` of the heal reads | `useUploadsRead`, `useRunSheet` |
 | `useLiveRun(live, feed)` | `LiveStep` or null: the live run's newest step, from its own stream and the feed's walk frames | `useUploadsRead` (`read.live`) |
 | `useRunSheet(sid, feed)` | `{ sheet, showEarlier, retry }`: the open run, its events and its heal answer | `UploadsView` |
 | `useRunEvents(sid, run)` | a run's events: the newest 500, Show earlier, the lines a stream appends | `useRunSheet` |
 | `useRunStream(sid, reader)` | one `EventSource` on a live run's stream; closed when `sid` clears, the run ends or the caller goes | `useLiveRun`, `useRunSheet` |
-| `useCoalescedCall(run, windowMs, active)` | many asks, one call: the first arms a `windowMs` timeout and the latest `run` fires once | `useUploadsRead`, `useRunSheet` |
 | `useThrottledCall(run, gapMs)` | the first ask runs now; asks inside the gap become ONE more call at its end | `useUploadsRead` (Refresh) |
 | `useUploadsClock(shown, ticking, readAt)` | `now`, epoch ms | `UploadsView` |
 | `useFollowNewest(newestKey)` | `{ paneRef, onScroll }` for the events pane | `RunEvents` |
@@ -17549,9 +17549,9 @@ The Uploads view's data layer, `src/modules/upload-runs/hooks/`: one read or one
 All on the host window (`useHostWindow`, MAN-7443). None polls: each is armed by an event or a live run, and cleared on hide or unmount.
 | timer | where | length | armed by | ends |
 |---|---|---|---|---|
-| frame debounce | `useCoalescedCall`, `FRAME_COALESCE_MS` in `useUploadsRead` and `useRunSheet` | 1 s | the first frame of a burst | when it fires |
+| frame debounce | the shared `useCoalescedCall` (many asks, one call: the first arms a `windowMs` timeout and the latest `run` fires once), `FRAME_COALESCE_MS` in `useUploadsRead` and `useRunSheet` | 1 s | the first frame of a burst | when it fires |
 | Refresh gap | `useThrottledCall`, `REFRESH_GAP_MS` | 1 s | a press of Refresh | when no press waited inside it |
-| feed re-dial | `useRunsFeed` | 1 s, doubling to 30 s | a dial the lane REFUSED (the browser never re-dials those: the lane's 503 while the engine boots, a 401); an `open` resets it | when it fires; Refresh and Try again dial at once |
+| feed re-dial | the shared `useEventFeed`, through `useRunsFeed` | 1 s, doubling to 30 s | a dial the lane REFUSED (the browser never re-dials those: the lane's 503 while the engine boots, a 401); an `open` resets it | when it fires; Refresh and Try again dial at once |
 | clock tick | `useUploadsClock` | 1 s | a live run and the view shown | when the run ends or the view hides |
 
 ## Rules an editor must not break
@@ -17572,13 +17572,13 @@ The Uploads view's pure parts, `src/modules/upload-runs/utils/`: the fills made 
 |---|---|---|
 | `joinFriction.ts` | `joinFriction(answer)`, `healedCounts(answer)` | `joinFriction`: per Claude session `{ rows, healed, open }` from the answer's rows. An `ignored` row is left out. A row is healed only when its `claimed_by` is a heal with status `done`; a row a `running` or `blocked` heal claimed is open. A session with no row has no entry: "no mark", never zero. `healedCounts`: `{ landed, running }` over the answer's heals (a heal that claimed or cured a row of the sessions asked for), `blocked` in neither: the Healed pill's two figures |
 | `typeRegression.ts` | `typeRegression(answer, runs)` | `{ initial, final }`, true when an armed run of that type ran in a session holding a row whose `regression` is not null. A test run, a run with no type and one with no Claude session name nothing to join on |
-| `bucketDays.ts` | `bucketDays(runs, days, now)` | `DayBucket[]` in the browser's local time, oldest first: one bucket for EVERY local day from the day the window opens (`now` less `days` × 24 h) through today, so a 7-day window has 8. Stepped by the calendar, not by 24 h. A run lands on the local day of its `started_at`; armed runs split `clean` and `hiccup`, a test run is `test`, a live run is in none, a run outside the buckets is left out. `days` is `overview.window.days` and `now` is `overview.generated_at` as epoch ms |
-| `bucketHours.ts` | `bucketHours(runs)` | 24 counts by local hour, midnight first: armed runs, the live one included; test runs in none; a `started_at` that cannot be read is left out |
 | `healAnswer.ts` | `readSessionsAnswer(body)`, `sessionIdsOf(runs)`, `chunkSessionIds(ids)`, `mergeAnswers(parts)`, `NO_SESSIONS_ANSWER` | `readSessionsAnswer` reads the worker's answer where it enters, or throws naming what was wrong: a wrong shape thrown while the sheet draws would blank the workspace's main region. A row needs `id`, `ts` (numbers), `session` (text), `claimed_by` (null or text) and `regression` null or whole (`heal_id`, `signature` text, `since` number); a heal needs `id`, `status`, `started_at`, `signatures_claimed` (array), `athena`, `claimed_here` (a number array) and `cured_here` (a number array, or null for a heal whose cure the ledger never recorded: MAN-9879). `sessions` keeps its text entries. `sessionIdsOf`: each run's Claude session once, in the runs' order, lowercase uuids only. `chunkSessionIds`: reads of at most 200. `mergeAnswers`: one part is returned as it is; a heal that appears in two reads is made one card, its `claimed_here` joined and its `cured_here` joined, null when either read says null (it is one column, so one silence); rows stay newest first |
 | `readEventsPage.ts` | `readEventsPage(sid, after, limit)`, `EventsReadFault` | one page of a run's events, or a throw of `EventsReadFault` (carries `trouble`, an `AffectedAreasTrouble`, as `useLaneRead` reads a fault): the lane's refusal, no answer, or an answer that is not a page with `events` and `next` |
 | `lastSeq.ts` | `lastSeqOf(run)` | `counts.events` plus the `events_not_kept` reason's `count` (0 when there is none). `last_seq` is not on the wire; the engine defines that reason's count as `last_seq` less the events held (`runs_shapes.py`), so the two add up to it. Used to open the live stream a little behind the newest event, to tell the bubbles the row has not counted, and to place the newest events page |
 | `uploadsFrames.ts` | `parseFrame(data)`, `parseBubble(data)` | the two streams' edge. `parseFrame`: a `run` frame (`session_id`, `at`, `state` text, `edge` of `opened`, `state`, `ended`) or a `walk` frame (`walk_id` text, `step_cursor` and `outcome` text or null), else null. `parseBubble`: needs `seq` an integer from 0, `ts`, `kind`, `role` text; carries `text`, `truncated` (only `true`), `tool` (needs a `summary`) and `meta` when they are there and shaped. Text that is not JSON or not these shapes is skipped with a console line naming the stream |
 | `uploadsWords.ts` (two additions) | `troubleSentence(t, trouble, subject)`, `AWAITING` | `troubleSentence`: the sentence for a lane fault, `cerberus.uploads.trouble.cause.<trouble>` with `subject` (`overview` or `run`) as the i18next `context`. `AWAITING` (`awaiting_input`), the state a live run waits on a person in, is exported for `useLiveRun` |
+
+The day and hour bucketing is the shared `src/shared/dayBuckets.ts` (MAN-9989). `useUploadsRead` maps each run to `{ at: started_at, part }`: a test run `test`, an armed run its verdict (`clean`, `hiccup`), a run with no verdict yet `null` (in no column, in the hour strip).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/utils/
 
@@ -17650,7 +17650,7 @@ node .verify/uploads-fill-states.mjs <out dir> <width> <stage>     # stages: fol
 | script | stage | proves | stands in, or launches |
 |---|---|---|---|
 | gate | every run, before the stages | the 30-day window holds no armed run and says so, with the way to 90 days | none |
-| gate | `history` | 90 days with Test runs on and off: both types with their counts, 90 day columns and 24 hour cells, no sideways pan, `tests=1` asked and test runs listed, then gone | none |
+| gate | `history` | 90 days with Test runs on and off: both types with their counts, 91 day columns (a 90-day window touches 91 local dates) and 24 hour cells, no sideways pan, `tests=1` asked and test runs listed, then gone | none |
 | gate | `run1007` | the 2026-10-07 run (`241c09797b5b`): "4 m 48 s", 56 events in one page, its one tool-error row and `heal-tool-error-20261008-030237-22b0`; Escape closes the sheet | none |
 | gate | `live` | the dry run appears in Live now with no reload (1.2 to 1.5 s after the launch, measured 2026-11-13), its sheet streams and follows, and both end with the run | launches a run |
 | gate | `tap` | after a switch to Fleet no request from the view in 6 s; back on Uploads the overview is read and the feed dialled again | none |
@@ -17739,3 +17739,18 @@ A press moves the chip between homes when its answer lands, and the button that 
 - The `empty` and `person` stages of `.verify/uploads-whole.mjs` (MAN-9915): at 1440 and 390 px the chip stood under the empty state and the press listed the proof admin's dry run.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/TestRunsChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/UploadsView.tsx
+
+## MAN-9989 — src/shared — the pieces Cerberus's views share: the event feed, the coalesced call, How often and the day and hour bucketing
+
+The pieces Cerberus's views share: the Uploads view composes them, and the Scheduling view composes the same ones. One copy each: a second copy would be two feeds and two pictures to keep right.
+
+| file | gives | rules |
+|---|---|---|
+| `src/shared/hooks/useEventFeed.ts` | `useEventFeed<F>({ url, parse, active, name })` → `EventFeed<F>` `{ subscribe, redial }`; `FeedEvent<F>` = `{ kind: 'open' } \| { kind: 'frame'; frame: F }`; `useFeedEvents<F>(feed, listener)` | ONE `EventSource` per view, open only while `active`. Each (re)dial is told as `open` (the feed keeps no history, so a reader reads again). `url` and `parse` are held by ref, read at every dial, so inline functions never re-dial. A dial the lane REFUSES (a status: 503 while the engine boots, 401) is dialled again after 1 s doubling to 30 s — the browser never re-dials those and the backend offers no "I am back" event; `redial` dials a refused feed at once (Refresh, Try again). A listener that throws is isolated and logged. `name` fills the two console lines (`upload runs` for the Uploads view). |
+| `src/shared/hooks/useCoalescedCall.ts` | `useCoalescedCall(run, windowMs, active)` → the request | Many asks, one call: the first arms ONE timeout, the latest `run` fires once. Armed only by an event, never re-armed by itself, cleared when `active` goes false or the caller goes. |
+| `src/shared/ui/HowOften.tsx` (from `@/shared/ui`) | `<HowOften days hours words />` | `words` is the i18n key prefix whose leaves it reads (`noDay`, `busiestDay`, `daysLabel`, `dayTitle`, `dayTitleTests`, `legend.clean`/`.hiccup`/`.test`, `today`, `noHour`, `busiestHour`, `hoursLabel`, `hourTitle`); the Uploads view hands `cerberus.uploads.often`. Data attributes: `data-how-often` (root), `data-how-often-day`, `data-how-often-hour` (`.verify/uploads-fill-gate.mjs` selects the last two). Paints by tone names only; colour never stands alone. |
+| `src/shared/dayBuckets.ts` | `DayBucket`, `DayBucketItem` = `{ at, part: 'clean' \| 'hiccup' \| 'test' \| null }`, `bucketDays(items, days, now)`, `bucketHours(items)` | In the BROWSER's local time. Days: the window opens at `now` less `days` × 24 h, so it touches one local day more than `days` (a 7-day window has 8 buckets, a 90-day one 91), stepped by the calendar, today last (the day `now` falls on); an item counts in its `part`, a `null` part in no column, and an item older than the window or after `now` is in no day's column. A caller hands the window as the server answered it: the Uploads view passes `days` = `overview.window.days` and `now` = `overview.generated_at` as epoch ms, so the last column is the day its newest runs fell on. Hours: 24 counts, midnight first; every item but a `test` (a `null` included); an unreadable `at` is left out. A caller maps its own rows to items (the Uploads view: `useUploadsRead`'s `dayItemOf`). Listed in `.oxlintrc.json`'s `frontend-shared-file` boundaries element. |
+
+The Uploads view's use of them: MAN-9911 (hooks), MAN-9891 (the module), MAN-9912 (utils).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/dayBuckets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCoalescedCall.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useEventFeed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HowOften.tsx
