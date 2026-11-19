@@ -5,10 +5,13 @@ import type { LaneStream } from './shadow-connector-lane-stream.js';
 import { NO_SECRET_MESSAGE, describeFailure, laneHeaders, upstreamUrl } from './shadow-connector-lane-wire.js';
 
 /**
- * Relaying a request to shadow-connector's internal-caller-gated surface — the one forwarder every
- * lane to shadow-connector goes through. Consumers: the `affected-areas` module (the Tours lane,
- * `/api/affected-areas`), the `carrier-bulletins` module (the bulletins lane,
- * `/api/carrier-bulletins`) and the `upload-runs` module (the upload runs' lane, `/api/upload-runs`).
+ * Relaying a request to an internal-caller-gated surface — shadow-connector's on :8001, or the eis backend's
+ * on :8004 — the one forwarder every lane goes through. Consumers: the `affected-areas` module (the Tours lane,
+ * `/api/affected-areas`), the `carrier-bulletins` module (the bulletins lane, `/api/carrier-bulletins`),
+ * the `upload-runs` module (the upload runs' lane, `/api/upload-runs`), the `scheduling-report` module
+ * (the scheduling report's lane, `/api/scheduling-report`) — the first lane that points at the eis
+ * backend (:8004) rather than the engine (:8001): a lane is any origin and any env file
+ * holding `EIS_INTERNAL_SECRET=`.
  * Each module owns its allowlist and its status mapping; this file owns the transport and the secret
  * behind it, so there is one copy of both. The lane has two verbs: `forward` (a JSON or image answer)
  * and `stream` (an event stream, relayed as it arrives — `./shadow-connector-lane-stream`); what a call
@@ -50,8 +53,9 @@ const SECRET_LINE = /^\s*(?:export\s+)?EIS_INTERNAL_SECRET\s*=(.*)$/;
 const USABLE_SECRET = /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/;
 
 /**
- * One forwarded call. Consumers: the routes of the `affected-areas`, `carrier-bulletins` and `upload-runs`
- * modules, each of which builds it from a request it has validated against its own allowlist.
+ * One forwarded call. Consumers: the routes of the `affected-areas`, `carrier-bulletins`,
+ * `upload-runs` and `scheduling-report` modules, each of which builds it from a request it has
+ * validated against its own allowlist.
  */
 export type LaneRequest = {
   method: 'GET' | 'POST' | 'PUT';

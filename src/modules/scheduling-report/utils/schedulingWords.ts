@@ -19,7 +19,7 @@ import { firstLine } from '@/shared/utils';
 const K = 'cerberus.scheduling';
 
 /** A verdict or an answer as it is drawn: its tone, its word and its icon, so the colour never stands alone. */
-export type ToneLook = { tone: Tone; word: string; Icon: LucideIcon };
+type ToneLook = { tone: Tone; word: string; Icon: LucideIcon };
 
 /**
  * The verdict's word, tone and icon. A MACHINE's entry wears the neutral mark whatever its verdict: it is counted in no
@@ -99,26 +99,54 @@ export function spanWord(t: TFunction, start: string | null, end: string | null)
  * opened on a visit and closed is "Closed without a change" (opening a visit is how one is looked at, so it is no failed
  * booking); and a direct change that was refused or failed "Did not go through", since no form was open to close. A
  * direct Undo that worked is "Undone": the server counts an Undo as no result of its own, and it is not a failure.
+ *
+ * A result an Undo took back says so in the same words the sheet uses, short ("Booked, then undone"): the row and the
+ * sheet must give one answer to "how did it end", and a row that said Booked over a cancelled visit gave another.
  */
-export function resultWord(t: TFunction, entry: Pick<SchedulingEntry, 'result' | 'state' | 'form' | 'kind' | 'surface' | 'presses'>): string {
+export function resultWord(t: TFunction, entry: EndingFacts): string {
   return t(`${K}.result.${endingKey(entry)}`);
 }
 
-/** Which of the result's words an entry takes: the result itself, or which "nothing" it was. */
-function endingKey(entry: Pick<SchedulingEntry, 'result' | 'state' | 'form' | 'kind' | 'surface' | 'presses'>): string {
-  if (entry.result !== 'nothing') return entry.result;
-  if (!entry.form) return entry.surface === 'undo' && entry.presses.ok > 0 ? 'undid' : 'notDone';
+/** What an entry's ending is read from. */
+type EndingFacts = Pick<SchedulingEntry, 'result' | 'state' | 'form' | 'kind' | 'surface' | 'presses' | 'reasons'>;
+
+/**
+ * Whether what the entry did was taken back by an Undo right after: the server's `undone` reason, on an entry that
+ * booked or changed a visit. The server still calls such an entry `booked` (an Undo is no result of its own), so the
+ * view reads the reason wherever it says or counts how a session ended. Used by the words below and by
+ * `SchedulingView`'s tally.
+ *
+ * WHAT THE REASON MEASURES IS NARROWER THAN THAT (`verdict.py`): "an act of this entry is an Undo, or the next act on
+ * its visit was one". So three readings are kept apart here. A CANCELLED entry is never undone: nothing un-cancels a
+ * visit, and the reason reaches a cancel only when someone else's Undo lands next on the visit, which stays cancelled.
+ * An Undo's OWN entry (`isUndoPress`) carries the reason too, and did nothing to be undone. And an Undo that FAILED
+ * still sets the reason: an overview entry holds no acts, so that one cannot be told from an Undo that took, and it
+ * reads "then undone" over a visit that stands until the wire says whether the Undo ended ok.
+ */
+export function wasUndone(entry: Pick<SchedulingEntry, 'result' | 'reasons'>): boolean {
+  return (entry.result === 'booked' || entry.result === 'changed') && entry.reasons.some((reason) => reason.code === 'undone');
+}
+
+/** Whether the entry IS an Undo press: one change made with no form, on the Undo surface (the grid's Undo). The server gives it the `undone` reason as well, where the reason names what the press was, not what became of it. */
+export function isUndoPress(entry: Pick<SchedulingEntry, 'form' | 'surface'>): boolean {
+  return !entry.form && entry.surface === 'undo';
+}
+
+/** Which of the ending's words an entry takes: its result (and that it was undone), or which "nothing" it was. One key for the row's word and the sheet's sentence. */
+function endingKey(entry: EndingFacts): string {
+  if (entry.result !== 'nothing') return wasUndone(entry) ? `${entry.result}Undone` : entry.result;
+  if (isUndoPress(entry)) return entry.presses.ok > 0 ? 'undid' : 'notDone';
+  if (!entry.form) return 'notDone';
   if (entry.state === 'open') return 'nothingYet';
-  return entry.kind === 'book' ? 'closedBooking' : 'closedChange';
+  return entry.kind === 'book' ? 'closedWithoutBooking' : 'closedWithoutChange';
 }
 
 /**
  * The sheet's one sentence of what happened, the result said whole. A result that was undone says so in the same breath
  * ("A visit was booked, then undone."), so the head never reads as a booking that stands.
  */
-export function endingSentence(t: TFunction, entry: Pick<SchedulingEntry, 'result' | 'state' | 'form' | 'kind' | 'surface' | 'presses' | 'reasons'>): string {
-  const undone = entry.result !== 'nothing' && entry.reasons.some((reason) => reason.code === 'undone');
-  return t(`${K}.sheet.ending.${endingKey(entry)}${undone ? 'Undone' : ''}`);
+export function endingSentence(t: TFunction, entry: EndingFacts): string {
+  return t(`${K}.sheet.ending.${endingKey(entry)}`);
 }
 
 /** Where a press came from: "In the form", "Dragged on the grid", "Resized on the grid", "Undo", "Through the API". An unknown one is drawn as data. */
@@ -136,12 +164,16 @@ export function openerWord(t: TFunction, opener: SchedulingOpener): string {
  * for the sheet (its count or its detail said whole). Each code of the closed vocabulary has its keys; a code this build
  * has no words for is drawn as the code itself, as data, and never dropped. A detail is data: the answer's own code, or
  * the calendar's own reason.
+ *
+ * `undone` is worded as what the server saw, an Undo pressed, and never as what became of the visit: that claim is the
+ * result word's, where `wasUndone` decides it. `ownUndo` says the entry is itself the Undo press (`isUndoPress`), whose
+ * sentence is that the press was an Undo: "pressed right after" would say the Undo was undone.
  */
-export function reasonWords(t: TFunction, reason: SchedulingReason): { chip: string; sentence: string } {
+export function reasonWords(t: TFunction, reason: SchedulingReason, ownUndo = false): { chip: string; sentence: string } {
   const base = `${K}.reasons.${reason.code}`;
   const detail = firstLine(reason.detail ?? '');
   const values = { count: reason.count ?? 1, detail };
-  const plain = t(`${base}.sentence`, { ...values, defaultValue: reason.code });
+  const plain = t(`${base}.${reason.code === 'undone' && ownUndo ? 'sentenceOwn' : 'sentence'}`, { ...values, defaultValue: reason.code });
   return {
     chip: t(`${base}.chip`, { ...values, defaultValue: reason.code }),
     sentence: detail === '' ? plain : t(`${base}.detail`, { ...values, defaultValue: `${plain} ${detail}` }),

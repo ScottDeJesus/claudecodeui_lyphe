@@ -6,7 +6,7 @@ import type { SchedulingEntry, SchedulingOverview } from '@/shared/scheduling-re
 type SchedulingOpenersProps = {
   /** Each door the form was opened from, with how many of the listed entries started there. */
   openers: SchedulingOverview['openers'];
-  /** The listed entries: the ones with no form, and the forms that have not reported, are counted from them. */
+  /** The listed entries: the ones with no form, and the forms that have not reported, are counted from them, people's apart from a machine's. */
   entries: SchedulingEntry[];
 };
 
@@ -20,7 +20,9 @@ type SchedulingOpenersProps = {
  *
  * THE COUNTS ADD UP IN WORDS. A form names its door in its report, so two kinds of entry are in no line above: a change
  * made with no form (on the grid, by Undo, through the API), and a form whose report has not arrived. Each is said in one
- * sentence under the list, only when there are any, so the lines and the Sessions count never seem to disagree.
+ * sentence under the list, only when there are any, so the lines and the Sessions count never seem to disagree. Those
+ * two sentences count PEOPLE's sessions, as the word says; with Machine calls listed, a machine's calls with no form get
+ * a sentence of their own, the way the Sessions badge counts them apart ("28 + 3 machine calls").
  *
  * With no form opened in the window the list is one sentence; a door this build has no name for is drawn as its own word.
  *
@@ -32,8 +34,10 @@ export function SchedulingOpeners({ openers, entries }: SchedulingOpenersProps) 
   // Most used first, whatever order the answer came in; doors that tie keep the answer's order.
   const ordered = [...openers].sort((a, b) => b.entries - a.entries);
   const total = ordered.reduce((sum, row) => sum + row.entries, 0);
-  const direct = entries.filter((entry) => !entry.form).length;
-  const unreported = entries.filter((entry) => entry.form && entry.opener === null).length;
+  const people = entries.filter((entry) => entry.actor_kind === 'person');
+  const direct = people.filter((entry) => !entry.form).length;
+  const unreported = people.filter((entry) => entry.form && entry.opener === null).length;
+  const machineDirect = entries.filter((entry) => entry.actor_kind === 'machine' && !entry.form).length;
 
   return (
     <div className="flex min-w-0 flex-col gap-3" data-scheduling-openers>
@@ -51,6 +55,7 @@ export function SchedulingOpeners({ openers, entries }: SchedulingOpenersProps) 
       )}
       {direct > 0 && <p className="m-0 text-xs text-muted-foreground" data-scheduling-openers-direct>{t(`${o}.direct`, { count: direct })}</p>}
       {unreported > 0 && <p className="m-0 text-xs text-muted-foreground" data-scheduling-openers-unreported>{t(`${o}.unreported`, { count: unreported })}</p>}
+      {machineDirect > 0 && <p className="m-0 text-xs text-muted-foreground" data-scheduling-openers-machines>{t(`${o}.directMachines`, { count: machineDirect })}</p>}
     </div>
   );
 }

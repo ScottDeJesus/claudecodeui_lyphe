@@ -5,14 +5,15 @@ import type { LaneAnswer, ShadowConnectorLane } from './shadow-connector-lane.js
 import { hangUpSignal, relayEventStream } from './shadow-connector-lane-stream.js';
 
 /**
- * The routes of a lane to shadow-connector — the one allowlist router every lane's routes file hands its
- * table to. Consumers: the `affected-areas` module (the Tours lane, `/api/affected-areas`), the
- * `carrier-bulletins` module (the bulletins lane, `/api/carrier-bulletins`) and the `upload-runs` module
- * (the upload runs' lane, `/api/upload-runs`). Each module owns its table, its id rules and its upstream
- * prefix; this file owns what the lanes would otherwise each write the same way, so the rules below hold
- * for all of them and cannot drift apart:
+ * The routes of a lane to an internal-caller-gated upstream (shadow-connector on :8001, or the eis backend on :8004)
+ * — the one allowlist router every lane's routes file hands its table to. Consumers: the `affected-areas` module
+ * (the Tours lane, `/api/affected-areas`), the `carrier-bulletins` module (the bulletins lane,
+ * `/api/carrier-bulletins`), the `scheduling-report` module (the scheduling report's lane,
+ * `/api/scheduling-report`) and the `upload-runs` module (the upload runs' lane, `/api/upload-runs`). Each module
+ * owns its table, its id rules and its upstream prefix; this file owns what the lanes would otherwise each write
+ * the same way, so the rules below hold for all of them and cannot drift apart:
  *
- *  - A method-and-path pair that is not a row of the table never reaches shadow-connector: the lane answers
+ *  - A method-and-path pair that is not a row of the table never reaches the upstream: the lane answers
  *    its own 404, so the request is neither forwarded nor handed to the app's catch-all.
  *  - Every id and every query value is held to its rule BEFORE a byte leaves. A failure is the lane's own
  *    422 `{ error }`, and the id that failed is never put in a URL (the checked ids cannot add a segment, a
@@ -32,11 +33,14 @@ import { hangUpSignal, relayEventStream } from './shadow-connector-lane-stream.j
 /**
  * A check one id or one query value is held to before anything is forwarded. `expects` is the half of the
  * 422 sentence that follows the field's name: `<name> must be <expects>`. Consumers: the id tables of the
- * `affected-areas`, `carrier-bulletins` and `upload-runs` routes, and this file's router.
+ * `affected-areas`, `carrier-bulletins`, `scheduling-report` and `upload-runs` routes, and this file's router.
  */
 export type LaneRule = { test: (value: string) => boolean; expects: string };
 
-/** A rule that a value must match whole. Consumers: the `affected-areas`, `carrier-bulletins` and `upload-runs` routes, for each id shape they accept. */
+/**
+ * A rule that a value must match whole. Consumers: the `affected-areas`, `carrier-bulletins`,
+ * `scheduling-report` and `upload-runs` routes, for each id shape they accept.
+ */
 export const patternRule = (regex: RegExp, expects: string): LaneRule => ({
   test: (value) => regex.test(value),
   expects,
@@ -49,7 +53,11 @@ export const patternRule = (regex: RegExp, expects: string): LaneRule => ({
  */
 export const LOWERCASE_UUID_SOURCE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
-/** A lowercase uuid. Consumers: the `affected-areas` routes (`region`, `read`), the `carrier-bulletins` routes (`bulletin`) and the `upload-runs` routes (the overview's `account`). */
+/**
+ * A lowercase uuid. Consumers: the `affected-areas` routes (`region`, `read`), the `carrier-bulletins` routes
+ * (`bulletin`), the `scheduling-report` routes (an entry's `id`, the overview's and the feed's `account`), the
+ * `upload-runs` routes (the overview's `account`).
+ */
 export const LOWERCASE_UUID_RULE: LaneRule = patternRule(new RegExp(`^${LOWERCASE_UUID_SOURCE}$`), 'a lowercase uuid');
 
 /** The sha256 of a file's bytes: 64 lowercase hex characters. Consumers: the `affected-areas` routes (`/images/:sha`) and the `carrier-bulletins` routes (`/files/:sha/...`). */
@@ -100,14 +108,14 @@ type LaneForwardedRoute = LaneRowBase & {
 type LaneStreamRoute = LaneRowBase & { method: 'get'; expect: 'stream'; body: 'none' };
 
 /**
- * One row of a lane's allowlist. Consumers: the `affected-areas`, `carrier-bulletins` and `upload-runs`
- * routes, each of which declares its whole contract as a list of these.
+ * One row of a lane's allowlist. Consumers: the `affected-areas`, `carrier-bulletins`, `scheduling-report` and
+ * `upload-runs` routes, each of which declares its whole contract as a list of these.
  */
 export type LaneRoute = LaneForwardedRoute | LaneStreamRoute;
 
 /**
  * What a lane's routes file hands `createLaneRouter`. Consumers: `affected-areas.routes.ts`,
- * `carrier-bulletins.routes.ts` and `upload-runs.routes.ts`.
+ * `carrier-bulletins.routes.ts`, `scheduling-report.routes.ts` and `upload-runs.routes.ts`.
  */
 export type LaneRouterDefinition = {
   /** The lane's name in its own 404 sentence: `not a route of the <lane> lane`. */
@@ -300,7 +308,8 @@ function streamHandler(spec: LaneStreamRoute, { upstreamPrefix, pathRules, strea
  * two tails, in order: the lane's own 404 for every other path under the mount, and the 422 for a malformed
  * escape. A table that cannot be served — a `stream` row with no `stream`, a `bytes` row with no image type —
  * is refused here, when the server starts, and not on the first request that finds out.
- * Consumers: `createAffectedAreasRouter`, `createCarrierBulletinsRouter` and `createUploadRunsRouter`.
+ * Consumers: `createAffectedAreasRouter`, `createCarrierBulletinsRouter`, `createSchedulingReportRouter` and
+ * `createUploadRunsRouter`.
  */
 export function createLaneRouter({
   lane,
@@ -352,7 +361,7 @@ export function createLaneRouter({
   }
 
   // Everything else under the mount: the lane's own 404, so a path outside the allowlist is answered
-  // here and never reaches shadow-connector, and never falls through to the app's catch-all.
+  // here and never reaches the upstream, and never falls through to the app's catch-all.
   router.use((_request, response) => {
     response.status(404).json({ error: `not a route of the ${lane} lane` });
   });

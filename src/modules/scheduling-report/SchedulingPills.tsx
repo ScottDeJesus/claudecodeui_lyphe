@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { SchedulingPillKey, SchedulingTally } from '@/modules/scheduling-report/utils/schedulingModel';
@@ -20,15 +21,16 @@ type SchedulingPillsProps = {
   onSelect: (key: SchedulingPillKey) => void;
 };
 
-/** `wrap` marks a value that is a phrase: it may break across lines on a phone, where a fixed pill would run off the edge. */
-type PillSpec = { key: SchedulingPillKey; label: string; value: string; tone: Tone; title: string; wrap?: boolean };
+/** `wrap` marks a value that is a phrase: it may break across lines on a phone, where a fixed pill would run off the edge. `Icon` leads a value whose tone says a verdict, so the colour is not its only sign. */
+type PillSpec = { key: SchedulingPillKey; label: string; value: string; tone: Tone; title: string; wrap?: boolean; Icon?: LucideIcon };
 
 /**
  * THE VIEW'S VITALS, five pills in the heal tab's grammar: a label and a figure in the tone that says whether to look.
  * Sessions is the window's count. Speed bumps is amber above none and green at none (grey when the window holds no
  * session at all, since nothing went clean either). Booked and Closed without booking are the two ends of a booking
- * form: a visit booked, or the form closed with nothing booked; both are counts, so both are grey. Last session is its
- * age and who pressed, in its verdict's tone.
+ * form: a visit booked and not undone right after, or the form closed with nothing booked; both are counts, so both are
+ * grey. Last session is its age and who pressed, in its verdict's tone and led by its verdict's icon (the check, the
+ * triangle or the octagon every row draws): a phone shows no `title`, so the tone must not be the only thing saying it.
  *
  * THERE IS NO LIVE PILL AND NO HEALED PILL. A use of the form takes about a minute, and nothing files scheduling friction
  * yet: a pill that could only read "none" would be a promise the view cannot keep.
@@ -44,6 +46,7 @@ export function SchedulingPills({ tally, truncated, now, canGo, activePill, onSe
   const { t } = useTranslation();
   const p = 'cerberus.scheduling.pills';
   const last = tally.last;
+  const lastLook = last === null ? null : verdictLook(t, last);
   // A window cut short counts the newest entries alone, so every count of it is a floor.
   const count = (figure: number) => (truncated ? t(`${p}.atLeast`, { count: figure }) : String(figure));
 
@@ -63,9 +66,10 @@ export function SchedulingPills({ tally, truncated, now, canGo, activePill, onSe
       key: 'last',
       label: t(`${p}.last`),
       value: last === null ? t(`${p}.lastNone`) : `${agoWord(t, last.started_at, now)} · ${whoWord(t, last.actor)}`,
-      tone: last === null ? 'neutral' : verdictLook(t, last).tone,
-      title: last === null ? t(`${p}.lastNoneTitle`) : verdictLook(t, last).word,
+      tone: lastLook === null ? 'neutral' : lastLook.tone,
+      title: lastLook === null ? t(`${p}.lastNoneTitle`) : lastLook.word,
       wrap: true,
+      Icon: lastLook?.Icon,
     },
   ];
 
@@ -84,7 +88,10 @@ export function SchedulingPills({ tally, truncated, now, canGo, activePill, onSe
           data-scheduling-pill={pill.key}
         >
           <span className="text-xs">{pill.label}</span>
-          <Badge as="span" tone={pill.tone} className={pill.wrap ? 'min-w-0 whitespace-normal break-words' : undefined}>{pill.value}</Badge>
+          <Badge as="span" tone={pill.tone} className={pill.wrap ? 'min-w-0 whitespace-normal break-words' : undefined}>
+            {pill.Icon !== undefined && <pill.Icon className="mr-1 h-3 w-3 flex-none" aria-hidden="true" />}
+            {pill.value}
+          </Badge>
         </Pill>
       ))}
     </PillBar>

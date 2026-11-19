@@ -11,10 +11,11 @@ import { NO_SECRET_MESSAGE, describeFailure, laneHeaders, upstreamUrl } from './
  * `shadow-connector-lane-router.ts` (which sends a `stream` row to it and writes what it opens) and
  * `server/index.ts` (whose shutdown path ends the open streams, `endOpenEventStreams`).
  *
- * A view that is TOLD of every change — the upload runs' feed, a live run's bubbles — holds an event stream
- * open, and shadow-connector's surface is internal-caller gated, so this server is the one hop that can hold
- * the secret for it. The stream is relayed as it arrives: nothing is buffered here, and nothing is left open
- * when the browser goes or this server retires. Four things differ from `forward`, and each has a reason:
+ * A view that is TOLD of every change — the upload runs' feed, a live run's bubbles, the scheduling report's feed —
+ * holds an event stream open, and the surface a lane reaches (shadow-connector's on :8001, the eis backend's on
+ * :8004) is internal-caller gated, so this server is the one hop that can hold the secret for it. The stream is
+ * relayed as it arrives: nothing is buffered here, and nothing is left open when the browser goes or this server
+ * retires. Four things differ from `forward`, and each has a reason:
  *
  *  - The bound covers CONNECTING (and reading any answer that is not a stream), never the stream: an open
  *    event stream is meant to outlast any timeout. What keeps a dead upstream from holding a browser for ever

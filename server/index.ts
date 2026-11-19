@@ -84,6 +84,7 @@ import { createJevModule } from './modules/jev/index.js';
 import { createAffectedAreasModule } from './modules/affected-areas/index.js';
 import { createCarrierBulletinsModule } from './modules/carrier-bulletins/index.js';
 import { createUploadRunsModule } from './modules/upload-runs/index.js';
+import { createSchedulingReportModule } from './modules/scheduling-report/index.js';
 import { createDispatcherModule } from './modules/dispatcher/index.js';
 import { sessionlessEnv } from './shared/child-env.js';
 import { createBoardVersionReader } from './shared/dispatcher-board-gate.service.js';
@@ -434,6 +435,15 @@ app.use('/api/carrier-bulletins', authenticateToken, carrierBulletins.router);
 // below) — an EventSource's `?token=` is read by `authenticateToken` here and never forwarded.
 const uploadRuns = createUploadRunsModule();
 app.use('/api/upload-runs', authenticateToken, uploadRuns.router);
+
+// Scheduling report — the eis backend's `/api/eis/internal/scheduling-report` (:8004, not shadow-connector's
+// :8001), what each scheduling session and press did and the feed that says the record changed, forwarded over
+// loopback (protected). The first lane that points at :8004: that surface sits behind the same internal secret,
+// so a hop through :8001 would relay a third service for nothing. Read-only — three GET routes, an id is
+// checked before a byte leaves, and the feed is relayed as it arrives and closes with the browser — an
+// EventSource's `?token=` is read by `authenticateToken` here and never forwarded.
+const schedulingReport = createSchedulingReportModule();
+app.use('/api/scheduling-report', authenticateToken, schedulingReport.router);
 
 // The launcher souls a session started by hand — the poll behind the `soul_launch_state` frame that
 // pins each one in its own chat's rows (protected). Built out here for the same

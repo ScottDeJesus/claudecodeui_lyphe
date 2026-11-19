@@ -150,6 +150,7 @@ section: The Cerberus screen's words — the cerberus block of en/common.json/00
 | `tours` | 2 | the strip's name and hint for Tours, `tab` and `tabHint`, which `CerberusPanel.tsx` reads; the view's own words are `affectedAreas.*` (MAN-8575) |
 | `bulletins` | 187 | the Bulletins view's words, read by `src/modules/carrier-bulletins`, bar `tab` and `tabHint`, which `CerberusPanel.tsx` reads for the strip (MAN-8880) |
 | `uploads` | 343 | the Uploads view's words, read by `src/modules/upload-runs`, bar `tab` and `tabHint`, which `CerberusPanel.tsx` reads for the strip (the `VIEWS` row and the `KeptView` label): groups and counts in MAN-9891 |
+| `scheduling` | 354 | the Scheduling view's words, read by `src/modules/scheduling-report` (scaffold; its `tab` and `tabHint` are read by the fill's `VIEWS` row): groups `head` 31, `pills` 13, `sections` 10, `kinds` 10, `often` 16, `openers` 11, `starts` 8, `sessions` 18, `result` 10, `surface` 5, `reasons` 60, `acts` 32, `sheet` 100, `trouble` 10, `empty` 4, the rest ≤3: the view's row is its own manual |
 | `time` | 13 | spans and relative times |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json

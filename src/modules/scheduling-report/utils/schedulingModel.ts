@@ -1,5 +1,5 @@
 import type { DayBucket } from '@/shared/dayBuckets';
-import type { SchedulingEntry, SchedulingEntryWhole, SchedulingOverview, SchedulingWindowDays } from '@/shared/scheduling-report-types';
+import type { SchedulingEntry, SchedulingEntryWhole, SchedulingOverview } from '@/shared/scheduling-report-types';
 
 /*
  * THE SCHEDULING VIEW'S MODEL: the shapes its root hands its parts. Types only, nothing here runs.
@@ -13,8 +13,8 @@ import type { SchedulingEntry, SchedulingEntryWhole, SchedulingOverview, Schedul
  * with no form, on the grid or through the API (a direct entry). On screen it is called a session.
  */
 
-/** The window switch's three lengths, in days: the wire's own three, so the switch can never offer one the lane refuses. */
-export type SchedulingWindow = SchedulingWindowDays;
+/** The window switch's three lengths, in days: the three the lane's `?days=` takes (`SchedulingWindowDays` on the wire), written out as the contract fixes them. */
+export type SchedulingWindow = 7 | 30 | 90;
 
 /**
  * What the view is narrowed to. `by` is one person's stamp (`actor`, `eis:<login>`) or null for everyone; `machines` lists
@@ -53,7 +53,8 @@ export type SchedulingPillKey = 'sessions' | 'bumps' | 'booked' | 'closed' | 'la
 
 /**
  * The window's sessions counted for the head and the pills. PEOPLE's entries only: a machine's is in none of these, listed
- * or not. `bumps` is the ones that did not go clean; `booked`, `changed` and `cancelled` are counted by how each ended;
+ * or not. `bumps` is the ones that did not go clean; `booked`, `changed` and `cancelled` are counted by how each ended,
+ * `booked` and `changed` less the ones an Undo took back right after (a visit booked and undone is no visit booked);
  * `closed` is the booking forms that were closed with nothing booked; `last` is the newest of them.
  */
 export type SchedulingTally = {

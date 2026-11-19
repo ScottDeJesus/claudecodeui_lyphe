@@ -24,6 +24,9 @@ type EntrySheetHeadProps = {
  * closes. A form whose report never arrived says what is therefore not known, in the warn tone, since that is itself a
  * speed bump. A machine's call says it is in no figure of the view.
  *
+ * NOT YET IS NOT NEVER. A form still open has no door and no length to show, and its two facts say "not known yet"; only
+ * a form whose report never came says "not reported". The same words for both made an open form read as a fault.
+ *
  * Used by this module's `EntrySheet`, as its first block.
  */
 export function EntrySheetHead({ entry, now }: EntrySheetHeadProps) {
@@ -31,14 +34,15 @@ export function EntrySheetHead({ entry, now }: EntrySheetHeadProps) {
   const s = 'cerberus.scheduling.sheet';
   const look = verdictLook(t, entry);
   const machine = entry.actor_kind === 'machine';
+  const stillOpen = entry.state === 'open';
 
   const facts: Fact[] = [
     { label: t(`${s}.facts.who`), parts: [whoWord(t, entry.actor), dayClockWord(entry.started_at), agoWord(t, entry.started_at, now)] },
     { label: t(`${s}.facts.job`), parts: [jobWord(t, entry.job), ...(entry.job?.loss_type ? [entry.job.loss_type] : [])] },
     entry.form
-      ? { label: t(`${s}.facts.door`), parts: [entry.opener === null ? t(`${s}.facts.doorNone`) : openerWord(t, entry.opener)] }
+      ? { label: t(`${s}.facts.door`), parts: [entry.opener === null ? t(stillOpen ? `${s}.facts.notYet` : `${s}.facts.doorNone`) : openerWord(t, entry.opener)] }
       : { label: t(`${s}.facts.made`), parts: [entry.surface === null ? t(`${s}.facts.doorNone`) : surfaceWord(t, entry.surface)] },
-    ...(entry.form ? [{ label: t(`${s}.facts.formOpen`), parts: [entry.open_seconds === null ? t(`${s}.facts.formOpenNone`) : durationWord(t, entry.open_seconds * 1000)] }] : []),
+    ...(entry.form ? [{ label: t(`${s}.facts.formOpen`), parts: [entry.open_seconds === null ? t(stillOpen ? `${s}.facts.notYet` : `${s}.facts.formOpenNone`) : durationWord(t, entry.open_seconds * 1000)] }] : []),
   ];
 
   return (
@@ -54,7 +58,7 @@ export function EntrySheetHead({ entry, now }: EntrySheetHeadProps) {
       <FactList facts={facts} />
 
       {machine && <Banner tone="neutral"><p className="text-[13px]">{t(`${s}.note.machine`)}</p></Banner>}
-      {!machine && entry.state === 'open' && <Banner tone="info"><p className="text-[13px]">{t(`${s}.note.open`)}</p></Banner>}
+      {!machine && stillOpen && <Banner tone="info"><p className="text-[13px]">{t(`${s}.note.open`)}</p></Banner>}
       {!machine && entry.state === 'not_reported' && <Banner tone="warn"><p className="text-[13px]">{t(`${s}.note.notReported`)}</p></Banner>}
     </div>
   );

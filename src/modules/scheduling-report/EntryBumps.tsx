@@ -1,7 +1,7 @@
 import { BotIcon, CircleCheckIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { REASON_ICON, reasonWords } from '@/modules/scheduling-report/utils/schedulingWords';
+import { isUndoPress, REASON_ICON, reasonWords } from '@/modules/scheduling-report/utils/schedulingWords';
 import type { SchedulingEntry, SchedulingReason } from '@/shared/scheduling-report-types';
 
 /**
@@ -12,6 +12,9 @@ import type { SchedulingEntry, SchedulingReason } from '@/shared/scheduling-repo
  * WHAT IS ONLY NOTED COMES AFTER, UNDER ITS OWN WORD. A neutral reason (the calendar was paused, the lead was not the
  * best fit, a time of their own was chosen) is never a speed bump: it is listed below, in grey with the circled i, so a
  * clean session can still say what was unusual about it without being drawn as trouble.
+ *
+ * AN UNDO'S OWN SPEED BUMP IS THAT IT WAS AN UNDO. The server answers an Undo press as a speed bump with the one reason
+ * `undone`; here that reason reads "This press was an Undo.", since the usual sentence would say the Undo was undone.
  *
  * A MACHINE'S CALL IS NEVER DRAWN CLEAN OR BUMPED, here as on its row. With no reason it says nothing stood against it,
  * in grey under the machine mark; its reasons keep their shapes and lose their colours.
@@ -34,20 +37,20 @@ export function EntryBumps({ entry }: { entry: SchedulingEntry }) {
           {t(machine ? `${b}.noneMachine` : `${b}.none`)}
         </p>
       ) : (
-        <ReasonLines reasons={bumps} quiet={machine} />
+        <ReasonLines reasons={bumps} quiet={machine} ownUndo={isUndoPress(entry)} />
       )}
       {notes.length > 0 && (
         <div className="flex min-w-0 flex-col gap-2" data-scheduling-notes={notes.length}>
           <p className="m-0 text-xs text-muted-foreground">{t(`${b}.noted`)}</p>
-          <ReasonLines reasons={notes} quiet />
+          <ReasonLines reasons={notes} quiet ownUndo={false} />
         </div>
       )}
     </div>
   );
 }
 
-/** The reasons as sentences, one a line, each led by its tone's icon; `quiet` greys them (a note, or a machine's). */
-function ReasonLines({ reasons, quiet }: { reasons: SchedulingReason[]; quiet: boolean }) {
+/** The reasons as sentences, one a line, each led by its tone's icon; `quiet` greys them (a note, or a machine's), and `ownUndo` says the entry is itself an Undo press. */
+function ReasonLines({ reasons, quiet, ownUndo }: { reasons: SchedulingReason[]; quiet: boolean; ownUndo: boolean }) {
   const { t } = useTranslation();
   return (
     <ul className="m-0 flex min-w-0 list-none flex-col gap-2 p-0">
@@ -56,7 +59,7 @@ function ReasonLines({ reasons, quiet }: { reasons: SchedulingReason[]; quiet: b
         return (
           <li key={reason.code} data-tone={quiet ? 'neutral' : reason.tone} data-scheduling-reason={reason.code} className="flex min-w-0 items-start gap-2.5 text-[13.5px] leading-snug text-foreground">
             <Icon className="mt-0.5 h-4 w-4 flex-none text-tone-ink" aria-hidden="true" />
-            <span className="min-w-0 break-words">{reasonWords(t, reason).sentence}</span>
+            <span className="min-w-0 break-words">{reasonWords(t, reason, ownUndo).sentence}</span>
           </li>
         );
       })}

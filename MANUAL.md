@@ -17754,3 +17754,57 @@ The pieces Cerberus's views share: the Uploads view composes them, and the Sched
 The Uploads view's use of them: MAN-9911 (hooks), MAN-9891 (the module), MAN-9912 (utils).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/dayBuckets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCoalescedCall.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useEventFeed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HowOften.tsx
+
+## MAN-9992 — src/modules/scheduling-report — the Scheduling view: scaffold state, files, the fill's markers and the rules an edit keeps
+
+The Scheduling view of the Cerberus tab: what happens when someone schedules in Restorly, session by session, read-only. Plan `scheduling-in-cerberus`. The tab's seventh view, after Uploads (MAN-9891). Slots the fill takes: MAN-7867.
+
+## State — 2026-11-18
+| fact | holds |
+|---|---|
+| mounted | NO. The view runs through its real root over fixtures only; `CerberusPanel.tsx` holds two `FILL:` comments (`scheduling-row` in `VIEWS`, `scheduling-panel` after the Uploads `KeptView`) and draws nothing for it |
+| reads | none. `FAKE_READS` (`scheduling-fake.ts`) stands where the two hooks go; every handler is `unwired({...})`, a no-op |
+| wire types | `@/shared/scheduling-report-types` (`SchedulingEntry`, `SchedulingEntryWhole`, `SchedulingOverview`, `SchedulingKindCounts`); day buckets `@/shared/dayBuckets` |
+| words | `cerberus.scheduling.*`, 354 leaves in 25 groups (MAN-9893) |
+| gate | `tsc --noEmit -p tsconfig.json` and `oxlint` on the module exit 0; no file over 237 lines; no Gemini call |
+| fixture | every entry invented; the eleven door names are worded from seam 7 |
+
+## Files — `src/modules/scheduling-report/`
+| file | draws or holds |
+|---|---|
+| `index.ts` | barrel: `SchedulingView`, `lazy`, its own chunk |
+| `SchedulingView.tsx` | root `SchedulingView({ shown })`: holds window (7/30/90, default 30), `SchedulingFilters`, `openId`, `activePill`; `const now = readAt`; draws every state |
+| `SchedulingHead.tsx`, `SchedulingPills.tsx` | headline (amber, never red), summary, window switch, Refresh; five pills `sessions`/`bumps`/`booked`/`closed`/`last` |
+| `SchedulingBody.tsx` | two columns: By what was done (`SchedulingKindList`), How often, Where it starts (`SchedulingOpeners`, names and "5 of 22", no bars), then Sessions (`EntryList`, `EntryRow`) |
+| `MachineCallsChip.tsx`, `TroubleBanner.tsx` | the chip (two homes: Sessions list head and empty state); the failed-read and stale strip |
+| `EntrySheet.tsx`, `EntrySheetHead.tsx`, `EntryBumps.tsx`, `EntryOffered.tsx`, `EntryChosen.tsx`, `EntryPresses.tsx`, `EntryVisitNow.tsx`, `ActLine.tsx`, `FactList.tsx` | one session's sheet; a form with no report draws three sections, not five |
+| `utils/schedulingModel.ts` | types only: `SchedulingWindow`, `SchedulingFilters`, `SchedulingRead`, `EntrySheetRead`, `SchedulingPillKey`, `SchedulingTally` |
+| `utils/schedulingWords.ts` | pure word and look helpers (`resultWord`, `reasonWords`, `wasUndone`, `isUndoPress`, `troubleSentence`, …) |
+| `scheduling-fake.ts`, `fake/entries.ts`, `fake/wholes.ts` | fixtures; `FAKE_STAGE.pick()` / `.seat()` put the root in a scene through the setters each `unwired` names; deleted whole by the fill |
+
+## The fill — `FILL:` markers in `SchedulingView.tsx` (`grep -rn "FILL:" src/modules/scheduling-report`)
+| marker | the fill does |
+|---|---|
+| `fake` | delete the import, `scheduling-fake.ts` and `fake/` |
+| `useSchedulingRead` | `({ shown, window, filters }) → { read, feed, readAt, refresh, retry }`; `readAt` is epoch ms and moves on a failed read too, or the stale strip's age is wrong |
+| `entriesToBuckets` | `utils/entriesToBuckets.ts`, pure, called in that hook: `read.days` and `read.hours` |
+| `useEntrySheet` | `(shown ? openId : null, feed) → { sheet, retry }`; reads on open and on a coalesced feed frame |
+| `onWindow`, `onFilter`, `onRefresh`, `onOpenEntry`, `onCloseEntry`, `onRetry` | the setters and reads each marker's text names |
+| `onFilter` | after a Machine calls press moves the chip between empty state and Sessions list, focus follows it (`[data-scheduling-machines-chip] button`) |
+| `onPill` | `sessions`, `closed`, `last` → `#scheduling-sessions`; `bumps`, `booked` → `#scheduling-kinds`; `scrollIntoView` block `start`, `auto` under reduced motion else `smooth` |
+
+## Rules an edit keeps
+- Read-only: no press books, changes or cancels a visit.
+- Hidden, the view reads nothing and raises no sheet; it reads on show, on a press and on a feed frame, never on a timer.
+- A machine's entry is listed only behind Machine calls and counts in no figure; drawn grey, it is How often's `test` part.
+- One word per thing: an entry is a "session", a hiccup a "speed bump".
+- "Nothing" is four results: "Closed without booking" (booking form; the only one the Closed pill counts), "Closed without a change" (form opened on a visit), "Did not go through" (direct change refused or failed), "Undone" (direct Undo that worked).
+- A neutral reason is the grey badge; only warn and danger reasons get the toned ring.
+- A chosen person always has a chip: `EntryList` draws it with a zero when the answer no longer lists them.
+- `wasUndone` is true only for a booked or changed result; never widen it to cancelled. Only the result word and the Booked/Changed counts say "then undone".
+- The `undone` reason is worded as what the server saw: chip "Undo pressed", sentence "An Undo was pressed right after." True for a failed Undo too.
+- `isUndoPress(entry)` (no form, Undo surface) is the test for an entry that is itself an Undo: its row hides the `undone` chip (reads Speed bump · "Undone" · badge "Undo") and its sheet says "This press was an Undo."
+- Open server question: a booking or change whose Undo failed still reads "then undone" and leaves Booked/Changed, since an overview entry carries no acts. The verdict rule or wire (seam 4, shadow-connector) must say whether the Undo ended ok. If the rule stops putting `undone` on the Undo's own entry and after a failed Undo, this view needs no change and fixture entry 107 loses its reason.
+- `agoWord`, `durationWord`, `clockWord`, `dayClockWord`, `whoWord` are copies of the Uploads words (a module may not deep-import another's utils); lifting them to shared is a follow-up.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/ActLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryBumps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryChosen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryOffered.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntrySheetHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntrySheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/EntryVisitNow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/FactList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/fake/entries.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/fake/wholes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/MachineCallsChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/scheduling-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingKindList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingOpeners.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingPills.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/SchedulingView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/TroubleBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/utils/schedulingModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/scheduling-report/utils/schedulingWords.ts

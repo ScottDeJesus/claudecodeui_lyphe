@@ -1,7 +1,7 @@
 import { HourglassIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { dayClockWord, durationWord, jobWord, reasonWords, resultWord, surfaceWord, verdictLook, whoWord } from '@/modules/scheduling-report/utils/schedulingWords';
+import { dayClockWord, durationWord, isUndoPress, jobWord, reasonWords, resultWord, surfaceWord, verdictLook, whoWord } from '@/modules/scheduling-report/utils/schedulingWords';
 import type { SchedulingEntry } from '@/shared/scheduling-report-types';
 import { Badge, Chip } from '@/shared/ui';
 
@@ -19,14 +19,17 @@ const REASON_CHIPS = 3;
  *
  * The verdict leads, as a word with its tone and its icon, since "did it go well" is the question a list of sessions is
  * scanned for. Then the job (customer and project number) with the date and clock at the row's end. Under it, how it
- * ended in the full ink (Booked, Changed, Cancelled, Closed without booking), then who pressed, the lead by name and how
- * long the form was open. Last the marks: up to three reasons, worst first, then "+N"; "form still open" on an entry
+ * ended in the full ink (Booked, Changed, Cancelled, Closed without booking; "Booked, then undone" when an Undo took it
+ * back, as the sheet says it), then who pressed, the lead by name and how long the form was open. Last the marks: up to three reasons, worst first, then "+N"; "form still open" on an entry
  * whose form has not closed; and on a direct entry the surface it was made on (Dragged on the grid, Resized on the grid,
  * Undo, Through the API), which is all that says no form was used.
  *
  * A SPEED BUMP IS RINGED, A NOTE IS GREY. A reason that stands against the entry is a chip ringed in its tone, amber or
  * red; a reason that is only noted (not the best fit, a time of their own, the calendar paused) is the grey badge the
  * surface word wears. So down a list of clean rows nothing is ringed, and the eye stops only where something went wrong.
+ *
+ * AN UNDO'S OWN ROW SAYS UNDO ONCE. The server gives the Undo press itself the `undone` reason, and its result word
+ * ("Undone") and its surface badge ("Undo") already say what it was, so that reason is not drawn a third time.
  *
  * A MACHINE'S ENTRY IS DRAWN QUIET: its mark is the neutral "Machine call" and all its reasons are grey, so it can never
  * be counted with people's sessions by eye. A customer, a login, a person's name and a reason's detail are data and reach
@@ -40,7 +43,8 @@ export function EntryRow({ entry, onOpenEntry }: EntryRowProps) {
   const r = 'cerberus.scheduling.sessions';
   const look = verdictLook(t, entry);
   const machine = entry.actor_kind === 'machine';
-  const more = entry.reasons.length - REASON_CHIPS;
+  const reasons = isUndoPress(entry) ? entry.reasons.filter((reason) => reason.code !== 'undone') : entry.reasons;
+  const more = reasons.length - REASON_CHIPS;
   const job = jobWord(t, entry.job);
   const when = dayClockWord(entry.started_at);
   const result = resultWord(t, entry);
@@ -69,9 +73,9 @@ export function EntryRow({ entry, onOpenEntry }: EntryRowProps) {
           {entry.lead !== null && <>{' · '}{entry.lead.name === null ? t(`${r}.leadGone`) : t(`${r}.lead`, { name: entry.lead.name })}</>}
           {entry.open_seconds !== null && <>{' · '}<span className="tabular-nums">{t(`${r}.formOpen`, { length: durationWord(t, entry.open_seconds * 1000) })}</span></>}
         </span>
-        {(entry.reasons.length > 0 || stillOpen || entry.surface !== null) && (
+        {(reasons.length > 0 || stillOpen || entry.surface !== null) && (
           <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-            {entry.reasons.slice(0, REASON_CHIPS).map((reason) => (machine || reason.tone === 'neutral'
+            {reasons.slice(0, REASON_CHIPS).map((reason) => (machine || reason.tone === 'neutral'
               ? <Badge key={reason.code} as="span" tone="neutral">{reasonWords(t, reason).chip}</Badge>
               : <Chip key={reason.code} size="sm" tone={reason.tone}>{reasonWords(t, reason).chip}</Chip>
             ))}

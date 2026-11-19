@@ -3181,7 +3181,7 @@
         "bumps": "Speed bumps",
         "bumpsTitle": "Sessions in this window that did not go clean",
         "booked": "Booked",
-        "bookedTitle": "Sessions in this window that ended with a visit booked",
+        "bookedTitle": "Sessions in this window that ended with a visit booked and not undone right after",
         "closed": "Closed without booking",
         "closedTitle": "Booking forms that were opened and closed with nothing booked",
         "last": "Last session",
@@ -3256,6 +3256,8 @@
         "share": "{{count}} of {{total}}",
         "direct_one": "{{count}} more session used no form: it was made on the grid, by Undo or through the API.",
         "direct_other": "{{count}} more sessions used no form: they were made on the grid, by Undo or through the API.",
+        "directMachines_one": "{{count}} machine call used no form.",
+        "directMachines_other": "{{count}} machine calls used no form.",
         "unreported_one": "{{count}} form has not said where it was opened: its report has not arrived.",
         "unreported_other": "{{count}} forms have not said where they were opened: their reports have not arrived."
       },
@@ -3301,13 +3303,15 @@
       },
       "result": {
         "booked": "Booked",
+        "bookedUndone": "Booked, then undone",
         "changed": "Changed",
+        "changedUndone": "Changed, then put back",
         "cancelled": "Cancelled",
         "nothingYet": "Nothing done yet",
         "notDone": "Did not go through",
         "undid": "Undone",
-        "closedBooking": "Closed without booking",
-        "closedChange": "Closed without a change"
+        "closedWithoutBooking": "Closed without booking",
+        "closedWithoutChange": "Closed without a change"
       },
       "surface": {
         "form": "In the form",
@@ -3384,8 +3388,9 @@
           "sentence": "Nothing was done after a press was refused or failed."
         },
         "undone": {
-          "chip": "Undone",
-          "sentence": "It was undone right after."
+          "chip": "Undo pressed",
+          "sentence": "An Undo was pressed right after.",
+          "sentenceOwn": "This press was an Undo."
         },
         "not_reported": {
           "chip": "No report",
@@ -3488,12 +3493,11 @@
           "changed": "A visit was changed.",
           "changedUndone": "A visit was changed, then put back.",
           "cancelled": "A visit was cancelled.",
-          "cancelledUndone": "A visit was cancelled, then brought back.",
           "nothingYet": "Nothing has been done yet: the form is still open.",
           "notDone": "It did not go through.",
           "undid": "The change before it was undone.",
-          "closedBooking": "The form was closed without booking.",
-          "closedChange": "The form was closed without a change."
+          "closedWithoutBooking": "The form was closed without booking.",
+          "closedWithoutChange": "The form was closed without a change."
         },
         "facts": {
           "who": "Who",
@@ -3502,7 +3506,8 @@
           "doorNone": "not reported",
           "made": "Made",
           "formOpen": "Form open",
-          "formOpenNone": "not reported"
+          "formOpenNone": "not reported",
+          "notYet": "not known yet"
         },
         "note": {
           "machine": "A machine made this call. It is not counted in any figure of this view.",

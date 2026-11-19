@@ -1,17 +1,17 @@
 import { CalendarSearchIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { EntrySheet } from '@/modules/scheduling-report/EntrySheet';
+import { useEntrySheet } from '@/modules/scheduling-report/hooks/useEntrySheet';
+import { useSchedulingRead } from '@/modules/scheduling-report/hooks/useSchedulingRead';
 import { MachineCallsChip } from '@/modules/scheduling-report/MachineCallsChip';
-// FILL: fake — this import leaves with scheduling-fake.ts and the fake/ folder beside it, which the fill deletes: the two reads and the seven presses below take its place.
-import { FAKE_READS, unwired } from '@/modules/scheduling-report/scheduling-fake';
 import { SchedulingBody } from '@/modules/scheduling-report/SchedulingBody';
 import { SchedulingHead } from '@/modules/scheduling-report/SchedulingHead';
 import { SchedulingPills } from '@/modules/scheduling-report/SchedulingPills';
 import { TroubleBanner } from '@/modules/scheduling-report/TroubleBanner';
 import type { SchedulingFilters, SchedulingPillKey, SchedulingTally, SchedulingWindow } from '@/modules/scheduling-report/utils/schedulingModel';
-import { agoWord } from '@/modules/scheduling-report/utils/schedulingWords';
+import { agoWord, wasUndone } from '@/modules/scheduling-report/utils/schedulingWords';
 import { EmptyState } from '@/shared/ui';
 
 type SchedulingViewProps = {
@@ -21,6 +21,9 @@ type SchedulingViewProps = {
 
 /** A block arriving: Verve's page entrance, as the Cerberus tab's own views enter. */
 const ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTimingFunction.enter)_both]';
+
+/** Where each pill carries the reader: the section its figure counted. */
+const PILL_TARGET: Record<SchedulingPillKey, string> = { sessions: 'scheduling-sessions', bumps: 'scheduling-kinds', booked: 'scheduling-kinds', closed: 'scheduling-sessions', last: 'scheduling-sessions' };
 
 /**
  * THE SCHEDULING VIEW: what happens when someone schedules in Restorly. Every use of the Schedule-a-visit form (what
@@ -43,11 +46,11 @@ const ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTimingFunctio
  * A MACHINE'S ENTRY is listed only behind Machine calls and is counted in no figure: not the head's, the pills' or a
  * kind's. Listed, it is drawn grey, and it is How often's grey part.
  *
- * The root is the view's data hub. It holds three things of its own (the window, the filters, the open entry) and is
- * handed the rest as two reads, `SchedulingRead` and `EntrySheetRead` (`utils/schedulingModel.ts`); the parts draw what
- * they are given. It reads on show, on a press and when the feed says something moved, never on a timer and never while
- * hidden (MAN-8918). Words are `cerberus.scheduling.*`; a login, a customer, a person's name, a code and a reason's
- * detail are data.
+ * The root is the view's data hub. It holds three things of its own (the window, the filters, the open entry) and reads
+ * the rest through two hooks, `useSchedulingRead` and `useEntrySheet`, as `SchedulingRead` and `EntrySheetRead`
+ * (`utils/schedulingModel.ts`); the parts draw what they are given. It reads on show, on a press and when the feed says
+ * something moved, never on a timer and never while hidden (MAN-8918). Words are `cerberus.scheduling.*`; a login, a
+ * customer, a person's name, a code and a reason's detail are data.
  *
  * Used by the cerberus module's `CerberusPanel`, through this module's barrel, as the seventh view of its strip.
  */
@@ -62,35 +65,53 @@ export function SchedulingView({ shown }: SchedulingViewProps) {
   const [openId, setOpenId] = useState<string | null>(null);
   // The pill last pressed, whose section the reader was carried to; null until one is, so no pill reads as a filter in force.
   const [activePill, setActivePill] = useState<SchedulingPillKey | null>(null);
+  // The view's own element, where keyboard focus is looked for again, and whether Machine calls was pressed and its answer has not landed.
+  const root = useRef<HTMLDivElement>(null);
+  const machinesPressed = useRef(false);
 
   // ── The reads: on show, on a press and on a feed frame; never on a timer, never while hidden. ──
-  // FILL: useSchedulingRead — useSchedulingRead({ shown, window: days, filters }) → { read: SchedulingRead, feed, readAt, refresh, retry }: the window's entries, read on every show, on a window or server-side filter change and on a press, and told by the feed while shown. `readAt` is when the newest read settled, answered or failed, as epoch ms.
-  // FILL: entriesToBuckets — utils/entriesToBuckets.ts, pure, called inside that hook: the overview's entries as `@/shared/dayBuckets` items by when each started (a machine's the `test` part, a person's `clean` or `hiccup` by its verdict), for `read.days` and `read.hours`.
-  const { read, readAt } = FAKE_READS.window(t);
-  // FILL: useEntrySheet — useEntrySheet(shown ? openId : null, feed) → { sheet: EntrySheetRead, retry: retrySheet }: the open entry, read on open and again on a coalesced feed frame; nothing while the sheet is shut or the view hidden.
-  const sheet = FAKE_READS.sheet(t, shown ? openId : null);
+  // The window's entries, bucketed for How often, and the feed they are told by while the view is shown.
+  const { read, feed, readAt, refresh, retry } = useSchedulingRead({ shown, window: days, filters });
+  // The open entry; the sheet is drawn only while the view is shown, so a hidden view reads none.
+  const { sheet, retry: retrySheet } = useEntrySheet(shown ? openId : null, feed);
   // The clock every age on the view is counted from: the moment the newest read settled. A failed read moves it too, which
   // is what lets the stale strip say how old the answer on screen is. Nothing here ticks: no entry is ever live, so an
   // age is true as of the last time the screen asked, and the view holds no timer at all (MAN-8918).
   const now = readAt;
 
   // ── The presses. None writes: they change what is read and what is shown. ──
-  // FILL: onWindow — setDays(next). The window is part of the overview's key, so the change reads the overview again.
-  const onWindow: (next: SchedulingWindow) => void = unwired({ days: setDays });
-  // FILL: onFilter — setFilters(next). A changed `by` or `machines` reads the overview again; `bumpsOnly` alone is the browser's own and reads nothing. When the answer to a Machine calls press moves its chip between the empty state and the Sessions list, keyboard focus follows it (`[data-scheduling-machines-chip] button`), as UploadsView does for Test runs.
-  const onFilter: (next: SchedulingFilters) => void = unwired({ filters: setFilters });
-  // FILL: onRefresh — refresh(): reads the overview again and dials the feed again if it was refused, keeping the screen as it is until the new answer lands.
-  const onRefresh: () => void = unwired();
-  // FILL: onOpenEntry — setOpenId(id): the sheet opens on that entry, and its read begins.
-  const onOpenEntry: (id: string) => void = unwired({ openId: setOpenId });
-  // FILL: onCloseEntry — setOpenId(null): Escape, the sheet's ✕ and its scrim.
-  const onCloseEntry: () => void = unwired({ openId: setOpenId });
-  // FILL: onRetry — retry() and retrySheet(): Try again on the view's banner, on the stale strip and in the sheet reads again whichever of the two failed.
-  const onRetry: () => void = unwired();
-  // FILL: onPill — setActivePill(key), then the section that pill's figure counted is brought into view: `sessions`, `closed` and `last` go to #scheduling-sessions, `bumps` and `booked` to #scheduling-kinds (scrollIntoView, block 'start'; behaviour 'auto' under prefers-reduced-motion, else 'smooth'), as UploadsView's onPill does.
-  const onPill: (key: SchedulingPillKey) => void = unwired({ pill: setActivePill });
+  // The window and the filters are part of the overview's key, so changing them reads it again; Speed bumps only alone is the browser's own and reads nothing.
+  const onWindow = setDays;
+  const onFilter = (next: SchedulingFilters) => {
+    // Machine calls is the one filter that moves a control: the answer decides whether the chip stands under the empty state or among the Sessions list's chips.
+    if (next.machines !== filters.machines) machinesPressed.current = true;
+    setFilters(next);
+  };
+  const onRefresh = refresh;
+  const onOpenEntry = setOpenId;
+  const onCloseEntry = () => setOpenId(null);
+  const onRetry = () => {
+    retry();
+    retrySheet();
+  };
+  // A pill carries the reader to its section, as the Uploads view's do: instant for a reader who asked for less motion.
+  const onPill = (key: SchedulingPillKey) => {
+    setActivePill(key);
+    document.getElementById(PILL_TARGET[key])?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  };
 
   const overview = read.overview;
+
+  // The answer to a press on Machine calls landed (or the view was hidden before it did): the chip may have moved, and the button
+  // that was pressed went with its old home, which drops keyboard focus to the page. Focus follows the chip to its new place.
+  useEffect(() => {
+    if (!machinesPressed.current) return;
+    machinesPressed.current = false;
+    if (shown && document.activeElement === document.body) root.current?.querySelector<HTMLElement>('[data-scheduling-machines-chip] button')?.focus();
+  }, [overview, shown]);
 
   if (overview === null) {
     return (
@@ -124,12 +145,17 @@ export function SchedulingView({ shown }: SchedulingViewProps) {
 
   // The window's sessions, counted for the head and the pills: people's alone, so a machine's call is in none of these whether or not it is listed.
   const people = overview.entries.filter((entry) => entry.actor_kind === 'person');
+  // The sessions whose result still stood when they ended. An Undo right after takes a booking or a change back, and the
+  // server still calls that session `booked`: counted so, "13 booked" would hold visits that were cancelled seconds later.
+  // It is left out of booked and changed below, as its row and its sheet say "Booked, then undone"; it is still a session
+  // and a speed bump. A cancel is never taken back (`wasUndone`), so every cancelled session is counted.
+  const stood = people.filter((entry) => !wasUndone(entry));
   const tally: SchedulingTally = {
     sessions: people.length,
     bumps: people.filter((entry) => entry.verdict === 'hiccup').length,
-    booked: people.filter((entry) => entry.result === 'booked').length,
-    changed: people.filter((entry) => entry.result === 'changed').length,
-    cancelled: people.filter((entry) => entry.result === 'cancelled').length,
+    booked: stood.filter((entry) => entry.result === 'booked').length,
+    changed: stood.filter((entry) => entry.result === 'changed').length,
+    cancelled: stood.filter((entry) => entry.result === 'cancelled').length,
     // A booking form that was closed with nothing booked. A form opened on a visit and closed is not one (that is how a visit is looked at), and a form still open has not been closed.
     closed: people.filter((entry) => entry.form && entry.kind === 'book' && entry.result === 'nothing' && entry.state !== 'open').length,
     last: people[0] ?? null,
@@ -144,7 +170,7 @@ export function SchedulingView({ shown }: SchedulingViewProps) {
 
   return (
     // The view is its own size container: the body's two columns follow the view's width, never the window's.
-    <div className="min-w-0 max-w-[1180px] px-[clamp(16px,4cqi,32px)] pb-7 pt-5" data-scheduling-view={read.stale ? 'stale' : 'ready'}>
+    <div ref={root} className="min-w-0 max-w-[1180px] px-[clamp(16px,4cqi,32px)] pb-7 pt-5" data-scheduling-view={read.stale ? 'stale' : 'ready'}>
       <div className={`flex min-w-0 flex-col gap-5 [container-type:inline-size] ${ENTER}`}>
         <SchedulingHead days={days} tally={tally} truncated={overview.truncated} filters={filters} now={now} onWindow={onWindow} onRefresh={onRefresh} onFilter={onFilter} />
 
