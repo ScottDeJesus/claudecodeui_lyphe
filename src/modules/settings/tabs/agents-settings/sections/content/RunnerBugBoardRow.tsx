@@ -1,4 +1,4 @@
-import { KanbanSquare, RefreshCw, Tags } from 'lucide-react';
+import { Bug, RefreshCw, Tags } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -50,7 +50,7 @@ function Retry({ onRetry }: { onRetry: () => void }) {
  * NO NUMBER IS NOT THE DEFAULT. Until a read answers, each row says so in words and its slot holds the retry. Neither control is ever
  * `disabled` while a write is in flight (Chromium blurs a control the instant one lands): `aria-busy` tells assistive tech instead.
  *
- * The first row wears the board's own `KanbanSquare`; the second wears `Tags`, because the sort's answer is the tag a card carries.
+ * The first row wears the board's own `Bug`; the second wears `Tags`, because the sort's answer is the tag a card carries.
  *
  * Used by `RunnerModelContent`, which draws it directly under `RunnerCpuLimitRow`.
  */
@@ -76,7 +76,7 @@ export default function RunnerBugBoardRow() {
     <>
       <SettingRow
         data-runner-bug-board-width={width === null ? 'unknown' : width}
-        icon={<KanbanSquare className="h-4 w-4" />}
+        icon={<Bug className="h-4 w-4" />}
         label={widthLabel}
         description={width === null
           ? unknownSentence

@@ -1,4 +1,4 @@
-import { CloudOff, KanbanSquare } from 'lucide-react';
+import { Bug, CloudOff } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -171,7 +171,7 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
       return (
         <div className="flex flex-1 items-center justify-center p-6">
           <EmptyState
-            icon={KanbanSquare}
+            icon={Bug}
             title={t('kanban.noBoard.title')}
             message={t('kanban.noBoard.message')}
             actionLabel={t('kanban.noBoard.action')}
