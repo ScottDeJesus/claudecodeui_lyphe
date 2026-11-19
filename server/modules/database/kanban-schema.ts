@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS kanban_cards (
     build_tokens_out INTEGER NOT NULL DEFAULT 0,
     build_tokens_cache_read INTEGER NOT NULL DEFAULT 0,
     build_tokens_cache_create INTEGER NOT NULL DEFAULT 0,
+    done_at TEXT NULL,
+    changelog TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     legacy_id TEXT NULL UNIQUE
@@ -181,6 +183,8 @@ CREATE INDEX IF NOT EXISTS ix_kanban_decisions_card ON kanban_decisions(card_id)
 CREATE INDEX IF NOT EXISTS ix_kanban_checklist_card ON kanban_checklist_items(card_id);
 CREATE INDEX IF NOT EXISTS ix_kanban_attachments_card ON kanban_attachments(card_id);
 CREATE INDEX IF NOT EXISTS ix_kanban_events_board ON kanban_events(board_id, id);
+-- A card's own history read: its creating event (who filed it) and its newest move into Done. Without this every such read scans the whole log.
+CREATE INDEX IF NOT EXISTS ix_kanban_events_card ON kanban_events(card_id, id);
 -- The lesson index read is always "this status, newest first"; the whole index read is this one index.
 CREATE INDEX IF NOT EXISTS ix_kanban_lessons_status ON kanban_lessons(status, created_at);
 `;

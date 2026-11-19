@@ -11,7 +11,7 @@ import { DrawerQuestions } from '@/modules/kanban/card-drawer/DrawerQuestions';
 import { DrawerScenarios } from '@/modules/kanban/card-drawer/DrawerScenarios';
 import { useDrawerReading } from '@/modules/kanban/card-drawer/useDrawerReading';
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
-import { flowOf, type KanbanLinkedTitle, type KanbanWalk } from '@/modules/kanban/utils/walkModel';
+import { kindWordKey, type KanbanLinkedTitle, type KanbanWalk } from '@/modules/kanban/utils/walkModel';
 import { SubagentTranscriptView } from '@/modules/chat';
 import type { KanbanBoardEvent, KanbanCardDetail } from '@/shared/kanban-types';
 import { api, readApiJson } from '@/shared/api';
@@ -202,7 +202,7 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
   );
 
   const detail = read.detail;
-  const flow = detail === null ? null : flowOf(detail.tags);
+  const kind = detail === null ? null : kindWordKey(detail.tags, walk);
 
   // A card that waits on an answer opens ON its question. It is the one thing the sheet was opened
   // to get done, and under a title, a priority, tags and three empty fields it starts below the
@@ -273,8 +273,8 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
             scrolls — a title can be edited out from under the reader, an id cannot. */}
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
           <span className="vv-tabular truncate text-xs text-ink-faint">{cardId}</span>
-          {/* What kind of card this is, as a word: the flow its walk is on. */}
-          {flow && <Badge variant="outline" className="vv-badge--compact shrink-0">{t(flow.wordKey)}</Badge>}
+          {/* What kind of card this is, as a word: the flow its walk is on, or Regression for the night's cure. */}
+          {kind && <Badge variant="outline" className="vv-badge--compact shrink-0">{t(kind)}</Badge>}
           {detail !== null && (reading !== null || asking) && (
             <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" data-drawer-card-title>{detail.title}</span>
           )}

@@ -165,17 +165,17 @@ What they share is the contract every later one joins:
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/SphereCanvas.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
 
-## MAN-9017 — The library those tokens paint — Import from the barrel, `@/shared/ui`. It side-effect-imports all eight stylesheets (rule
+## MAN-9017 — The library those tokens paint — Import from the barrel, `@/shared/ui`. It side-effect-imports all nine stylesheets (rule
 section: README/002 The library those tokens paint/002 Import from the barrel, `@/shared/ui`. It side-effect-imports all eight stylesheets (rule
 
-4. **Import from the barrel, `@/shared/ui`.** It side-effect-imports all eight stylesheets (rule
+4. **Import from the barrel, `@/shared/ui`.** It side-effect-imports all nine stylesheets (rule
    6), so the barrel — not the component file — is what puts the paint in the document. A deep
    import by path gets an unpainted component unless something else loaded the barrel first.
 5. **Props come from a site you can point at** — the integration plan's §4 table
    (`~/.claude/plans/cloudcli-verve-integration.md`), or a real call. A prop nobody passes is a
    prop nobody proves: `Card`'s `interactive` has no consumer today.
 6. **A stylesheet at its ceiling opens a new file; it never wins lines back by squeezing what is
-   there.** The barrel imports eight sheets, in this order (lines measured 2026-10-17 unless dated):
+   there.** The barrel imports nine sheets, in this order (lines measured 2026-10-17 unless dated):
 
    | import | sheet | opened | lines | also holds |
    |---|---|---|---|---|
@@ -186,9 +186,10 @@ section: README/002 The library those tokens paint/002 Import from the barrel, `
    | 5 | [`media.css`](media.css) | 6th | 281 (2026-10-26) | a literal-colour exception: the gallery tag's and count's near-black scrim and white ink, which sit on a photograph and must not flip with the theme (the sheet's own header says why) |
    | 6 | [`spots.css`](spots.css) | 8th | 86 (2026-10-26) | `RegionImage`'s spots (`.vv-region-spot`), opened when `media.css` stood at 280 lines and the spot paint would carry it past 300; the second literal-colour exception, the spot's near-black disc in a white ring, which sits on a picture and must not flip with the theme (the sheet's own header says why) |
    | 7 | [`data.css`](data.css) | 7th | 220 (2026-10-30) | the segmented count pill, spelt again because feedback.css is at its ceiling and takes no more lines; the segmented option's `detail` and its 44 px under 768 px |
-   | 8 | `board.css` | 3rd | 227 | the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their variants |
+   | 8 | [`readings.css`](readings.css) | 9th | 79 (2026-11-19) | `Readout` and `DayBars` (MAN-10036, MAN-10037), opened when `data.css` stood at 220 lines and the two would carry it past 300; both only read the tone swap (`--tone-ink`, `--tone-dot`, `--tone-glyph`) |
+   | 9 | `board.css` | 3rd | 227 | the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their variants |
 
-   `panels.css` is the fifth sheet opened and the fourth imported; `media.css` is the sixth opened and the fifth imported; `spots.css` is the eighth opened and the sixth imported, beside the sheet it extends; `data.css` is the seventh opened and the seventh imported. The order is load-bearing at one end:
+   `panels.css` is the fifth sheet opened and the fourth imported; `media.css` is the sixth opened and the fifth imported; `spots.css` is the eighth opened and the sixth imported, beside the sheet it extends; `data.css` is the seventh opened and the seventh imported; `readings.css` is the ninth opened and the eighth imported, beside the sheet it would otherwise have filled. The order is load-bearing at one end:
    - `board.css` stays LAST. A lane card composes `.vv-card`'s ground and overrides its background,
      shadow and transition, and at equal specificity the LATER rule wins, so imported any earlier
      `board.css` would lose all three to `.vv-card`.
@@ -629,3 +630,60 @@ All with `position="right"`: `RailButton` (every view button of the views rail),
 2026-10-25: Tab onto the rail's Chat button shows "Chat" 21–33ms after the key (`node .verify/rail-live.mjs`, MAN-9005).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx
+
+## MAN-10036 — `Readout` — one figure and its name, built to Astrolabe's Readout and ReadoutRow: props, the unknown dash, tone, paint (`verve/readings.css`)
+
+`src/shared/ui/Readout.tsx` is in the library because Astrolabe draws it (`design-system/astrolabe/components/Readout` and `ReadoutRow`): one figure with its name. Exported from the barrel `@/shared/ui`. Caller (2026-11-19): the kanban module's bug dashboard (`src/modules/kanban/dashboard/DashboardNumbers.tsx`, `DashboardWaysIn.tsx`).
+
+## Props
+| prop | meaning | site |
+|---|---|---|
+| `label` | what the figure counts, in the reader's words. Drawn above the figure as the telemetry caption | every dashboard number |
+| `value` | `number` (drawn with the locale's grouping), `string` (drawn as written: `4.5`, `None`), or `null` / not given: NO reading | open counts; a fix time's figure; `null` for a priority at which nothing was fixed |
+| `unit` | small, beside the figure on its baseline. Not drawn beside an unknown reading | `h`, `min`, `days` |
+| `tone` | a `Tone`. Any tone but `neutral` colours the figure with `--tone-ink` and puts the tone's glyph (`--tone-glyph`) before it. Left off or `neutral`: plain ink | `warn` on the open High count while it is not zero |
+| `note` | one line under the figure: what the number is compared to | `9 in 10 within 3.1 days · 19 fixed` |
+| `size` | `md` (default, 24 px) or `lg` (44 px, light): the one large number of a panel | `lg` on the open count |
+| `unknownLabel` | what an unknown reading is called aloud; the em-dash itself is `aria-hidden` | `not known` |
+
+## Rules
+- UNKNOWN IS NEVER ZERO. `value` of `null` or `undefined` draws an em-dash in `--ink-faint`, with no unit and no tone, and `data-unknown` on the root. `0` is a reading and is drawn as `0`. The case `cases/client/the-kits-readout-says-an-unknown-reading-as-an-em-dash-never-a-zero-and-a-zero-as-0.ts` holds it.
+- The dash is `--ink-faint`, not Astrolabe's `opacity-dim` (0.4): at that opacity it falls under 4.5:1 on the light ground.
+- Tone is never colour alone: a toned figure carries the glyph of the `[data-tone]` swap (tokens.css). `data-tone` is set on the root only for a tone that is not `neutral` and a reading that is known.
+- DOM order is label, figure, unit, note, which is the order a screen reader says them in.
+- The piece formats nothing but a number's grouping: hours into `4.5 h` or `3.2 days` is the caller's (`fixTime` in `DashboardNumbers.tsx`).
+
+## Paint — `verve/readings.css`
+The eighth sheet the barrel imports (the ninth opened), after `data.css` and before `board.css`, opened when `data.css` stood at 220 lines. `.vv-readout` (gap), `__label` (`--font-mono`, `--text-caption`, 0.14em, upper-case, `--ink-faint`), `__value` (`--font-mono`, tabular, `--ink-strong`, 24 px / 500; `[data-size='lg']` 44 px / 300), `__unit` and `__note` (`--ink-muted`). No rule declares a `--tone-*` property.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Readout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/readings.css
+
+## MAN-10037 — `DayBars` — one or two series over named days from a ruled zero baseline, the second hanging below it: props, drawing, paint (`verve/readings.css`)
+
+`src/shared/ui/DayBars.tsx`: one or two series over named days, as bars from a ruled zero baseline. Exported from the barrel `@/shared/ui`. Lifted from the two plots the API view draws for itself, `src/modules/deepseek-spend/DeepseekDayBars.tsx` and `src/modules/jev/JevDayBars.tsx`, which are left as they are (one series each, their own words and money formats). Caller (2026-11-19): the kanban module's bug dashboard, `src/modules/kanban/dashboard/DashboardFlow.tsx`: cards opened and fixed per day.
+
+## Props
+| prop | meaning |
+|---|---|
+| `days` | `{ day: 'YYYY-MM-DD', values: number[], title: string }[]`, oldest first. `values` holds one number per series, in the order of `series`. `title` is the day's whole reading in the caller's words and becomes the column's `title`. The last day is today's |
+| `series` | one or two of `{ label, tone? }`. `tone` is a `Tone`: the bars and the legend mark read its `--tone-dot`; left off, the accent |
+| `label` | the plot's one spoken sentence (`role="img"`, `aria-label`) |
+| `peakLabel` | `(peak: number) => string`: the words for the scale, given the tallest bar of either series |
+
+## Drawing
+- One series: bars grow up from the baseline, 96 px tall at the peak (the height of the two plots it was lifted from).
+- Two series: THE SECOND HANGS BELOW THE SAME BASELINE, 64 px a side, both on one scale (the peak is the tallest bar of either). A day is one column at any width; side by side, two bars a day are under 2 px each at 90 days on a 390 px phone. Which series a bar belongs to is its side of the rule as well as its ink, and the legend marks them ▲ and ▼ (one series: ■).
+- A zero day is a 1 px stub on its side of the rule, so a quiet day never reads as a missing one. A window of all zeros is a row of stubs.
+- Every bar is at full strength, on every day, with nothing behind it but the plot's own ground: a faded bar, or one on a tinted column, falls under the 3:1 a drawn shape needs on the light ground. Today is marked by a 2 px rule under its column (`.vv-daybars__day[data-today]::after`, `--ink-muted`), in the gap between the plot and its dates; a pointer's hover draws the same rule in `--border-strong` under the column it is over. The two plots it was lifted from fade every day but today.
+- The legend says each series' total (summed by the piece) and, at its far end, `peakLabel(peak)`.
+- Under the plot: the first and last day as short dates, and the middle day too from 14 days on. Dates are built from the parts of `day`, so the browser's zone never shifts one.
+- From 45 days on the columns stand 1 px apart instead of 4 (`data-dense`).
+
+## Rules
+- A `title` is a pointer's. The plot is one image with one sentence; a caller that owes each day's figures to a finger or a screen reader draws them beside it (INV-10275). `DashboardFlow` does, in its `Day by day` table.
+- The piece holds no words of its own and calls no `useTranslation`: every string arrives as a prop.
+
+## Paint — `verve/readings.css`
+`.vv-daybars`, `__legend`, `__names`, `__series`, `__mark`, `__total`, `__peak`, `__plot`, `__day`, `__side[data-side='up'|'down']`, `__bar`, `__zero` (the rule, absolutely placed across the gaps), `__axis`. A bar's ground is `var(--tone-dot, var(--accent))`, with no opacity of its own. The hover look stands inside `@media (hover: hover)`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DayBars.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/readings.css

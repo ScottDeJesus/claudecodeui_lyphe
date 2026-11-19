@@ -14,6 +14,10 @@ import { cn, formatRelativeTime } from '@/shared/utils';
  * is spelled in tabular figures a reader can compare down a column. The closing remarks are last,
  * because they are a record rather than a decision.
  *
+ * THE CHANGELOG LINE STANDS UNDER THE CLOSING REMARKS: the one sentence the card's walk left for a
+ * person using the thing, as the dashboard's changelog prints it. It is read here and not typed:
+ * the walk writes it. A card that has none draws no place for one.
+ *
  * NOTHING HERE LETS A RUN PROCEED OR HOLDS IT BACK. A card on a self-running board is walked the
  * moment it is in To Do; what stops a walk is a question, and that is answered in its own section.
  *
@@ -48,6 +52,9 @@ export function DrawerIssuesAndTokens({ detail, writes }: DrawerIssuesAndTokensP
   const [remarks, setRemarks] = useState(detail.closingRemarks);
 
   const open = detail.issues.filter((row) => !row.resolved).length;
+
+  // The line the card's walk left for a person using the thing; a card with none draws no place for one.
+  const changelog = detail.changelog.trim();
 
   const spend = [
     { key: 'in', labelKey: 'kanban.tokens.in', value: detail.buildTokensIn },
@@ -179,6 +186,12 @@ export function DrawerIssuesAndTokens({ detail, writes }: DrawerIssuesAndTokensP
           className="vv-input w-full resize-y px-3 py-2 text-sm"
         />
       </Field>
+
+      {changelog.length > 0 && (
+        <Field label={t('kanban.changelog.title')} helper={t('kanban.changelog.helper')}>
+          <p className="text-sm leading-snug text-foreground" data-drawer-changelog>{changelog}</p>
+        </Field>
+      )}
     </section>
   );
 }

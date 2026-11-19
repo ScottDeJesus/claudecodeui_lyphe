@@ -272,7 +272,9 @@ export type KanbanAttachment = {
  * counters broken out, and the five child collections.
  *
  * It is built once per card open, from one transaction's worth of reads, so a card cannot render
- * a checklist row that disagrees with the count on its face.
+ * a checklist row that disagrees with the count on its face. `doneAt` is stamped by the move into
+ * Done and cleared by a move out, so it is a fact no later edit of the card (which moves
+ * `updated_at`) can disturb.
  *
  * Consumers: `kanban-cards.service.ts`'s `getCard`, the card-detail route, and
  * `src/shared/kanban-types.ts`.
@@ -282,6 +284,10 @@ export type KanbanCardDetail = KanbanCardSummary & {
   body: string;
   plan: string | null;
   closingRemarks: string;
+  /** When the card last arrived in Done (ISO-8601 UTC); null while it is not in Done. */
+  doneAt: string | null;
+  /** The one line a person reads about what the finished card changed; '' until a walk or a person writes it. */
+  changelog: string;
   buildTokensIn: number;
   buildTokensOut: number;
   buildTokensCacheRead: number;
@@ -390,3 +396,9 @@ export type KanbanVitals = {
   lessonsPendingEstate: number;
   memoryPendingEstate: number;
 };
+
+/**
+ * The board's stats and changelog shapes live in a sibling, since this file is past the house's
+ * size ceiling; re-exported so a caller imports every board shape from here.
+ */
+export * from './kanban-stats-types.js';

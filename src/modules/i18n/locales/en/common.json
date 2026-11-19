@@ -729,7 +729,9 @@
       "archive": "Archive",
       "untitled": "Untitled card",
       "moved": "{{title}} moved to {{lane}}, position {{position}} of {{total}}",
-      "held": "Held — {{why}}"
+      "held": "Held — {{why}}",
+      "aged_one": "waiting {{count}} day · rides as {{priority}}",
+      "aged_other": "waiting {{count}} days · rides as {{priority}}"
     },
     "priority": {
       "low": "Low",
@@ -800,7 +802,8 @@
     "flow": {
       "bug": "Bug",
       "change": "UI change",
-      "tweak": "Tweak"
+      "tweak": "Tweak",
+      "cure": "Regression"
     },
     "links": {
       "title": "Linked cards",
@@ -857,6 +860,171 @@
       "title": "Closing remarks",
       "placeholder": "What was left to say at the end"
     },
+    "changelog": {
+      "title": "Changelog line",
+      "helper": "What a person using it now sees. The dashboard's changelog prints it."
+    },
+    "faces": {
+      "label": "Bugs view",
+      "board": "Board",
+      "dashboard": "Dashboard",
+      "openHigh_one": "{{count}} high-priority card is open",
+      "openHigh_other": "{{count}} high-priority cards are open"
+    },
+    "dashboard": {
+      "loading": "Reading the numbers…",
+      "unknown": "not known",
+      "age_one": "{{count}} day",
+      "age_other": "{{count}} days",
+      "ageToday": "Today",
+      "unreachable": {
+        "title": "The dashboard could not be read",
+        "message": "The server did not answer. Nothing has been lost: the board is as you left it.",
+        "retry": "Try again"
+      },
+      "scope": {
+        "label": "Which boards",
+        "board": "This board",
+        "all": "All boards"
+      },
+      "window": {
+        "label": "How far back",
+        "days": "Last {{days}} days"
+      },
+      "units": {
+        "min": "min",
+        "h": "h",
+        "days": "days",
+        "day_one": "day",
+        "day_other": "days"
+      },
+      "numbers": {
+        "title": "The numbers",
+        "open": "Open",
+        "byLane": "Open cards by lane",
+        "oldestHigh": "Oldest open high",
+        "oldestHighNone": "None",
+        "oldestHighNoneNote": "No high-priority card is open.",
+        "openedOn": "opened {{date}}"
+      },
+      "fix": {
+        "title": "Median time to fix",
+        "about": "Cards that reached Done in the last {{days}} days, from opened to done.",
+        "all": "All",
+        "note_one": "9 in 10 within {{p90}} · {{count}} fixed",
+        "note_other": "9 in 10 within {{p90}} · {{count}} fixed",
+        "none": "None fixed in the last {{days}} days"
+      },
+      "flow": {
+        "title": "Opened and fixed per day",
+        "opened": "Opened",
+        "fixed": "Fixed",
+        "plot": "Cards opened and fixed per day, the last {{days}} days: {{opened}} opened, {{fixed}} fixed",
+        "peak": "Tallest bar: {{peak}} in a day",
+        "barTitle": "{{date}} · {{opened}} opened · {{fixed}} fixed",
+        "quiet": "Nothing was opened or fixed in the last {{days}} days.",
+        "byDay": "Day by day",
+        "tableLabel": "Cards opened and fixed, day by day",
+        "quietLeftOut": "Days with nothing opened or fixed are left out.",
+        "columns": {
+          "day": "Day"
+        }
+      },
+      "oldest": {
+        "title": "Oldest open cards",
+        "empty": "No card is open",
+        "columns": {
+          "card": "Card",
+          "board": "Board",
+          "priority": "Priority",
+          "lane": "Lane",
+          "age": "Open for"
+        }
+      },
+      "waysIn": {
+        "title": "Where tickets came from",
+        "about": "Cards opened in the last {{days}} days, by who or what opened them.",
+        "empty": "No card was opened in the last {{days}} days",
+        "ticketsFailed": "The tickets' counts could not be read. {{error}}",
+        "columns": {
+          "source": "Came from",
+          "opened": "Opened",
+          "open": "Still open"
+        },
+        "sources": {
+          "operator": "Typed on the board",
+          "restorly": "Reported from Restorly",
+          "chat": "A chat's bug command",
+          "soul": "A soul at work",
+          "nightly": "The night's regression run",
+          "cerberus": "Cerberus's red watch"
+        },
+        "cameBack": {
+          "title": "Came back",
+          "reopened": "Reopened",
+          "reopenedNote": "went quiet on its own, then happened again",
+          "regressions": "Regressions",
+          "regressionsNote": "fixed once, then broke again"
+        }
+      },
+      "cases": {
+        "title": "Regression cases",
+        "failed": "The regression cases could not be read. {{error}}",
+        "suitesLabel": "Regression cases by suite",
+        "noSuites": "No suite of cases yet",
+        "night": "{{date}}: {{ran}} ran, {{held}} held, {{broken}} broke, {{cannotRun}} could not run",
+        "noNight": "No night has run it yet",
+        "broke": "Broke {{date}} · {{suite}}",
+        "sentenceWhole": "Show the whole sentence",
+        "sentenceLess": "Show less",
+        "columns": {
+          "suite": "Suite",
+          "holding": "Holding",
+          "broken": "Broken",
+          "regressed": "Regressed",
+          "cantRun": "Can't run",
+          "night": "Its last night"
+        },
+        "open": {
+          "title": "Open regressions",
+          "titleOthers": "Other open regressions",
+          "summary": "{{ruled}} ruled a regression in the last {{days}} days, {{cured}} of them holding again.",
+          "summaryNone": "No case was ruled a regression in the last {{days}} days.",
+          "none": "No case is regressed.",
+          "noneOthers": "No other case is regressed.",
+          "noCard": "No card yet",
+          "waitingBoard": "Its ticket is waiting for a board"
+        },
+        "cure": {
+          "walking": "A cure is under way",
+          "done": "A cure finished; the next run says if it holds",
+          "ruling": "Its cure is waiting on your ruling",
+          "nothingChanged": "A cure was tried and changed nothing",
+          "blocked": "A cure was tried and could not finish",
+          "stopped": "A cure stopped before it finished",
+          "gone": "A cure was tried; nothing is kept of it",
+          "ended": "A cure was tried and did not cure it",
+          "none": "No cure sent yet"
+        },
+        "theirs": {
+          "title": "Yours to look at",
+          "about": "Two cures were tried on each of these and it still breaks. No third is sent, so each waits on you."
+        }
+      },
+      "changelog": {
+        "title": "Changelog",
+        "copy": "Copy as Markdown",
+        "empty": "No changelog line yet",
+        "emptyMessage": "A card that reaches Done by a walk leaves one sentence here.",
+        "cardOn": "{{title}} · {{board}}"
+      },
+      "unplaced": {
+        "title_one": "{{count}} ticket is waiting for a board",
+        "title_other": "{{count}} tickets are waiting for a board",
+        "about_one": "No board names the folder it was filed against. Add that folder to a board's repositories and it is placed at once.",
+        "about_other": "No board names the folders they were filed against. Add a folder to a board's repositories and its ticket is placed at once."
+      }
+    },
     "toast": {
       "cardNotSaved": "The card was not saved",
       "boardNotSaved": "The board was not saved",
@@ -867,7 +1035,9 @@
       "autonomyOff": "Autonomy off",
       "reposSaved": "Repositories saved",
       "cardArchived": "Card archived",
-      "laneCleared": "The lane's cards were archived"
+      "laneCleared": "The lane's cards were archived",
+      "changelogCopied": "Changelog copied as Markdown",
+      "changelogNotCopied": "The changelog could not be copied"
     }
   },
   "status": {

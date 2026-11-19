@@ -108,6 +108,15 @@ export { kanbanQuestionsDb } from '@/modules/database/repositories/kanban-questi
 // kanban module's roster verb hands the dispatcher when it compares a card with the rest of its board.
 export { kanbanRosterDb } from '@/modules/database/repositories/kanban-roster.db.js';
 export type { KanbanRosterCard } from '@/modules/database/repositories/kanban-roster.db.js';
+// The board's numbers: read-only statements behind the kanban module's stats and changelog — open cards, cards fixed and
+// opened in a window with who filed them, and the changelog lines of finished cards. Nothing here writes.
+export { kanbanStatsDb } from '@/modules/database/repositories/kanban-stats.db.js';
+export type {
+  KanbanStatsChangelogRow,
+  KanbanStatsCreatedRow,
+  KanbanStatsFixedRow,
+  KanbanStatsOpenRow,
+} from '@/modules/database/repositories/kanban-stats.db.js';
 // The memory-intake lane's own table: proposals to write a memory into one of five destinations,
 // each waiting on a person's approval. It is not a board table and no board reads it.
 export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candidates.db.js';

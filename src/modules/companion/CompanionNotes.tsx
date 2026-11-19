@@ -2,9 +2,11 @@ import { X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Markdown } from '@/modules/chat';
 import { CompanionFoldMark } from '@/modules/companion/CompanionFoldMark';
 import { errorMessage } from '@/shared/api';
 import type { CompanionNote } from '@/shared/companion-types';
+import { MARKDOWN_CARDS_CLASS } from '@/shared/constants';
 import { useToast } from '@/shared/context/ToastContext';
 import { Button, Card, CardFoldBody, CardFoldToggle, Collapsible } from '@/shared/ui';
 
@@ -21,20 +23,20 @@ type CompanionNotesProps = {
   onDismiss: (id: number) => Promise<void>;
 };
 
-/** A line that opens a list: `- `, `* `, `• `, `1. ` or `1) `. */
-const LIST_LINE = /^\s*(?:[-*•]|\d+[.)])\s+/m;
-/** A path: `/abs/…`, `~/…`, `./…`, `../…`, a Windows drive, or a relative `dir/file.ext`. */
-const PATH = /(?:^|[\s(`'"])(?:~|\.{1,2})?\/[^\s/]+|[A-Za-z]:\\|[\w.-]+\/[\w.-]+\.\w{1,8}\b/;
-
-/** Whether a note holds a list or a path, which are read by their shape: those keep her line breaks in monospace. */
-const isPreformatted = (text: string): boolean => LIST_LINE.test(text) || PATH.test(text);
+/**
+ * The card's body: its own size and ink (text-sm, the foreground) over the chat renderer's markup, not the transcript's
+ * large serif reading size. The block margins are tightened to a card's measure, and the first and last block's outer
+ * margin is dropped so the card's padding holds, and it wears the chat reply's reading style (`MARKDOWN_CARDS_CLASS`), as a reply does.
+ */
+const NOTE_PROSE = `prose prose-sm max-w-none break-words pr-1.5 text-sm leading-relaxed text-foreground dark:prose-invert prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-headings:mb-1.5 prose-headings:mt-3 prose-pre:my-2 prose-table:my-2 [&>:first-child]:mt-0 [&>:last-child]:mb-0 ${MARKDOWN_CARDS_CLASS}`;
 
 /**
  * The cards she put on the panel with `show_note` instead of saying them: a list, a path, a set of numbers — things better
  * seen than heard. Each card is its title and its text, and a ✕ that dismisses it; it stays until he does, or until she
- * takes it down herself (`dismiss_note`, which arrives as the same `companion_note_removed`). A note that
- * holds a list or a path keeps her lines exactly, in monospace (a long path breaks where it must rather than running off the card);
- * any other note is prose with her line breaks kept. The panel scrolls the notes as one, between the walkthrough and the
+ * takes it down herself (`dismiss_note`, which arrives as the same `companion_note_removed`). Its text is drawn through
+ * the chat's own `Markdown` (from the chat module's barrel), so a card renders whatever a chat renders — headings, lists,
+ * tables, links, code fences and the sandboxed `widget` fence — at the card's body size, her single line breaks kept.
+ * The panel scrolls the notes as one, between the walkthrough and the
  * draft, so a long note never pushes the draft or the composer off the panel and never nests a scroller in a scroller.
  *
  * THE COUNT LINE stands over them whenever there is one — "3 notes", sticky as they scroll — with the section's one fold
@@ -114,11 +116,9 @@ export function CompanionNotes({ notes, name, folded, onFoldChange, fresh, onDis
                     <X aria-hidden="true" />
                   </Button>
                 </div>
-                {isPreformatted(note.text) ? (
-                  <pre className="whitespace-pre-wrap break-words pr-1.5 font-mono text-xs leading-relaxed text-foreground">{note.text}</pre>
-                ) : (
-                  <p className="whitespace-pre-line break-words pr-1.5 text-sm leading-relaxed text-foreground">{note.text}</p>
-                )}
+                <Markdown className={NOTE_PROSE} breaks>
+                  {note.text}
+                </Markdown>
               </Card>
             ))}
           </div>

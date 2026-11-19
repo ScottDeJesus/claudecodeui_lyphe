@@ -7,6 +7,7 @@ import { kanbanChecklistService } from './kanban-checklist.service.js';
 import { kanbanLessonsService } from './kanban-lessons.service.js';
 import { kanbanQuestionsService } from './kanban-questions.service.js';
 import { startLessonSpillSweep } from './kanban-spill.service.js';
+import { kanbanStatsService } from './kanban-stats.service.js';
 import type { KanbanMemoryPendingReader } from './routes/board.routes.js';
 import { createKanbanRouter } from './routes/kanban.routes.js';
 
@@ -47,6 +48,7 @@ export function createKanbanModule(dependencies: KanbanModuleDependencies): Rout
     checklist: kanbanChecklistService,
     attachments: kanbanAttachmentsService,
     lessons: kanbanLessonsService,
+    stats: kanbanStatsService,
     memoryPending: dependencies.memoryPending,
   });
 }

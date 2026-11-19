@@ -3,9 +3,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { KanbanBoardDialog, type KanbanBoardDialogMode, type KanbanBoardDraft } from '@/modules/kanban/KanbanBoardDialog';
+import { KanbanBoardFace } from '@/modules/kanban/KanbanBoardFace';
 import { KanbanBoardHeader } from '@/modules/kanban/KanbanBoardHeader';
-import { KanbanRail } from '@/modules/kanban/KanbanRail';
 import { KanbanCardDrawer } from '@/modules/kanban/card-drawer/KanbanCardDrawer';
+import { BugDashboard } from '@/modules/kanban/dashboard/BugDashboard';
 import { useBoardProjects } from '@/modules/kanban/hooks/useBoardProjects';
 import { useBoardReposPrompt } from '@/modules/kanban/hooks/useBoardReposPrompt';
 import { useKanbanBoards } from '@/modules/kanban/hooks/useKanbanBoards';
@@ -15,13 +16,14 @@ import { useKanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
 import { useKanbanWalks } from '@/modules/kanban/hooks/useKanbanWalks';
 import { useLinkedTitles } from '@/modules/kanban/hooks/useLinkedTitles';
 import type { KanbanViewSort } from '@/modules/kanban/utils/cardModel';
-import { foldedStatuses, kanbanLanes } from '@/modules/kanban/utils/lanePolicy';
-import { Banner, EmptyState, Spinner } from '@/shared/ui';
+import { DONE_LANE_ID, kanbanLanes } from '@/modules/kanban/utils/lanePolicy';
+import type { BugDashboardView } from '@/shared/types';
+import { EmptyState, Spinner, Tabs } from '@/shared/ui';
 
 /**
- * The Kanban tab's pane: the board's one row of chrome, the lane rail, and the four states the
- * board can be in. A reader's first sight is the leftmost lane and its count — where the work
- * ready to be picked up lives.
+ * The Kanban tab's pane: the board's one row of chrome, the strip that switches its two faces (the
+ * Board's lane rail and the Dashboard's numbers), and the four states the board can be in. A
+ * reader's first sight is the leftmost lane and its count — where the work ready to be picked up lives.
  *
  * IT COMPOSES, IT DOES NOT BUILD. The lanes and their faces are the rail's; the hooks below are the
  * board's data; the two decisions the kit may never know — which statuses compose which lane, and
@@ -34,9 +36,9 @@ import { Banner, EmptyState, Spinner } from '@/shared/ui';
  * the board sees both the lane a card left and the one it landed in; a Toast leaves, and a thing
  * that leaves cannot announce.
  *
- * THE VIEW SORT AND THE COLLAPSED LANES ARE THE PANEL'S OWN, because they are per-SCREEN and not
- * per-board: both survive a board switch, which is what makes the second board open the way the
- * first one was left.
+ * THE VIEW SORT, THE COLLAPSED LANES, THE FACE AND WHAT THE DASHBOARD IS ASKED are the panel's own,
+ * because they are per-SCREEN and not per-board: all survive a board switch, which is what makes
+ * the second board open the way the first one was left. None is remembered across visits.
  */
 
 type KanbanPanelProps = {
@@ -80,6 +82,23 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
   const [sorts, setSorts] = useState<Record<string, KanbanViewSort>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [dialog, setDialog] = useState<KanbanBoardDialogMode>(null);
+  // Which of the view's two faces is drawn. The Board on every arrival: the dashboard is a look, the board is the work.
+  const [face, setFace] = useState<'board' | 'dashboard'>('board');
+  // Which boards and how far back the dashboard is asked for, kept here so a visit to the Board face does not reset it.
+  const [dashboardView, setDashboardView] = useState<BugDashboardView>({ scope: 'board', days: 30 });
+
+  // The Dashboard tab's count: the open board's open high cards, off the cards this panel already holds, so the Board face asks for no dashboard read.
+  const openHigh = board.loading ? undefined : lanes
+    .filter((spec) => spec.id !== DONE_LANE_ID)
+    .flatMap((spec) => board.cardIds(spec.id))
+    .filter((cardId) => board.summaryOf(cardId)?.priority === 'high').length;
+
+  // A dashboard row opens its card on its own board: the selection is made on that board, so it shows the moment the board does.
+  const openDashboardCard = (cardId: string, boardId: string) => {
+    if (boardId !== currentBoardId) void selectBoard(boardId);
+    setFace('board');
+    board.openCardOn(boardId, cardId);
+  };
 
   const drag = useKanbanDrag({
     specs: lanes,
@@ -93,11 +112,9 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
     announce: board.announce,
   });
 
-  /** Cards To Do carries that wait on an answer — the questions row, and zero under autonomy. */
-  const foldedQuestions = board.countOf(foldedStatuses(autonomy));
 
   // Each card's walk off the dispatcher's feed, read ONCE here for the faces and the drawer.
-  const walkOf = useKanbanWalks(currentBoardId);
+  const walkOf = useKanbanWalks(currentBoardId, board.summaryOf);
 
   // What the board knows of another of its cards, by id: its title off the lanes already loaded, or
   // read by id for a card no loaded page holds (an archived one, one further down a lane); `'unread'`
@@ -143,9 +160,10 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
   const currentBoard = boards.find((candidate) => candidate.id === currentBoardId);
   const currentName = currentBoard?.name ?? '';
 
-  /** Loading, unreachable, no board, board. Four different pieces of news, never one spinner. */
+  /** Loading, unreachable, no board, then the face: four pieces of news, never one spinner. The lanes' own loading and failure are the Board face's. */
   const body = () => {
-    if (boardsLoading || board.loading) {
+    const onBoard = face === 'board';
+    if (boardsLoading || (onBoard && board.loading)) {
       return (
         <div className="flex flex-1 items-center justify-center p-6">
           <Spinner label={t('kanban.loading')} />
@@ -153,7 +171,7 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
       );
     }
 
-    if (boardsUnreachable || board.unreachable) {
+    if (boardsUnreachable || (onBoard && board.unreachable)) {
       return (
         <div className="flex flex-1 items-center justify-center p-6">
           <EmptyState
@@ -183,34 +201,24 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
       );
     }
 
-    // The banner rides WITH the rail rather than above every state: it explains a lane on the
-    // screen, and over a spinner or an error would explain nothing the reader can see. Autonomy
-    // off hides no card and rewrites no status — they sit in To Do wearing their own chip, and
-    // this says so once.
+    if (!onBoard) return <BugDashboard boardId={currentBoardId} view={dashboardView} onView={setDashboardView} onOpenCard={openDashboardCard} />;
+
     return (
-      <>
-        {!autonomy && foldedQuestions > 0 && (
-          <Banner tone="info">{t('kanban.board.questionsFolded', { count: foldedQuestions })}</Banner>
-        )}
-        <KanbanRail
-          specs={lanes}
-          board={board}
-          drag={drag}
-          writes={writes}
-          boardId={currentBoardId}
-          walkOf={walkOf}
-          titleOf={titleOf}
-          sorts={sorts}
-          collapsed={collapsed}
-          onSort={(laneId, sort) => setSorts((held) => ({ ...held, [laneId]: sort }))}
-          onCollapse={(laneId, folded) => setCollapsed((held) => ({ ...held, [laneId]: folded }))}
-        />
-      </>
+      <KanbanBoardFace
+        autonomy={autonomy}
+        boardId={currentBoardId}
+        specs={lanes} board={board}
+        drag={drag} writes={writes}
+        walkOf={walkOf} titleOf={titleOf}
+        sorts={sorts} collapsed={collapsed}
+        onSort={(laneId, sort) => setSorts((held) => ({ ...held, [laneId]: sort }))}
+        onCollapse={(laneId, folded) => setCollapsed((held) => ({ ...held, [laneId]: folded }))}
+      />
     );
   };
 
   return (
-    <div className="vv-board flex h-full min-h-0 flex-col" data-kanban-panel data-project-id={projectId ?? undefined}>
+    <div className="vv-board flex h-full min-h-0 flex-col" data-kanban-panel data-kanban-face={face} data-project-id={projectId ?? undefined}>
       <KanbanBoardHeader
         boards={boards}
         currentBoardId={currentBoardId}
@@ -230,6 +238,21 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
         onEditRepos={() => setDialog('repos')}
         onArchiveBoard={() => setDialog('archive')}
       />
+
+      {/* The two faces: a flat strip on the header's ground, capped so two words do not stretch across a desktop, 44 px
+          under a finger. The Dashboard's pill counts the open high cards, in amber and in words; none at zero. */}
+      <div className="shrink-0 border-b border-border px-3 finger:[&_[role=tab]]:min-h-11">
+        <div className="w-full max-w-xs">
+          <Tabs
+            variant="underline" ariaLabel={t('kanban.faces.label')}
+            active={face} onChange={(id) => setFace(id === 'dashboard' ? 'dashboard' : 'board')}
+            tabs={[
+              { id: 'board', label: t('kanban.faces.board') },
+              { id: 'dashboard', label: t('kanban.faces.dashboard'), count: openHigh, attention: openHigh ? t('kanban.faces.openHigh', { count: openHigh }) : undefined },
+            ]}
+          />
+        </div>
+      </div>
 
       {body()}
 

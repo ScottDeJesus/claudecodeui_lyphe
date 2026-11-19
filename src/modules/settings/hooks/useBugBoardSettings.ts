@@ -12,6 +12,13 @@ export const BUG_BOARD_WIDTH_CHOICES: readonly number[] = [1, 2, 3, 4];
 export const BUG_BOARD_THRESHOLD_MIN = 0.5;
 export const BUG_BOARD_THRESHOLD_MAX = 0.99;
 
+/**
+ * The bounds the dispatcher holds a waiting card's ageing to (`card_config`'s `age_days`): whole days, and the lowest turns ageing off.
+ * Used by `RunnerBugBoardRow`, which builds its dropdown from them.
+ */
+export const BUG_BOARD_AGE_DAYS_MIN = 0;
+export const BUG_BOARD_AGE_DAYS_MAX = 30;
+
 /** The confidence's notation: two decimals, as a card's Sort step prints it (`0.93`), so the field and that step compare by eye. */
 const THRESHOLD_DECIMALS = 2;
 
@@ -20,7 +27,12 @@ type BugBoardSettings = {
   width: number | null;
   /** How sure a voice must be for its sort to be taken, as the dispatcher last answered, or `null` while no read has succeeded. */
   threshold: number | null;
-  /** True once a read has failed: the two numbers are unknown, which is not the same as their defaults. */
+  /**
+   * How many whole days a card waits in To Do for each priority it moves up, `0` for never, as the dispatcher last answered; `null`
+   * while no read has succeeded, and while the dispatcher that answered does not report the number.
+   */
+  ageDays: number | null;
+  /** True once a read has failed: the numbers are unknown, which is not the same as their defaults. */
   unreadable: boolean;
   /** True while a write is in flight. */
   saving: boolean;
@@ -36,6 +48,8 @@ type BugBoardSettings = {
   thresholdOutOfBounds: boolean;
   /** Move the number of cards walked at once. */
   setWidth: (next: number) => Promise<void>;
+  /** Move the days a waiting card waits per priority; `0` turns ageing off. */
+  setAgeDays: (next: number) => Promise<void>;
   /** Keep what the operator typed into the confidence field as a draft; nothing is written, and `thresholdOutOfBounds` falls. */
   typeThreshold: (text: string) => void;
   /**
@@ -47,21 +61,27 @@ type BugBoardSettings = {
   refresh: () => Promise<void>;
 };
 
-/** The two numbers as the dispatcher reads them off the file, both inside their bounds. */
-type BugBoardReading = { width: number; threshold: number };
+/**
+ * The numbers as the dispatcher reads them off the file, each inside its bounds. `ageDays` is `null` when the answer carried none: a
+ * dispatcher older than the number answers the other two alone, and they are still a reading.
+ */
+type BugBoardReading = { width: number; threshold: number; ageDays: number | null };
 
-/** A change to either number; a write sends only the fields it moves. */
-type BugBoardChange = { width?: number; threshold?: number };
+/** A change to any of the three numbers; a write sends only the fields it moves. */
+type BugBoardChange = { width?: number; threshold?: number; ageDays?: number };
 
 /** An envelope like `{success:false,error:{…}}` parses as JSON too, so only a body with both numbers in range is an answer, never a default. */
 function readingOf(body: unknown): BugBoardReading | null {
   if (typeof body !== 'object' || body === null) return null;
-  const { width, threshold } = body as { width?: unknown; threshold?: unknown };
+  const { width, threshold, ageDays } = body as { width?: unknown; threshold?: unknown; ageDays?: unknown };
   if (typeof width !== 'number' || !BUG_BOARD_WIDTH_CHOICES.includes(width)) return null;
   // `NaN` passes both range checks below, so finiteness is its own test.
   if (typeof threshold !== 'number' || !Number.isFinite(threshold)) return null;
   if (threshold < BUG_BOARD_THRESHOLD_MIN || threshold > BUG_BOARD_THRESHOLD_MAX) return null;
-  return { width, threshold };
+  // The third number is read apart: none, or one that is no whole number of days inside its bounds, is "not reported", never a
+  // default and never a reason to drop the two numbers beside it.
+  const reported = typeof ageDays === 'number' && Number.isInteger(ageDays) && ageDays >= BUG_BOARD_AGE_DAYS_MIN && ageDays <= BUG_BOARD_AGE_DAYS_MAX;
+  return { width, threshold, ageDays: reported ? ageDays : null };
 }
 
 /** The settings as the server reads them off disk, or `null` when they could not be asked. */
@@ -96,8 +116,8 @@ async function load(isStale: () => boolean, apply: (truth: BugBoardReading | nul
 }
 
 /**
- * The one reader and writer of the dispatcher's two card numbers in `src/`: how many board cards it works at once, and how sure the sort
- * must be. Used by the settings module's `RunnerBugBoardRow`, which composes it.
+ * The one reader and writer of the dispatcher's three card numbers in `src/`: how many board cards it works at once, how sure the sort
+ * must be, and how many days a waiting card waits per priority it moves up. Used by the settings module's `RunnerBugBoardRow`, which composes it.
  *
  * The numbers are NOT client preferences: they are `~/.claude/charters/cards.toml`, which the dispatcher reads at every take-up and every
  * sort, so every read here is a request to the server (`GET` / `PUT /api/kanban-dispatch/settings`, which relay `dispatcher card config`).
@@ -192,6 +212,11 @@ export function useBugBoardSettings(): BugBoardSettings {
     await write({ width: next });
   }, [write]);
 
+  const setAgeDays = useCallback(async (next: number) => {
+    if (!Number.isInteger(next) || next < BUG_BOARD_AGE_DAYS_MIN || next > BUG_BOARD_AGE_DAYS_MAX) return;
+    await write({ ageDays: next });
+  }, [write]);
+
   const typeThreshold = useCallback((text: string) => {
     draftRef.current = text;
     setDraft(text);
@@ -229,11 +254,13 @@ export function useBugBoardSettings(): BugBoardSettings {
   return {
     width: reading === null ? null : reading.width,
     threshold: reading === null ? null : reading.threshold,
+    ageDays: reading === null ? null : reading.ageDays,
     unreadable,
     saving,
     thresholdText,
     thresholdOutOfBounds,
     setWidth,
+    setAgeDays,
     typeThreshold,
     leaveThreshold,
     refresh,

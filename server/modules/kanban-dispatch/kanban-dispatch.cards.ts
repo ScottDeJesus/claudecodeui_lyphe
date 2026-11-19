@@ -64,8 +64,9 @@ export type BoardDoneCard = {
   closing_remarks: string;
   description: string;
   /**
-   * The board keeps no separate stamp of a card's arrival in Done. Its last change is that arrival,
-   * unless the card was edited after it arrived.
+   * When the card arrived in Done: the board's own stamp, written by the move into Done and untouched
+   * by later edits. A card whose stamp is missing (none on the live board) falls back to its last
+   * change.
    */
   done_at: string;
   archived: boolean;
@@ -285,7 +286,7 @@ function toDoneCard(card: RosterCard): BoardDoneCard {
     tags: card.tags,
     closing_remarks: card.closingRemarks,
     description: cutDescription(card.description),
-    done_at: card.updatedAt,
+    done_at: card.doneAt ?? card.updatedAt,
     archived: card.archived,
   };
 }

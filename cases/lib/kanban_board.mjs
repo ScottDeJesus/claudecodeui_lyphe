@@ -15,8 +15,10 @@
 // by id. The vitals are five distinct numbers, so a register drawn from the wrong key reads the wrong number.
 
 const WAIT_MS = 30000;
-// Read off src/ and the live page 2026-11-18: the rail's Kanban view, the home's Menu and its Kanban entry.
-const RAIL_KANBAN = 'nav[aria-label="Views"] button[aria-label="Kanban"]';
+// Read off src/ and the live page 2026-11-18: the rail's Kanban view, the home's Menu and its Kanban entry. The view is
+// named Bugs since a4e2af52 (2026-11-19, `nav.kanban` in en/common.json); both names are found.
+const RAIL_KANBAN = 'nav[aria-label="Views"] :is(button[aria-label="Bugs"], button[aria-label="Kanban"])';
+const VIEW_NAME = /^\s*(Bugs|Kanban)\s*$/;
 const HOME_MENU = 'button[aria-label="Menu"]';
 const MENU_ENTRY = ':is([role="menu"], [role="dialog"]) :is(button, [role="menuitem"])';
 const KANBAN = /\/api\/kanban(-dispatch)?(\/|$|\?)/;
@@ -52,12 +54,14 @@ export const NOTE_LINES = [
   "BEFORE: done cards of the cases area — nothing similar",
 ];
 
-/** The open card's detail: the summary and a ledger that would light every control the drawer ever drew. */
+/** The open card's detail: the summary and a ledger that would light every control the drawer ever drew. `doneAt` and
+ *  `changelog` are on every detail the server answers since the board's two columns (bug-board-ways-in-and-dashboard,
+ *  seam 8); the drawer reads `changelog` as a string, so a detail without it is a shape the server no longer sends. */
 export function detailOf(summary) {
   return {
     ...summary,
     description: "The hint says its repo path where it means an absolute one.", body: "", plan: "Fix the hint.",
-    closingRemarks: "",
+    closingRemarks: "", doneAt: null, changelog: "",
     buildTokensIn: 1200, buildTokensOut: 340, buildTokensCacheRead: 9000, buildTokensCacheCreate: 450,
     questions: [], issues: [], decisions: [], attachments: [],
     checklist: [
@@ -114,7 +118,7 @@ export async function openBoard(page) {
     await page.locator(`${RAIL_KANBAN}:visible`).first().click({ timeout: WAIT_MS });
   } else {
     await page.locator(`${HOME_MENU}:visible`).first().click();
-    await page.locator(MENU_ENTRY, { hasText: /^\s*Kanban\s*$/ }).first().click({ timeout: WAIT_MS });
+    await page.locator(MENU_ENTRY, { hasText: VIEW_NAME }).first().click({ timeout: WAIT_MS });
   }
   await page.getByRole("combobox", { name: "Board" }).or(page.getByRole("button", { name: "Board" })).first()
     .waitFor({ timeout: WAIT_MS });

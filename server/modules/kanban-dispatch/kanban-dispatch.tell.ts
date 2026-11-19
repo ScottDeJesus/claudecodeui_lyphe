@@ -4,6 +4,7 @@ import type { KanbanBoard, KanbanCardDetail } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
 import { DISPATCHER_ACTOR } from './kanban-dispatch.cards.js';
+import { isPlacedTicketCreation } from './kanban-dispatch.tickets.js';
 
 /**
  * The longest text field the dispatcher takes; it refuses a longer one as `card_told.TEXT_MAX`.
@@ -41,6 +42,8 @@ type CardRecord = {
   body: string;
   tags: KanbanCardDetail['tags'];
   priority: KanbanCardDetail['priority'];
+  status: KanbanCardDetail['status'];
+  archived: boolean;
   attachments: string[];
 };
 type AnswerRecord = { question: string; selected: string[]; other: string };
@@ -125,10 +128,11 @@ export function createCardTeller(dependencies: CardTellerDependencies): (write: 
 
 /**
  * The tell a write should send, or null when it is not one to tell. The dispatcher's own notes are
- * never told back to it, and a write with no board has nothing to dispatch.
+ * never told back to it, and a write with no board has nothing to dispatch. A card a bug ticket placed
+ * is never told `created`: the placing stamp already wrote its row.
  */
 function tellFor(write: KanbanWriteEvent): Tell | null {
-  if (write.actor === DISPATCHER_ACTOR || write.boardId === null) {
+  if (write.actor === DISPATCHER_ACTOR || write.boardId === null || isPlacedTicketCreation(write)) {
     return null;
   }
   const event = tellEventOf(write);
@@ -239,6 +243,8 @@ function cardOf(card: KanbanCardDetail): CardRecord {
     body: cutText(card.body),
     tags: card.tags,
     priority: card.priority,
+    status: card.status,
+    archived: card.archived,
     attachments: attachmentPaths(card.id, card.attachments),
   };
 }

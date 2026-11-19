@@ -36,6 +36,12 @@ const NO_COUNTS: KanbanCardCounts = {
   checklistTotal: 0,
 };
 
+/**
+ * The status whose arrival stamps `done_at`. Named once so the stamp's SQL and its bound checks
+ * cannot disagree about which lane is Done.
+ */
+const DONE_STATUS: KanbanStatus = 'done';
+
 /** The columns a card's text patch may touch, mapped to their SQL names. */
 const CARD_PATCH_COLUMNS = {
   title: 'title',
@@ -44,6 +50,7 @@ const CARD_PATCH_COLUMNS = {
   body: 'body',
   plan: 'plan',
   closingRemarks: 'closing_remarks',
+  changelog: 'changelog',
 } as const;
 
 /** What a card patch may change. Every field is optional; an absent one is left exactly as it was. */
@@ -55,6 +62,7 @@ export type KanbanCardUpdatePatch = {
   body?: string;
   plan?: string | null;
   closingRemarks?: string;
+  changelog?: string;
 };
 
 /**
@@ -144,12 +152,12 @@ export const kanbanCardsDb = {
     const now = new Date().toISOString();
     getConnection()
       .prepare(
-        `INSERT INTO kanban_cards (id, board_id, title, status, priority, description, sort_order, created_at, updated_at)
+        `INSERT INTO kanban_cards (id, board_id, title, status, priority, description, sort_order, created_at, updated_at, done_at)
          VALUES (
            ?, ?, ?, ?, ?, ?,
            (SELECT COALESCE(MAX(sort_order), 0) + ${KANBAN_SORT_ORDER_GAP} FROM kanban_cards
             WHERE board_id = ? AND archived = 0),
-           ?, ?
+           ?, ?, ?
          )`
       )
       .run(
@@ -161,7 +169,8 @@ export const kanbanCardsDb = {
         input.description,
         input.boardId,
         now,
-        now
+        now,
+        input.status === DONE_STATUS ? now : null
       );
   },
 
@@ -262,13 +271,28 @@ export const kanbanCardsDb = {
     return result.changes > 0;
   },
 
-  /** Moves one card to a status at a given sort_order. */
+  /**
+   * Moves one card to a status at a given sort_order, and stamps or clears `done_at` with it.
+   *
+   * It lives in this one UPDATE because every move goes through it, so no verb can forget the stamp.
+   * Entering Done stamps the arrival, a reorder within Done keeps the stamp it has, and leaving Done
+   * clears it. The right-hand side reads the row's OLD values, which is what lets one assignment see
+   * the status the card is leaving.
+   */
   setStatusAndOrder(input: { id: string; status: KanbanStatus; sortOrder: number }): void {
-    const assignments = ['status = ?', 'sort_order = ?', 'updated_at = ?'];
+    const now = new Date().toISOString();
+    const assignments = [
+      'status = ?',
+      'sort_order = ?',
+      'updated_at = ?',
+      `done_at = CASE WHEN ? <> '${DONE_STATUS}' THEN NULL WHEN status = '${DONE_STATUS}' AND done_at IS NOT NULL THEN done_at ELSE ? END`,
+    ];
     const values: (string | number | null)[] = [
       input.status,
       input.sortOrder,
-      new Date().toISOString(),
+      now,
+      input.status,
+      now,
     ];
     values.push(input.id);
 

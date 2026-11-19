@@ -5268,7 +5268,7 @@ rather than through a second copy of anything.
 ## MAN-563 — The tables
 section: kanban/002 The tables
 
-Twelve tables and ten indexes, all declared in ONE idempotent script,
+Twelve tables and eleven indexes, all declared in ONE idempotent script,
 `server/modules/database/kanban-schema.ts`'s `KANBAN_SCHEMA_SQL`, exec'd from `runMigrations` in
 `migrations.ts:565` — after the projects rebuild, because `kanban_boards.project_id` references
 `projects(project_id)`. There is no version counter: every statement is `IF NOT EXISTS`, and that
@@ -5287,7 +5287,7 @@ retries next boot.
 | Table | What it holds |
 |---|---|
 | `kanban_boards` | A board: its name, the project it is ABOUT (`project_id` — never a lane filter), `autonomy` (the board-dispatch governor, MAN-10022), `repos` (TEXT JSON array of absolute git work-tree paths, default `'[]'`; a board with `autonomy = 1` always holds at least one — §"The services"), `sort_order`, `archived`, `legacy_id`. |
-| `kanban_cards` | The card: title, `status` with a five-value CHECK, `priority` with a three-value CHECK, description, `closing_remarks`, `plan`, `body`, `archived`, `sort_order`, the four token counters (`build_tokens_in`, `_out`, `_cache_read`, `_cache_create` — added to by `addCardTokens`, §"The services"), and the timestamps. |
+| `kanban_cards` | The card: title, `status` with a five-value CHECK, `priority` with a three-value CHECK, description, `closing_remarks`, `plan`, `body`, `archived`, `sort_order`, the four token counters (`build_tokens_in`, `_out`, `_cache_read`, `_cache_create` — added to by `addCardTokens`, §"The services"), `done_at` (TEXT NULL, when the card last entered Done) and `changelog` (TEXT NOT NULL DEFAULT '', one line about what it changed — §"The services"), and the timestamps. |
 | `kanban_card_tags` | The card/tag join. There is no tag entity: `(card_id, tag)` is the primary key and a tag exists only as a name attached to a card. |
 | `kanban_questions` | A card's questions: `text`, `multi`, `options` and `selected` as JSON text arrays, the free-text `other`, and `answered`. |
 | `kanban_issues` | Issues filed against a card, with `filed_at`, `resolved`, and who resolved it. |
@@ -5299,11 +5299,11 @@ retries next boot.
 | `kanban_id_seq` | `prefix` / `next`. The id minting arithmetic and nothing else. |
 | `kanban_lessons` | The lesson STORE: what a build learned, staged for a person's review — `name`, `summary`, `body`, `trigger`, `kind` (`note` or `skill_draft`), `tags`, `status`, `source` (default `'learn'`), an optional `draft_path`. `card_id` is `ON DELETE SET NULL`, never CASCADE — a lesson OUTLIVES the card it was learned on. No CHECK on `status`, `kind` or `trigger`: the lesson vocabulary has grown a value before now, so the doors validate instead of a constraint. |
 
-The ten indexes are all named `ix_kanban_*` so one query can count them:
+The eleven indexes are all named `ix_kanban_*` so one query can count them:
 `cards_board_status` and `cards_board_updated` on the two lane orderings, `card_tags_tag` for a
 tag search, and one `*_card` index on each child table **except** `kanban_lessons` — its own read
 is always "this status, newest first", so its index is `lessons_status` on `(status, created_at)`
-instead. `events_board` is `(board_id, id)`, which is what makes the audit-log read a range scan.
+instead. `events_board` is `(board_id, id)`, which is what makes the audit-log read a range scan; `events_card` is `(card_id, id)`, which makes the creator and backfill lookups one card's range.
 
 **There is deliberately no index on `legacy_id`.** The column is `NULL UNIQUE` on every table that
 has one, and a UNIQUE constraint already builds its own index — a second one would be dead weight
@@ -5409,7 +5409,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-wri
 ## MAN-582 — The services
 section: kanban/005 The services
 
-Six service files, cut by cohesion rather than one file growing to dozens of verbs. Every write
+Seven service files, cut by cohesion rather than one file growing to dozens of verbs. Every write
 verb takes an optional trailing `context?: KanbanWriteContext` (`{ actor?: string }`); a route passes none (the operator's own write), and the intake door and the board-dispatch module pass their own actor.
 
 `kanban-boards.service.ts`
@@ -5421,6 +5421,7 @@ getBoard(boardId) -> KanbanBoard | null
 updateBoard(boardId, patch: { name?, autonomy?, projectId?, repos?, archived? }, context?) -> KanbanBoard
 selectBoard(boardId, context?) -> { currentBoardId }
 boardForProject(projectId) -> KanbanBoard | null
+boardForPath(folder) -> KanbanBoard | null
 laneCounts(boardId) -> KanbanLaneCount[]
 listEvents(options: { boardId?, cardId?, limit? }) -> KanbanEventRow[]
 ```
@@ -5439,6 +5440,12 @@ not inside a git work tree). The routes answer 400 `repos must be an array of st
 
 The check reads the board inside the transaction, so the autonomy and repos it judges are the ones stored.
 
+`boardForPath` is how a ticket filed against a folder finds its board: among boards not archived, the
+one whose `repos` hold the LONGEST folder that is the folder itself or contains it (a repo contains a
+folder when the folder equals it or starts with it plus `/`, so `/a/bc` is not under `/a/b`). On a tie a
+board that runs itself comes first, then the oldest (`createdAt`, then `id`). A relative or empty path
+answers null rather than being resolved against the server's cwd. A read: no seam, no frame.
+
 `selectBoard` is a write to `kanban_settings.current_board` and takes the seam like any other.
 `laneCounts` and `listEvents` are the only two reads the whole module exposes
 at board level. Nothing in this module spawns a session; the board-dispatch module (MAN-10022) is what joins a self-running board to work.
@@ -5449,12 +5456,37 @@ at board level. Nothing in this module spawns a session; the board-dispatch modu
 listLaneCards(boardId, statuses: KanbanStatus[], options: { limit?, cursor? }) -> { cards, nextCursor }
 createCard(boardId, input: { title, priority?, status?, description? }, context?) -> KanbanCardSummary
 getCard(cardId) -> KanbanCardDetail
-updateCard(cardId, patch: { title?, priority?, description?, body?, plan?, closingRemarks? }, context?) -> KanbanCardSummary
+createdBy(cardId) -> string
+updateCard(cardId, patch: { title?, priority?, description?, body?, plan?, closingRemarks?, changelog? }, context?) -> KanbanCardSummary
 moveCard(cardId, input: { status, afterId?, beforeId? }, context?) -> KanbanCardSummary
 archiveCard(cardId, context?) / restoreCard(cardId, context?) -> KanbanCardSummary
 addTag(cardId, tag, context?) / removeTag(cardId, tag, context?) -> KanbanCardSummary
 addCardTokens(cardId, delta: { tokensIn, tokensOut, cacheRead, cacheCreate }, context?) -> KanbanCardSummary
 ```
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/assets/services/image-assets.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations-kanban-done.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-boards.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-cards.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-stats-figures.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-stats.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
+
+## MAN-10030 — The services — The card's arrival in Done and its changelog line.
+section: kanban/005 The services/001 The card's arrival in Done and its changelog line.
+
+**The card's arrival in Done and its changelog line.** `kanban_cards` carries `done_at TEXT NULL` and
+`changelog TEXT NOT NULL DEFAULT ''`, declared in `kanban-schema.ts` for a new database and added to a
+live one by `migrations-kanban-done.ts` (`migrateKanbanCardDoneColumns`, one call in `migrations.ts`).
+`done_at` is written by the move's own statement (`kanbanCardsDb.setStatusAndOrder`): entering `done`
+stamps it with the move's `updated_at`, a reorder within Done keeps it, leaving Done clears it; a card
+created straight into `done` is stamped at creation. An edit never moves it, which is why it, and not
+`updated_at`, says when a card closed. The migration filled it once for cards already done, from the
+newest `card.moved` (`to: done`) or `feature.moved` (`status: done`) event, else `updated_at`; it runs at
+every boot and writes nothing once no done card lacks a stamp, and an event whose payload is not valid
+JSON is skipped through a `CASE WHEN json_valid` guard (the live log holds one). `changelog` is one line a
+person reads about what the finished card changed: `updateCard` trims it and refuses a line break or more
+than `KANBAN_CHANGELOG_MAX_CHARS` (300) with 400 `KANBAN_CHANGELOG_INVALID`; '' clears it. `getCard`'s
+`KanbanCardDetail` and the roster's `KanbanRosterCard` carry both as `doneAt` and `changelog`; the lane
+summary does not.
+
+`createdBy` answers who filed a card: the actor of its oldest `card.created` or `feature.created` event
+(`kanbanEventsDb.creatorOf`, an index read on `ix_kanban_events_card (card_id, id)`), `unknown` when the
+log holds none, the ordinary 404 for a missing card.
 
 `listLaneCards` is the ONLY place a status list reaches SQL, and it builds its placeholder list
 from the array's length — never by interpolating a string. A one-element array is the ordinary
@@ -5494,6 +5526,11 @@ different subject from a list of text rows.
 
 `kanban-attachments.service.ts` — a card's attachment BYTES, and the row that indexes them
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations-kanban-done.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/kanban-cards.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/kanban-events.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/kanban-roster.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-cards.guards.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-cards.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-checklist.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-questions.service.ts
+
+## MAN-10031 — The services — attachmentsRoot() -> string // KANBAN_ATTACHMENTS_ROOT ?? ~/.cloudcli/kanban-attachments
+section: kanban/005 The services/002 attachmentsRoot() -> string // KANBAN_ATTACHMENTS_ROOT ?? ~/.cloudcli/kanban-attachments
+
 ```
 attachmentsRoot() -> string                              // KANBAN_ATTACHMENTS_ROOT ?? ~/.cloudcli/kanban-attachments
 addAttachment(cardId, { filename, mime, bytes: Buffer }, context?) -> KanbanAttachment
@@ -5522,19 +5559,41 @@ separator-and-resolve containment predicate the global chat-assets folder uses
 (`server/modules/assets/services/image-assets.service.ts`) — moved there as a pure extraction so the
 one check has one home instead of two copies that could drift apart.
 
+`kanban-stats.service.ts` — the board's numbers and its changelog, reads only (no seam, no transaction, no frame)
+
+```
+stats(boardId | null, days, now?) -> KanbanStats
+changelog(boardId | null, { since?, limit? }) -> KanbanChangelogEntry[]
+```
+
+`null` is every board not archived; a named board may be archived, and an unknown one is the board's
+404. OPEN is not archived and not in `done`; the history numbers (opened, fixed, time to fix, ways in,
+came back, the changelog) count archived cards too, since archiving a card does not undo that it was
+opened or fixed. The window is whole UTC days ending today (`days` 1–365, else 400
+`KANBAN_STATS_DAYS_INVALID`). Time to fix is hours from `created_at` to `done_at` over cards whose
+`done_at` is in the window: count, median, nearest-rank p90, one decimal, null when none closed.
+`waysIn` groups cards created in the window by `createdBy`'s actor; `cameBack` counts those carrying a
+`regression-of:` tag. A changelog entry is a done card with a non-empty line, newest `done_at` first;
+`kind` is the first of its tags among `regression`, `bug`, `ui-change`, `tweak`, else null. `since` that
+is not a date is 400 `KANBAN_CHANGELOG_SINCE_INVALID`; `limit` 1–200. The rows come from
+`kanbanStatsDb` (`repositories/kanban-stats.db.ts`); the arithmetic is pure functions in
+`kanban-stats-figures.ts`; the shapes are `server/shared/kanban-stats-types.ts`, re-exported from
+`kanban-types.ts`, with a client mirror. Exported from the barrel with both types. Routes: MAN-10033.
+
 `kanban-lessons.service.ts` — `stageLesson`, `listLessons`, `getLesson`, `reviewLesson`,
 §"The lessons lane".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/assets/services/image-assets.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-boards.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/assets/services/image-assets.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/kanban-stats.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-attachments.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-lessons.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-stats-figures.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-stats.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
 
 ## MAN-587 — The routes
 section: kanban/006 The routes
 
 `server/modules/kanban/routes/` is a PACKAGE, not one file: `board.routes.ts` (8 routes),
 `card.routes.ts` (9), `detail.routes.ts` (7), `learning.routes.ts` (4,
-§"The lessons lane") and `attachment.routes.ts` (3, below), each exporting a
+§"The lessons lane"), `attachment.routes.ts` (3, below) and `stats.routes.ts` (2, the board's
+numbers and changelog, MAN-10033), each exporting a
 `create<X>Routes(services): Router` factory; and `kanban.routes.ts`, the FACTORY that builds one
-`express.Router()` and `use`s the five onto it. The package is INTERNAL — nothing outside
+`express.Router()` and `use`s the six onto it. The package is INTERNAL — nothing outside
 `kanban.module.ts` imports it, and the module's barrel exports the services and the module
 constructor, never a route.
 
@@ -5602,6 +5661,25 @@ Success bodies are the bare JSON objects named above. Failures are
 an `AppError` thrown to `next(error)` and rendered by the global handler as
 `{ success: false, error: { code, message } }`. Both shapes already coexist elsewhere in this
 server; the board adds no third one. `express.json()` is global, so no body parser is added here.
+
+## MAN-10033 — The numbers and the changelog — GET /api/kanban/stats and GET /api/kanban/changelog (stats.routes.ts)
+section: kanban/006b The numbers and the changelog
+
+`server/modules/kanban/routes/stats.routes.ts` (`createStatsRoutes({ stats })`, mounted by `kanban.routes.ts` beside the other five factories) owns two reads on the board's one mount, `/api/kanban`, behind `authenticateToken` like every board route:
+
+```
+GET /api/kanban/stats?board=<id>|all&days=<1-365, default 30>                          -> { stats: KanbanStats }
+GET /api/kanban/changelog?board=<id>|all&since=<date>&limit=<1-200, default 50>&format=json|md
+      format json (default) -> { changelog: KanbanChangelogEntry[] }
+      format md             -> text/markdown; charset=utf-8, one line per entry:
+                               - <YYYY-MM-DD of doneAt> — <changelog> (<title>, <board name>)
+```
+
+`board` absent, empty or `all` is every board not archived; any other value is a board id handed to the service, so an unknown one answers the board's ordinary 404 `KANBAN_BOARD_NOT_FOUND`. `days` and `limit` that are absent, not numbers or below 1 take their default, and above the ceiling take the ceiling (the clamp the audit log's `limit` uses). A `format` other than `json` or `md` is 400 `{ error: 'format must be json or md' }`, answered before any read; a `since` that is not a date is the service's 400 `KANBAN_CHANGELOG_SINCE_INVALID` (a bare `YYYY-MM-DD` is that UTC midnight). The md lines name the card and board by name, never by id (INV-76), with any line break in a title or board name folded to a space so each entry stays one line; an empty changelog is an empty body. Both routes are reads: no transaction, no audit row, no frame. The numbers and their rules are `kanban-stats.service.ts` (MAN-582's family); the dashboard's `Copy as Markdown` fetches `format=md`.
+
+Shown on the live board: `GET /api/kanban/stats?board=b-90&days=365` answered open 83 (21 high, 49 medium, 13 low; 37 not ready, 46 to do), 336 fixed with median 7.1 h and p90 52.7 h, each equal to the same count taken in SQL.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/kanban-stats.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/routes/kanban.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/routes/stats.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/kanban-stats-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/kanban-stats-types.ts
 
 ## MAN-588 — The frame
 section: kanban/007 The frame
@@ -14096,30 +14174,33 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/cp
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-intake/
 
-## MAN-10000 — Board cards settings — the two Settings → Agents rows: files, handles, hook contract
+## MAN-10000 — Board cards settings — the three Settings → Agents rows: files, handles, hook contract
 
-`RunnerBugBoardRow.tsx` (Settings → Agents, drawn by `RunnerModelContent.tsx` directly under `RunnerCpuLimitRow`) is the operator's view of the dispatcher's two board-card numbers in `~/.claude/charters/cards.toml`. The launch rows a card walk uses: MAN-7417.
+`RunnerBugBoardRow.tsx` (Settings → Agents, drawn by `RunnerModelContent.tsx` directly under `RunnerCpuLimitRow`) is the operator's view of the dispatcher's three board-card numbers in `~/.claude/charters/cards.toml`. The launch rows a card walk uses: MAN-7417.
 
 ## Data
-- `useBugBoardSettings` reads and writes `api.settings.bugBoard()` / `api.settings.saveBugBoard({width?, threshold?})` → `GET` / `PUT /api/kanban-dispatch/settings` (`dispatcher card config`).
+- `useBugBoardSettings` reads and writes `api.settings.bugBoard()` / `api.settings.saveBugBoard({width?, threshold?, ageDays?})` → `GET` / `PUT /api/kanban-dispatch/settings` (`dispatcher card config`).
+- `ageDays` is read from the same answer; `readingOf` takes it apart from the other two: absent, non-integer or outside `BUG_BOARD_AGE_DAYS_MIN` 0 / `BUG_BOARD_AGE_DAYS_MAX` 30 = `null` ("not reported"), never a default and never a reason to drop `width` / `threshold`.
 
 ## Rows
-Two `SettingRow`s in one file, one hook; each has its own sentence and control. Strings: `agents.bugBoard.*` in `en/settings.json` (`fr` too), each call with a `defaultValue`.
+Three `SettingRow`s in one file, one hook; each has its own sentence and control. Strings: `agents.bugBoard.*` in `en/settings.json` (`fr` too), each call with a `defaultValue`.
 | row | handle | control | icon |
 |---|---|---|---|
 | Cards walked at once | `data-runner-bug-board-width="unknown\|<n>"` | `Select`, `BUG_BOARD_WIDTH_CHOICES` = 1–4, each said with its noun (`option_one` / `option_other`) | `KanbanSquare` |
 | Sort confidence | `data-runner-bug-board-threshold="unknown\|<n>"` | number `Input` `#runner-bug-board-threshold`, step 0.01, `min`/`max` = `BUG_BOARD_THRESHOLD_MIN` 0.5 / `BUG_BOARD_THRESHOLD_MAX` 0.99, shown at two decimals (the notation of a card's Sort step), bounds as the `Field` caption | `Tags` |
+| Days before a waiting card moves up a priority | `data-runner-bug-board-age-days="unknown\|<n>"` | `Select` of every whole value 0–30, each said with its noun (`agents.bugBoard.ageDays.option_one` / `_other`); `0` reads `Off` (`ageDays.off`) and its sentence is `ageDays.descriptionOff`. No out-of-bounds state: every pick is in range | `Hourglass` |
 
-- Both controls sit in a `w-44` block wrapper (the CPU limit's width). why: at `w-32` they stayed beside the text on a phone and squeezed it to a nine-line column.
+- All three controls sit in a `w-44` block wrapper (the CPU limit's width). why: at `w-32` they stayed beside the text on a phone and squeezed it to a nine-line column.
+- A dispatcher that answers `width` and `threshold` but no `ageDays` draws the other two rows and says `agents.bugBoard.ageDays.unreported` on the third, with the retry (`ageDays` `null`, `unreadable` false).
 - Under a finger (`finger:`) the field is `h-11` and the retry 44×44; the shared `Input` is 36 px at every width and the shared kit's list options are 31–39 px: both are the kit's to change.
 - The confidence description is `#runner-bug-board-threshold-about`, the field's `aria-describedby`.
-- Unknown is never the default: while `width` / `threshold` is `null` the description says loading or `agents.bugBoard.unreadable` and the control slot holds a retry on both rows.
+- Unknown is never the default: while `width` / `threshold` / `ageDays` is `null` the description says loading, `agents.bugBoard.unreadable` or (third row) `ageDays.unreported`, and the control slot holds a retry.
 - A number outside the bounds snaps back and says `agents.bugBoard.threshold.outOfBounds` under the field until it is typed in again; a blank draft sends and says nothing.
 - No control is `disabled` mid-write; the wrapper carries `aria-busy`.
 - The copy says "self-running board" and never quotes the switch's label.
 
 ## Hook contract — `useBugBoardSettings()`
-Returns `{width, threshold, unreadable, saving, thresholdText, thresholdOutOfBounds, setWidth, typeThreshold, leaveThreshold, refresh}`; the shape is the row's contract. The hook owns the confidence draft, so the row holds no state.
+Returns `{width, threshold, ageDays, unreadable, saving, thresholdText, thresholdOutOfBounds, setWidth, setAgeDays, typeThreshold, leaveThreshold, refresh}`; the shape is the row's contract. `setAgeDays(next)` writes a whole number 0–30 as `PUT {ageDays}` (anything else is dropped unsent), folded into an in-flight write like `setWidth`'s and corrected by the read-back; the route relays it as `dispatcher card config --age-days` (MAN-10022). The hook owns the confidence draft, so the row holds no state.
 - `width` / `threshold` `null` = no read has succeeded; a body that is not the two numbers inside their bounds (width in `BUG_BOARD_WIDTH_CHOICES`, threshold finite) is `unreadable`, never a default; a refused write is no reading either.
 - `thresholdText`: the draft while one is open, else `threshold.toFixed(2)`; a read never overwrites a draft.
 - `leaveThreshold`: no draft sends nothing; blank drops the draft; a non-number or out-of-bounds drops it and raises `thresholdOutOfBounds`; else `PUT {threshold}` rounded to two decimals.

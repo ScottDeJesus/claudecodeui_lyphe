@@ -4,6 +4,8 @@ import { AppError } from '@/shared/utils.js';
 
 import { AS_DISPATCHER, askOnce, attachShotOnce, boardAnswer, cardOnBoard, changeCardFor, markStep, noteDecisionOnce, setSteps } from './kanban-dispatch.cards.js';
 import { readNotes, type DispatcherNote } from './kanban-dispatch.notes.js';
+import { createTicketPlacer } from './kanban-dispatch.tickets.js';
+import { announceFixed } from './kanban-dispatch.word.js';
 
 /** Lines remembered as already logged; at this many the memory starts over, so a long-lived server stays bounded. */
 const SAID_LINES_MAX = 500;
@@ -21,11 +23,14 @@ type Stamp = Record<string, unknown> | null;
 /** A note whose card, or for link and close the card its payload names, is no longer on its board. */
 const GONE: Stamp = { gone: true };
 
-/** The seams the applier needs: the dispatcher command runner and the journal. */
-export type NoteApplierDependencies = { commands: CommandDependencies; log: (line: string) => void };
+/** The seams the applier needs: the dispatcher command runner, the runner for a ticket's placing stamp (a longer ceiling: the stamp may sort the card with a model before it answers), and the journal. */
+export type NoteApplierDependencies = { commands: CommandDependencies; ticketStampCommands: CommandDependencies; log: (line: string) => void };
 
-/** Pokes a pass and stops the applier. */
-export type NoteApplier = { poke(): void; stop(): void };
+/**
+ * Pokes a pass and stops the applier. pokeWithUnplaced asks for a pass whose placing step also takes the tickets no board
+ * could take before (`bug pending --unplaced`), for server start and for a board created or whose folders changed.
+ */
+export type NoteApplier = { poke(): void; pokeWithUnplaced(): void; stop(): void };
 
 /** A new note kind must get a case; reaching this at runtime means one was missed. */
 function assertNever(value: never): never {
@@ -36,7 +41,7 @@ function assertNever(value: never): never {
  * Applies one note through the kanban services and returns what to stamp it with.
  * A card that left its board is stamped gone, so its note is not retried forever.
  */
-function applyNote(note: DispatcherNote): Stamp {
+function applyNote(note: DispatcherNote, logError: (line: string) => void): Stamp {
   const card = cardOnBoard(note.card, note.board);
   if (card === null) return GONE;
   switch (note.kind) {
@@ -47,7 +52,10 @@ function applyNote(note: DispatcherNote): Stamp {
       markStep(card, note);
       return null;
     case 'status':
-      if (card.status !== note.status) kanbanCardsService.moveCard(card.id, { status: note.status }, AS_DISPATCHER);
+      if (card.status === note.status) return null;
+      kanbanCardsService.moveCard(card.id, { status: note.status }, AS_DISPATCHER);
+      // Only a real move announces: a note re-applied after a restart finds the card already in Done and must not announce twice.
+      if (note.status === 'done') announceFixed(card.id, logError);
       return null;
     case 'tags':
       for (const tag of note.add) kanbanCardsService.addTag(card.id, tag, AS_DISPATCHER);
@@ -59,11 +67,9 @@ function applyNote(note: DispatcherNote): Stamp {
     case 'decision':
       noteDecisionOnce(card, note);
       return null;
-    case 'text': {
-      const change = note.field === 'plan' ? { plan: note.value } : { closingRemarks: note.value };
-      kanbanCardsService.updateCard(card.id, change, AS_DISPATCHER);
+    case 'text':
+      kanbanCardsService.updateCard(card.id, textChange(note), AS_DISPATCHER);
       return null;
-    }
     case 'shot':
       attachShotOnce(card, note);
       return null;
@@ -93,6 +99,20 @@ function applyNote(note: DispatcherNote): Stamp {
   }
 }
 
+/** The one card field a text note sets, in the shape the card service takes. */
+function textChange(note: Extract<DispatcherNote, { kind: 'text' }>): { plan: string } | { closingRemarks: string } | { changelog: string } {
+  switch (note.field) {
+    case 'plan':
+      return { plan: note.value };
+    case 'closingRemarks':
+      return { closingRemarks: note.value };
+    case 'changelog':
+      return { changelog: note.value };
+    default:
+      return assertNever(note.field);
+  }
+}
+
 /** How a dispatcher command ended, in the words the journal uses. */
 function exitWords(exit: number | null): string {
   return exit === null ? 'did not answer' : `exited ${exit}`;
@@ -114,8 +134,8 @@ function isNoteRefusal(error: unknown): error is AppError {
 }
 
 /**
- * Creates the board's note applier. Each pass applies the dispatcher's unapplied notes in id order;
- * pokes that arrive during a pass cost exactly one more pass.
+ * Creates the board's note applier. Each pass places the dispatcher's filed tickets on their boards first, then applies
+ * the dispatcher's unapplied notes in id order; pokes that arrive during a pass cost exactly one more pass.
  */
 export function createNoteApplier(dependencies: NoteApplierDependencies): NoteApplier {
   const { commands } = dependencies;
@@ -128,6 +148,9 @@ export function createNoteApplier(dependencies: NoteApplierDependencies): NoteAp
    * a later pass retries only the stamp, so no note is applied twice by this process.
    */
   const owedStamps = new Map<number, Stamp>();
+  const placer = createTicketPlacer({ commands, stampCommands: dependencies.ticketStampCommands, say });
+  /** Set by pokeWithUnplaced, read and cleared at the start of the next pass. */
+  let unplacedWanted = false;
 
   /** Logs a line only the first time it is seen, so a note that fails on every poke does not bury the journal. */
   function say(line: string): void {
@@ -140,7 +163,7 @@ export function createNoteApplier(dependencies: NoteApplierDependencies): NoteAp
   /** Applies one note; a refusal by the note becomes a stamp, any other failure returns null so its card waits. */
   function tryApply(note: DispatcherNote): { stamp: Stamp } | null {
     try {
-      return { stamp: applyNote(note) };
+      return { stamp: applyNote(note, say) };
     } catch (error) {
       const where = `note ${note.id} (${note.kind} on card ${note.card})`;
       if (isNoteRefusal(error)) {
@@ -173,8 +196,16 @@ export function createNoteApplier(dependencies: NoteApplierDependencies): NoteAp
     }
   }
 
-  /** One sweep; once a note of a card fails, that card's later notes wait while other cards go on. */
+  /**
+   * One sweep: the tickets are placed first, then the notes are applied; once a note of a card fails, that card's later
+   * notes wait while other cards go on.
+   */
   async function pass(): Promise<void> {
+    // PLACE comes first in every pass — the tickets filed since the last pass get their cards before the notes are applied;
+    // a failed placing is said by the placer and never stops the notes.
+    const withUnplaced = unplacedWanted;
+    unplacedWanted = false;
+    await placer.pass(withUnplaced);
     const listed = await runDispatcherCommand(commands, ['card', 'notes', '--json']);
     if (listed.exit !== 0) {
       say(`${LOG_PREFIX} dispatcher card notes ${exitWords(listed.exit)}: ${failureLine(listed)}`);
@@ -226,15 +257,22 @@ export function createNoteApplier(dependencies: NoteApplierDependencies): NoteAp
     }
   }
 
+  /** Asks for a pass now; a poke during a running pass queues exactly one more. */
+  function poke(): void {
+    if (stopped) return;
+    if (running) {
+      again = true;
+      return;
+    }
+    void run();
+  }
+
   return {
-    /** Asks for a pass now; a poke during a running pass queues exactly one more. */
-    poke(): void {
-      if (stopped) return;
-      if (running) {
-        again = true;
-        return;
-      }
-      void run();
+    poke,
+    /** A poke whose pass also places the tickets no board could take before. */
+    pokeWithUnplaced(): void {
+      unplacedWanted = true;
+      poke();
     },
     /** Ends the applier: no poke starts a pass after this, and the running pass stops looping. */
     stop(): void {

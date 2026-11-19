@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { kanbanBoardsDb, kanbanEventsDb, kanbanIdsDb, projectsDb } from '@/modules/database/index.js';
 import {
   type KanbanBoard,
@@ -70,9 +72,46 @@ function requireReposForAutonomy(autonomy: boolean, repos: readonly string[]): v
   }
 }
 
+/** The answer when no repository of a board holds a folder. Real path lengths are at least 1, so -1 cannot collide. */
+const NO_REPO_MATCH = -1;
+
 /**
- * The board verbs: create, list, read, update, select, resolve for a project, count a board's
- * cards per status, and read the audit log.
+ * Orders two values by `<` and `>` rather than `localeCompare`, so the order a sort produces does not depend on the
+ * machine's locale and the same two ids always sort the same way.
+ */
+function compareAscending<T extends string | number>(left: T, right: T): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+/**
+ * The length of the longest of a board's repositories that holds the target folder, or NO_REPO_MATCH when none does.
+ *
+ * A repository holds the folder when it IS the folder or the folder sits under it. The separator test is what keeps
+ * `/a/bc` out of `/a/b`; the longest match is what lets a deeper board on a nested folder win over a shallower one.
+ */
+function longestContainingRepo(board: KanbanBoard, target: string): number {
+  let longestMatchLength = NO_REPO_MATCH;
+  for (const repo of board.repos) {
+    const resolvedRepo = path.resolve(repo);
+    const repoPrefix = resolvedRepo.endsWith(path.sep) ? resolvedRepo : resolvedRepo + path.sep;
+    const holdsTarget = target === resolvedRepo || target.startsWith(repoPrefix);
+    if (holdsTarget && resolvedRepo.length > longestMatchLength) {
+      longestMatchLength = resolvedRepo.length;
+    }
+  }
+  return longestMatchLength;
+}
+
+/** The names of the fields a board patch sets, in a fixed order; a field left undefined was not asked to change. */
+function setFieldsOf(patch: { name?: string; autonomy?: boolean; projectId?: string | null; archived?: boolean; repos?: string[] }): string[] {
+  return (['name', 'autonomy', 'projectId', 'archived', 'repos'] as const).filter((field) => patch[field] !== undefined);
+}
+
+/**
+ * The board verbs: create, list, read, update, select, resolve for a project, resolve a folder to its board, count a
+ * board's cards per status, and read the audit log.
  *
  * EVERY write here goes through `writeKanban` — no verb in this file opens a transaction, inserts
  * an event or broadcasts. A write verb threads `context?.actor` straight into the seam, so the
@@ -172,6 +211,9 @@ export const kanbanBoardsService = {
     } else {
       auditedAutonomy = autonomy === undefined ? {} : { autonomy };
     }
+    // A board.updated write names the fields its patch set (as card.updated does), so a listener can tell a change of
+    // folders or a restore from a rename. An archive keeps its one-key payload.
+    const payload = archiving ? auditedAutonomy : { ...auditedAutonomy, fields: setFieldsOf(patch) };
 
     return writeKanban(
       {
@@ -179,7 +221,7 @@ export const kanbanBoardsService = {
         boardId,
         actor: context?.actor,
         // Named in the audit row, so a listener (the board-dispatch module) can tell the autonomy switch moving from a rename, and an archive that turned it off.
-        payload: auditedAutonomy,
+        payload,
       },
       () => {
         if (patch.projectId !== undefined && patch.projectId !== null) requireProject(patch.projectId);
@@ -243,6 +285,37 @@ export const kanbanBoardsService = {
    */
   boardForProject(projectId: string): KanbanBoard | null {
     return kanbanBoardsDb.getBoardByProject(projectId);
+  },
+
+  /**
+   * The live board a folder belongs to, or null when no board names it.
+   *
+   * A board names the repositories its cards are built in; the folder belongs to the board whose repos hold the LONGEST
+   * folder that is the folder itself or contains it, so a board on `/a/b` wins over a board on `/a` for `/a/b/c`. On a
+   * tie a board that runs itself comes first (a ticket placed there is walked), then the oldest board. Archived boards
+   * are never chosen. A relative or empty path is refused as null rather than resolved against this server's cwd: the
+   * path comes from outside the process.
+   */
+  boardForPath(folder: string): KanbanBoard | null {
+    if (folder.trim() === '' || !path.isAbsolute(folder)) return null;
+    const target = path.resolve(folder);
+
+    const candidates: { board: KanbanBoard; matchedPathLength: number }[] = [];
+    for (const board of kanbanBoardsDb.listBoards(false)) {
+      const matchedPathLength = longestContainingRepo(board, target);
+      if (matchedPathLength !== NO_REPO_MATCH) candidates.push({ board, matchedPathLength });
+    }
+
+    candidates.sort(
+      (left, right) =>
+        right.matchedPathLength - left.matchedPathLength ||
+        Number(right.board.autonomy) - Number(left.board.autonomy) ||
+        compareAscending(left.board.createdAt, right.board.createdAt) ||
+        compareAscending(left.board.id, right.board.id)
+    );
+
+    const best = candidates[0];
+    return best === undefined ? null : best.board;
   },
 
   /** Five rows, one per status, over the board's live cards. Missing board, 404. */

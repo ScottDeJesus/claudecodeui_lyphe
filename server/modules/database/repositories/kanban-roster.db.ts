@@ -21,6 +21,9 @@ export type KanbanRosterCard = {
   status: KanbanStatus;
   description: string;
   closingRemarks: string;
+  /** When the card last arrived in Done; null while it is not there. */
+  doneAt: string | null;
+  changelog: string;
   tags: string[];
   archived: boolean;
   updatedAt: string;
@@ -39,7 +42,7 @@ export const kanbanRosterDb = {
     const db = getConnection();
     const rows = db
       .prepare(
-        `SELECT id, title, status, description, closing_remarks, archived, updated_at
+        `SELECT id, title, status, description, closing_remarks, done_at, changelog, archived, updated_at
          FROM kanban_cards
          WHERE board_id = ?
          ORDER BY updated_at DESC, id DESC`
@@ -50,6 +53,8 @@ export const kanbanRosterDb = {
         status: KanbanStatus;
         description: string;
         closing_remarks: string;
+        done_at: string | null;
+        changelog: string;
         archived: number;
         updated_at: string;
       }[];
@@ -62,6 +67,8 @@ export const kanbanRosterDb = {
       status: row.status,
       description: row.description,
       closingRemarks: row.closing_remarks,
+      doneAt: row.done_at,
+      changelog: row.changelog,
       tags: tagsByCard.get(row.id) ?? [],
       archived: row.archived !== 0,
       updatedAt: row.updated_at,

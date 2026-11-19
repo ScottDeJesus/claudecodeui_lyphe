@@ -23,3 +23,7 @@ export { ComposerDropOverlay } from '@/modules/chat/composer/ComposerDropOverlay
 // own size) and in her portrait's strip (`size: 'small'`), so the chat module stays the one home of that look.
 export { default as ChatMessageImages } from '@/modules/chat/transcript/ChatMessageImages';
 export { default as ChatMessageFiles } from '@/modules/chat/transcript/ChatMessageFiles';
+// The chat's markdown renderer, the one that draws a reply (GFM, code fences, the sandboxed `widget` fence, tables, links, math).
+// Consumers: the companion module's `CompanionNotes` (her cards on the floating panel) and the station module's `cardBodies`
+// (her cards on the stage), so a card draws whatever a chat draws, through the same component, at the card's own type size.
+export { Markdown } from '@/modules/chat/transcript/Markdown';

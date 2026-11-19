@@ -3,6 +3,7 @@ import {
   kanbanCardsDb,
   kanbanCardTagsDb,
   kanbanChecklistDb,
+  kanbanEventsDb,
   kanbanIdsDb,
   kanbanQuestionsDb,
   laneBounds,
@@ -25,12 +26,16 @@ import {
   cardNotFound,
   requireBoard,
   requireCardRow,
+  requireChangelog,
   requireLaneNeighbour,
   requireSummary,
   requireTag,
   requireTitle,
 } from './kanban-cards.guards.js';
 import { writeKanban } from './kanban-write.service.js';
+
+/** The actor named for a card whose creating event the log does not hold. */
+const UNKNOWN_CREATOR = 'unknown';
 
 /**
  * The sort_order a moved card lands on, from the two neighbours the caller named.
@@ -234,6 +239,8 @@ export const kanbanCardsService = {
       body: row.body,
       plan: row.plan,
       closingRemarks: row.closing_remarks,
+      doneAt: row.done_at,
+      changelog: row.changelog,
       buildTokensIn: row.build_tokens_in,
       buildTokensOut: row.build_tokens_out,
       buildTokensCacheRead: row.build_tokens_cache_read,
@@ -244,6 +251,17 @@ export const kanbanCardsService = {
       checklist: kanbanChecklistDb.listChecklistItems(cardId),
       attachments: kanbanChecklistDb.listAttachments(cardId),
     };
+  },
+
+  /**
+   * Who filed a card: the actor of its creating event — a person (`operator`, `restorly`), a door that files tickets
+   * (`chat`, `soul`, `nightly`, `cerberus`) or the dispatcher. The board-dispatch module reads it to decide whether a
+   * finished card is news for a person. A read: no transaction, no frame. A missing card is the same 404 every card verb
+   * answers; a card whose log holds no creating event (none on the live board today) reads as `unknown`.
+   */
+  createdBy(cardId: string): string {
+    requireCardRow(cardId);
+    return kanbanEventsDb.creatorOf(cardId) ?? UNKNOWN_CREATOR;
   },
 
   /**
@@ -259,10 +277,12 @@ export const kanbanCardsService = {
       body?: string;
       plan?: string | null;
       closingRemarks?: string;
+      changelog?: string;
     },
     context?: KanbanWriteContext
   ): KanbanCardSummary {
     const title = patch.title === undefined ? undefined : requireTitle(patch.title);
+    const changelog = patch.changelog === undefined ? undefined : requireChangelog(patch.changelog);
 
     // Named in the audit row: which of the patch's fields this write set, so a listener can tell a
     // person's edit of the card's words from a walk writing its plan.
@@ -287,6 +307,7 @@ export const kanbanCardsService = {
           body: patch.body,
           plan: patch.plan,
           closingRemarks: patch.closingRemarks,
+          changelog,
         });
 
         if (!changed) throw cardNotFound(cardId);
@@ -332,7 +353,9 @@ export const kanbanCardsService = {
   /**
    * Moves one card into a status, at the position its two neighbours describe. The move and its
    * renormalisation when the midpoint runs out of room are ONE `mutate` callback: one transaction,
-   * one event, one frame.
+   * one event, one frame. The move is also what stamps the card's arrival in Done (`done_at`) and
+   * clears it on leaving, in the same statement (`kanbanCardsDb.setStatusAndOrder`), so the stamp is
+   * exactly the move's commit.
    */
   moveCard(
     cardId: string,

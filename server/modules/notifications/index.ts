@@ -15,6 +15,10 @@ export type {
   CerberusRedItem,
   CerberusRedMeta,
 } from '@/modules/notifications/services/cerberus-red-copy.service.js';
+// spanText and fixSentence: used by the red watch's tickets (`modules/cerberus/red-watch-tickets.ts`), whose words say how long a
+// check has been red and what its diagnosis proposed exactly as the push says them.
+export { spanText } from '@/modules/notifications/services/cerberus-red-copy.service.js';
+export { fixSentence } from '@/modules/notifications/services/cerberus-red-cause.js';
 // Used by callers outside this module that show an event's wording: the one headline and body per code.
 export { buildNotificationText } from '@/modules/notifications/services/notification-copy.service.js';
 // wholeBodyKind: used by the companion module's alert block to choose which events it asks `spendFreeWording` for the whole body of

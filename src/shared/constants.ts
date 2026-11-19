@@ -295,8 +295,10 @@ export const LLM_PROVIDER_LABELS: Record<LLMProvider, string> = {
  * `src/modules/chat/transcript/markdownCards.css`. `Plain*` renders every markdown surface and
  * only the wrapper knows which one, so the opt-in lives on the wrapper as one class.
  *
- * Applied by MessageComponent's reply, thinking and tool-text bodies, and by MarkdownContent for
- * every tool markdown body. User message bubbles and tool errors deliberately do not carry it.
+ * Applied by MessageComponent's reply, thinking and tool-text bodies, by MarkdownContent for
+ * every tool markdown body, and by Kaylee's cards (the companion module's `CompanionNotes` and
+ * the station module's `cardBodies`), which draw her card text through the chat's `Markdown`.
+ * User message bubbles and tool errors deliberately do not carry it.
  */
 export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
 

@@ -16,6 +16,13 @@ type KanbanEventDbRow = {
 const DEFAULT_EVENT_LIMIT = 50;
 
 /**
+ * The two spellings the log uses for a card's creation. `card.created` is what the write seam records
+ * today; `feature.created` is what the imported board's log holds. A creator lookup that matched only one
+ * would miss every card from the other, so both are listed here once and spelled into the query from here.
+ */
+const CARD_CREATED_KINDS: readonly string[] = ['card.created', 'feature.created'];
+
+/**
  * Parses a stored payload back into an object.
  *
  * A row whose `payload` will not parse still travels — as an empty object rather than as a
@@ -120,5 +127,25 @@ export const kanbanEventsDb = {
       .all(...values, options.limit ?? DEFAULT_EVENT_LIMIT) as KanbanEventDbRow[];
 
     return rows.map(toKanbanEventRow);
+  },
+
+  /**
+   * The actor of a card's creating event, or null when the log holds none. It is who filed the card — a person
+   * (operator, restorly), a door (chat, soul, nightly, cerberus) or the dispatcher — and it is read from the log because the
+   * card row keeps no such column. Both vocabularies the log holds count: `card.created` (today's) and `feature.created`
+   * (the imported board's). The oldest such row wins, since a card is created once.
+   */
+  creatorOf(cardId: string): string | null {
+    const db = getConnection();
+    const row = db
+      .prepare(
+        `SELECT actor FROM kanban_events
+         WHERE card_id = ? AND kind IN (${CARD_CREATED_KINDS.map((kind) => `'${kind}'`).join(', ')})
+         ORDER BY id ASC
+         LIMIT 1`
+      )
+      .get(cardId) as { actor: string } | undefined;
+
+    return row?.actor ?? null;
   },
 };

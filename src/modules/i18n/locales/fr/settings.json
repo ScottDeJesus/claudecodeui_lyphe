@@ -364,6 +364,17 @@
         "field": "{{min}} à {{max}}",
         "fieldLabel": "Confiance du tri, de {{min}} à {{max}}",
         "outOfBounds": "Non enregistré : utilisez {{min}} à {{max}}."
+      },
+      "ageDays": {
+        "label": "Jours avant qu'une carte en attente monte d'une priorité",
+        "description_one": "Une carte qui attend dans À faire est prise une priorité plus haut pour chaque jour d'attente, jusqu'à haute. Une carte basse qui a assez attendu passe devant une carte haute saisie aujourd'hui. La priorité affichée sur la carte ne change jamais. Prend effet à la prochaine carte.",
+        "description_other": "Une carte qui attend dans À faire est prise une priorité plus haut tous les {{count}} jours d'attente, jusqu'à haute. Une carte basse qui a assez attendu passe devant une carte haute saisie aujourd'hui. La priorité affichée sur la carte ne change jamais. Prend effet à la prochaine carte.",
+        "descriptionOff": "Désactivé : une carte qui attend dans À faire est prise à la priorité qu'elle affiche, quelle que soit son attente ; une carte basse peut donc attendre derrière chaque nouvelle carte haute. Prend effet à la prochaine carte.",
+        "unreported": "Ce dispatcher n'indique pas encore ce nombre, sa valeur est donc inconnue.",
+        "off": "Désactivé",
+        "option_one": "{{count}} jour",
+        "option_other": "{{count}} jours",
+        "selectLabel": "Jours avant qu'une carte de tableau en attente monte d'une priorité"
       }
     },
     "weeklyStop": {

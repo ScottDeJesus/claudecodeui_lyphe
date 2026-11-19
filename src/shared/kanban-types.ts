@@ -163,13 +163,16 @@ export type KanbanAttachment = {
  * counters broken out, and the five child collections.
  *
  * It is fetched once when the card is opened and never cached between opens, so the drawer cannot
- * render a checklist row that disagrees with the count on its face.
+ * render a checklist row that disagrees with the count on its face. `doneAt` is stamped by the
+ * move into Done and cleared by a move out.
  */
 export type KanbanCardDetail = KanbanCardSummary & {
   description: string;
   body: string;
   plan: string | null;
   closingRemarks: string;
+  doneAt: string | null;
+  changelog: string;
   buildTokensIn: number;
   buildTokensOut: number;
   buildTokensCacheRead: number;
@@ -310,3 +313,9 @@ export type KanbanBoardEvent = {
   lanes: KanbanLaneCount[];
   at: number;
 };
+
+/**
+ * The board's stats and changelog shapes live in a sibling mirror, since this file is past the
+ * house's size ceiling; re-exported so the panel imports every board shape from here.
+ */
+export * from '@/shared/kanban-stats-types';

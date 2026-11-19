@@ -2,7 +2,7 @@
 // at `/api/kanban` — the board list, its create, update and select, its per-status counts, the
 // project lookup and its audit log, the cards: their lane pages, create, detail, patch, move,
 // archive, restore, tags, questions and their answers, issues, checklist and attachments, and the
-// lessons: the staged corpus, its by-id read and the two reviews.
+// lessons: the staged corpus, its by-id read and the two reviews; the board's numbers and its changelog (`/stats`, `/changelog`).
 export { createKanbanModule } from './kanban.module.js';
 // The write-listener seam: `onKanbanWrite(listener)` is told of every committed board write, after its commit and
 // beside its frame, and returns the unsubscribe. It is how the board-dispatch module hears a card created or moved
@@ -22,6 +22,9 @@ export { kanbanChecklistService } from './kanban-checklist.service.js';
 // The lesson store's five verbs: the board's own read surface for what a build learned, delivered on the board's one mount (`/api/kanban`).
 export { kanbanLessonsService } from './kanban-lessons.service.js';
 export { kanbanQuestionsService } from './kanban-questions.service.js';
+// The board's numbers and its changelog: reads only, for the stats routes and the board-dispatch module's dashboard.
+export { kanbanStatsService } from './kanban-stats.service.js';
+export type { KanbanChangelogEntry, KanbanStats } from '@/shared/kanban-types.js';
 // The board's roster: every card of one board, archived and done ones included, read whole for the board-dispatch
 // module, which answers the dispatcher's `board` note with it.
 export { kanbanRosterService } from './kanban-roster.service.js';

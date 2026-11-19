@@ -19,7 +19,8 @@ import { broken, held, runCase } from "../lib/case.mjs";
 import { BOARD, CARDS, faceOf, openBoard } from "../lib/kanban_board.mjs";
 
 const WAIT_MS = 15000;
-const RAIL_KANBAN = 'nav[aria-label="Views"] button[aria-label="Kanban"]';
+// The view is named Bugs since a4e2af52 (2026-11-19); both names are found.
+const RAIL_KANBAN = 'nav[aria-label="Views"] :is(button[aria-label="Bugs"], button[aria-label="Kanban"])';
 const HOME_MENU = 'button[aria-label="Menu"]';
 const MENU_ENTRY = ':is([role="menu"], [role="dialog"]) :is(button, [role="menuitem"])';
 const NEEDS = "A board runs itself only once it names at least one repository.";
@@ -38,7 +39,7 @@ async function openKanban(page) {
     await page.locator(`${RAIL_KANBAN}:visible`).first().click();
   } else {
     await page.locator(`${HOME_MENU}:visible`).first().click();
-    await page.locator(MENU_ENTRY, { hasText: /^\s*Kanban\s*$/ }).first().click();
+    await page.locator(MENU_ENTRY, { hasText: /^\s*(Bugs|Kanban)\s*$/ }).first().click();
   }
   await faceOf(page, CARDS.bug.id).waitFor({ timeout: 30000 });
 }

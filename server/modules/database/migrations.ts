@@ -28,6 +28,7 @@ import { NOTIFICATION_HISTORY_SCHEMA_SQL } from '@/modules/database/notification
 import { migrateProvenanceColumnToLegacyId } from '@/modules/database/migrations-legacy-id.js';
 import { addColumnToTableIfNotExists, getTableInfo, tableExists } from '@/modules/database/migrations-columns.js';
 import { migrateKanbanBoardRepos, purgeRetiredBoardSchema } from '@/modules/database/migrations-board-dispatch.js';
+import { migrateKanbanCardDoneColumns } from '@/modules/database/migrations-kanban-done.js';
 import { visibleProjectPathSql } from '@/shared/hidden-project-paths.js';
 
 const SQLITE_UUID_SQL = `
@@ -924,6 +925,8 @@ export const runMigrations = (db: Database) => {
     // After the projects rebuild above: the boards table references projects(project_id).
     db.exec(KANBAN_SCHEMA_SQL);
     migrateKanbanBoardRepos(db);
+    // A card's arrival in Done and its changelog line: two added columns, and done_at filled once for cards already done.
+    migrateKanbanCardDoneColumns(db);
     // After the board's own script and its added columns, the columns and table nothing reads any more are dropped, once, after a dated copy of the database.
     purgeRetiredBoardSchema(db);
     // The memory lane's own table, in its own script — it is not a board table, so it is not in

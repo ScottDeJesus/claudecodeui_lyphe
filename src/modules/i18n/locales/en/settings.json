@@ -731,6 +731,17 @@
         "field": "{{min}} to {{max}}",
         "fieldLabel": "Sort confidence, from {{min}} to {{max}}",
         "outOfBounds": "Not saved: use {{min}} to {{max}}."
+      },
+      "ageDays": {
+        "label": "Days before a waiting card moves up a priority",
+        "description_one": "A card waiting in To Do is taken one priority higher for every day it has waited, up to high. A low card that has waited long enough goes ahead of a high card typed today. The priority shown on the card is never changed. Takes effect at the next card.",
+        "description_other": "A card waiting in To Do is taken one priority higher for every {{count}} days it has waited, up to high. A low card that has waited long enough goes ahead of a high card typed today. The priority shown on the card is never changed. Takes effect at the next card.",
+        "descriptionOff": "Off: a card waiting in To Do is taken at the priority it shows, however long it has waited, so a low card can wait behind every new high one. Takes effect at the next card.",
+        "unreported": "This dispatcher does not report the number yet, so its value is unknown.",
+        "off": "Off",
+        "option_one": "{{count}} day",
+        "option_other": "{{count}} days",
+        "selectLabel": "Days before a waiting board card moves up a priority"
       }
     },
     "weeklyStop": {

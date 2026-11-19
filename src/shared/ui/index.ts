@@ -81,6 +81,10 @@ import '@/shared/ui/verve/spots.css';
 // data.css holds the paint of SegmentedControl and DataTable. Like media.css, its place is free: `.vv-segmented*` and
 // `.vv-datatable*` are its own and every rule reads only tokens. The one constraint is still that board.css stays last, below.
 import '@/shared/ui/verve/data.css';
+// readings.css holds the paint of Readout and DayBars. Its place is as free as data.css's: `.vv-readout*` and `.vv-daybars*`
+// are its own and every rule reads only tokens. It was opened beside data.css rather than squeezed into it (data.css stood
+// at 220 lines; MANUAL rule 6). The one constraint is still that board.css stays last, below.
+import '@/shared/ui/verve/readings.css';
 // The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
 // `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
 // `.vv-card` won every one of those at equal specificity and a selected card lost its wash.
@@ -112,6 +116,10 @@ export { DarkModeToggle } from '@/shared/ui/DarkModeToggle';
 // Verve's §5 sortable data table: sort arrows on the heads, `aria-sort` on the sorted one, a row that opens under
 // itself. The affected-areas module's proving tables are drawn with it.
 export { DataTable } from '@/shared/ui/DataTable';
+// One or two series over named days, from a ruled zero baseline: a second series hangs below the rule the first stands on.
+// Lifted from the API view's two spend plots, which stay their own. The kanban module's bug dashboard draws cards opened
+// and fixed per day with it.
+export { DayBars } from '@/shared/ui/DayBars';
 export { AppLogo } from '@/shared/ui/AppLogo';
 export { default as DeepSeekLogo } from '@/shared/ui/DeepSeekLogo';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
@@ -166,6 +174,9 @@ export type {
   PromptInputSubmitProps,
 } from '@/shared/ui/PromptInput';
 export { QuestionOptionRow } from '@/shared/ui/QuestionOptionRow';
+// Astrolabe's Readout and ReadoutRow as one piece: a figure, its name, an optional unit, tone and comparison, and an em-dash
+// for a reading nobody has. Admitted because Astrolabe draws it; the kanban module's bug dashboard reads its numbers with it.
+export { Readout } from '@/shared/ui/Readout';
 // A photo with its regions drawn over it: one SVG in the image's own 0..1 space (outline weight constant at any size
 // and zoom), a numbered badge at each region's corner, a press on either selecting it. The affected-areas module draws
 // a view's regions with it; the photo-match viewer is next. It also takes a box dragged on the photo (`drawing`) and

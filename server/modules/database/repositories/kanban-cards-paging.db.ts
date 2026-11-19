@@ -39,6 +39,9 @@ export type KanbanCardRow = {
   build_tokens_out: number;
   build_tokens_cache_read: number;
   build_tokens_cache_create: number;
+  /** When the card last arrived in Done; null while it is not there. Stamped by the move verb, never by an edit. */
+  done_at: string | null;
+  changelog: string;
   created_at: string;
   updated_at: string;
 };
@@ -47,6 +50,7 @@ export type KanbanCardRow = {
 export const CARD_COLUMNS = `id, board_id, title, status, priority, description, body, plan, closing_remarks,
   archived, sort_order,
   build_tokens_in, build_tokens_out, build_tokens_cache_read, build_tokens_cache_create,
+  done_at, changelog,
   created_at, updated_at`;
 
 /**

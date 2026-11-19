@@ -1,5 +1,5 @@
 // FEED: `dispatcher status --json` carries `cards`, one object per card row (board, card, title, state, flow, part,
-// sorted_by, confidence, hold, waits_on, chain_id, cases [{suite, name, word}], stages [{name, soul, launch_id, status,
+// sorted_by, confidence, hold, waits_on, waited_days, rides_as, chain_id, cases [{suite, name, word}], stages [{name, soul, launch_id, status,
 // verdict, cost_usd, tokens_in, tokens_out}]). The dispatcher lane reads it through its own reader (`dispatcher-card.reader.ts`) into
 // `DispatcherPicture.cards`, the list the `dispatcher_state` frame carries to the board, and refuses a card whose field
 // does not read, naming the field — as it refuses a malformed plan or outing.
@@ -18,7 +18,7 @@ import { scratchDir } from "../lib/scratch.mjs";
 
 const CARD = {
   board: "b-1", card: "c-2", title: "cases sweep --suite . refuses the relative path", state: "walking", flow: "bug",
-  part: "whole", sorted_by: "jev", confidence: 0.93, hold: null, waits_on: null,
+  part: "whole", sorted_by: "jev", confidence: 0.93, hold: null, waits_on: null, waited_days: null, rides_as: null,
   chain_id: "chain-card-b-1-c-2-20261119-000000-abcd",
   cases: [{ suite: "/home/lyphe/.claude", name: "a-relative-suite-path-is-refused-naming-an-absolute-one", word: "broken" }],
   stages: [
@@ -27,7 +27,7 @@ const CARD = {
   ],
 };
 const QUEUED = { ...CARD, card: "c-3", title: "held", state: "queued", flow: "tweak", sorted_by: "default", confidence: null,
-  hold: "cards: 1 of 1 walking", waits_on: 7, chain_id: null, cases: [], stages: [] };
+  hold: "cards: 1 of 1 walking", waits_on: 7, waited_days: 4, rides_as: "medium", chain_id: null, cases: [], stages: [] };
 
 const documentWith = (cards: unknown[]) => ({
   generated_at: "2026-11-19T00:00:00Z", home: "/nowhere/dispatcher",

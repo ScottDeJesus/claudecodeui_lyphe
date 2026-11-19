@@ -684,12 +684,13 @@ export const api = {
     cpuLimit: () => get('/api/settings/cpu-limit'),
     saveCpuLimit: (state: { percent: number | null }) => put('/api/settings/cpu-limit', state),
 
-    // The dispatcher's two numbers for board cards, `~/.claude/charters/cards.toml` — how many cards it walks at once
-    // (`width`, 1-4) and how sure the sort must be (`threshold`, 0.50-0.99); host-wide, not a per-user preference. The
-    // routes relay `dispatcher card config` and both answer the two numbers read back off the file; the PUT takes either
-    // field or both.
+    // The dispatcher's three numbers for board cards, `~/.claude/charters/cards.toml` — how many cards it walks at once
+    // (`width`, 1-4), how sure the sort must be (`threshold`, 0.50-0.99) and how many whole days (0-30) a queued card waits
+    // before it rides one priority higher (`ageDays`; 0 turns ageing off); host-wide, not a per-user preference. The
+    // routes relay `dispatcher card config` and both answer the numbers read back off the file (`ageDays` null from a
+    // dispatcher that does not report it); the PUT takes any of the fields.
     bugBoard: () => get('/api/kanban-dispatch/settings'),
-    saveBugBoard: (state: { width?: number; threshold?: number }) => put('/api/kanban-dispatch/settings', state),
+    saveBugBoard: (state: { width?: number; threshold?: number; ageDays?: number }) => put('/api/kanban-dispatch/settings', state),
 
     // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
     // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
@@ -1485,6 +1486,10 @@ export const api = {
     createCard: (id: string, body: Record<string, unknown>) => post(`/api/kanban/boards/${encodeURIComponent(id)}/cards`, body),
     boardForProject: (projectId: string) => get(`/api/kanban/projects/${encodeURIComponent(projectId)}/board`),
     card: (id: string) => get(`/api/kanban/cards/${encodeURIComponent(id)}`),
+    // The Bugs view's Dashboard face's one read: `board` is a board id or `all`; `days` the window. Answers `BugDashboardAnswer`.
+    dashboard: (board: string, days: number) => get(`/api/kanban-dispatch/dashboard?board=${encodeURIComponent(board)}&days=${days}`),
+    // The changelog as Markdown (`text/markdown`, one dated line per card), what the dashboard's Copy as Markdown copies.
+    changelogMarkdown: (board: string) => get(`/api/kanban/changelog?board=${encodeURIComponent(board)}&format=md`),
     updateCard: (id: string, body: Record<string, unknown>) => patch(`/api/kanban/cards/${encodeURIComponent(id)}`, body),
     moveCard: (id: string, body: Record<string, unknown>) => post(`/api/kanban/cards/${encodeURIComponent(id)}/move`, body),
     archiveCard: (id: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/archive`, {}),

@@ -13,6 +13,7 @@ import type { CerberusOverview } from '@/shared/cerberus-types.js';
 
 import { pushDiagnosisOf } from './red-watch-diagnosis.js';
 import { planRedWatch, type RedWatchPlan } from './red-watch-plan.js';
+import { tellTickets } from './red-watch-tickets.js';
 import { wardenLinks } from './warden-links.js';
 
 /**
@@ -40,6 +41,11 @@ import { wardenLinks } from './warden-links.js';
  * has none yet, one still running or one that failed pages on time without a cause, no second push follows
  * when a diagnosis finishes, and the next reminder carries it — a trouble already paged included. A lookup that
  * throws pages without it. Recoveries carry none.
+ *
+ * A RED CHECK IS ALSO A TICKET. Right after the transaction and the diagnosis lookup, before the pages-halted return so a
+ * halted phone never halts a ticket, `tellTickets` (`red-watch-tickets.ts`) files each opened and each reminded check on
+ * the house's bug line (`dispatcher bug file`, keyed `check:<node>/<key>`) and clears the ticket of each recovered one
+ * (`bug cleared`). It runs in the background, is never awaited and never throws into the tick; a silent close files nothing.
  *
  * The event's code and priority follow the strongest group in the tick: any new red → `cerberus.red` (urgent),
  * only reminders → `cerberus.red.reminder`, only recoveries → `cerberus.recovered`. A mixed tick is one
@@ -172,6 +178,11 @@ export function tickRedWatch(overview: CerberusOverview): void {
   if (plan.opens.length + plan.reminders.length + plan.recoveries.length + plan.closes.length === 0) return;
 
   const applied = applyPlan(plan, now);
+  // After the incident is recorded, never before it: the lookup reads the store and adds a cause, it never decides a page
+  // or a ticket. Done here, before the halt, because a halted phone never halts a ticket.
+  applied.opened = applied.opened.map(withDiagnosis);
+  applied.reminded = applied.reminded.map(withDiagnosis);
+  tellTickets(applied);
   const moved = applied.opened.length + applied.reminded.length + applied.recovered.length;
   const counts = `opened ${applied.opened.length}, reminded ${applied.reminded.length}, recovered ${applied.recovered.length}`;
   const closed = applied.closedSilently > 0 ? `, closed ${applied.closedSilently} silently` : '';
@@ -189,9 +200,6 @@ export function tickRedWatch(overview: CerberusOverview): void {
     console.log(`[red-watch] ${counts}${closed} → no enabled ntfy endpoint, nobody paged`);
     return;
   }
-  // After the incident is recorded, never before it: the lookup reads the store and adds a cause, it never decides a page.
-  applied.opened = applied.opened.map(withDiagnosis);
-  applied.reminded = applied.reminded.map(withDiagnosis);
   pushToUsers(applied, userIds, now);
   console.log(`[red-watch] ${counts}${closed} → pushed to ${userIds.length} user${userIds.length === 1 ? '' : 's'}`);
 }

@@ -5964,10 +5964,11 @@ knows which surface it is, so the opt-in is one class there — `MARKDOWN_CARDS_
 `src/shared/constants.ts`, spelled `'chat-md-cards'` — and the paint is a stylesheet scoped to that
 class, side-effect imported by `Markdown.tsx`. It changes no DOM: the class rides the wrapper and
 nothing under it moves, so **a miss is today's markup** still holds byte for byte and
-`probe-shapes-baseline.mjs` is untouched by the cards. Four call sites in three files carry it —
-`MessageComponent`'s two bodies (the assistant reply, the tool-use text), `ThinkingRow`'s body, and
-`MarkdownContent`, which is every tool markdown body. A user message bubble and a tool error
-deliberately do not.
+`probe-shapes-baseline.mjs` is untouched by the cards. It rides `MessageComponent`'s two bodies (the
+assistant reply, the tool-use text), `ThinkingRow`'s body, `MarkdownContent` (every tool markdown
+body), and Kaylee's cards (`CompanionNotes` in the companion module, `cardBodies` in the station
+module, both drawing card text through the chat's `Markdown`). A user message bubble and a tool
+error deliberately do not.
 
 **Three layers, in this order.** Tailwind Typography paints from the prose container; the `Plain*`
 component's own class string paints next; on a carded surface `markdownCards.css` paints last. It
