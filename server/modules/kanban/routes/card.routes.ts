@@ -6,7 +6,6 @@ import {
   KANBAN_LANE_LIMIT_MAX,
   KANBAN_PRIORITIES,
   KANBAN_STATUSES,
-  kanbanWriteContext,
   type KanbanPriority,
   type KanbanStatus,
 } from '@/shared/kanban-types.js';
@@ -106,10 +105,8 @@ function optionalString(
  * The card routes: the lane page, create, detail, patch, move, archive, restore and the two tag
  * writes.
  *
- * Auth is the mount's (`authenticateToken` in `server/index.ts`, `kanbanMetisSecretGuard` for
- * `/api/kanban-pm`): no file here imports a guard. Every write verb takes the optional trailing
- * context and the route hands it `kanbanWriteContext(response)` — the actor the mount's guard
- * stamped, so an event's actor is `'metis'` through the Metis door and `'operator'` everywhere else.
+ * Auth is the mount's (`authenticateToken` in `server/index.ts`): no file here imports a guard.
+ * A write is the operator's, so no handler passes a write context.
  *
  * These handlers parse, call one service verb and shape the answer. No transaction, no database
  * handle, and no lane policy lives here: which statuses compose a lane is the panel's, and the
@@ -175,8 +172,7 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
             priority: isPriority(body.priority) ? body.priority : undefined,
             status: isStatus(body.status) ? body.status : undefined,
             description,
-          },
-          kanbanWriteContext(response)
+          }
         ),
       });
     })
@@ -228,7 +224,7 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
       }
 
       response.json({
-        card: cards.updateCard(request.params.cardId, patch, kanbanWriteContext(response)),
+        card: cards.updateCard(request.params.cardId, patch),
       });
     })
   );
@@ -256,8 +252,7 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
             status: body.status,
             afterId: (body.afterId as string | null | undefined) ?? null,
             beforeId: (body.beforeId as string | null | undefined) ?? null,
-          },
-          kanbanWriteContext(response)
+          }
         ),
       });
     })
@@ -266,14 +261,14 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
   router.post(
     '/cards/:cardId/archive',
     handle<{ cardId: string }>((request, response) => {
-      response.json({ card: cards.archiveCard(request.params.cardId, kanbanWriteContext(response)) });
+      response.json({ card: cards.archiveCard(request.params.cardId) });
     })
   );
 
   router.post(
     '/cards/:cardId/restore',
     handle<{ cardId: string }>((request, response) => {
-      response.json({ card: cards.restoreCard(request.params.cardId, kanbanWriteContext(response)) });
+      response.json({ card: cards.restoreCard(request.params.cardId) });
     })
   );
 
@@ -287,7 +282,7 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
         return;
       }
 
-      response.json({ card: cards.addTag(request.params.cardId, body.tag, kanbanWriteContext(response)) });
+      response.json({ card: cards.addTag(request.params.cardId, body.tag) });
     })
   );
 
@@ -295,7 +290,7 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
     '/cards/:cardId/tags/:tag',
     handle<{ cardId: string; tag: string }>((request, response) => {
       response.json({
-        card: cards.removeTag(request.params.cardId, request.params.tag, kanbanWriteContext(response)),
+        card: cards.removeTag(request.params.cardId, request.params.tag),
       });
     })
   );

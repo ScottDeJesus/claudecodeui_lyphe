@@ -4,7 +4,6 @@ import { kanbanAttachmentsService } from './kanban-attachments.service.js';
 import { kanbanBoardsService } from './kanban-boards.service.js';
 import { kanbanCardsService } from './kanban-cards.service.js';
 import { kanbanChecklistService } from './kanban-checklist.service.js';
-import { kanbanLeasesService } from './kanban-leases.service.js';
 import { kanbanLessonsService } from './kanban-lessons.service.js';
 import { kanbanQuestionsService } from './kanban-questions.service.js';
 import { startLessonSpillSweep } from './kanban-spill.service.js';
@@ -36,7 +35,7 @@ export type KanbanModuleDependencies = {
  * IT STARTS ONE THING, and it is the only thing that is not a name handed over: the board's lesson
  * queue door, which is a timer rather than a request (Interfaces §3). Its own module reads the
  * filesystem and the spill root; this root only decides when it begins. Starting it is idempotent,
- * because this router is built once for each of its two mounts.
+ * so a second build of the router starts no second sweep.
  */
 export function createKanbanModule(dependencies: KanbanModuleDependencies): Router {
   startLessonSpillSweep();
@@ -47,7 +46,6 @@ export function createKanbanModule(dependencies: KanbanModuleDependencies): Rout
     questions: kanbanQuestionsService,
     checklist: kanbanChecklistService,
     attachments: kanbanAttachmentsService,
-    leases: kanbanLeasesService,
     lessons: kanbanLessonsService,
     memoryPending: dependencies.memoryPending,
   });

@@ -15,21 +15,19 @@ import { writeKanban } from './kanban-write.service.js';
 /**
  * The lessons lane: a note worth carrying into a future session, staged for a person's review.
  *
- * The lifecycle is one-way and its two ends have OPPOSITE actors. A build (or the spill sweep)
- * STAGES; only a person reviews, and only an approved lesson ever reaches a session again. That
- * split is why `stageLesson` and `reviewLesson` are not symmetrical: staging is ungated and names
- * its own actor through `source`, while a review is a person's act — refused at the door on the
- * `kanban-pm` mount (`kanban-metis.routes.ts`'s `REVIEW_PATH`), so a Metis can file a lesson but
- * can never promote her own.
+ * The lifecycle is one-way and its two ends have OPPOSITE actors. The `/learn` spill sweep STAGES;
+ * only a person REVIEWS, through `/api/kanban`. That split is why `stageLesson` and `reviewLesson`
+ * are not symmetrical: staging is ungated and names its own actor through `source`, while a review
+ * is a person's act and is stamped as the operator's.
  *
  * A lesson belongs to the ESTATE, not to a board: `cardId` is provenance and is nullable, and a
  * lesson with no card writes an event row whose `board_id` is NULL — which is what the write seam's
  * nullable `boardId` was widened for. A lesson that DOES name a card writes into that card's board,
  * so the note lands in the lane of the board it was learned on.
  *
- * The five verbs are exported as FUNCTIONS rather than gathered into an object, because that is the
- * contract the MCP catalog and the routes both name; `kanbanLessonsService` below is the same five
- * in the one-object shape the route package's dependency bag takes.
+ * The four verbs are exported as FUNCTIONS rather than gathered into an object, because that is the
+ * contract the routes name; `kanbanLessonsService` below is the same four in the one-object shape
+ * the route package's dependency bag takes.
  *
  * The verbs do no reshaping of their own: the repository carries a full lesson row and a lean index
  * row, and each verb takes one of the two as it stands.
@@ -58,14 +56,6 @@ export const KANBAN_LESSON_STATUSES = ['staged', 'approved', 'rejected'] as cons
 
 /** The index read's own default. */
 const LESSON_INDEX_LIMIT = 100;
-
-/**
- * The approved index's ceiling: the top fifty, unscored.
- *
- * Recency is the WHOLE order — no lesson scoring exists here and none is invented, so this is a
- * slice of the newest approved lessons and never a relevance ranking.
- */
-const APPROVED_INDEX_LIMIT = 50;
 
 /** The board a lesson belongs to through its card, or null for a lesson that has no card. */
 function boardOfCard(card: KanbanCardRow | null): string | null {
@@ -156,7 +146,7 @@ function skillDraftPath(lessonId: string, name: string): string {
  */
 export function stageLesson(input: KanbanLessonInput, context?: KanbanWriteContext): KanbanLesson {
   const kind = input.kind ?? 'note';
-  const source = input.source ?? 'metis';
+  const source = input.source ?? 'learn';
   const body = input.body ?? '';
   const card = input.cardId === undefined || input.cardId === null ? null : requireLessonCard(input.cardId);
 
@@ -165,8 +155,8 @@ export function stageLesson(input: KanbanLessonInput, context?: KanbanWriteConte
       kind: 'lesson.staged',
       cardId: card === null ? null : card.id,
       boardId: boardOfCard(card),
-      // The stager IS the actor, which is what `source` names: a lesson staged by a build reads
-      // `metis` in the activity spine, and a caller that knows better passes a context.
+      // The stager IS the actor, which is what `source` names: a lesson staged by the spill sweep
+      // reads `learn` in the activity spine, and a caller that knows better passes a context.
       actor: context?.actor ?? source,
       // A function of the mutation, because the id is minted inside the transaction.
       payload: (lesson) => ({ lesson_id: lesson.id, name: input.name, kind }),
@@ -264,23 +254,12 @@ export function reviewLesson(
   );
 }
 
-/**
- * The APPROVED lessons a future session scans — the newest fifty, lean, unscored.
- *
- * Staged lessons are inert and never appear here: the corpus a session reads is exactly what a
- * person approved. It is deliberately lean — this read is on the orient path, so it must stay cheap.
- */
-export function approvedIndex(limit: number = APPROVED_INDEX_LIMIT): KanbanLessonLean[] {
-  return listLessons({ status: 'approved', limit });
-}
-
-/** The five verbs in the one-object shape `kanban.module.ts` hands the route package. */
+/** The four verbs in the one-object shape `kanban.module.ts` hands the route package. */
 export type KanbanLessonsService = {
   stageLesson: typeof stageLesson;
   listLessons: typeof listLessons;
   getLesson: typeof getLesson;
   reviewLesson: typeof reviewLesson;
-  approvedIndex: typeof approvedIndex;
 };
 
 export const kanbanLessonsService: KanbanLessonsService = {
@@ -288,5 +267,4 @@ export const kanbanLessonsService: KanbanLessonsService = {
   listLessons,
   getLesson,
   reviewLesson,
-  approvedIndex,
 };

@@ -35,7 +35,7 @@ type AgentLaunchRowItemProps = {
 };
 
 /**
- * Used by `AgentLaunchPanel` for every soul, for Metis, and for the sorter and the tweak: one line of the launch table.
+ * Used by `AgentLaunchPanel` for every soul and for the sorter and the tweak: one line of the launch table.
  *
  * THREE THINGS: who it is (the name, with the description as secondary text, cut at two lines and
  * opened by a press, because a soul's description can run a page), what it launches at (the model and

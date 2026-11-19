@@ -40,7 +40,7 @@ function WindowStandIn({ titleId, onClose, children }: { titleId: string; onClos
 
 /**
  * Rendered by AgentCategoryContentSection first in the house-wide stack under Claude's "account" panel:
- * the one row that opens the launch table — the model and effort every soul, and Metis, launches at.
+ * the one row that opens the launch table — the model and effort every soul, the card sorter and the tweak builder launch at.
  *
  * A ROW AND A WINDOW, NOT A SECOND SETTINGS TAB. The table is the house's, so it sits with the other
  * house-wide switches under Claude, but it is a wide screen of its own (up to three columns of souls),
@@ -78,7 +78,7 @@ export default function AgentChainsContent() {
         <SettingRow
           label={t('agents.agentChains.label', { defaultValue: 'Agent chains' })}
           description={t('agents.agentChains.description', {
-            defaultValue: 'The model and effort every soul, and Metis, launches at in each lane.',
+            defaultValue: 'The model and effort every soul, the card sorter and the tweak builder launch at in each lane.',
           })}
         >
           {/* `asChild` makes the button the dialog's trigger, which is what returns focus to it on close. */}

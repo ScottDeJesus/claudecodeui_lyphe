@@ -18,6 +18,14 @@ const TOLD_FIELDS: readonly string[] = ['title', 'description', 'body', 'priorit
 
 export type TellEvent = 'created' | 'queued' | 'updated' | 'answered' | 'stopped' | 'board-off';
 
+/**
+ * The four tells that start or change work need the switch on both at the write and at the send, so a
+ * switch turned off while one waits in its chain withdraws it. `stopped` and `board-off` are not here:
+ * they are told whatever the switch reads, because a stop is always safe and is the board's only way to
+ * halt a walk already out once the switch is off.
+ */
+const NEEDS_AUTONOMY_AT_SEND: ReadonlySet<TellEvent> = new Set(['created', 'queued', 'updated', 'answered']);
+
 /** A tell to send. Only board-off concerns the board alone; every other tell names its card too. */
 type Tell =
   | { event: 'board-off'; boardId: string; actor: string }
@@ -78,8 +86,8 @@ const TELLS: readonly { event: TellEvent; when: (write: KanbanWriteEvent) => boo
   }, // card.moved to not_ready or done by a person; card.archived -> stopped
   {
     event: 'board-off',
-    when: (write) => write.kind === 'board.updated' && write.payload.autonomy === false,
-  }, // board.updated turning autonomy off -> board-off
+    when: (write) => (write.kind === 'board.updated' || write.kind === 'board.archived') && write.payload.autonomy === false,
+  }, // board.updated turning autonomy off, or board.archived of a board that ran itself -> board-off
 ];
 
 /**
@@ -127,6 +135,10 @@ function tellFor(write: KanbanWriteEvent): Tell | null {
   if (event === null) {
     return null;
   }
+  const board = kanbanBoardsService.getBoard(write.boardId);
+  if (board === null || (NEEDS_AUTONOMY_AT_SEND.has(event) && !board.autonomy)) {
+    return null;
+  }
   if (event === 'board-off') {
     return { event, boardId: write.boardId, actor: write.actor };
   }
@@ -167,13 +179,14 @@ function queueTell(tell: Tell, chains: Map<string, Promise<void>>, dependencies:
 }
 
 /**
- * Sends one tell, or nothing when the board is gone or, for every tell but board-off, has autonomy
- * off. Both are read here rather than at the write, so a switch turned off while the tell waited
- * in its chain is honoured.
+ * Sends one tell, or nothing when the board is gone. The four tells that start or change work
+ * (NEEDS_AUTONOMY_AT_SEND) need the switch on at the send too, so a switch turned off while one of them
+ * waited in its chain withdraws it. `stopped` and `board-off` are sent whatever the switch reads, because
+ * a stop is always safe and is the board's only way to halt a walk already out once the switch is off.
  */
 async function sendTell(tell: Tell, dependencies: CardTellerDependencies): Promise<void> {
   const board = kanbanBoardsService.getBoard(tell.boardId);
-  if (board === null || (tell.event !== 'board-off' && !board.autonomy)) {
+  if (board === null || (NEEDS_AUTONOMY_AT_SEND.has(tell.event) && !board.autonomy)) {
     return;
   }
   const record = tell.event === 'board-off' ? { board: boardOf(board) } : recordOf(board, tell);

@@ -1,9 +1,7 @@
 import { getConnection } from '@/modules/database/connection.js';
 import {
-  KANBAN_LEASE_STALE_SECONDS,
   KANBAN_SORT_ORDER_GAP,
   type KanbanCardSummary,
-  type KanbanLeaseState,
   type KanbanPriority,
   type KanbanStatus,
 } from '@/shared/kanban-types.js';
@@ -20,9 +18,8 @@ import { AppError } from '@/shared/utils.js';
  * statements that touch those rows; it imports from here, and this file never imports from it.
  *
  * There is exactly ONE row-to-summary mapper in the module. A second one for the page would be a
- * lane whose cards disagree with the drawer opened from one of them — the counts would drift, the
- * lease would be spelled twice, and the bug would only show on the pages that mapper's author
- * happened not to test.
+ * lane whose cards disagree with the drawer opened from one of them — the counts would drift, and
+ * the bug would only show on the pages that mapper's author happened not to test.
  */
 
 /** One `kanban_cards` row, every column a summary or a detail read needs. */
@@ -36,27 +33,21 @@ export type KanbanCardRow = {
   body: string;
   plan: string | null;
   closing_remarks: string;
-  approved: number;
-  approved_at: string | null;
   archived: number;
   sort_order: number;
   build_tokens_in: number;
   build_tokens_out: number;
   build_tokens_cache_read: number;
   build_tokens_cache_create: number;
-  build_lease_at: string | null;
-  build_owner: string | null;
-  plan_lease_at: string | null;
-  plan_owner: string | null;
   created_at: string;
   updated_at: string;
 };
 
 /** Every column of a card, in one spelling, so no query is the odd one out. */
 export const CARD_COLUMNS = `id, board_id, title, status, priority, description, body, plan, closing_remarks,
-  approved, approved_at, archived, sort_order,
+  archived, sort_order,
   build_tokens_in, build_tokens_out, build_tokens_cache_read, build_tokens_cache_create,
-  build_lease_at, build_owner, plan_lease_at, plan_owner, created_at, updated_at`;
+  created_at, updated_at`;
 
 /**
  * Where a lane page resumes: the sort key of the last card the previous page showed, and that
@@ -85,24 +76,6 @@ type KanbanCountsRow = {
   checklist_total: number;
 };
 
-/**
- * How a lease reads right now, from the stamp alone.
- *
- * A missing stamp is `'none'`: nothing was ever claimed, which is a different answer from a claim
- * that has gone quiet. A stamp that will not parse is `'stale'`, deliberately — the caller who
- * wrote it is gone either way, and treating an unreadable one as live would hold a card forever.
- * The threshold is the shared constant, never a literal here: two spellings of 40 in one server
- * is a badge and a claim disagreeing.
- */
-export function readLeaseState(buildLeaseAt: string | null): KanbanLeaseState {
-  if (buildLeaseAt === null) return 'none';
-
-  const claimedAtMs = Date.parse(buildLeaseAt);
-  if (Number.isNaN(claimedAtMs)) return 'stale';
-
-  return Date.now() - claimedAtMs > KANBAN_LEASE_STALE_SECONDS * 1000 ? 'stale' : 'held';
-}
-
 /** One row plus its tags and counts, as every reader of a card face sees it. */
 export function toSummary(row: KanbanCardRow, tags: string[], counts: KanbanCardCounts): KanbanCardSummary {
   return {
@@ -124,13 +97,7 @@ export function toSummary(row: KanbanCardRow, tags: string[], counts: KanbanCard
       row.build_tokens_out +
       row.build_tokens_cache_read +
       row.build_tokens_cache_create,
-    approved: row.approved === 1,
     archived: row.archived === 1,
-    buildLeaseAt: row.build_lease_at,
-    buildOwner: row.build_owner,
-    planLeaseAt: row.plan_lease_at,
-    planOwner: row.plan_owner,
-    leaseState: readLeaseState(row.build_lease_at),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

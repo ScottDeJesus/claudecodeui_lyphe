@@ -63,7 +63,6 @@ export function DrawerLinks({ detail, titleOf, onOpenCard }: DrawerLinksProps) {
                 variant="outline"
                 className="h-auto min-h-9 w-full justify-start gap-2 whitespace-normal px-3 py-2 text-left font-normal finger:min-h-11"
                 data-linked-card={id}
-                // FILL: onOpenCard
                 onClick={() => onOpenCard(id)}
               >
                 <span className="shrink-0 text-xs text-muted-foreground">{link.word}</span>

@@ -58,10 +58,8 @@ export default function RunnerBugBoardRow() {
   const { t } = useTranslation('settings');
 
   // ── The wires: one read of both numbers, and its acts. Everything below them is composition. ──
-  // FILL: useBugBoardSettings
   const { width, threshold, unreadable, saving, thresholdText, thresholdOutOfBounds, setWidth, typeThreshold, leaveThreshold, refresh } =
     useBugBoardSettings();
-  // FILL: onRetry
   const onRetry = (): void => void refresh();
 
   const widthLabel = t('agents.bugBoard.width.label', { defaultValue: 'Cards walked at once' });
@@ -99,7 +97,6 @@ export default function RunnerBugBoardRow() {
                 label: t('agents.bugBoard.width.option', { count: cards, defaultValue_one: '{{count}} card', defaultValue_other: '{{count}} cards' }),
               }))}
               value={String(width)}
-              // FILL: onWidthChange
               onChange={(next) => void setWidth(Number(next))}
               ariaLabel={t('agents.bugBoard.width.selectLabel', { defaultValue: 'Board cards walked at once' })}
             />
@@ -147,13 +144,11 @@ export default function RunnerBugBoardRow() {
                 value={thresholdText}
                 aria-label={t('agents.bugBoard.threshold.fieldLabel', { ...bounds, defaultValue: 'Sort confidence, from {{min}} to {{max}}' })}
                 aria-describedby={THRESHOLD_ABOUT_ID}
-                // FILL: onThresholdType
                 onChange={(event) => typeThreshold(event.currentTarget.value)}
-                // FILL: onThresholdEnter — Enter leaves the field, so a keyboard commits through the one door a click elsewhere uses.
+                // Enter leaves the field, so a keyboard commits through the one door a click elsewhere uses.
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') event.currentTarget.blur();
                 }}
-                // FILL: onThresholdLeave
                 onBlur={() => leaveThreshold()}
               />
             </Field>

@@ -22,9 +22,8 @@ import { fileURLToPath } from 'node:url';
  * dev checkout of the same tree does not, and the last resort is announced on stderr so the two
  * indistinguishable cases can still be told apart by whoever reads the log.
  *
- * Consumers: `server/modules/browser-use/browser-use.service.ts` (the entry it registers with
- * every provider's MCP config) and `server/modules/kanban-metis/index.ts` (the command a
- * spawned Metis child is handed). Two callers of one resolver, never two copies of one resolver.
+ * Consumer: `server/modules/browser-use/browser-use.service.ts` (the entry it registers with
+ * every provider's MCP config).
  */
 export function resolveMcpCommand(
   scriptBaseName: string,
@@ -77,9 +76,8 @@ export function resolveMcpCommand(
  * The directory of the module that called into this file — the folder the `<base>.js` /
  * `<base>.ts` siblings are resolved against.
  *
- * A shared file cannot name that folder from its own `import.meta.url`: it is `modules/browser-use`
- * for one caller and `modules/kanban-metis` for the other, at a depth neither of them shares with
- * `server/shared`. The stack therefore carries the only copy of the answer, and the frames of this
+ * A shared file cannot name that folder from its own `import.meta.url`: it is the caller's folder
+ * (`modules/browser-use`), at a depth `server/shared` does not share. The stack therefore carries the only copy of the answer, and the frames of this
  * own file are skipped by module name (extension-insensitive, because the compiled twin of a `.ts`
  * frame is the same directory).
  *

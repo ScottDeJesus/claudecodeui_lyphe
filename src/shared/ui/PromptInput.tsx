@@ -31,7 +31,7 @@ export type PromptInputProps = {
   status?: PromptInputStatus;
 } & React.FormHTMLAttributes<HTMLFormElement>;
 
-/** Composer form shell, used by ChatComposer, the companion module's CompanionComposer and the kanban module's KanbanMetisConversation. */
+/** Composer form shell, used by ChatComposer and the companion module's CompanionComposer. */
 export const PromptInput = React.forwardRef<HTMLFormElement, PromptInputProps>(
   ({ className, status = 'ready', children, ...props }, ref) => {
     const contextValue = React.useMemo(() => ({ status }), [status]);
@@ -244,8 +244,8 @@ PromptInputButton.displayName = 'PromptInputButton';
 export type PromptInputSubmitProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 /**
- * Send/stop button of the composer, used by ChatComposer, the companion module's CompanionComposer and the kanban module's
- * KanbanMetisConversation. It keeps the field's focus (`keepFieldFocus`), disabled or not: one tap sends, and the field stays focused for
+ * Send/stop button of the composer, used by ChatComposer and the companion module's CompanionComposer.
+ * It keeps the field's focus (`keepFieldFocus`), disabled or not: one tap sends, and the field stays focused for
  * the next words, and a tap on a Send with nothing to send (or the one the last tap just disabled) leaves the keyboard up.
  */
 export const PromptInputSubmit = React.forwardRef<HTMLButtonElement, PromptInputSubmitProps>(

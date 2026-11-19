@@ -52,7 +52,7 @@ export const IS_PLATFORM = process.env.VITE_IS_PLATFORM === 'true';
  * never the operator's. It names no `PORT`: the server never listens on one, and the `cloudcli` CLI,
  * the one place that accepts `PORT`, copies it into `SERVER_PORT` before the server starts, so an
  * origin built from `PORT` could only point at a port nothing here listens on. Consumed by
- * `kanban-metis.module.ts`, `browser-use.service.ts` and the toolsets module.
+ * `browser-use.service.ts` and the toolsets module.
  */
 export function loopbackApiOrigin(): string {
   return `http://127.0.0.1:${process.env.SERVER_PORT || '3001'}`;

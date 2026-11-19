@@ -602,7 +602,7 @@
     "error": "Error: {{error}}",
     "agentChains": {
       "label": "Agent chains",
-      "description": "The model and effort every soul, and Metis, launches at in each lane.",
+      "description": "The model and effort every soul, the card sorter and the tweak builder launch at in each lane.",
       "button": "Edit Agent Chains",
       "loadFailed": "Agent Chains could not be loaded.",
       "reload": "Reload the page"

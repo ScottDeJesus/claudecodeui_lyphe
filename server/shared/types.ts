@@ -219,7 +219,6 @@ export type GatewayEventKind =
   | 'session_upserted'
   | 'loading_progress'
   | 'soul_launch_state'
-  | 'kanban_metis_state'
   | 'kanban_event'
   | 'notes_changed'
   | 'followups_changed'
@@ -393,7 +392,7 @@ export type DispatcherCardState = 'told' | 'queued' | 'walking' | 'asking' | 'do
 /** One case a card's walk wrote or ran, its word derived at the dispatcher's read and never stored (INV-172). */
 export type DispatcherCardCase = { suite: string; name: string; word: string };
 /** One stage entry of the card's walk, read off its chain record as a walking phase's stages are (`phase_chain.stage_rows`); `cost_usd` is paid dollars. */
-export type DispatcherCardStage = { name: string; soul: string | null; launch_id: string | null; status: string | null; verdict: string | null; cost_usd: number };
+export type DispatcherCardStage = { name: string; soul: string | null; launch_id: string | null; status: string | null; verdict: string | null; cost_usd: number; /** The sitting's own tokens: its spend when it rode the Claude subscription, where `cost_usd` is 0. */ tokens_in: number; tokens_out: number };
 /** One board card the dispatcher walks, as `dispatcher status --json`'s `cards` lists it (`report_cards.py`): `board`/`card` are the board's own ids, `hold` is the sentence a queued card waits on (null otherwise), `waits_on` the dispatcher's row id of the card it waits for. Read by `dispatcher-card.reader.ts`. */
 export type DispatcherCard = { board: string; card: string; title: string; state: DispatcherCardState; flow: 'bug' | 'change' | 'tweak' | null; part: 'whole' | 'fix' | 'change'; sorted_by: string | null; confidence: number | null; hold: string | null; waits_on: number | null; chain_id: string | null; cases: DispatcherCardCase[]; stages: DispatcherCardStage[] };
 /** The two causes a phase's or a plan's `stalled` word carries (`report_stall`): `dispatcher_down` when no daemon holds the home, so nothing can record anything, and `ended_unrecorded` when one does and has not. Both are answered by Resume, which wakes or starts the daemon. */
@@ -508,50 +507,6 @@ export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
 export type SoulLaunchSnapshot = { launch_id: string; launched_by: string | null; dispatcher_work: boolean; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; model: string; blocked: boolean; /** Set while the launch is waiting for the box's CPU to have room (`hooks/plan_runner/pacer/cpu_marker.py`'s marker, read while its launcher is alive and its soul has not started): the pin says "Waiting for CPU" with an Override instead of `running`. `null` otherwise. */ cpu_wait: DispatcherCpuWait | null; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null; tokens_in: number | null; tokens_out: number | null };
 /** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending, oldest first. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
-// ---------------------------
-//----------------- KANBAN METIS: the session a board launches ------------
-
-/**
- * One Metis session — a board's own autonomous builder, spawned detached by
- * `modules/kanban-metis` and watched after every server restart.
- *
- * `sessionId` is the uuid handed to `claude --session-id`, and it is the identity everywhere:
- * the state directory under `~/.claude/state/kanban-metis/`, the address of every route, the
- * transcript lookup, and the input to the derived lease owner. The board MINTS it, which is why
- * no launch-id-to-session-id translation exists anywhere on this path.
- *
- * `owner` is the lease owner every build-lease verb compares against — `sha256(sessionId)`
- * truncated to sixteen lowercase hex, DERIVED rather than minted, so a resumed or re-adopted
- * session comes back as the same owner and can still refresh the leases it holds.
- *
- * `model` is the `--model` flag the child was actually given (`deepseek-flash`, or the Claude word
- * the launch table gives Metis) and `provider` says which endpoint it bills; the pair is settled at
- * spawn from the board's own `deepseekFlash`, never re-derived here, because the switch applies at
- * the NEXT spawn.
- *
- * `lastActivityAt` is `child.log`'s mtime, not a heartbeat the child writes: the child is
- * detached and owns its own log file descriptor, so its log's stamp is the only liveness signal
- * that survives a server restart. `pid` is a fact to show and, for a live session, to signal.
- * Every timestamp is epoch MILLISECONDS.
- */
-export type KanbanMetisSession = {
-  sessionId: string;
-  boardId: string;
-  boardName: string;
-  provider: 'deepseek' | 'claude';
-  model: string;
-  owner: string;
-  launchedBy: 'operator' | 'driver';
-  state: 'running' | 'completed' | 'stopped' | 'failed';
-  pid: number | null;
-  startedAt: number;
-  endedAt: number | null;
-  lastActivityAt: number;
-  exitCode: number | null;
-};
-
-/** The whole picture, pushed on change over `/ws`. `sessions` is ordered by `startedAt` ascending, oldest first. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a session. */
-export type KanbanMetisStateEvent = { kind: 'kanban_metis_state'; sessions: KanbanMetisSession[]; at: number };
 // ---------------------------
 //----------------- UNIVERSE: the estate map and its live activity ------------
 /**
@@ -2607,8 +2562,8 @@ export type DeepseekBalance =
 
 // ---------------------------
 //----------------- AGENT LAUNCH RELAY: the launch table, through its CLI ------------
-// The launch table (`~/.claude/charters/launch.toml`) says which model and effort every soul, and Metis,
-// launches at. Its one reader and writer is the hooks' `launch_table` package, and this server only runs
+// The launch table (`~/.claude/charters/launch.toml`) says which model and effort every soul, the card sorter and the tweak
+// builder launch at. Its one reader and writer is the hooks' `launch_table` package, and this server only runs
 // that package's CLI (`~/.claude/scripts/launch-table`): it never opens the file. So the census
 // Settings → Agents → Edit Agent Chains draws is carried WHOLE as the CLI printed it, and its shape is written down once, in Python
 // (`hooks/launch_table/census.py`) and mirrored for the client in `src/shared/types.ts`. The
@@ -2622,25 +2577,11 @@ export type DeepseekBalance =
  *  - `unreadable`   the CLI exited 0 and what it printed was not the one JSON object its contract promises.
  *
  * Nothing that produces one of these throws: a caller branches on `ok`. Read by the relay's service and
- * routes (the status each reason earns) and by kanban-metis's spawn (a failed resolve blocks a launch).
+ * routes (the status each reason earns).
  */
 export type AgentLaunchResult<T> =
   | { ok: true; value: T }
   | { ok: false; reason: 'refused' | 'unreachable' | 'unreadable'; message: string };
-
-/**
- * What `launch-table resolve <name> --side <side>` answers: the `--model` word and the `--effort` word a
- * launch of `name` takes on that side. `effort` is `null` when no `--effort` flag is due, so the CLI's own
- * effortLevel applies. On the `deepseek` side `model` is the house's DeepSeek model word and `effort` is
- * the one house-wide DeepSeek effort. Read by the relay's service, which checks the shape, and by
- * kanban-metis's env service, which turns it into a child's argv.
- */
-export type AgentLaunchResolved = {
-  name: string;
-  side: 'claude' | 'deepseek';
-  model: string;
-  effort: string | null;
-};
 
 /**
  * One row's edit, as `PUT /api/agent-launch/rows/:name` carries it and `launch-table set` takes it. A field

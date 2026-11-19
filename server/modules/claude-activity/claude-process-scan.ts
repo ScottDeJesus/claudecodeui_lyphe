@@ -2,7 +2,7 @@
  * The process scan: which `claude` CLIs are alive on this machine, whoever started them.
  *
  * It exists because the run registry and the session-host metas only know the work THIS server
- * started. A dispatch soul, a plan-runner chain, a shell tab's interactive session and a Metis child
+ * started. A dispatch soul, a plan-runner chain and a shell tab's interactive session
  * are all `claude` processes the server never registered as a turn, and an update that installs under
  * any of them is an update that installs under a conversation.
  *

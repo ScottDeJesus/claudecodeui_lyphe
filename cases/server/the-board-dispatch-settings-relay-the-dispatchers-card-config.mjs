@@ -1,7 +1,5 @@
-// The running server mounts the board-dispatch module behind sign-in and no longer mounts Metis's two doors:
-// GET /api/kanban-dispatch/settings relays `dispatcher card config` (200 with its width and threshold for the checks
-// token, 401 with none), while /api/kanban-metis and /api/kanban-pm fall through to the API's own 404
-// (API_ROUTE_NOT_FOUND), so neither her panel's routes nor the secret-guarded board door answer any more.
+// The running server mounts the board-dispatch module behind sign-in: GET /api/kanban-dispatch/settings relays
+// `dispatcher card config` (200 with its width and threshold for the checks token, 401 with none).
 //
 // Read only: the settings are read, never written.
 //
@@ -16,7 +14,6 @@ import { api, apiWithNoToken } from "../lib/app.mjs";
 import { broken, cannotRun, held, runCase } from "../lib/case.mjs";
 
 const SETTINGS = "/api/kanban-dispatch/settings";
-const NOT_FOUND = "API_ROUTE_NOT_FOUND";
 
 runCase(async () => {
   let config;
@@ -40,15 +37,6 @@ runCase(async () => {
     wrong.push(`GET ${SETTINGS} answered ${JSON.stringify(signedIn.json)}, not width ${config.width} and threshold ${config.threshold} as the dispatcher prints`);
   }
 
-  const metis = await api("/api/kanban-metis/sessions");
-  if (metis.status !== 404 || metis.json?.code !== NOT_FOUND) {
-    wrong.push(`GET /api/kanban-metis/sessions answered ${metis.status} ${metis.json?.code ?? ""}, not 404 ${NOT_FOUND}`);
-  }
-  const pm = await apiWithNoToken("/api/kanban-pm/boards", { judge401: false });
-  if (pm.status !== 404 || pm.json?.code !== NOT_FOUND) {
-    wrong.push(`GET /api/kanban-pm/boards answered ${pm.status} ${pm.json?.code ?? ""}, not 404 ${NOT_FOUND}`);
-  }
-
   if (wrong.length > 0) return broken(wrong.join("; "));
-  return held(`${SETTINGS}: 401 signed out, 200 with width ${config.width} and threshold ${config.threshold}; /api/kanban-metis and /api/kanban-pm both 404 ${NOT_FOUND}`);
+  return held(`${SETTINGS}: 401 signed out, 200 with width ${config.width} and threshold ${config.threshold}`);
 });

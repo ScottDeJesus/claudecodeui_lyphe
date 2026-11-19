@@ -6,15 +6,16 @@ import { KanbanBoardDialog, type KanbanBoardDialogMode, type KanbanBoardDraft } 
 import { KanbanBoardHeader } from '@/modules/kanban/KanbanBoardHeader';
 import { KanbanRail } from '@/modules/kanban/KanbanRail';
 import { KanbanCardDrawer } from '@/modules/kanban/card-drawer/KanbanCardDrawer';
+import { useBoardProjects } from '@/modules/kanban/hooks/useBoardProjects';
+import { useBoardReposPrompt } from '@/modules/kanban/hooks/useBoardReposPrompt';
 import { useKanbanBoards } from '@/modules/kanban/hooks/useKanbanBoards';
 import { useKanbanDrag } from '@/modules/kanban/hooks/useKanbanDrag';
 import { useKanbanLanes } from '@/modules/kanban/hooks/useKanbanLanes';
 import { useKanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
 import { useKanbanWalks } from '@/modules/kanban/hooks/useKanbanWalks';
+import { useLinkedTitles } from '@/modules/kanban/hooks/useLinkedTitles';
 import type { KanbanViewSort } from '@/modules/kanban/utils/cardModel';
 import { foldedStatuses, kanbanLanes } from '@/modules/kanban/utils/lanePolicy';
-import { FAKE_BOARD_ID, FAKE_GONE, FAKE_PROJECTS, FAKE_TITLES } from '@/modules/kanban/utils/walkFixtures';
-import type { KanbanLinkedTitle } from '@/modules/kanban/utils/walkModel';
 import { Banner, EmptyState, Spinner } from '@/shared/ui';
 
 /**
@@ -95,49 +96,47 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
   /** Cards To Do carries that wait on an answer — the questions row, and zero under autonomy. */
   const foldedQuestions = board.countOf(foldedStatuses(autonomy));
 
-  // FILL: walks — each card's walk off the dispatcher's feed, read ONCE here for the faces and the drawer.
+  // Each card's walk off the dispatcher's feed, read ONCE here for the faces and the drawer.
   const walkOf = useKanbanWalks(currentBoardId);
 
-  // FILL: linkTitle — what the board knows of another of its cards, by id. `{ title }` off the
-  // lanes already loaded (`board.summaryOf`), or read by id for a card no loaded page holds (an
-  // archived one, one further down a lane). `'unread'` only while that read is out. `'gone'` when
-  // the read answers 404: the card was deleted, and its link is then words with no press. A link
-  // never falls back to an id.
-  const titleOf = useCallback(
-    (cardId: string): KanbanLinkedTitle => {
-      if (currentBoardId !== FAKE_BOARD_ID) return 'unread';
-      if (FAKE_GONE.includes(cardId)) return 'gone';
-      const title = FAKE_TITLES[cardId];
-      return title === undefined ? 'unread' : { title };
-    },
-    [currentBoardId]
-  );
+  // What the board knows of another of its cards, by id: its title off the lanes already loaded, or
+  // read by id for a card no loaded page holds (an archived one, one further down a lane); `'unread'`
+  // only while that read is out, and `'gone'` when it answers 404. A link never falls back to an id.
+  const titleOf = useLinkedTitles(currentBoardId, board.summaryOf);
 
-  // FILL: projects — the projects the app already lists, each a name and its absolute path.
-  const projects = FAKE_PROJECTS;
+  // The projects the app already lists, each a name and its absolute path: read while the dialog is
+  // open on a row that asks for repositories, and only then.
+  const projects = useBoardProjects(dialog === 'new' || dialog === 'repos');
 
-  // FILL: needsRepos — the sentence of the 409 `KANBAN_BOARD_NEEDS_REPOS` a refused Autonomy switch
-  // answers with. Set, it opens the dialog on `repos` (`setDialog('repos')`) with the sentence above
-  // the list; it is cleared when the dialog closes.
-  const reposNotice: string | null = null;
+  // The server's two sentences about the repositories. The 409 `KANBAN_BOARD_NEEDS_REPOS` of a
+  // refused Autonomy switch opens the dialog on `repos` with its sentence above the list, and is
+  // cleared when the dialog closes; the 400 of a path that is not a directory inside a git work tree
+  // is said under the field, and the dialog stays open over the draft.
+  const reposPrompt = useBoardReposPrompt(dialog, setDialog);
+  const reposNotice = reposPrompt.notice;
+  const reposRefusal = reposPrompt.refusal;
 
-  // FILL: reposRefusal — the server's sentence when it refused the repositories: the 400 of a path
-  // that is not a directory inside a git work tree. The dialog stays open over the draft.
-  const reposRefusal: string | null = null;
+  /** The two saves that carry repositories. Each closes the dialog on the server's ANSWER and not on
+   *  the press, and only if the reader is still in the box it was saved from: a refusal has to find
+   *  the draft still on screen. A new board is made with its repositories in one call, or not made. */
+  const saveWithRepos = async (mode: 'new' | 'repos', name: string, repos: string[]) => {
+    const landed = mode === 'new'
+      ? await createBoard(name, repos)
+      : currentBoardId !== null && (await updateBoard(currentBoardId, { repos }));
+    if (landed) setDialog((open) => (open === mode ? null : open));
+  };
 
   /** The board dialog's one write. Archive NEVER falls back by hand: every board write re-reads the
    *  list, and the board the server answers with as current is the one this panel paints. */
   const confirmDialog = (draft: KanbanBoardDraft) => {
     const mode = dialog;
-    // FILL: onSaveRepos — `draft.repos`, written through `PATCH /api/kanban/boards/:boardId` for
-    // `repos`, and sent WITH the name for `new` (`POST /api/kanban/boards` takes `repos`), so a new
-    // board is made with its repositories in one call or not made at all. Either save closes the
-    // dialog on the server's answer and not on the press: a refusal has to find the draft still on
-    // screen. The line below is this marker's: it is where `repos` is read off the draft.
-    const { name } = draft;
+    const { name, repos } = draft;
+    if (mode === 'new' || mode === 'repos') {
+      void saveWithRepos(mode, name, repos);
+      return;
+    }
     setDialog(null);
-    if (mode === 'new') void createBoard(name);
-    else if (mode === 'rename' && currentBoardId) void updateBoard(currentBoardId, { name });
+    if (mode === 'rename' && currentBoardId) void updateBoard(currentBoardId, { name });
     else if (mode === 'archive' && currentBoardId) void updateBoard(currentBoardId, { archived: true });
   };
 
@@ -259,7 +258,7 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
         writes={writes}
         walk={board.selectedCardId === null ? null : walkOf(board.selectedCardId)}
         titleOf={titleOf}
-        // FILL: onOpenCard — a link's press opens the linked card in this same sheet.
+        // A link's press opens the linked card in this same sheet.
         onOpenCard={board.openCard}
         onClose={() => board.openCard(null)}
       />

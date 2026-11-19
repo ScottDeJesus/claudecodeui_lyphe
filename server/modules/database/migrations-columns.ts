@@ -23,6 +23,22 @@ export const addColumnToTableIfNotExists = (
   }
 };
 
+/**
+ * SQLite's `DROP COLUMN` refuses a column that is a key, is indexed or is named by a constraint. That
+ * refusal is left to rise, not caught here.
+ */
+export const dropColumnIfExists = (
+  db: Database,
+  tableName: string,
+  columnNames: string[],
+  columnName: string
+): void => {
+  if (columnNames.includes(columnName)) {
+    console.log(`Running migration: Dropping ${columnName} column from ${tableName} table`);
+    db.exec(`ALTER TABLE ${tableName} DROP COLUMN ${columnName}`);
+  }
+};
+
 export const tableExists = (db: Database, tableName: string): boolean =>
   Boolean(
     db
@@ -32,3 +48,18 @@ export const tableExists = (db: Database, tableName: string): boolean =>
 
 export const getTableInfo = (db: Database, tableName: string): TableInfoRow[] =>
   db.prepare(`PRAGMA table_info(${tableName})`).all() as TableInfoRow[];
+
+type ColumnDefaultRow = {
+  name: string;
+  dflt_value: string | null;
+};
+
+export const getColumnDefault = (
+  db: Database,
+  tableName: string,
+  columnName: string
+): string | null =>
+  db
+    .prepare<[], ColumnDefaultRow>(`PRAGMA table_info(${tableName})`)
+    .all()
+    .find((row) => row.name === columnName)?.dflt_value ?? null;

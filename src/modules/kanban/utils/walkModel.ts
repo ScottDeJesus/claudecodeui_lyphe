@@ -59,7 +59,7 @@ export function soulName(soul: string): string {
 
 /** Whether a sitting is still out. */
 export function stageRunning(stage: KanbanWalkStage): boolean {
-  // FILL: running — the status word the feed gives a stage whose soul is still out.
+  // `waiting` is what the plan runner stamps on a stage entry at its launch (`chain_state.py`), until the stage's ending replaces it.
   return stage.status === 'waiting';
 }
 

@@ -62,8 +62,8 @@ type NoteFormProps = {
  *
  * AN IME'S ENTER IS THE IME'S. While a composition is being built (a Japanese, Korean or Chinese
  * title), the Enter that commits the composed word arrives as a keydown this form would otherwise
- * take for finishing — so both handlers return before it, as the house's two other Enter-as-send
- * handlers do (`useChatComposerState.ts`, `KanbanMetisConversation.tsx`).
+ * take for finishing — so both handlers return before it, as the chat composer's Enter-as-send
+ * handler does (`useChatComposerState.ts`).
  */
 export function NoteForm({ draft, onChange, onDone, showDone, onLeave, onSaveNow, status, titleRef }: NoteFormProps) {
   const { t } = useTranslation();

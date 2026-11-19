@@ -35,9 +35,9 @@ const EARLIER_STEP = 100;
  * mounting all of the server's 1000 at once would be a thousand tool renderers the moment the row
  * is opened — and the newest steps are the ones the reader came for.
  *
- * Drawn by the chat module's `transcript/PinnedSubagents.tsx`, in a dialog over the chat. Its third
- * drawer is the kanban module's `KanbanMetisPanel.tsx`, which opens a board Metis's fleet row here
- * with a `'metis'` target and no chat session — one view, three kinds, never a copy.
+ * Drawn by the chat module's `transcript/PinnedSubagents.tsx`, in a dialog over the chat. Its other
+ * caller, outside the chat, is the kanban card drawer, which opens a walk stage's soul transcript
+ * (`{ kind: 'soul', id: <launch id> }`) here with no chat session — one view, two kinds, never a copy.
  */
 export function SubagentTranscriptView({
   sessionId,

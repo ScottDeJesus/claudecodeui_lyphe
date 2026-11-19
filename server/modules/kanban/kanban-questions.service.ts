@@ -1,19 +1,8 @@
-import {
-  kanbanApprovalsDb,
-  kanbanCardsDb,
-  kanbanIdsDb,
-  kanbanQuestionsDb,
-  type KanbanCardRow,
-} from '@/modules/database/index.js';
-import type {
-  KanbanCardSummary,
-  KanbanDecision,
-  KanbanQuestion,
-  KanbanWriteContext,
-} from '@/shared/kanban-types.js';
+import { kanbanCardsDb, kanbanIdsDb, kanbanQuestionsDb } from '@/modules/database/index.js';
+import type { KanbanDecision, KanbanQuestion, KanbanWriteContext } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
-import { cardNotFound, requireCardRow, requireSummary } from './kanban-cards.guards.js';
+import { requireCardRow } from './kanban-cards.guards.js';
 import { writeKanban } from './kanban-write.service.js';
 
 /** A question that is not there is a 404, and this is the one place that sentence is written. */
@@ -61,49 +50,16 @@ function requireQuestion(questionId: string): KanbanQuestion {
 }
 
 /**
- * THE APPROVE GATE.
- *
- * A card may be approved when nobody is still waiting on an answer AND the card says something
- * about what would be built — a plan, a body, or at least a description. Either half alone is a
- * card the board would launch with a question unresolved or nothing to launch at all, and both
- * refusals are 409s rather than 400s: the request was well formed, the card is not ready.
- *
- * It reads inside the write's transaction, which is the point of it being here rather than in a
- * route: the unanswered count the gate sees is the count the approval is decided against.
- */
-function requireApprovable(row: KanbanCardRow): void {
-  const unanswered = kanbanQuestionsDb.countUnanswered(row.id);
-  if (unanswered > 0) {
-    throw new AppError(
-      `This card cannot be approved while ${unanswered} question${unanswered === 1 ? '' : 's'} remain unanswered.`,
-      { code: 'KANBAN_CARD_QUESTIONS_OPEN', statusCode: 409 }
-    );
-  }
-
-  const hasSubstance =
-    (row.plan ?? '').trim().length > 0 ||
-    row.body.trim().length > 0 ||
-    row.description.trim().length > 0;
-
-  if (!hasSubstance) {
-    throw new AppError('A card needs a plan, a body or a description before it can be approved.', {
-      code: 'KANBAN_CARD_NEEDS_PLAN',
-      statusCode: 409,
-    });
-  }
-}
-
-/**
- * The questions a card asks, the decisions it records, answered or noted, and the gate that holds a card
- * back until both are settled.
+ * The questions a card asks, and the decisions it records, answered or noted.
  *
  * EVERY write here goes through `writeKanban` — no verb in this file opens a transaction, appends
  * an audit row or sends a frame — and every one threads `context?.actor` into the seam, so an
- * audit row's actor is the caller's own (`'metis'` through the Metis door, `'operator'` when the
- * route stamped none) without a signature moving. A verb that needs two writes to be atomic does both inside ONE `mutate` callback.
+ * audit row's actor is the caller's own (the dispatcher and the intake door pass theirs; a route
+ * passes none, and its row reads `'operator'`) without a signature moving. A verb that needs two
+ * writes to be atomic does both inside ONE `mutate` callback.
  *
  * Consumers: `routes/detail.routes.ts`, `kanban-cards.service.ts`'s `getCard`, and the barrel,
- * which is how a future in-process MCP adapter calls the same verbs.
+ * which is how any in-process caller reaches the same verbs.
  */
 export const kanbanQuestionsService = {
   /**
@@ -151,7 +107,6 @@ export const kanbanQuestionsService = {
             id: cardId,
             status: 'questions',
             sortOrder: current.sort_order,
-            clearBuildLease: false,
           });
         }
 
@@ -246,49 +201,6 @@ export const kanbanQuestionsService = {
           choice: [choice],
           tags: [],
         })
-    );
-  },
-
-  /**
-   * Approves a card, once the gate above lets it through.
-   *
-   * A `not_ready` card that passes the gate is promoted to `todo` AND approved in ONE statement
-   * inside the one `mutate` callback — never two writes, so a card can never be approved and left
-   * in the backlog, nor promoted and left unapproved. A card already in another status only gains
-   * the approval; the gate never moves a card that its author has placed.
-   */
-  approveCard(cardId: string, context?: KanbanWriteContext): KanbanCardSummary {
-    return writeKanban(
-      { kind: 'card.approved', cardId, boardId: (card) => card.boardId, actor: context?.actor },
-      () => {
-        const row = requireCardRow(cardId);
-        requireApprovable(row);
-
-        kanbanApprovalsDb.setApproved({
-          id: cardId,
-          approved: true,
-          promoteTo: row.status === 'not_ready' ? 'todo' : undefined,
-        });
-
-        return requireSummary(cardId);
-      }
-    );
-  },
-
-  /**
-   * Withdraws a card's approval.
-   *
-   * It clears `approved` and `approved_at` and NOTHING else: un-approving is not un-promoting, and
-   * a card that was approved out of the backlog stays in To Do where its approval put it. Its
-   * status is the author's decision to change, not this verb's.
-   */
-  unapproveCard(cardId: string, context?: KanbanWriteContext): KanbanCardSummary {
-    return writeKanban(
-      { kind: 'card.unapproved', cardId, boardId: (card) => card.boardId, actor: context?.actor },
-      () => {
-        if (!kanbanApprovalsDb.setApproved({ id: cardId, approved: false })) throw cardNotFound(cardId);
-        return requireSummary(cardId);
-      }
     );
   },
 };

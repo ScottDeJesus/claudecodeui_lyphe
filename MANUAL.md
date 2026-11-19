@@ -345,13 +345,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/, /ho
 
 ## MAN-7416 — server/modules/agent-launch — the relay's service, shape checks, failure classes and timeouts
 
-Module internals of the `/api/agent-launch` relay. Its contract (routes, bodies, refused 400 · unreachable 503 · unreadable 502, `LAUNCH_TABLE_BIN`) is MAN-7418; Metis's resolve is a section of MAN-7418; the window that reads it is MAN-7417. The server never opens `launch.toml` and never regenerates a shim; the CLI is the one reader and writer (MAN-7415, MAN-7407).
+Module internals of the `/api/agent-launch` relay. Its contract (routes, bodies, refused 400 · unreachable 503 · unreadable 502, `LAUNCH_TABLE_BIN`) is MAN-7418; the window that reads it is MAN-7417. The server never opens `launch.toml` and never regenerates a shim; the CLI is the one reader and writer (MAN-7415, MAN-7407).
 
 ## service
 | what | value |
 |---|---|
-| instance | one `createAgentLaunchService({ bin })`, built on first use, shared by the router and `resolveLaunchSide` |
-| `resolveLaunchSide(name, side)` | barrel export; runs `resolve <name> --side <side>` through the same service; answers `AgentLaunchResolved` `{name, side, model, effort}` |
+| instance | one `createAgentLaunchService({ bin })`, built on first use, used by the router |
 | spawn | `execFile` with argv (no shell), `cwd` = `os.homedir()`, env = `userFacingEnv()`, stdout cap 4 MiB |
 
 ## route checks — shape only
@@ -371,21 +370,21 @@ Every failure is `AgentLaunchResult` `{ok: false, reason, message}`; the status 
 |---|---|
 | `refused` | exit 2 with `{"error": "<sentence>"}` on stdout; the sentence passes untouched. The CLI's own argparse faults are refusals too |
 | `unreachable` | spawn failure (`ENOENT`), timeout, crash, any other exit, exit 2 with no `{"error"}` on stdout |
-| `unreadable` | exit 0 whose stdout is not one JSON object; a `resolveSide` answer whose `name`, `side`, `model` or `effort` does not match what was asked |
+| `unreadable` | exit 0 whose stdout is not one JSON object |
 
 | verb | timeout |
 |---|---|
-| `show`, `resolve` | 20 s (`READ_TIMEOUT_MS`) |
+| `show` | 20 s (`READ_TIMEOUT_MS`) |
 | `set`, `defaults` | 90 s (`WRITE_TIMEOUT_MS`): the CLI's lock wait plus the 60 s regeneration |
 
 An error thrown outside these branches goes to the app's error handler.
 
 ## shared types — `server/shared/types.ts`
-`AgentLaunchResult<T>` · `AgentLaunchResolved` · `AgentLaunchRowChange` · `AgentLaunchDefaultsChange`.
+`AgentLaunchResult<T>` · `AgentLaunchRowChange` · `AgentLaunchDefaultsChange`.
 
 `AgentLaunchDefaultsChange` = `{model?, effort?, deepseek_effort?, dactyl_model?, dactyl_effort?, summarizer_model?, summarizer_effort?}`; the argv flags are `--dactyl-model` / `--dactyl-effort` and `--summarizer-model` / `--summarizer-effort`.
 
-The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort`, `choices.sorter_models`, `choices.tweak_models` included; row `kind` adds `sorter` and `tweak`, lane adds `sorter`), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
+The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort`, `choices.sorter_models`, `choices.tweak_models` included; row `kind` is `soul`, `sorter` or `tweak`, lane `agent`, `dispatcher`, `chain` or `sorter`), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts
 
@@ -2390,13 +2389,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx
 
 ## MAN-7926 — Cerberus fixes, the whole once — .verify/cerberus-fixes-whole-scratch.sh, -live.mjs and cerberus-fixes-refused-shot.mjs: what each proves, how to run it, the verdicts
 
-The fixes screen, the catalog and the auto-run rule shown end to end: a real Run now on the live tab, auto-run and a refusal on a scratch center. The whole before the fixes: MAN-7899 (`.verify/cerberus-whole*`). Runs, the rule, the refusal's source: MAN-7904, MAN-7910, INV-7106, INV-7080. The screen: MAN-7906. The seeded entries: MAN-7925. The scratch server and its slots: MAN-673 (`cloudcli:docs`).
+The fixes screen, the catalog and the auto-run rule shown end to end: a real Run now on the live tab, auto-run and a refusal on a scratch center. The whole before the fixes: MAN-7899 (`.verify/cerberus-whole*`). Runs, the rule, the refusal's source: MAN-7904, MAN-7910, INV-7106, INV-7080. The screen: MAN-7906. The seeded entries: MAN-7925.
 
 ## Files
 | file | proves | runs against |
 |---|---|---|
 | `.verify/cerberus-fixes-whole-live.mjs` | Run now on `docstore/backup.age`, pressed in the sheet as a person presses it | the live app on :5183 (`openConsole`, `openNodeCard`), `~/.cloudcli/cerberus.db` read-only |
-| `.verify/cerberus-fixes-whole-scratch.sh` | auto-run once inside its limit, the recheck, a refused `run.start` | a scratch center (`scripts/sunset-probe.sh`) and a scratch warden |
+| `.verify/cerberus-fixes-whole-scratch.sh` | auto-run once inside its limit, the recheck, a refused `run.start` | a scratch center and a scratch warden |
 | `.verify/cerberus-fixes-refused-shot.mjs` | `FixOutput` reads "Refused" after the refusal's crossed-octagon icon (`lucide-octagon-x`), and the refusal's reason, over a real run view | the running :5183 client, the scratch center's answer |
 
 ## Run it
@@ -2456,7 +2455,7 @@ Shows MAN-7933's two rules live: a node whose update is the active one takes no 
 bash .verify/cerberus-node-updating.sh        # repo root; slot 2 unless SUNSET_SLOT says otherwise; about 6 min
 ```
 
-Slot claimed by `probe_db` (`scripts/sunset-probe.sh`); a slot another probe holds is refused and the trap leaves it alone. Opens no `~/.cloudcli/cerberus.db`, writes no `dist-warden/`, binds no 3012; releases N, N+1, N+2 are built through scratch copies of the tree (`.verify/lib/scratch-wardens.sh`).
+The probe claims its own slot; a slot another probe holds is refused and the trap leaves it alone. Opens no `~/.cloudcli/cerberus.db`, writes no `dist-warden/`, binds no 3012; releases N, N+1, N+2 are built through scratch copies of the tree (`.verify/lib/scratch-wardens.sh`).
 
 | Step | Shown |
 |---|---|
@@ -3031,7 +3030,7 @@ The seams tool sets cross, as types and one hook. The Claude runtime reaches the
 
 ## `loopbackApiOrigin()` — `server/shared/utils.ts`
 
-- Answers `http://127.0.0.1:${process.env.SERVER_PORT || '3001'}`, re-read at every call. Callers: `resolveApiOrigin` (`kanban-metis.module.ts`), `getMcpApiUrl` (`browser-use.service.ts`), the toolsets module.
+- Answers `http://127.0.0.1:${process.env.SERVER_PORT || '3001'}`, re-read at every call. Callers: `getMcpApiUrl` (`browser-use.service.ts`), the toolsets module.
 - It names no `PORT` (INV-8440). A server on another port (a probe on 7893) hands its children its own origin.
 
 ## `JWT_SECRET` export — `server/modules/auth/index.ts`
@@ -5494,7 +5493,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/a
 section: server/modules/companion/tools — stop_session, rename_session and answer_session: acting on a chat through the house's own verbs/003 Gotchas a probe meets
 
 - **This box asks about nothing.** `~/.claude/settings.json` allows `Bash(*)` and the runtime loads the `user`, `project` and `local` setting sources, so "Run date in Bash." raises no permission. An `ask` rule outranks an `allow` rule, so the probe writes `.claude/settings.json` with `ask: ["Bash(date:*)", "Bash(uname:*)"]` in a project of its own. A project's settings apply to EVERY chat launched there: written into the shared `PROBE_PROJECT` it made another session's `date` chat start asking (measured 2026-10-27), so the probe's project is `${PROBE_PROJECT}-act`, removed by unlink and rmdir after.
-- **Account 1 has one Kaylee.** Lines typed by two probes on the live server land in one conversation, and her "Stop it." stopped a chat that was not the typist's (her log: "The probe long chat is halted"). The scratch runner gives the probe its own server over a database copy (`scripts/sunset-probe.sh`, slot 6) and a scratch Vite; `/clear` on the copy forgets the live conversation id first, so she never resumes the live JSONL.
+- **Account 1 has one Kaylee.** Lines typed by two probes on the live server land in one conversation, and her "Stop it." stopped a chat that was not the typist's (her log: "The probe long chat is halted"). The scratch runner gives the probe its own server over a database copy (slot 6) and a scratch Vite; `/clear` on the copy forgets the live conversation id first, so she never resumes the live JSONL.
 - **A plan-runner child's environment reaches the chats.** The scratch server starts every probe chat's CLI with its own environment, and `hooks/runner_never_stop.py` refuses `AskUserQuestion` in any process with `PLAN_RUNNER_CHILD=1`: the ask leg's chat was refused and filed a followup instead of asking. The runner unsets the plan-runner and session-identity variables before it starts the server.
 - **A session host outlives its server.** Each chat that raised an ask leaves a keepalive `session-host/host.js <host id> <sessions dir>` with a live Haiku CLI child after the scratch server stops (measured 2026-10-27). The runner ends the slot's hosts (SIGTERM, matched on the slot's own sessions dir as a whole word) before it stops the server.
 
@@ -8393,7 +8392,7 @@ The words every one of them says its lines in (`maskCredentials`, `clipLine`, `f
 - A card id (`c-<n>`): `getCard`; a 404 → refused `No card has the id …`.
 - Else a title or phrase: up to 10 pages of 200 cards (`SEARCH_PAGES_MAX`) are read, so a board past 2,000 cards is searched in its first 2,000. An exact title wins; else every card whose title or any tag holds the phrase, newest `updatedAt` first. None → `No card on <board> has "<phrase>" in its title or tags. The lanes are not ready, todo, questions, active and done.` (`LANE_WORDS_LINE`). One → the card whole. Several → `<n> cards on <board> fit "<phrase>":` and lines.
 - A card line: `<title ≤60> · <lane> · <priority> · <first 2 tags, +n> · card <id>` (`no tags` when none).
-- A card whole (`cardFacts`): title, `<lane> · <priority> priority · <tags> · card <id>`, `Checklist: d of t done.` or `No checklist.`, up to 5 open questions with up to 6 options each (`And k more.`) or `No open questions.`, `Approved <when>.` or `Not approved.`; then `Description:` and the description (credentials masked; empty → `(no description)`), whole when ≤2,000 characters, else a dactyl digest under `CARD_BRIEF`.
+- A card whole (`cardFacts`): title, `<lane> · <priority> priority · <tags> · card <id>`, `Checklist: d of t done.` or `No checklist.`, up to 5 open questions with up to 6 options each (`And k more.`) or `No open questions.`; then `Description:` and the description (credentials masked; empty → `(no description)`), whole when ≤2,000 characters, else a dactyl digest under `CARD_BRIEF`.
 - NEVER a card's `buildTokens` or a detail's four counters: no function in `kanban-lines.ts` reads them.
 
 ## Probe — `.verify/companion-panel-reads.mjs`
@@ -11786,7 +11785,7 @@ His presses on what stands on his stage: the Pin on a card and the Back, Next an
 ## Probes
 - `.verify/companion-cards-routes.sh live|scratch` runs `.verify/companion-cards-routes.mjs`: every call is the page's own (bearer token, `x-companion-client`), the answer's status and body set beside the database's rows and the `companion_*` frames a websocket client heard. It writes the frames and a `GET` of her picture at each quiet moment to `CARDS_FRAMES_OUT.<n>.json` for `.verify/companion-reducer.mjs`.
   - `live` (:3011, account 1): pin, unpin, repeat pin; a malformed body; his × on a pinned card; `PUT /walk` with none held (409). It never presses Clear and never presses another account's card. It skips the no-walk section when account 1 holds a walk.
-  - `scratch` (a server over a COPY of `auth.db`, slot 3 or `COMPANION_CARDS_SLOT`; `scripts/sunset-probe.sh`; the trap takes it down): another account's card (404, row untouched), Clear keeping the pinned, `PUT /walk` at 3, `at` 9 on four items (409 with the count), `DELETE /walk` twice (one frame).
+  - `scratch` (a server over a COPY of `auth.db`, slot 3 or `COMPANION_CARDS_SLOT`; the trap takes it down): another account's card (404, row untouched), Clear keeping the pinned, `PUT /walk` at 3, `at` 9 on four items (409 with the count), `DELETE /walk` twice (one frame).
   - The wrapper blanks `companion_state.unanswered_json` in the copy before boot. why: a copy re-sends the account's unanswered line on boot and wakes her model; any other scratch probe over a copy does.
 - `.verify/companion-cards-page.sh` runs `.verify/companion-cards-page.mjs` against a scratch Vite client (port 5199, `COMPANION_CARDS_CLIENT_PORT`) proxying to :3011: `pinNote`, `moveWalk`, `endWalk` pressed through the real `CompanionProvider` and read back from its picture and the database; a failed move or a missing card rejects with the server's sentence. It refuses to start when account 1 already holds a walk. The live :5183 client is not used.
 - The page probe never holds an answer and its socket is live, so it cannot show the echo standing down (MAN-9148 §`pinNote`).
@@ -17072,7 +17071,7 @@ The presses stay off past the door's own read, until the heal summary lands: INV
 Not checked: an unknown `shelf`, `state` or `decision.status`; the cards read them as unknown words. A key the cards walk unguarded joins this function in the same change. The producer never sends a refused shape: every rule it writes is whole, `ts` is always a number (`said_at` falls back to the cited time), and any fault answers `{"rules": [], "rules_more": 0}` (MAN-9677).
 
 ## Proof
-2026-11-07, a scratch stack: `scripts/sunset-probe.sh` `boot_probe_server` and `.verify/lib/vite-scratch.config.mjs`, `HEAL_LEDGER_PATH` at a Python `.backup()` copy of the ledger, three rules planted through `heal_ledger.rules`, `memory_queue.propose` and the sweep (a house rule, a project rule, a shelf rule). 83 checks held at 390×844 and 1440×900, light and dark; frames `.verify/shots/heal-rules-fill-*.png` (gitignored). No probe script is kept.
+2026-11-07, a scratch stack: a scratch server and `.verify/lib/vite-scratch.config.mjs`, `HEAL_LEDGER_PATH` at a Python `.backup()` copy of the ledger, three rules planted through `heal_ledger.rules`, `memory_queue.propose` and the sweep (a house rule, a project rule, a shelf rule). 83 checks held at 390×844 and 1440×900, light and dark; frames `.verify/shots/heal-rules-fill-*.png` (gitignored). No probe script is kept.
 - Discard on the house rule: both presses on before the click and off within 62 ms; off from the write's answer until the summary landed (102 samples over 4,368 ms, the summary held 1.5 s) and after the Memory queue's re-read answered (99 samples over 4,355 ms); then `discarded Nov 7`, 3 rows listed, the store row `rejected`.
 - `file it`: one `POST /api/memory/mc-156/approve` answered 422 inside the page; the cap words replaced the earlier failure on the card.
 - A write aborted in the page: `The memory queue is not reachable.` on the card at once.
@@ -17875,3 +17874,118 @@ A failure arrives as `{ error }` from the lane, or `{ detail }` passed through f
 - `src/modules/scheduling-report` (MAN-9992) is the only caller of `api.schedulingReport` and, beside `api.ts`, the only importer of the wire types.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/scheduling-report-types.ts
+
+## MAN-10022 — server/modules/kanban-dispatch — the board tells the dispatcher what a person did to a card and applies the notes it writes back
+
+`server/modules/kanban-dispatch/` joins a self-running board (`autonomy` on) to the dispatcher. It reaches the board only through `@/modules/kanban/index.js` and the dispatcher only through `runDispatcherCommand` (`dispatcher card ...`, MAN-10009); it opens no file of the dispatcher's home.
+
+## Wiring
+| part | fact |
+|---|---|
+| `createKanbanDispatchModule(storeWatch)` | `server/index.ts` builds it with the dispatcher's store watch, mounts `router` at `/api/kanban-dispatch` behind `authenticateToken`, calls `start()` after `listen` and `stop()` on shutdown |
+| teller | `onKanbanWrite(teller)` subscribed at CONSTRUCTION, not in `start()`: a card created in the gap before `start()` is still told |
+| applier | `storeWatch.attach('status', poke)` in `start()` plus one poke at start (notes written while the server was down) |
+| `stop()` | unsubscribes, detaches, then stops the applier |
+| timeouts | `card told` 180 s (it sorts first: Jev, then maybe one tool-less Haiku); `notes`, `applied`, `config` 20 s |
+
+## Tell — `kanban-dispatch.tell.ts` (`tellEventOf`, `createCardTeller`)
+One `TELLS` table, first match wins; `write.actor === 'dispatcher'` (`DISPATCHER_ACTOR`) and a write with no board are never told.
+| write | event |
+|---|---|
+| `card.created` | `created` |
+| `card.moved` to `todo` | `queued` |
+| `card.updated` whose payload `fields` hold `title`, `description`, `body` or `priority` | `updated` |
+| `question.answered` leaving `card.openQuestions === 0` | `answered` (record carries `answers`) |
+| `card.moved` to `not_ready` or `done`; `card.archived` | `stopped` |
+| `board.updated` or `board.archived` with payload `autonomy === false` | `board-off` |
+- `created`, `queued`, `updated`, `answered` need `board.autonomy` on at the write AND at the send (`NEEDS_AUTONOMY_AT_SEND`); `stopped` and `board-off` are told whatever the switch reads. why: a stop is the only way to halt a walk once the switch is off.
+- The listener never blocks or throws into the write. One promise chain per card, one per board for `board-off`: tells of a subject go out in write order; a failed tell does not break the chain.
+- Card text (`title`, `description`, `body`, question texts) is cut at 20,000 code points (`TEXT_CHARS_MAX` = the dispatcher's `TEXT_MAX`); attachments go as absolute paths of the files they resolve to.
+- Exit 0 logs the dispatcher's first line; exit 2 logs `the dispatcher refused <event> ...`; anything else logs `exited N` / `did not answer`.
+
+## Audit payloads the tell reads
+| kind | payload |
+|---|---|
+| `board.updated` | `{ autonomy }` when the write set the switch; an archive of a running board writes `{ autonomy: false }`, an archive of a stopped one `{}` |
+| `card.updated` | `{ fields: [...] }` the patch fields the write set |
+`PATCH /api/kanban/boards/:id` `{ autonomy: true }` on an archived board is 409 `KANBAN_BOARD_ARCHIVED` (inside the repos-check transaction); `archived: false` in the same patch lifts it.
+
+## Apply — `kanban-dispatch.apply.ts` (`createNoteApplier`)
+1. `dispatcher card notes --json` → `readNotes` (`kanban-dispatch.notes.ts`, readers in `kanban-dispatch.fields.ts`); a note that does not read costs only itself (logged, skipped); a printout that is not a JSON list is refused whole.
+2. Notes apply in id order through the kanban services as actor `dispatcher` (`AS_DISPATCHER`).
+3. `dispatcher card applied <id> [--result -]` stamps each.
+- One pass at a time; a poke during a pass costs exactly one more pass. A failed stamp is kept in `owedStamps` and retried as a stamp only, never re-applied by this process.
+- A failure (not a 4xx) leaves the note pending and holds that card's later notes; other cards go on.
+- A 4xx `AppError` is the note's fault: stamped `{"refused": "<message>"}`, logged once. A card not on the note's board stamps `{"gone": true}`.
+- Re-applying after a stop between apply and stamp is safe for every kind but `tokens` (`addCardTokens` adds twice).
+
+| note kind | does |
+|---|---|
+| `steps` | `setSteps`: checklist becomes exactly these texts, existing text keeps its state and note |
+| `step` | `markStep`: sets state/note; adds the step when the text is not on the checklist |
+| `status` | `moveCard` unless already there |
+| `tags` | `addTag` / `removeTag` |
+| `question` | `askOnce` (skips an unanswered same-text question) |
+| `decision` | `noteDecisionOnce` |
+| `text` | `plan` or `closingRemarks` via `updateCard` |
+| `shot` | `attachShotOnce` via `addAttachmentFromPath(..., filename)`; skips a name already attached |
+| `tokens` | `addCardTokens` |
+| `card` | `changeCardFor`: opens the change half in To Do; stamps `{ card: <id> }` |
+| `board` | stamps `{ open: [...], done: [...] }` from `kanbanRosterService.boardCards` (every card but the asking one); `done_at` is the card's `updated_at` |
+| `link` | tags the target; records the decision |
+| `close` | `closingRemarks`, then moves to `done` |
+
+## Routes — `kanban-dispatch.routes.ts`
+`GET /api/kanban-dispatch/settings`, `PUT /api/kanban-dispatch/settings` `{ width?, threshold? }` → `{ width, threshold }` relayed from `dispatcher card config --json` (MAN-10005). `width` whole 1–4, `threshold` 0.50–0.99; a body naming neither, a non-object body or an out-of-bound value is 400 (checked here and by the dispatcher: exit 2 → 400); an unreadable or failing dispatcher is 502.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.apply.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.cards.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.fields.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.notes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.tell.ts
+
+## MAN-10023 — Board roster read, addAttachmentFromPath's display name and DispatcherPicture.cards — the board-dispatch module's reads
+
+## `kanbanRosterService.boardCards(boardId)` — `kanban-roster.service.ts`, `kanban-roster.db.ts`
+Every card of one board, archived and Done included (the lane reads drop archived), `updated_at` DESC then `id` DESC → `KanbanRosterCard[]` `{ id, title, status, description, closingRemarks, tags, archived, updatedAt }`. Tags in ONE batch query. Unknown board: 404 `KANBAN_BOARD_NOT_FOUND`. A read: no write seam, no frame. Exported by `server/modules/kanban/index.ts` with the type; its one consumer is the `board` note.
+
+## `addAttachmentFromPath(cardId, filePath, context?, filename?)`
+The optional `filename` is the display name the attachment carries (the `shot` note's name); absent, the file's basename.
+
+## `DispatcherPicture.cards` — `dispatcher-card.reader.ts` (`cardsOf`, `cardOf`)
+Reads the `cards` key of `dispatcher status --json` (`hooks/dispatcher/report_cards.py`) into `DispatcherCard[]` (`src/shared/types.ts` and `server/shared/types.ts`, one text in both): `{ board, card, title, state, flow, part, sorted_by, confidence, hold, waits_on, chain_id, cases[], stages[] }; the client's `DispatcherLanePicture` (`DispatcherFeed.tsx`) carries `cards` through`.
+- `state` ∈ `told queued walking asking done handed-back stopped withdrawn`; `flow` ∈ `bug change tweak` or `null`; `part` ∈ `whole fix change`.
+- `cases[]` `{ suite, name, word }`; `stages[]` `{ name, soul, launch_id, status, verdict, cost_usd, tokens_in, tokens_out }`; `tokens_*` are the stage's own entry in the chain record (`report_cards.py` `_stages`), the sitting's spend on the Claude subscription where `cost_usd` is 0; `stageOf` reads both through `countSince`, so a build older than the keys reads 0.
+- A key that is there and does not read is refused by name (a different dispatcher build); `cards` absent reads `[]`. Nothing is derived or cut here (INV-172); the dispatcher already drops an ending older than a day.
+- `dispatcher-state.service.ts` carries `cards` in the picture and on the `dispatcher_state` frame (`DispatcherStateEvent.cards`); the board matches a walk to its card by `board` + `card` id.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/kanban-roster.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-card.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-attachments.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-roster.service.ts
+
+## MAN-10024 — The board's screens fill — walks, linked titles, repos dialog hooks
+
+## `useKanbanWalks(boardId)` — `hooks/useKanbanWalks.ts`
+- Source: `DispatcherFeed.tsx` `cards` (`DispatcherCard[]`, MAN-10023), via `useLiveTopic(DISPATCHER_ALL_TOPIC)`; matched by `board` + `card` (a card id is unique only per board).
+- Returns `(cardId) => KanbanWalk | null`; `null` = the dispatcher is not walking it (autonomy off, not told yet, ended over a day ago): the face draws no hold, the drawer no stages.
+- `hold`: the feed's reason with its leading class word dropped (`cards: 1 of 1 walking` reads "1 of 1 cards walking").
+- `stageOf` passes `tokens_in`/`tokens_out` on; `DrawerStepStages` hands both to `spendText`.
+- Called once, by `KanbanPanel`; face and drawer share the answer.
+
+## `useLinkedTitles(boardId, summaryOf)` — `hooks/useLinkedTitles.ts`
+- Returns `(cardId) => KanbanLinkedTitle`: a title, `'unread'` or `'gone'`.
+- Loaded card: title read off the lanes (`summaryOf`). Not loaded (archived, another board, further down a lane): read once by id.
+- 404 ⇒ `'gone'` (words, no press). Any other failure ⇒ stays `'unread'` until the board changes; no retry loop.
+- Answers belong to one board; dropped on board change. The id read is queued from `titleOf` and drained in a microtask, never inside render.
+
+## `useBoardProjects(wanted)` — `hooks/useBoardProjects.ts`
+- `GET /api/projects` (`api.projects.list`), only while `wanted` (dialog open on a row that asks for repositories); read fresh on each opening.
+- Projects with a missing folder are left out; an unreadable list is `[]` (the dialog still takes a typed path).
+
+## `useBoardReposPrompt` — `hooks/useBoardReposPrompt.ts`
+- Module-level store carrying the server's refusal from `useKanbanBoards` to `KanbanPanel`'s dialog; one refusal at a time, the newer replaces the older.
+- `needs-repos`: 409 `KANBAN_BOARD_NEEDS_REPOS` of the Autonomy switch on a board with no repos ⇒ dialog opens on Repositories, server sentence above the list.
+- `refused`: 400 on a repos list the server rejects ⇒ sentence under the field, dialog stays open over the draft.
+- Cleared on dialog close and on a landed write. On dialog open a held `refused` is cleared (a late 400 never shows in the next dialog); `needs-repos` is kept, it is what opens the dialog.
+
+## `useKanbanBoards` — board writes
+- Writes return whether they landed. `createBoard` and repos edits send `repos`; the 409/400 route to the dialog (above), not a toast. `KanbanPanel` closes the dialog on the server's answer (`saveWithRepos`).
+
+## `utils/walkModel.ts`
+- Stage-to-step rule. A running stage's status word is `waiting` (what the plan runner writes at launch). `DrawerChecklist.stepIndexOf` picks the step a stage is drawn under.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useBoardProjects.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useBoardReposPrompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanBoards.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useLinkedTitles.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/walkModel.ts

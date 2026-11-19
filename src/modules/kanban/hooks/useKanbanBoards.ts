@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
+import { sayBoardReposRefusal, type BoardReposRefusal } from '@/modules/kanban/hooks/useBoardReposPrompt';
 import type { KanbanBoard } from '@/shared/kanban-types';
-import { api, readApiJson } from '@/shared/api';
+import { api, attemptWrite, readApiJson } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
 
 /**
@@ -15,8 +16,8 @@ import { useToast } from '@/shared/context/ToastContext';
  * project selected too, and then there is nothing to hint with: the mount adopts no board, and a
  * board made there carries no project label.
  *
- * EVERY WRITE RE-READS. Selecting, renaming, archiving and flipping either of the board's two
- * switches all change what `listBoards` answers — an archived board drops out of the list, and the
+ * EVERY WRITE RE-READS. Selecting, renaming, archiving, setting the repositories and flipping the
+ * board's switch all change what `listBoards` answers — an archived board drops out of the list, and the
  * selected board reads as null when the setting names one that is gone — so the panel takes its
  * next picture from the server rather than from a local guess about what the list became.
  */
@@ -27,7 +28,7 @@ type BoardListBody = { boards: KanbanBoard[]; currentBoardId: string | null };
 export type KanbanBoardPatch = {
   name?: string;
   autonomy?: boolean;
-  deepseekFlash?: boolean;
+  repos?: string[];
   projectId?: string | null;
   archived?: boolean;
 };
@@ -37,16 +38,15 @@ export type KanbanBoards = {
   currentBoardId: string | null;
   /** The selected board's own setting. It gates the UI only; no write is ever skipped. */
   autonomy: boolean;
-  /** The selected board's own DeepSeek switch: where this board's Metis, and every plan runner
-   *  she starts, are billed. This panel only paints and writes it — nothing running is moved. */
-  deepseekFlash: boolean;
   loading: boolean;
   /** A failed READ. Different news from a board with no cards — and from having no board. */
   unreachable: boolean;
   refresh: () => Promise<void>;
   selectBoard: (boardId: string) => Promise<void>;
-  createBoard: (name: string) => Promise<void>;
-  updateBoard: (boardId: string, patch: KanbanBoardPatch) => Promise<void>;
+  /** Resolves `true` once the server took the write, `false` when it did not (the refusal already said, in a toast or in the board dialog). */
+  createBoard: (name: string, repos: string[]) => Promise<boolean>;
+  /** Resolves `true` once the server took the write, `false` when it did not (the refusal already said, in a toast or in the board dialog). */
+  updateBoard: (boardId: string, patch: KanbanBoardPatch) => Promise<boolean>;
 };
 
 /** The message an `Error` carries, for a toast that must say what the server said. */
@@ -56,9 +56,32 @@ function reasonFor(error: unknown): string | undefined {
 }
 
 /**
+ * The server's codes for the refusal the board dialog is about, as `kanban-boards.service.ts` sends
+ * them. A refusal is matched on its code and never on its sentence, because the sentence is words
+ * for a reader and may be reworded. KANBAN_BOARD_REPO_INVALID needs no constant: a repository it
+ * refuses arrives on a write that carried repositories, and the dialog takes that either way.
+ */
+const NEEDS_REPOS_CODE = 'KANBAN_BOARD_NEEDS_REPOS';
+
+/**
+ * The board dialog's refusal a failed write is, or `null` for one a toast says. A write that carried
+ * repositories was refused while the dialog showing them is open, so any refusal of it is the
+ * dialog's; an Autonomy switch refused for naming no repository opens that dialog.
+ */
+function dialogRefusalOf(
+  attempt: { sentence: string | null; code: string | null },
+  carriedRepos: boolean
+): BoardReposRefusal | null {
+  if (!attempt.sentence) return null;
+  if (attempt.code === NEEDS_REPOS_CODE) return { kind: 'needs-repos', sentence: attempt.sentence };
+  if (carriedRepos) return { kind: 'refused', sentence: attempt.sentence };
+  return null;
+}
+
+/**
  * WHAT ONE BOARD WRITE DID, IN WORDS — because none of the three is legible from the control that
  * caused it. A rename leaves the row looking like every other row, an archive takes the board out
- * of the list entirely, and either of the two switches shows its own new position without ever
+ * of the list entirely, and the switch shows its own new position without ever
  * saying the write landed.
  *
  * THE SENTENCE IS THE WHOLE OF IT. `ToastRequest` carries a title, a message and a tone and no
@@ -75,9 +98,7 @@ function saidFor(patch: KanbanBoardPatch, t: TFunction): string | undefined {
   if (patch.autonomy !== undefined) {
     return patch.autonomy ? t('kanban.toast.autonomyOn') : t('kanban.toast.autonomyOff');
   }
-  if (patch.deepseekFlash !== undefined) {
-    return patch.deepseekFlash ? t('kanban.toast.deepseekFlashOn') : t('kanban.toast.deepseekFlashOff');
-  }
+  if (patch.repos !== undefined) return t('kanban.toast.reposSaved');
   return undefined;
 }
 
@@ -201,6 +222,19 @@ export function useKanbanBoards(projectId: string | null): KanbanBoards {
     [t, toast]
   );
 
+  const refuseBoardWrite = useCallback(
+    (attempt: { sentence: string | null; code: string | null }, carriedRepos: boolean) => {
+      const said = dialogRefusalOf(attempt, carriedRepos);
+      if (said) {
+        sayBoardReposRefusal(said);
+        return;
+      }
+      console.warn('[useKanbanBoards] the board write was refused:', attempt.code, attempt.sentence);
+      toast({ tone: 'warn', title: t('kanban.toast.boardNotSaved'), message: attempt.sentence ?? undefined });
+    },
+    [t, toast]
+  );
+
   const selectBoard = useCallback(
     async (boardId: string) => {
       try {
@@ -218,39 +252,49 @@ export function useKanbanBoards(projectId: string | null): KanbanBoards {
   );
 
   const createBoard = useCallback(
-    async (name: string) => {
+    async (name: string, repos: string[]): Promise<boolean> => {
+      const attempt = await attemptWrite(() =>
+        api.kanban.createBoard({ name, projectId: currentProjectRef.current, repos })
+      );
+      if (!attempt.landed) {
+        refuseBoardWrite(attempt, true);
+        return false;
+      }
       try {
-        const body = await readApiJson<{ board: KanbanBoard }>(
-          await api.kanban.createBoard({ name, projectId: currentProjectRef.current })
-        );
+        const body = await readApiJson<{ board: KanbanBoard }>(attempt.response);
         // The board you just made is the board you are looking at: creating one and leaving the
         // reader on the old one is a row that appears to have done nothing.
         await readApiJson(await api.kanban.selectBoard(body.board.id));
         await read();
         if (mountedRef.current) toast({ tone: 'positive', title: t('kanban.toast.boardCreated') });
+        sayBoardReposRefusal(null);
+        return true;
       } catch (error) {
         failBoardWrite(error);
+        return false;
       }
     },
-    [read, failBoardWrite, t, toast]
+    [read, failBoardWrite, refuseBoardWrite, t, toast]
   );
 
   const updateBoard = useCallback(
-    async (boardId: string, patch: KanbanBoardPatch) => {
-      try {
-        await readApiJson(await api.kanban.updateBoard(boardId, patch));
-        await read();
-
-        // Read AFTER the re-read, so the sentence describes a board list that already agrees with
-        // it: an archive whose toast arrived before the board left the switcher would name a row
-        // the reader can still see.
-        const said = saidFor(patch, t);
-        if (said && mountedRef.current) toast({ tone: 'positive', title: said });
-      } catch (error) {
-        failBoardWrite(error);
+    async (boardId: string, patch: KanbanBoardPatch): Promise<boolean> => {
+      const attempt = await attemptWrite(() => api.kanban.updateBoard(boardId, patch));
+      if (!attempt.landed) {
+        refuseBoardWrite(attempt, patch.repos !== undefined);
+        return false;
       }
+      await read();
+
+      // Read AFTER the re-read, so the sentence describes a board list that already agrees with
+      // it: an archive whose toast arrived before the board left the switcher would name a row
+      // the reader can still see.
+      const said = saidFor(patch, t);
+      if (said && mountedRef.current) toast({ tone: 'positive', title: said });
+      if (patch.repos !== undefined) sayBoardReposRefusal(null);
+      return true;
     },
-    [read, failBoardWrite, t, toast]
+    [read, refuseBoardWrite, t, toast]
   );
 
   const autonomy = useMemo(
@@ -258,19 +302,10 @@ export function useKanbanBoards(projectId: string | null): KanbanBoards {
     [boards, currentBoardId]
   );
 
-  // Read off the CURRENT BOARD for the same reason autonomy is: the switch paints the row's own
-  // column, and `?? false` is what a board that is gone — or a server too old to answer with the
-  // field — reads as, which is the position the switch was born in.
-  const deepseekFlash = useMemo(
-    () => boards.find((board) => board.id === currentBoardId)?.deepseekFlash ?? false,
-    [boards, currentBoardId]
-  );
-
   return {
     boards,
     currentBoardId,
     autonomy,
-    deepseekFlash,
     loading,
     unreachable,
     refresh,

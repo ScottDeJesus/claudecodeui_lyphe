@@ -9,8 +9,10 @@
  * THE CONSEQUENCE OF THAT NO-OP IS THE TRAP: once a database has these
  * tables, editing a column here changes NOTHING on it. Adding, renaming or
  * retyping a column later therefore needs an explicit `ALTER TABLE` — write
- * it with `addColumnToTableIfNotExists` in `migrations.ts`, beside the
- * `sessions` columns — not by editing a declaration below. A bare edit to a
+ * it as an explicit `ALTER TABLE` in a migration (`addColumnToTableIfNotExists`
+ * / `dropColumnIfExists` in `migrations-columns.ts`, called from `migrations.ts`
+ * or a sibling such as `migrations-board-dispatch.ts`) — not by editing a
+ * declaration below. A bare edit to a
  * table body still passes every scratch-database check (the scratch file is
  * created empty, so it builds the new shape) and fails only on a real
  * database that already has the old one, as a runtime error in a later phase.
@@ -28,8 +30,6 @@ CREATE TABLE IF NOT EXISTS kanban_boards (
     name TEXT NOT NULL,
     project_id TEXT NULL REFERENCES projects(project_id) ON DELETE SET NULL,
     autonomy INTEGER NOT NULL DEFAULT 0,
-    deepseek_flash INTEGER NOT NULL DEFAULT 0,
-    concurrency INTEGER NOT NULL DEFAULT 1,
     repos TEXT NOT NULL DEFAULT '[]',
     sort_order REAL NOT NULL DEFAULT 0,
     archived INTEGER NOT NULL DEFAULT 0,
@@ -50,18 +50,12 @@ CREATE TABLE IF NOT EXISTS kanban_cards (
     closing_remarks TEXT NOT NULL DEFAULT '',
     plan TEXT NULL,
     body TEXT NOT NULL DEFAULT '',
-    approved INTEGER NOT NULL DEFAULT 0,
-    approved_at TEXT NULL,
     archived INTEGER NOT NULL DEFAULT 0,
     sort_order REAL NOT NULL DEFAULT 0,
     build_tokens_in INTEGER NOT NULL DEFAULT 0,
     build_tokens_out INTEGER NOT NULL DEFAULT 0,
     build_tokens_cache_read INTEGER NOT NULL DEFAULT 0,
     build_tokens_cache_create INTEGER NOT NULL DEFAULT 0,
-    build_lease_at TEXT NULL,
-    build_owner TEXT NULL,
-    plan_lease_at TEXT NULL,
-    plan_owner TEXT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     legacy_id TEXT NULL UNIQUE
@@ -171,29 +165,11 @@ CREATE TABLE IF NOT EXISTS kanban_lessons (
     kind TEXT NOT NULL DEFAULT 'note',
     tags TEXT NOT NULL DEFAULT '[]',
     status TEXT NOT NULL DEFAULT 'staged',
-    source TEXT NOT NULL DEFAULT 'metis',
+    source TEXT NOT NULL DEFAULT 'learn',
     draft_path TEXT NULL,
     created_at TEXT NOT NULL,
     reviewed_at TEXT NULL,
     legacy_id TEXT NULL UNIQUE
-);
-
--- What one Metis session has spent, read from its transcript: the per-session ledger behind the
--- card's rolled-up token chips. session_id is the primary key because a session has exactly one
--- row, upserted as the transcript grows; the counters are TOTALS the next tick subtracts from, and
--- byte_offset is where the main transcript's cursor stood at that write (never read back to resume).
--- board_id and card_id are provenance and may be NULL — a session whose card is deleted keeps its
--- row, and the row's tokens are not the card's.
-CREATE TABLE IF NOT EXISTS kanban_session_usage (
-    session_id TEXT PRIMARY KEY NOT NULL,
-    board_id TEXT NULL,
-    card_id TEXT NULL,
-    tokens_in INTEGER NOT NULL DEFAULT 0,
-    tokens_out INTEGER NOT NULL DEFAULT 0,
-    cache_read INTEGER NOT NULL DEFAULT 0,
-    cache_create INTEGER NOT NULL DEFAULT 0,
-    byte_offset INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS ix_kanban_cards_board_status ON kanban_cards(board_id, status, sort_order);
@@ -205,7 +181,6 @@ CREATE INDEX IF NOT EXISTS ix_kanban_decisions_card ON kanban_decisions(card_id)
 CREATE INDEX IF NOT EXISTS ix_kanban_checklist_card ON kanban_checklist_items(card_id);
 CREATE INDEX IF NOT EXISTS ix_kanban_attachments_card ON kanban_attachments(card_id);
 CREATE INDEX IF NOT EXISTS ix_kanban_events_board ON kanban_events(board_id, id);
--- The lesson index read is always "this status, newest first"; the whole index read is this one
--- index. kanban_session_usage needs none: its reads are all by its own primary key.
+-- The lesson index read is always "this status, newest first"; the whole index read is this one index.
 CREATE INDEX IF NOT EXISTS ix_kanban_lessons_status ON kanban_lessons(status, created_at);
 `;

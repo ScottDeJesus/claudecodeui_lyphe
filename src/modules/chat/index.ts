@@ -2,8 +2,8 @@ export { default as ChatInterface } from '@/modules/chat/ChatInterface';
 export { default as TokenUsageSummary, type TokenUsageSurface } from '@/modules/chat/composer/TokenUsageSummary';
 export { default as ChatExportMenu, type ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
 // The one transcript view, opened from a row: the chat's own subagent rows draw it in the pinned
-// dialog, and it is the same view a board Metis's row opens. Consumer: the
-// kanban module's `KanbanMetisPanel.tsx`, which reads it through this barrel.
+// dialog, and it is the same view a kanban card drawer's walk stage opens. Consumer: the
+// kanban module's card drawer (`card-drawer/KanbanCardDrawer.tsx`), which reads it through this barrel.
 export { SubagentTranscriptView } from '@/modules/chat/subagents/SubagentTranscriptView';
 // The words of a question, through the chat's own markdown renderer. Consumers: the dispatcher
 // module's `LockAnswer` and `RoundAnswer`, so a plan's prompt reads in the same words and markdown

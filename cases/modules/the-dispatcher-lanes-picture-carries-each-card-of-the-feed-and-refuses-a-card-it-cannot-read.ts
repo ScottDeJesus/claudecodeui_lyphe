@@ -1,6 +1,6 @@
 // FEED: `dispatcher status --json` carries `cards`, one object per card row (board, card, title, state, flow, part,
 // sorted_by, confidence, hold, waits_on, chain_id, cases [{suite, name, word}], stages [{name, soul, launch_id, status,
-// verdict, cost_usd}]). The dispatcher lane reads it through its own reader (`dispatcher-card.reader.ts`) into
+// verdict, cost_usd, tokens_in, tokens_out}]). The dispatcher lane reads it through its own reader (`dispatcher-card.reader.ts`) into
 // `DispatcherPicture.cards`, the list the `dispatcher_state` frame carries to the board, and refuses a card whose field
 // does not read, naming the field — as it refuses a malformed plan or outing.
 //
@@ -22,8 +22,8 @@ const CARD = {
   chain_id: "chain-card-b-1-c-2-20261119-000000-abcd",
   cases: [{ suite: "/home/lyphe/.claude", name: "a-relative-suite-path-is-refused-naming-an-absolute-one", word: "broken" }],
   stages: [
-    { name: "diagnose", soul: "asclepius", launch_id: "dispatch-asclepius-20261119-000000-aaaa", status: "done", verdict: null, cost_usd: 0.42 },
-    { name: "scenarios", soul: "athena", launch_id: null, status: null, verdict: null, cost_usd: 0 },
+    { name: "diagnose", soul: "asclepius", launch_id: "dispatch-asclepius-20261119-000000-aaaa", status: "done", verdict: null, cost_usd: 0.42, tokens_in: 1200, tokens_out: 340 },
+    { name: "scenarios", soul: "athena", launch_id: null, status: null, verdict: null, cost_usd: 0, tokens_in: 0, tokens_out: 0 },
   ],
 };
 const QUEUED = { ...CARD, card: "c-3", title: "held", state: "queued", flow: "tweak", sorted_by: "default", confidence: null,

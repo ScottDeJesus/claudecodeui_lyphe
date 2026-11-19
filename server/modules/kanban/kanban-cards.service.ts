@@ -91,7 +91,7 @@ function setCardArchived(
  *
  * A DELTA, never a total: the card's four `build_tokens_*` columns are the sum of every session
  * that ever worked the card, so a caller handing over a session's cumulative would erase the
- * spend of the session before it. `metis-telemetry.service.ts` is the only caller.
+ * spend of the session before it.
  */
 export type KanbanTokenDelta = {
   tokensIn: number;
@@ -103,7 +103,7 @@ export type KanbanTokenDelta = {
 /**
  * ONE accumulating statement: `col = col + ?`, never a read-modify-write.
  *
- * The read-then-write shape loses an increment whenever a tick races a claim, a move or another
+ * The read-then-write shape loses an increment whenever a tick races a move or another
  * session's tick on the same row — SQLite serialises the write lock, so the additive UPDATE is the
  * only shape that cannot drop a delta. Zero on a card the row no longer holds (a card deleted
  * between the attribution read and this statement), which the verb turns into the caller's 404.
@@ -156,7 +156,7 @@ function setCardTag(
 /**
  * The card verbs. EVERY write goes through `writeKanban` — no verb here opens a transaction, inserts
  * an event or broadcasts — and each threads `context?.actor` into the seam, so an audit row's actor
- * is the caller's own (`'metis'` through the Metis door, `'operator'` when the route stamped none)
+ * is the caller's own (`'dispatcher'` through the board dispatch, `'operator'` when the caller passed none)
  * without a signature moving.
  */
 export const kanbanCardsService = {
@@ -234,7 +234,6 @@ export const kanbanCardsService = {
       body: row.body,
       plan: row.plan,
       closingRemarks: row.closing_remarks,
-      approvedAt: row.approved_at,
       buildTokensIn: row.build_tokens_in,
       buildTokensOut: row.build_tokens_out,
       buildTokensCacheRead: row.build_tokens_cache_read,
@@ -302,7 +301,7 @@ export const kanbanCardsService = {
    * The card face's token figure and the drawer's four-counter ledger render these columns. An
    * import seeds them once; this is the only LIVE writer, and the telemetry watcher
    * is its one caller, handing over a DELTA (the session's transcript against the row it stored last
-   * tick). Two Metis sessions can work one card over its life, so the accumulate is the whole point:
+   * tick). Two sessions can work one card over its life, so the accumulate is the whole point:
    * a verb that SET the columns to its own totals would erase the earlier session's spend.
    *
    * A card that has gone away between the attribution read and this write is the same 404 every
@@ -331,9 +330,9 @@ export const kanbanCardsService = {
   },
 
   /**
-   * Moves one card into a status, at the position its two neighbours describe. The move, its
-   * renormalisation when the midpoint runs out of room, and the clearing of the build lease are ONE
-   * `mutate` callback: one transaction, one event, one frame. A card leaving `active` loses its lease.
+   * Moves one card into a status, at the position its two neighbours describe. The move and its
+   * renormalisation when the midpoint runs out of room are ONE `mutate` callback: one transaction,
+   * one event, one frame.
    */
   moveCard(
     cardId: string,
@@ -353,7 +352,7 @@ export const kanbanCardsService = {
         boardId: (card) => card.boardId,
       },
       () => {
-        // Re-read inside the transaction: this row decides which lane the card is LEAVING.
+        // Re-read inside the transaction: the card must still be there, and its board is read from this row.
         const current = requireCardRow(cardId);
 
         kanbanCardsDb.setStatusAndOrder({
@@ -364,7 +363,6 @@ export const kanbanCardsService = {
             input.afterId ?? null,
             input.beforeId ?? null
           ),
-          clearBuildLease: current.status === 'active' && input.status !== 'active',
         });
 
         return requireSummary(cardId);

@@ -123,6 +123,11 @@ export function createNoteApplier(dependencies: NoteApplierDependencies): NoteAp
   let running = false;
   let again = false;
   let stopped = false;
+  /**
+   * Notes applied whose stamp did not take, keyed by the note's id (stable and unique in the dispatcher's store);
+   * a later pass retries only the stamp, so no note is applied twice by this process.
+   */
+  const owedStamps = new Map<number, Stamp>();
 
   /** Logs a line only the first time it is seen, so a note that fails on every poke does not bury the journal. */
   function say(line: string): void {
@@ -178,12 +183,29 @@ export function createNoteApplier(dependencies: NoteApplierDependencies): NoteAp
     const read = readOrSay(listed.stdout);
     if (read === null) return;
     for (const line of read.unread) say(`${LOG_PREFIX} a note this server cannot read: ${line}`);
+    const listedIds = new Set(read.notes.map((note) => note.id));
+    for (const id of owedStamps.keys()) if (!listedIds.has(id)) owedStamps.delete(id);
     const held = new Set<string>();
     for (const note of read.notes) {
       const key = `${note.board}/${note.card}`;
       if (held.has(key)) continue;
-      const outcome = tryApply(note);
-      if (outcome === null || !(await stampNote(note.id, outcome.stamp))) held.add(key);
+      let stamp: Stamp;
+      if (owedStamps.has(note.id)) {
+        stamp = owedStamps.get(note.id) ?? null;
+      } else {
+        const outcome = tryApply(note);
+        if (outcome === null) {
+          held.add(key);
+          continue;
+        }
+        stamp = outcome.stamp;
+      }
+      if (await stampNote(note.id, stamp)) {
+        owedStamps.delete(note.id);
+      } else {
+        owedStamps.set(note.id, stamp);
+        held.add(key);
+      }
     }
   }
 

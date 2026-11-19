@@ -1,6 +1,6 @@
 import type { DispatcherCard, DispatcherCardCase, DispatcherCardStage, DispatcherCardState } from '@/shared/types.js';
 
-import { each, field, isCount, isCountOrNull, isRecord, isText, isTextOrNull, need, oneOf } from './dispatcher-state.transport.js';
+import { countSince, each, field, isCount, isCountOrNull, isRecord, isText, isTextOrNull, need, oneOf } from './dispatcher-state.transport.js';
 
 /**
  * One card walk of the dispatcher's document (`hooks/dispatcher/report_cards.py`), read field by field into the type the board draws.
@@ -8,7 +8,7 @@ import { each, field, isCount, isCountOrNull, isRecord, isText, isTextOrNull, ne
  * It is the planner reader's sibling and follows its every rule: this document is printed whole by a process that has exited, so a field
  * that does not match is a DIFFERENT BUILD of the dispatcher rather than a torn write, and it is refused BY NAME. THE KEYS IT USES, named
  * as the planner reader names its own: `board`, `card`, `title`, `state`, `flow`, `part`, `sorted_by`, `confidence`, `hold`, `waits_on`,
- * `chain_id`, `cases` (`suite`, `name`, `word`) and `stages` (`name`, `soul`, `launch_id`, `status`, `verdict`, `cost_usd`). Every one is
+ * `chain_id`, `cases` (`suite`, `name`, `word`) and `stages` (`name`, `soul`, `launch_id`, `status`, `verdict`, `cost_usd`, `tokens_in`, `tokens_out`). Every one is
  * derived by the dispatcher at its read and never stored (INV-172); this server only carries them. A key that is there and does not read is
  * refused by name; the `cards` list absent is a build older than it and reads as no cards.
  */
@@ -32,7 +32,7 @@ function caseOf(raw: unknown, where: string): DispatcherCardCase {
   };
 }
 
-/** One stage of a card, read whole. The launch's dollars are a count; its soul, launch id, status and verdict may be unset. */
+/** One stage of a card, read whole. The launch's dollars and tokens are counts, the tokens 0 from a build older than them; its soul, launch id, status and verdict may be unset. */
 function stageOf(raw: unknown, where: string): DispatcherCardStage {
   const stage = need(raw, isRecord, where);
   return {
@@ -42,6 +42,8 @@ function stageOf(raw: unknown, where: string): DispatcherCardStage {
     status: need(field(stage, 'status'), isTextOrNull, `${where}.status`),
     verdict: need(field(stage, 'verdict'), isTextOrNull, `${where}.verdict`),
     cost_usd: need(field(stage, 'cost_usd'), isCount, `${where}.cost_usd`),
+    tokens_in: countSince(field(stage, 'tokens_in'), `${where}.tokens_in`),
+    tokens_out: countSince(field(stage, 'tokens_out'), `${where}.tokens_out`),
   };
 }
 

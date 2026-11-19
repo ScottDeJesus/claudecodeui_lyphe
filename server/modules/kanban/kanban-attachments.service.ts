@@ -29,9 +29,7 @@ import { writeKanban } from './kanban-write.service.js';
  * land in that seam's one transaction, and the frame it broadcasts is what repaints an open drawer.
  * No verb here opens a transaction of its own.
  *
- * Consumers: `routes/attachment.routes.ts`, `kanban.module.ts`, and the barrel beside it. The MCP
- * program is NOT one of them — it is a leaf that reaches the board over HTTP through
- * `/api/kanban-pm`, never by importing a service.
+ * Consumers: `routes/attachment.routes.ts`, `kanban.module.ts`, and the barrel beside it.
  */
 
 /**

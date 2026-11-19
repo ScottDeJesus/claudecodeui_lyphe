@@ -262,26 +262,14 @@ export const kanbanCardsDb = {
     return result.changes > 0;
   },
 
-  /**
-   * Moves one card to a status at a given sort_order, clearing its build lease when asked.
-   *
-   * The lease clearing is part of the SAME statement as the move, not a second write after it: a
-   * move that landed and a lease that failed to clear would leave an `active` lease on a card that
-   * is no longer being built, and nothing would ever come back to release it.
-   */
-  setStatusAndOrder(input: {
-    id: string;
-    status: KanbanStatus;
-    sortOrder: number;
-    clearBuildLease: boolean;
-  }): void {
+  /** Moves one card to a status at a given sort_order. */
+  setStatusAndOrder(input: { id: string; status: KanbanStatus; sortOrder: number }): void {
     const assignments = ['status = ?', 'sort_order = ?', 'updated_at = ?'];
     const values: (string | number | null)[] = [
       input.status,
       input.sortOrder,
       new Date().toISOString(),
     ];
-    if (input.clearBuildLease) assignments.push('build_lease_at = NULL', 'build_owner = NULL');
     values.push(input.id);
 
     getConnection()

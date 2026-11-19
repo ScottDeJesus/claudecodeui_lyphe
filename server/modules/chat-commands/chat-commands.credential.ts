@@ -9,9 +9,7 @@ import { JWT_SECRET } from '@/modules/auth/index.js';
  * ONE CREDENTIAL PER CHAT, SHARED BY EVERY COMMAND A CHAT RUNS (`toolset`, `notes`, `followups`). The `toolset:`
  * prefix is the scheme's history and stays exactly as it is: the digest is already in the
  * environment of every chat that was launched, under `CLOUDCLI_TOOLSET_TOKEN`, and a different
- * derivation would lock all of them out of every command door until their next process. It is the `kanban-pm`
- * door's scheme (`deriveMetisSecret`) behind a prefix of its own, so a credential minted for that door
- * can never stand in for this one.
+ * derivation would lock all of them out of every command door until their next process.
  *
  * NOTHING IS STORED: the launch hands the digest to the CLI, and the guard recomputes it for the
  * session id the request claims, so a restart changes nothing and a chat that has ended is simply a

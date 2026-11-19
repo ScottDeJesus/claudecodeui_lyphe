@@ -7,16 +7,14 @@ import { stageLesson } from './kanban-lessons.service.js';
 import type { KanbanLessonInput } from './kanban-lessons.service.js';
 
 /**
- * The board's own LESSON queue door: the file a `/learn` drops when the session holds no `kanban-pm`
- * MCP to stage a lesson with.
+ * The lesson door for every session: the file a `/learn` drops into `pending-lessons/`, which this
+ * sweep stages.
  *
- * WHY THIS EXISTS. `stageLesson` has ONE ingest path and two front doors: the board's own
- * `POST /api/kanban/lessons` route, behind `authenticateToken` and unreachable from a session, and
- * this sweep. A session WITHOUT a `kanban-pm` MCP (a plain Claude Code session, a subagent, another
- * project) has no verb that reaches the board, so it writes one JSON file into `pending-lessons/`
- * and this stages it within 15 seconds, exactly as the MCP door will once a later phase of this plan
- * restores it. The MEMORY lane keeps its OWN door in its own module: the two queues' door rules are
- * genuinely different, so a shared sweeper would be a third thing that has to know both.
+ * WHY THIS EXISTS. `stageLesson` has ONE ingest path and ONE front door, this sweep. A session (a
+ * plain Claude Code session, a subagent, another project) has no verb that reaches the board, so it
+ * writes one JSON file into `pending-lessons/` and this stages it within 15 seconds. The MEMORY lane
+ * keeps its OWN door in its own module: the two queues' door rules are genuinely different, so a
+ * shared sweeper would be a third thing that has to know both.
  *
  * THE PRODUCER CONTRACT IS `<name>.json.tmp`, THEN RENAME TO `<name>.json` — the contract
  * `learn.md` §4 keeps. The scan is `endsWith('.json')`, so a `.tmp`
@@ -51,9 +49,9 @@ const SUMMARY_MAX_CHARS = 60;
 /**
  * The running sweep, or null before it starts.
  *
- * ONE SWEEP PER PROCESS, not one per module construction. The board's router is built twice — once
- * for `/api/kanban` and once for the `/api/kanban-pm` mount a Metis can reach — so a per-construction
- * interval would scan one directory with two timers and stage the same file twice.
+ * ONE SWEEP PER PROCESS, not one per module construction. The board's router is built once, for
+ * `/api/kanban`; a per-construction interval would scan one directory with two timers and stage the
+ * same file twice if a second construction ever ran.
  */
 let sweepTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -67,7 +65,7 @@ function spillRoot(): string {
   return expandHome(process.env.CLOUDCLI_SPILL_ROOT || '~/.cloudcli');
 }
 
-/** Where a `/learn` without the MCP drops its file — the path `learn.md` §4 writes. */
+/** Where a `/learn` drops its file — the path `learn.md` §4 writes. */
 function lessonQueueDir(): string {
   return path.join(spillRoot(), 'pending-lessons');
 }
@@ -118,17 +116,14 @@ function text(value: unknown, field: string): string {
  * `undefined` and surfacing as sqlite's own sentence rendered a 500 — the file path is the one place
  * no transport pre-check runs. What is checked here is exactly what the row requires: `name`,
  * `summary` and `trigger` are non-empty strings, `name` and `summary` carry the lesson contract's
- * two length bounds (`learn.md` §2 — the MCP door enforces the same pair, and a bound promised to
- * the writer is one this door has to keep), and the four optional
- * fields carry the shapes the repository can store.
+ * two length bounds (`learn.md` §2: a bound promised to the writer is one this door has to keep),
+ * and the four optional fields carry the shapes the repository can store.
  *
- * The `trigger` VOCABULARY is deliberately NOT re-declared here. It has one home — the `kanban-pm`
- * tool catalog (`kanban-pm-tools-board.ts`), which is a leaf this module may not import — and a
- * second copy would be a second thing to keep in step. The column tolerates any string, and the
- * MCP's own door is the gate for a Metis-authored lesson.
+ * The `trigger` is checked only as a non-blank string: this door holds no vocabulary of triggers,
+ * and the column tolerates any string.
  *
  * `source` is never read from the file: the ingest path's identity is `'learn'` and the sweep stamps
- * it itself, so a hand-authored file cannot claim to be a Metis build.
+ * it itself, so a hand-authored file cannot claim any source but `'learn'`.
  */
 function lessonInputFromJson(parsed: unknown): KanbanLessonInput {
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
@@ -249,8 +244,7 @@ function queuedFiles(dir: string): string[] {
     // Name order IS age order: `learn.md` writes an `<epoch>-<slug>.json` name.
     return fs.readdirSync(dir).filter((name) => name.endsWith('.json')).sort();
   } catch {
-    // A queue that does not exist yet is the COMMON case, not a fault: a session with the MCP
-    // never writes a file at all.
+    // A queue that does not exist yet is the COMMON case, not a fault: nothing has been dropped yet.
     return [];
   }
 }

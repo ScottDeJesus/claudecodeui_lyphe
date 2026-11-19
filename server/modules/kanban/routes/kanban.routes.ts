@@ -5,7 +5,6 @@ import type { KanbanAttachmentsService } from '../kanban-attachments.service.js'
 import type { KanbanBoardsService } from '../kanban-boards.service.js';
 import type { KanbanCardsService } from '../kanban-cards.service.js';
 import type { KanbanChecklistService } from '../kanban-checklist.service.js';
-import type { KanbanLeasesService } from '../kanban-leases.service.js';
 import type { KanbanLessonsService } from '../kanban-lessons.service.js';
 import type { KanbanQuestionsService } from '../kanban-questions.service.js';
 
@@ -29,7 +28,6 @@ export type KanbanServices = {
   questions: KanbanQuestionsService;
   checklist: KanbanChecklistService;
   attachments: KanbanAttachmentsService;
-  leases: KanbanLeasesService;
   lessons: KanbanLessonsService;
   // The one READING the board cannot take for itself, handed in by the composition root rather
   // than imported: the estate's pending memories live in the memory-intake lane's table, and this
@@ -42,7 +40,7 @@ export type KanbanServices = {
  * The board module's route factory — and the only file in `routes/` that more than one phase
  * touches.
  *
- * Thirty-one routes in one file is born over the house ceiling, so the routes are a PACKAGE and
+ * Thirty-one routes in one file is over the house ceiling, so the routes are a PACKAGE and
  * this file is the mount: it builds one router and hands the services to each sibling factory.
  * It holds no route handler of its own, ever, and it decides no paths of its own either — the
  * prefixes are the siblings' (`board.routes.ts` owns `/boards`, `/projects/:projectId/board` and

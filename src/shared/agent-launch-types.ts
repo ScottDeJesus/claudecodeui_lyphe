@@ -67,7 +67,7 @@ export type AgentLaunchSide = {
  * own sentence about the lane, or null when it has nothing to add.
  */
 export type AgentLaunchLane = {
-  lane: 'agent' | 'dispatcher' | 'chain' | 'metis' | 'sorter';
+  lane: 'agent' | 'dispatcher' | 'chain' | 'sorter';
   reach: 'new-session' | 'next-launch';
   note: string | null;
   sides: AgentLaunchSide[];
@@ -85,8 +85,8 @@ export type AgentLaunchShim = {
 };
 
 /**
- * One row of the launch table: a soul, Metis (`kind: 'metis'`, with no shim), or one of the two rows a board card's
- * walk launches at — the card sorter (`kind: 'sorter'`) and the tweak builder (`kind: 'tweak'`), after her and with no shim.
+ * One row of the launch table: a soul, or one of the two rows a board card's walk launches at — the card sorter
+ * (`kind: 'sorter'`) and the tweak builder (`kind: 'tweak'`), with no shim.
  *
  * `model` and `effort` are what the row RESOLVES to; `model_pinned` and `effort_pinned` say whether
  * the row's own table entry set them (a pin) or they came from `defaults`. Clearing a pin is sending
@@ -99,7 +99,7 @@ export type AgentLaunchShim = {
  */
 export type AgentLaunchRow = {
   name: string;
-  kind: 'soul' | 'metis' | 'sorter' | 'tweak';
+  kind: 'soul' | 'sorter' | 'tweak';
   description: string;
   model: string;
   model_pinned: boolean;
@@ -112,7 +112,7 @@ export type AgentLaunchRow = {
 /**
  * What the shims' regeneration said after a write.
  *
- * `ran` is false when nothing needed regenerating (a Metis-only change) or the table was a scratch
+ * `ran` is false when nothing needed regenerating or the table was a scratch
  * copy; `ok` is false when the generator failed — the write is kept either way. `said` is the
  * generator's last stdout line, or the tail of its error, at most 300 characters.
  */
@@ -123,7 +123,7 @@ export type AgentLaunchRegen = {
 };
 
 /**
- * The whole picture: the table's state, its defaults, one row per soul then Metis, and — on the
+ * The whole picture: the table's state, its defaults, one row per soul and one each for the card sorter and tweak builder, and — on the
  * census a write answers with — the regeneration.
  *
  * `state` is `file` for a table read off disk, `absent` when there is none, `malformed` when it could

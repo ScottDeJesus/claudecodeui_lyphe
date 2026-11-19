@@ -5,7 +5,6 @@ import { promisify } from 'node:util';
 import { userFacingEnv } from '@/shared/child-env.js';
 import type {
   AgentLaunchDefaultsChange,
-  AgentLaunchResolved,
   AgentLaunchResult,
   AgentLaunchRowChange,
 } from '@/shared/types.js';
@@ -36,7 +35,7 @@ const execFileAsync = promisify(execFile);
  */
 const OUTPUT_MAX_BYTES = 4 * 1024 * 1024;
 
-/** Wall-clock ceiling for `show` and `resolve`: the CLI reads one small file and the shims' frontmatter. */
+/** Wall-clock ceiling for `show`: the CLI reads one small file and the shims' frontmatter. */
 const READ_TIMEOUT_MS = 20_000;
 
 /**
@@ -59,14 +58,12 @@ const SAID_MAX_CHARS = 300;
 type AgentLaunchCensus = Record<string, unknown>;
 
 export type AgentLaunchService = {
-  /** The whole census the window reads: the defaults, one row per soul and Metis, each row's lanes. */
+  /** The whole census the window reads: the defaults, one row per soul, the card sorter and the tweak builder, each row's lanes. */
   census(): Promise<AgentLaunchResult<AgentLaunchCensus>>;
   /** Pin or clear one row's model and effort. Answers the census the CLI printed AFTER the write. */
   setRow(name: string, change: AgentLaunchRowChange): Promise<AgentLaunchResult<AgentLaunchCensus>>;
   /** Change the table's defaults. Answers the census the CLI printed AFTER the write. */
   setDefaults(change: AgentLaunchDefaultsChange): Promise<AgentLaunchResult<AgentLaunchCensus>>;
-  /** The `--model` and `--effort` words a launch of `name` takes on one side of the DeepSeek switch. */
-  resolveSide(name: string, side: AgentLaunchResolved['side']): Promise<AgentLaunchResult<AgentLaunchResolved>>;
 };
 
 export type AgentLaunchServiceDependencies = {
@@ -153,15 +150,6 @@ async function ask(
   return { ok: true, value: payload };
 }
 
-/** `resolve`'s object narrowed to the answer it promises, or null when a field is missing or mistyped. */
-function asResolved(payload: Record<string, unknown>, name: string, side: string): AgentLaunchResolved | null {
-  const { model, effort } = payload;
-  const answered = payload['name'] === name && payload['side'] === side;
-  if (!answered || typeof model !== 'string' || !model) return null;
-  if (effort !== null && typeof effort !== 'string') return null;
-  return { name, side: side as AgentLaunchResolved['side'], model, effort };
-}
-
 /** The argv of `set`: `null` is the CLI's own word for "clear this pin", `default`. */
 function setRowArgv(name: string, change: AgentLaunchRowChange): string[] {
   const argv = ['set', name];
@@ -192,15 +180,5 @@ export function createAgentLaunchService({ bin }: AgentLaunchServiceDependencies
     setRow: (name, change) => ask(bin, setRowArgv(name, change), WRITE_TIMEOUT_MS),
 
     setDefaults: (change) => ask(bin, setDefaultsArgv(change), WRITE_TIMEOUT_MS),
-
-    async resolveSide(name, side) {
-      const asked = await ask(bin, ['resolve', name, '--side', side], READ_TIMEOUT_MS);
-      if (!asked.ok) return asked;
-      const resolved = asResolved(asked.value, name, side);
-      if (resolved === null) {
-        return { ok: false, reason: 'unreadable', message: 'the launch table did not resolve the launch it was asked about' };
-      }
-      return { ok: true, value: resolved };
-    },
   };
 }

@@ -3648,7 +3648,7 @@ export type DispatcherCardState = 'told' | 'queued' | 'walking' | 'asking' | 'do
 /** One case a card's walk wrote or ran, with its word as the dispatcher derived it at its read. */
 export type DispatcherCardCase = { suite: string; name: string; word: string };
 /** One stage of the card's walk; `launch_id` opens its transcript (`SubagentTranscriptTarget` kind `soul`), `cost_usd` is paid dollars. */
-export type DispatcherCardStage = { name: string; soul: string | null; launch_id: string | null; status: string | null; verdict: string | null; cost_usd: number };
+export type DispatcherCardStage = { name: string; soul: string | null; launch_id: string | null; status: string | null; verdict: string | null; cost_usd: number; /** The sitting's own tokens: its spend when it rode the Claude subscription, where `cost_usd` is 0. */ tokens_in: number; tokens_out: number };
 /** One board card the dispatcher walks, as the `dispatcher_state` frame's `cards` carries it; matched to a board card by `board` and `card` (the board's own ids); `hold` is the sentence a queued card waits on, null otherwise. */
 export type DispatcherCard = { board: string; card: string; title: string; state: DispatcherCardState; flow: 'bug' | 'change' | 'tweak' | null; part: 'whole' | 'fix' | 'change'; sorted_by: string | null; confidence: number | null; hold: string | null; waits_on: number | null; chain_id: string | null; cases: DispatcherCardCase[]; stages: DispatcherCardStage[] };
 /** The two causes a phase's or a plan's `stalled` word carries (`report_stall`): `dispatcher_down` when no daemon holds the home, so nothing can record anything, and `ended_unrecorded` when one does and has not. Both are answered by Resume, which wakes or starts the daemon. */
@@ -3714,7 +3714,7 @@ export type DispatcherOffpeak = { at: number | null };
 // ---------------------------
 //----------------- DISPATCHER, CLIENT ONLY: the picture the lane's feed retains ------------
 /** What the dispatcher's feed retains on `dispatcher:all`, and what every plan card reads off it: the frame's whole picture MINUS the two keys that change without anything moving (`home`, `generated_at`, restamped on every poll of the watcher) and minus the frame's own clock, which the bus carries as the value's `at`. It is the document's own spelling throughout — `offpeak_at` keeps its underscore — so the one place that renames it is the reader's `epochOf`. `planners` is the store's own list of outings, and it is what the Planning card's lines are read from (`planningLines`), the ones no plan card and no deck can carry among them: an arc's design before its arc file loads. */
-export type DispatcherLanePicture = { plans: DispatcherPlan[]; arcs: DispatcherArc[]; planners: DispatcherPlanner[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; /** The BROWSER's own clock (epoch ms) at the moment this reading reached it — stamped by `DispatcherFeed` when it publishes, never sent by the server. It is what a running working-time pill counts its seconds from (`useWorkedSeconds`): both ends of that subtraction are then this browser's clock, so a browser minutes ahead of or behind the server's still paints the server's figure. Absent only on a picture no feed has published. */ received_at?: number };
+export type DispatcherLanePicture = { plans: DispatcherPlan[]; arcs: DispatcherArc[]; planners: DispatcherPlanner[]; /** The board's card walks (`report_cards.py`), each matched to its board card by `board` and `card`; `[]` from a server older than the key. */ cards: DispatcherCard[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; /** The BROWSER's own clock (epoch ms) at the moment this reading reached it — stamped by `DispatcherFeed` when it publishes, never sent by the server. It is what a running working-time pill counts its seconds from (`useWorkedSeconds`): both ends of that subtraction are then this browser's clock, so a browser minutes ahead of or behind the server's still paints the server's figure. Absent only on a picture no feed has published. */ received_at?: number };
 // ---------------------------
 //----------------- DISPATCHER, CLIENT ONLY: the lane's top-level cards, in the operator's order ------------
 /** One arc of the lane with the plans of it, in the arc's own order (`DispatcherArc.plans`) — one deck's worth. Built by `byArc`, drawn by `DispatchArcDecks`. */
@@ -3748,41 +3748,6 @@ export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
 export type SoulLaunchSnapshot = { launch_id: string; launched_by: string | null; dispatcher_work: boolean; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; model: string; blocked: boolean; /** Set while the launch is waiting for the box's CPU to have room (`hooks/plan_runner/pacer/cpu_marker.py`'s marker, read while its launcher is alive and its soul has not started): the pin says "Waiting for CPU" with an Override instead of `running`. `null` otherwise. */ cpu_wait: DispatcherCpuWait | null; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null; tokens_in: number | null; tokens_out: number | null };
 /** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
 export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
-
-// ---------------------------
-//----------------- KANBAN METIS: the session a board launches ------------
-
-/**
- * One Metis session — a board's own autonomous builder — as the pilot panel draws it.
- *
- * Mirrored field for field from `server/shared/types.ts`. `sessionId` is the uuid the board
- * minted and handed to `claude --session-id`: the state directory's name, the address of every
- * route and the input to the lease owner. `owner` is that derived owner, sixteen lowercase hex,
- * which is what the board compares on every build-lease verb. `model` is the `--model` the child
- * was actually given and `provider` says which endpoint it bills; the pair is settled at spawn.
- *
- * `lastActivityAt` is `child.log`'s mtime — the child is detached and owns its own log, so its
- * log's stamp is the only liveness signal that outlives a server restart. Every timestamp is
- * epoch MILLISECONDS.
- */
-export type KanbanMetisSession = {
-  sessionId: string;
-  boardId: string;
-  boardName: string;
-  provider: 'deepseek' | 'claude';
-  model: string;
-  owner: string;
-  launchedBy: 'operator' | 'driver';
-  state: 'running' | 'completed' | 'stopped' | 'failed';
-  pid: number | null;
-  startedAt: number;
-  endedAt: number | null;
-  lastActivityAt: number;
-  exitCode: number | null;
-};
-
-/** The whole picture, pushed on change over `/ws`. `sessions` is ordered by `startedAt` ascending. `at` is epoch MILLISECONDS, unlike every field inside a session. */
-export type KanbanMetisStateEvent = { kind: 'kanban_metis_state'; sessions: KanbanMetisSession[]; at: number };
 
 // ---------------------------
 //----------------- UNIVERSE: the estate map and its live activity ------------
@@ -3897,8 +3862,8 @@ export type UniverseDigest = { edits: number; execs: number; at: number };
 /** What one subagent transcript read answers, mirrored byte-for-byte from the server's `server/shared/types.ts`. `found` is `false` when the session, provider, file or launch cannot be resolved — then `activity` is empty, `total` is 0, `inFlight` is `false` and `finishedAt` is `null`, and "not found" is a 200 carrying this shape, never an HTTP error. `activity` is the LAST 1000 entries (the server's `SUBAGENT_TRANSCRIPT_LIMIT`), each truncated, and `total` is the untruncated count. */
 export type SubagentTranscriptResult = { found: boolean; activity: SubagentActivity[]; total: number; inFlight: boolean; finishedAt: string | null };
 
-/** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), a launcher soul addressed by its launch id, or a board's Metis addressed by the session id the board minted. Its third consumer is the kanban module's `KanbanMetisPanel.tsx`, which opens a fleet row into the same view rather than a copy of it. */
-export type SubagentTranscriptTarget = { kind: 'agent' | 'soul' | 'metis'; id: string };
+/** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), or a launcher soul addressed by its launch id. */
+export type SubagentTranscriptTarget = { kind: 'agent' | 'soul'; id: string };
 
 //----------------- JEV SEMANTIC JUDGMENT: switches and the reader ------------
 /** The house Jev switches as one answer, mirrored from the server's `JevSwitches`: the master, each scope's STORED value, and each scope's LIVE one. A live field is the pair's actual effect (`master && stored`), not a file of its own — a narrower opt-in counts only while the master is on, and that rule is derived server-side so the panel cannot hold a second opinion about it. A scope added on the server arrives here as two more fields, which is why `JevContent.tsx` draws its rows from a table rather than field by field. */

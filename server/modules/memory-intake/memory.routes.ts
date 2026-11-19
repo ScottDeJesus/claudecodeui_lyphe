@@ -29,8 +29,7 @@ import { memoryNotFound, type MemoryIntakeService } from './memory.service.js';
  * handler's `{ success: false, error: { code, message } }`, whose nested shape the reader would drop
  * on the floor. Success answers `{ candidate }`, which is the fresh row the panel re-renders from.
  *
- * NOTHING IN THIS FILE KNOWS ABOUT A BOARD. It is mounted at `/api/memory` and nowhere else, so the
- * `kanban-pm` mount a Metis can reach cannot see it, by construction rather than by a refusal list.
+ * NOTHING IN THIS FILE KNOWS ABOUT A BOARD. It is mounted at `/api/memory` and nowhere else.
  */
 
 /**

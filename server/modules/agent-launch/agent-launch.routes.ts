@@ -5,7 +5,7 @@ import type { AgentLaunchDefaultsChange, AgentLaunchResult, AgentLaunchRowChange
 import type { AgentLaunchService } from './agent-launch.service.js';
 
 /**
- * A row's name as the CLI takes one: a soul's slug or `metis`, the shape `~/.claude/agents/<name>.md`
+ * A row's name as the CLI takes one: a soul's slug, `sorter` or `tweak`, the shape `~/.claude/agents/<name>.md`
  * and the table's `[soul.<slug>]` share. It is NOT a whitelist of the souls that exist — a new soul
  * must not need an edit here — and the CLI answers a name it does not know in its own sentence.
  */
@@ -148,7 +148,7 @@ export function createAgentLaunchRouter(
       }
     };
 
-  /** The whole census the window reads: the defaults, one row per soul and Metis, each row's lanes. */
+  /** The whole census the window reads: the defaults, one row per soul, the card sorter and the tweak builder, each row's lanes. */
   router.get('/', relay(() => dependencies.census()));
 
   /** Pin or clear one row's model and effort. */

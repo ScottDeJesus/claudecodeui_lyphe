@@ -91,8 +91,7 @@ export function KanbanVitalsStrip({ boardId }: KanbanVitalsStripProps) {
   const { t } = useTranslation();
 
   // ── The wires: the two lines that carry data. Everything around them is composition. ──
-  // FILL: vitals — the five counts as the server now sends them (`building`, `awaitingAnswer`,
-  // `queued`, and the two estate counts), read through the hook below as it stands.
+  // The five counts as the server sends them: `building`, `awaitingAnswer`, `queued` and the two estate counts.
   // The reading is keyed by `boardId` and is the board feed's — what `useKanbanLaneFeed` reads for
   // the open board, and publishes for this strip to listen to. Nothing reaches the strip down a
   // prop chain: the header calls no hook, and the panel hands it no counts. `null` is no reading:

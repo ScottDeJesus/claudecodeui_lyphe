@@ -441,7 +441,7 @@
       "title": "The launch table could not be read",
       "retry": "Try again"
     },
-    "reach": "Chains, the dispatcher, Metis and a board card’s sorter take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only.",
+    "reach": "Chains, the dispatcher and a board card’s sorter take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only.",
     "defaults": {
       "title": "Defaults",
       "hint": "what a launch runs at when its row pins nothing",
@@ -478,9 +478,6 @@
       "pinned_one": "{{count}} pinned",
       "pinned_other": "{{count}} pinned"
     },
-    "metis": {
-      "title": "Metis"
-    },
     "cards": {
       "title": "Board cards"
     },
@@ -504,7 +501,6 @@
       "agent": "Agent call",
       "dispatcher": "Dispatcher",
       "chain": "Chain",
-      "metis": "Metis",
       "sorter": "Card sort",
       "newSession": "new session",
       "claude": "Claude",
@@ -714,40 +710,6 @@
       "questionsFolded_one": "{{count}} card in To Do is waiting on an answer",
       "questionsFolded_other": "{{count}} cards in To Do are waiting on an answer"
     },
-    "metis": {
-      "title": "Metis",
-      "launch": "Launch Metis",
-      "loading": "Reading the fleet…",
-      "empty": {
-        "title": "No Metis on this board",
-        "message": "Nothing is running here and nothing has run recently. Launch one to start working the board."
-      },
-      "state": {
-        "running": "Running",
-        "completed": "Completed",
-        "stopped": "Stopped",
-        "failed": "Failed"
-      },
-      "stop": "Stop",
-      "resume": "Resume",
-      "transcript": "Transcript",
-      "ago": "{{elapsed}} ago",
-      "exitCode": "exit {{code}}",
-      "runningCount_one": "{{count}} running",
-      "runningCount_other": "{{count}} running",
-      "collapse": "Hide the fleet",
-      "expand": "Show the fleet",
-      "notLaunched": "The Metis was not launched",
-      "notStopped": "The Metis was not stopped",
-      "notResumed": "The Metis was not resumed",
-      "dial": {
-        "stepper": "Metis sessions this board may run at once",
-        "decrease": "Run fewer Metis at once",
-        "increase": "Run more Metis at once",
-        "notMoved": "The dial was not moved",
-        "phoneLabel": "At once"
-      }
-    },
     "lanes": {
       "todo": "To Do",
       "questions": "Open questions",
@@ -903,8 +865,7 @@
       "boardArchived": "Board archived — nothing was deleted",
       "autonomyOn": "Autonomy on",
       "autonomyOff": "Autonomy off",
-      "deepseekFlashOn": "DeepSeek Flash on",
-      "deepseekFlashOff": "DeepSeek Flash off",
+      "reposSaved": "Repositories saved",
       "cardArchived": "Card archived",
       "laneCleared": "The lane's cards were archived"
     }

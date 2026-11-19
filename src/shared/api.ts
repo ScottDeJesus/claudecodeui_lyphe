@@ -299,28 +299,6 @@ const fileContentPath = (projectId: string, filePath: string) =>
 const pluginAssetPath = (pluginName: string, assetFile: string) =>
   `/api/plugins/${encodeURIComponent(pluginName)}/assets/${encodeURIComponent(assetFile)}`;
 
-// ─── The board's Metis transcript ───────────────────────────────────────────
-
-/**
- * One Metis transcript, read and unwrapped: `/api/kanban-metis/sessions/:sessionId/transcript`.
- *
- * DEFINED ONCE, NAMED TWICE, because two callers ask for it in their own vocabulary — the fleet
- * group below (`kanbanMetis.transcript`) and the transcript-reader family
- * (`subagentTranscripts.metis`), which addresses every subagent by a target kind. One route and
- * one unwrap, so the two names cannot drift into two spellings of a path.
- *
- * THE BOARD MINTS THE SESSION ID, so the id IS the mapping: there is no launch-id translation to
- * perform. Two ways for it to come back empty-handed, and they are different news: an id the
- * registry does not hold is a 404, which the caller reads as a failed request; a session the
- * registry knows whose transcript is not yet on disk is a `found: false` RESULT — the reader falls
- * back to scanning the projects root, and a board Metis having no sessions row of her own is
- * exactly that case.
- */
-const readKanbanMetisTranscript = async (sessionId: string): Promise<SubagentTranscriptResult> =>
-  readApiJson<SubagentTranscriptResult>(
-    await get(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/transcript`),
-  );
-
 /**
  * The lesson index's ceiling, as the route states it (`learning.routes.ts` — a larger `limit` is
  * REFUSED there, not clamped, so this is as much of the corpus as one read can carry).
@@ -705,6 +683,13 @@ export const api = {
     saveWeeklyStop: (state: { percent: number }) => put('/api/settings/weekly-stop', state),
     cpuLimit: () => get('/api/settings/cpu-limit'),
     saveCpuLimit: (state: { percent: number | null }) => put('/api/settings/cpu-limit', state),
+
+    // The dispatcher's two numbers for board cards, `~/.claude/charters/cards.toml` — how many cards it walks at once
+    // (`width`, 1-4) and how sure the sort must be (`threshold`, 0.50-0.99); host-wide, not a per-user preference. The
+    // routes relay `dispatcher card config` and both answer the two numbers read back off the file; the PUT takes either
+    // field or both.
+    bugBoard: () => get('/api/kanban-dispatch/settings'),
+    saveBugBoard: (state: { width?: number; threshold?: number }) => put('/api/kanban-dispatch/settings', state),
 
     // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
     // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
@@ -1465,12 +1450,10 @@ export const api = {
   // Writes carry no actor — there is no per-user identity on this board yet, and the server
   // defaults every audit row to `'operator'`. `laneCards` takes a lane as a SET of statuses and
   // joins them for the wire, because which statuses compose a lane (To Do is `todo` plus
-  // `questions` with autonomy off) is the panel's policy and only the panel's. A lease names an
-  // `owner` rather than an actor: a lease owner is a build process, and who holds a card and who
-  // wrote its audit row are different questions.
+  // `questions` with autonomy off) is the panel's policy and only the panel's.
   kanban: {
     boards: () => get('/api/kanban/boards'),
-    createBoard: (body: { name: string; projectId?: string | null }) => post('/api/kanban/boards', body),
+    createBoard: (body: { name: string; projectId?: string | null; repos?: string[] }) => post('/api/kanban/boards', body),
     updateBoard: (id: string, body: Record<string, unknown>) =>
       patch(`/api/kanban/boards/${encodeURIComponent(id)}`, body),
     selectBoard: (id: string) => post(`/api/kanban/boards/${encodeURIComponent(id)}/select`, {}),
@@ -1484,10 +1467,8 @@ export const api = {
     //
     // `lessons` asks for `staged` and nothing else, at the route's own ceiling rather than its
     // default of a hundred — a review list that quietly stops at a hundred while the strip above it
-    // counts the whole estate is two screens disagreeing about one number. The corpus a session
-    // scans is the server's own `approvedIndex`, never a reading this client makes. `lesson` is the
-    // ONE route here that carries a body: the list is lean by contract, so a row is read whole only
-    // when somebody opens it.
+    // counts the whole estate is two screens disagreeing about one number. `lesson` is the ONE route
+    // here that carries a body: the list is lean by contract, so a row is read whole only when somebody opens it.
     //
     // Both reviews are read from the RAW response, for the reason `memory.approve` above is: a 422
     // is a VERDICT — the server's own sentence naming the state the lesson is actually in — and a
@@ -1515,8 +1496,6 @@ export const api = {
     resolveIssue: (id: string, body: Record<string, unknown>) => post(`/api/kanban/issues/${encodeURIComponent(id)}/resolve`, body),
     addChecklistItem: (id: string, body: Record<string, unknown>) => post(`/api/kanban/cards/${encodeURIComponent(id)}/checklist`, body),
     updateChecklistItem: (id: string, body: Record<string, unknown>) => patch(`/api/kanban/checklist/${encodeURIComponent(id)}`, body),
-    approveCard: (id: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/approve`, {}),
-    unapproveCard: (id: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/unapprove`, {}),
 
     // A card's attachment BYTES: the upload, the fetch and the removal.
     //
@@ -1547,42 +1526,6 @@ export const api = {
       del(`/api/kanban/cards/${encodeURIComponent(cardId)}/attachments/${encodeURIComponent(attachmentId)}`),
 
     events: (query: string) => get(`/api/kanban/events${query}`),
-  },
-
-  // The board's Metis fleet (docs/MANUAL.md (kanban)): who this board has out working for it, the four verbs
-  // over a session, the nudge that wakes the driver, and the driver's own reading of the board.
-  // `sessions` is the SEED — the fleet is pushed on change as a `kanban_metis_state` frame, which a
-  // panel mounting between two changes would otherwise wait for with nothing on screen. `launch` is
-  // a board's act and answers the session the server minted, so the panel paints the new row
-  // without waiting for the frame behind it; `stop`, `resume` and `reply` answer the same shape for
-  // the session they moved.
-  kanbanMetis: {
-    sessions: () => get('/api/kanban-metis/sessions'),
-    // The driver's reading of one board: its autonomy, the dial that caps its sessions, how many are
-    // live, how much work is claimable, the churn cooldown, the rate-limit hold and whether the
-    // relaunch ledger still permits a spawn. The fleet panel reads it for the DIAL alone — its
-    // header's figure is this board's live count against that number — while the live count itself
-    // stays the fleet's own, so no two readings of one board can disagree about how many run.
-    driver: (boardId: string) =>
-      get(`/api/kanban-metis/boards/${encodeURIComponent(boardId)}/driver`),
-    launch: (boardId: string) =>
-      post(`/api/kanban-metis/boards/${encodeURIComponent(boardId)}/launch`, {}),
-    // Wakes this board's driver now rather than at its next tick, and answers `{ nudged, at }` —
-    // nothing about a session, because a nudge starts none: what the tick then reaps and claims is
-    // its own decision, and the fleet frame that follows carries it.
-    nudge: (boardId: string) =>
-      post(`/api/kanban-metis/boards/${encodeURIComponent(boardId)}/nudge`, {}),
-    stop: (sessionId: string) =>
-      post(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/stop`, {}),
-    resume: (sessionId: string) =>
-      post(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/resume`, {}),
-    // One person's words to a Metis whose child has stopped, as the turn she wakes up to. Answered
-    // with the same `{ session }` shape `resume` gives, and refusing in the same way a 409 does
-    // everywhere else on this board: `she is mid-turn — stop her first, then reply` while her child
-    // is running, or the board's dial in the server's own words when there is no room for her.
-    reply: (sessionId: string, text: string) =>
-      post(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/reply`, { text }),
-    transcript: readKanbanMetisTranscript,
   },
 
   // The application registry (docs/MANUAL.md (applications)): the rows the switcher's drawer lists, each a
@@ -1651,9 +1594,6 @@ export const api = {
     soul: async (launchId: string): Promise<SubagentTranscriptResult> => readApiJson<SubagentTranscriptResult>(
       await get(`/api/dispatch-souls/launches/${encodeURIComponent(launchId)}/transcript`),
     ),
-    // A board's Metis, addressed by the session id the BOARD minted. Its consumer is the kanban
-    // module's fleet panel, which opens a row into the same view the other two kinds use.
-    metis: readKanbanMetisTranscript,
   },
 
   // The installed Claude CLI and the version each LIVE run is on (docs/MANUAL.md (cli-version)). It

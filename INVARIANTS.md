@@ -126,20 +126,6 @@ probe-key: 865e41d8b4312cc946816bfea9e36790345505cd
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/hooks/dispatcher/accept.py, /home/lyphe/.claude/hooks/dispatcher/cmd/run.py, /home/lyphe/.claude/hooks/dispatcher/judgment_accept.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_write.py, /home/lyphe/.claude/hooks/intent_lock.py
 
-## INV-5743 — probe — a table outage is charged by the driver as a failed launch, and parks the board for ten minutes
-
-a table outage is charged by the driver as a failed launch, and parks the board for ten minutes
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && S=$(mktemp -d /tmp/athena-drv.XXXXXX) && mkdir -p "$S/home" "$S/st" "$S/bin" && printf '#!/bin/sh\necho boom >&2\nexit 1\n' > "$S/bin/launch-table" && chmod +x "$S/bin/launch-table" && cp ~/.claude/charters/launch.toml "$S/table.toml" && env HOME="$S/home" DATABASE_PATH="$S/db.sqlite" KANBAN_METIS_STATE_ROOT="$S/st" LAUNCH_TABLE_PATH="$S/table.toml" LAUNCH_TABLE_BIN="$S/bin/launch-table" TSX_TSCONFIG_PATH=$PWD/server/tsconfig.json node --import tsx /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--metis/scn/drv.mts 2>&1 | grep "launch failed\|relaunchAllowed"; case "$S" in /tmp/athena-drv.*) rm -r "$S";; esac
-expect: `launch failed: Metis's launch table could not be read: … (boom)` and `"relaunchAllowed":false` after one failed tick   (this pins the assumption; it is not a claimed defect)
-```
-
-measured 2026-09-28 by chain chain-agent-launch-config--metis-20260928-230031-e11a, finding L1, LOW
-probe-key: 7c92631fa3d5838604abd32e8efe3f7b95ac7a0b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/kanban-metis.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-spawn.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
-
 ## INV-5764 — probe — LOW — `.verify/chat-image-results.mjs` cannot fail
 
 LOW — `.verify/chat-image-results.mjs` cannot fail
@@ -5208,132 +5194,6 @@ probe-key: 1d2a6eaede6b784526a4b3c030f70001ac20c692
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-text.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs
 
-## INV-7206 — probe — LOW (the operator's call: the denylist is a named list, and the design says "the rest of `~/.claude/state` stays readable"). Two more stores of the same class are still readable
-
-LOW (the operator's call: the denylist is a named list, and the design says "the rest of `~/.claude/state` stays readable"). Two more stores of the same class are still readable
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-D=$(dirname "$0")
-cat > "$D/p.mjs" <<'JS'
-import fs from 'node:fs';
-import os from 'node:os';
-const { resolveReadable } = await import('/home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs');
-const state = `${os.homedir()}/.claude/state`;
-for (const [label, rel] of [['kanban-metis soul transcript', 'kanban-metis'], ['inline-briefs brief', 'inline-briefs']]) {
-  const dir = `${state}/${rel}`;
-  if (!fs.existsSync(dir)) { console.log(`${label}: not on this machine`); continue; }
-  const sub = rel === 'kanban-metis' ? `${dir}/${fs.readdirSync(dir)[0]}/child.log` : `${dir}/${fs.readdirSync(dir).find((f) => f.endsWith('.md'))}`;
-  const x = resolveReadable(sub, `${process.env.D}/wh`);
-  console.log(`${label}: ${x.refusal ? 'REFUSED' : 'readable by file.read'}`);
-}
-JS
-D="$D" node "$D/p.mjs" 2>&1 | grep -v '^\[warden\]'
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) rm -rf -- "$D";; esac
-expect: "REFUSED" for both once the operator names them; today both "readable by file.read"
-```
-
-measured 2026-10-07 by chain chain-cerberus--judgment--diag-reads-20261007-093440-3572, finding L7, LOW
-probe-key: c8f4ef6f1a66da4bdc6f26d1eca064d8f052bcce
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-text.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs
-
-## INV-7207 — probe — [MEDIUM] — The claim replaced the eight guards' bound-port and leftover-file refusals; a claim-less listener that does not answer 2xx on `/api/auth/status` is no longer refused, and `probe_db` overwrites its database
-
-[MEDIUM] — The claim replaced the eight guards' bound-port and leftover-file refusals; a claim-less listener that does not answer 2xx on `/api/auth/status` is no longer refused, and `probe_db` overwrites its database
-
-```probe
-D=$(mktemp -d /tmp/athena-p1.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-#!/usr/bin/env bash
-# A claim-less listener on slot 5's API port that answers 404, with a stand-in database of "another plan" beside it.
-D="$1"
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-if ss -ltn | grep -qE ':(7903|7904) ' || ls -d /tmp/sunset5-* > /dev/null 2>&1; then echo "slot 5 is busy; try later"; exit 0; fi
-cat > "$D/squat404.mjs" <<'JS'
-import http from 'node:http';
-http.createServer((q, r) => { r.statusCode = 404; r.end('Not found'); }).listen(7903, '127.0.0.1');
-setTimeout(() => process.exit(0), 30000);
-JS
-node "$D/squat404.mjs" & SQ=$!
-sleep 1
-echo "other plan's db" > /tmp/sunset5-probe.db
-( export SUNSET_SLOT=5; source scripts/sunset-probe.sh; trap stop_probe_server EXIT
-  probe_db; echo "probe_db rc=$? claimed=${SUNSET_CLAIMED:-no}; the stand-in db now starts: $(head -c 15 /tmp/sunset5-probe.db | tr -d '\0\n')" ) 2>&1 | cut -c1-200
-case "$SQ" in ''|*[!0123456789]*|0*|1) ;; *) kill "$SQ" 2>/dev/null ;; esac
-rm -f /tmp/sunset5-probe.db; rmdir /tmp/sunset5-claim 2>/dev/null
-ls -d /tmp/sunset5-* 2>&1 | head -2
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-p1.?*) rm -rf -- "$D" ;; esac
-expect: "probe_db rc=0 claimed=yes; the stand-in db now starts: SQLite format 3" while the defect stands; "probe_db rc=1 claimed=no; the stand-in db now starts: other plan's db" once a bound listener is refused
-```
-
-measured 2026-10-07 by chain chain-cerberus--judgment--probe-harness-20261007-095700-2c80, finding M1, MEDIUM
-probe-key: e32cc36946202c9afa0ed4b37d947507aa5916a6
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/sunset-probe.sh
-
-## INV-7208 — probe — [LOW] — A shell holds one claim in a single-prefix flag: claiming a second slot in the same shell silently orphans the first
-
-[LOW] — A shell holds one claim in a single-prefix flag: claiming a second slot in the same shell silently orphans the first
-
-```probe
-D=$(mktemp -d /tmp/athena-p2.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-#!/usr/bin/env bash
-# One shell claims slot 5, then names slot 4 and claims it too. Does its exit-trap stop still release slot 5?
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-if ls -d /tmp/sunset4-* /tmp/sunset5-* > /dev/null 2>&1; then echo "slot 4 or 5 is busy; try later"; exit 0; fi
-( export SUNSET_SLOT=5; source scripts/sunset-probe.sh; trap stop_probe_server EXIT
-  probe_db; echo "slot 5 probe_db rc=$?"
-  SUNSET_SLOT=4 probe_db; echo "slot 4 probe_db in the same shell rc=$?" ) 2>&1 | cut -c1-160
-echo "after the shell's trap stop: $(ls -d /tmp/sunset5-claim /tmp/sunset5-probe.db /tmp/sunset4-claim /tmp/sunset4-probe.db 2>/dev/null | tr '\n' ' ')"
-rm -f /tmp/sunset4-probe.db /tmp/sunset5-probe.db; rmdir /tmp/sunset4-claim /tmp/sunset5-claim 2>/dev/null
-echo "cleaned: $(ls -d /tmp/sunset4-* /tmp/sunset5-* 2>/dev/null | wc -l) left"
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-p2.?*) rm -rf -- "$D" ;; esac
-expect: "slot 4 probe_db in the same shell rc=0" and four paths listed after the trap stop while the defect stands; "rc=1" and an empty list once a second claim in one shell is refused
-```
-
-measured 2026-10-07 by chain chain-cerberus--judgment--probe-harness-20261007-095700-2c80, finding L1, LOW
-probe-key: 1381484630834460ac701489850090e601c5ebc3
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/sunset-probe.sh
-
-## INV-7209 — probe — [LOW] — The claim has no identity: a stop in a subshell leaves the parent's flag set, and the parent's later trap stop removes a successor's claim and roots
-
-[LOW] — The claim has no identity: a stop in a subshell leaves the parent's flag set, and the parent's later trap stop removes a successor's claim and roots
-
-```probe
-D=$(mktemp -d /tmp/athena-p2.XXXXXX) || exit 1
-cat > "$D/q.sh" <<'EOF'
-#!/usr/bin/env bash
-# A shell stops its server in a subshell, another probe takes the slot, then the first shell's exit trap runs its stop.
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-if ls -d /tmp/sunset5-* > /dev/null 2>&1; then echo "slot 5 is busy; try later"; exit 0; fi
-( export SUNSET_SLOT=5; source scripts/sunset-probe.sh; trap stop_probe_server EXIT
-  probe_db; ( stop_probe_server )
-  mkdir /tmp/sunset5-claim; echo "next probe's db" > /tmp/sunset5-probe.db     # the successor holds the slot now
-  echo "before the trap: $(ls -d /tmp/sunset5-claim /tmp/sunset5-probe.db 2>/dev/null | tr '\n' ' ')" )
-echo "after the first shell's trap stop: $(ls -d /tmp/sunset5-claim /tmp/sunset5-probe.db 2>/dev/null | tr '\n' ' ' | grep . || echo 'the successor claim and db are GONE')"
-rm -f /tmp/sunset5-probe.db; rmdir /tmp/sunset5-claim 2>/dev/null
-echo "cleaned: $(ls -d /tmp/sunset5-* 2>/dev/null | wc -l) left"
-EOF
-bash "$D/q.sh" "$D"
-case "$D" in /tmp/athena-p2.?*) rm -rf -- "$D" ;; esac
-expect: "after the first shell's trap stop: the successor claim and db are GONE" while the defect stands; the two paths listed once a stop cannot touch a claim its shell no longer holds
-```
-
-measured 2026-10-07 by chain chain-cerberus--judgment--probe-harness-20261007-095700-2c80, finding L2, LOW
-probe-key: e936c3887e47189e062628425536d7e69da3d5a6
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/sunset-probe.sh
-
 ## INV-7210 — probe — MEDIUM — the diagnosis prompt tells the model the old storage rule (outside the target file)
 
 MEDIUM — the diagnosis prompt tells the model the old storage rule (outside the target file)
@@ -7581,12 +7441,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterCon
 An origin for a child of this box that calls back into the API is `loopbackApiOrigin()` (`server/shared/utils.ts`), never a port expression written at the call site. It is `SERVER_PORT || '3001'`, the expression the listener reads (`server/index.ts`, `const SERVER_PORT`).
 
 - why no `PORT`: the server never listens on `PORT`. The `cloudcli` CLI is the one place that accepts it, and copies it into `SERVER_PORT` before the server starts (`server/modules/cli/cli.service.ts`: `else if (!SERVER_PORT && PORT) SERVER_PORT = PORT`). An origin built from `PORT` is right only where `SERVER_PORT` is already set, and wrong for a server started directly with `PORT=4000`: it listens on 3001 and the origin answers `:4000`.
-- symptom: a child's call back into the API (`CLOUDCLI_TOOLSET_URL`, the Metis board origin, the browser-use MCP URL) refuses to connect or reaches a different server.
+- symptom: a child's call back into the API (`CLOUDCLI_TOOLSET_URL`, the browser-use MCP URL) refuses to connect or reaches a different server.
 - fix: call `loopbackApiOrigin()`; if the listener learns another port variable, change the helper with it.
-- `KANBAN_PM_API_URL` stays the one explicit override, in `resolveApiOrigin` (`kanban-metis.module.ts`).
 - measured 2026-10-16: `grep -rn "process.env.PORT" server/` prints nothing.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/browser-use/browser-use.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/kanban-metis.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/browser-use/browser-use.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
 
 ## INV-8441 — probe — `loopbackApiOrigin`'s comment promises the running process's port, but with only `PORT` set the listener is on 3001
 
@@ -22076,26 +21935,6 @@ probe-key: c25480555e93d23bbe368e45839b587031e76a34
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs
 
-## INV-10651 — probe — INV-6: the plan pointer was dropped on a false premise; the plan exists on disk (MEDIUM)
-
-INV-6: the plan pointer was dropped on a false premise; the plan exists on disk (MEDIUM)
-
-```probe
-D=$(mktemp -d); cat > "$D/p.sh" <<'EOF'
-f=/home/lyphe/.claude/plans/archive/pm-metis-autonomy-hooks.plan.md
-echo "plan: $(head -1 "$f" 2>/dev/null || echo none)"
-echo "INV-6 names the plan: $(/home/lyphe/.claude/scripts/docstore get INV-6 | grep -c 'metis-autonomy-hooks')"
-echo "MAN-839 stale filename: $(/home/lyphe/.claude/scripts/docstore get MAN-839 | grep -c 'pm-f-218-metis-autonomy-hooks.plan.md')"
-EOF
-bash "$D/p.sh"
-# expect: plan line is "# pm-f-218-metis-autonomy-hooks — …", INV-6 names the plan: 0, MAN-839 stale filename: 1 (cured: INV-6 ≥ 1, MAN-839 0)
-```
-
-measured 2026-11-03 by chain chain-prune-sweep-house-hooks-20261103-050008-afd9, finding M1, MEDIUM
-probe-key: 723cb4faff7c806c9769d00b39e60887dcd41c29
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md
-
 ## INV-10659 — probe — MEDIUM — a Stop now ends in a close for an unpinned list chat, and her `stop_session` line, her answer, a comment and MAN-9065 still say the chat stays alive
 
 MEDIUM — a Stop now ends in a close for an unpinned list chat, and her `stop_session` line, her answer, a comment and MAN-9065 still say the chat stays alive
@@ -24406,7 +24245,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGut
 
 ## INV-11365 — the memory door's approve writes the operator's real shelves from os.homedir() — a scratch DATABASE_PATH moves the queue, never the shelves
 
-`POST /api/memory/<mc-n>/approve` lands its candidate at paths built from `os.homedir()` alone: `~/.claude/RULES.md`, `~/.claude/REQUIREMENTS.md`, `~/.claude/CLAUDE.md` and `~/.claude/projects/<project>/memory/` (`memory-plan.ts`: `projectsRoot`, and the `rules`, `requirements` and `claude` entries of the plan). `DATABASE_PATH` moves the queue and nothing else. `scripts/sunset-probe.sh` `boot_probe_server` sets `DATABASE_PATH`, `CLOUDCLI_SPILL_ROOT` and no `HOME`, so a scratch server that approves a planted candidate writes the operator's real file.
+`POST /api/memory/<mc-n>/approve` lands its candidate at paths built from `os.homedir()` alone: `~/.claude/RULES.md`, `~/.claude/REQUIREMENTS.md`, `~/.claude/CLAUDE.md` and `~/.claude/projects/<project>/memory/` (`memory-plan.ts`: `projectsRoot`, and the `rules`, `requirements` and `claude` entries of the plan). `DATABASE_PATH` moves the queue and nothing else. A scratch server started with `DATABASE_PATH` and `CLOUDCLI_SPILL_ROOT` and no `HOME` that approves a planted candidate writes the operator's real file.
 
 Keep: a probe never presses `file it` (approve) on any server. Show its wiring by answering the request inside the page (Playwright `page.route` on `**/api/memory/*/approve`, a 422) and counting that one POST left. Discard (`reject`) writes nothing to disk and is safe on a scratch store.
 
@@ -25645,3 +25484,30 @@ The chat app's regression cases are plain scripts on the running app: no framewo
 | one case, no record | `node cases/<area>/<name>.mjs` or `cloudcli-tsx cases/<area>/<name>.ts` from `/home/lyphe/.claude/claudecodeui_lyphe`, with `cases` on PATH or `CASES_KIT` set |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/cases/
+
+## INV-11896 — probe — LOW: warden file.read still reads state/inline-briefs (the operator's call)
+
+LOW (the operator's call: the denylist is a named list, and the design says "the rest of `~/.claude/state` stays readable"). One more store of the same class is still readable: `~/.claude/state/inline-briefs`.
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cat > "$D/p.mjs" <<'JS'
+import fs from 'node:fs';
+import os from 'node:os';
+const { resolveReadable } = await import('/home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs');
+const dir = `${os.homedir()}/.claude/state/inline-briefs`;
+if (!fs.existsSync(dir)) { console.log('inline-briefs brief: not on this machine'); process.exit(0); }
+const sub = `${dir}/${fs.readdirSync(dir).find((f) => f.endsWith('.md'))}`;
+const x = resolveReadable(sub, `${process.env.D}/wh`);
+console.log(`inline-briefs brief: ${x.refusal ? 'REFUSED' : 'readable by file.read'}`);
+JS
+D="$D" node "$D/p.mjs" 2>&1 | grep -v '^\[warden\]'
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf -- "$D";; esac
+expect: "REFUSED" once the operator names it; today "readable by file.read"
+```
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs

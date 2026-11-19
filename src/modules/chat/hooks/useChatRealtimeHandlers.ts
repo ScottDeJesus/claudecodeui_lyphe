@@ -359,7 +359,7 @@ export function useChatRealtimeHandlers({
       // A row joins the transcript only if the RUN WROTE IT. `ChatSessionWriter` hands every
       // provider frame to `ChatRunRegistry.decorateAndRecordEvent`, which stamps the run's
       // monotonic `seq` before the frame goes on the wire; a box-wide lane frame — `dispatcher_state`,
-      // `kanban_metis_state`, `kanban_event`, `universe_*` — belongs to no run and carries none.
+      // `kanban_event`, `universe_*` — belongs to no run and carries none.
       //
       // Asking the stamp rather than the kind is the point, and the kind list above is why: a lane
       // reaches production before anyone remembers to add it there, and the frame that slips

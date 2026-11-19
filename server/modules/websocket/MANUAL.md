@@ -294,10 +294,7 @@ Broadcasts `kind: dispatcher_state` when the plan store's document changes, reac
 Broadcasts `kind: soul_launch_state` when a hand-launched soul's directory changes, the same `modules/websocket/index.js` way.
 5. `modules/universe/universe.module.ts`
 Broadcasts `kind: universe_map` when a tracked repo's HEAD moves, and `kind: universe_activity` — the coalesced journal-and-transcript feed, at most ten frames a second and none while the estate is quiet — from the two taps in the same module ([docs/architecture/MANUAL.md (01-websocket-transport)](../../../docs/architecture/MANUAL.md) §"Fan-out: who receives what").
-6. `modules/kanban-metis/kanban-metis.module.ts`
-Broadcasts `kind: kanban_metis_state` when a board's live Metis sessions change, on the same `createPolledLane` shape as items 3 and 4.
-
-7. `modules/websocket/services/chat-run-registry.service.ts`
+6. `modules/websocket/services/chat-run-registry.service.ts`
 Broadcasts per-session `kind: session_upserted` when a run ends — once per run,
 from the terminal `complete` — so the sidebar re-reads the row whose
 `last_completed_at` (and `last_read_at`, when the chat was on screen) it just
@@ -309,11 +306,11 @@ session broadcasts nothing, so a tab's 30 s heartbeat writes and sends nothing.
 and `last_read_at` through the one unread expression
 (`SESSION_UNREAD_SQL`), never by re-deriving the comparison here.
 
-8. `modules/notes/notes.service.ts`
+7. `modules/notes/notes.service.ts`
 Broadcasts `kind: notes_changed` after a note is created, replaced or deleted, reaching this set through `modules/websocket/index.js`. The frame names no note and no account (MAN-7517).
-9. `modules/providers/services/simple-list.service.ts`
+8. `modules/providers/services/simple-list.service.ts`
 Broadcasts `kind: simple_list_changed` after a simple-list folder is made, renamed, folded or deleted, or a chat or folder is moved, reaching this set through `modules/websocket/index.js`. The frame names no folder and no chat (MAN-7519).
-10. `modules/providers/list/claude/session-host/host-liveness.ts`
+9. `modules/providers/list/claude/session-host/host-liveness.ts`
 Broadcasts `kind: session_host_liveness` when a chat gains its first or loses its last session host, reaching this set through `modules/websocket/index.js`; `handleChatConnection` also sends the same kind, as a snapshot, to each socket that joins the set, once the keepalive hosts are re-adopted (`whenHostsReadopted`). The ids ride a `sessionIds` array, never a `sessionId` key (session-host, MAN-695).
 
 This design centralizes cross-module realtime fanout without requiring route-local references to WebSocket internals.

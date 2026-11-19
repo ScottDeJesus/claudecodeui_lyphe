@@ -1,11 +1,10 @@
 /**
  * The activity reading: is any Claude work in flight on this machine right now?
  *
- * One question, asked of four places, because no single place can answer it. A chat run is in the
- * run registry; a conversation that outlived a restart is in its session host's meta; a board's
- * Metis is in the Metis registry; and everything else — a dispatch soul, a plan-runner chain, a
- * terminal's own `claude` — is only visible as a process. Each leg answers with reasons, and the
- * answer is busy when any leg has one.
+ * One question, asked of three places, because no single place can answer it. A chat run is in the
+ * run registry; a conversation that outlived a restart is in its session host's meta; and everything
+ * else — a dispatch soul, a plan-runner chain, a terminal's own `claude` — is only visible as a process.
+ * Each leg answers with reasons, and the answer is busy when any leg has one.
  *
  * THE ANSWER FAILS CLOSED. A leg that throws contributes a reason saying it could not be read, so an
  * unreadable process list, an unanswered tmux or a registry that is not up yet all read as busy. The
@@ -20,7 +19,6 @@
  * machine's `claude` processes, and an install under one breaks the conversation as it would any other.
  */
 
-import { countRunningMetisSessions } from '@/modules/kanban-metis/index.js';
 import {
   busyReason,
   listColocatedNodeHosts,
@@ -98,14 +96,6 @@ export async function readClaudeActivity(): Promise<ClaudeActivity> {
     }
   } catch (error) {
     reasons.push(`the Claude conversations could not be read: ${messageOf(error)}`);
-  }
-
-  try {
-    const metisCount = countRunningMetisSessions();
-    if (metisCount === null) reasons.push('the Metis sessions could not be counted yet');
-    else if (metisCount > 0) reasons.push(`${countPhrase(metisCount, 'Metis session', 'Metis sessions')} running`);
-  } catch (error) {
-    reasons.push(`the Metis sessions could not be read: ${messageOf(error)}`);
   }
 
   try {
