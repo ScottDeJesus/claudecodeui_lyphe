@@ -7,7 +7,7 @@ import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, Read
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 import type { CompanionLogEntry, CompanionMouthPiece, CompanionSessionRef } from '@/shared/companion-types';
-import type { KanbanChangelogEntry, KanbanStats } from '@/shared/kanban-types';
+import type { KanbanChangelogEntry, KanbanPriority, KanbanStats } from '@/shared/kanban-types';
 import type { RoadmapEpic, RoadmapFeature, RoadmapMilestone } from '@/shared/roadmap-types';
 import type { StationAskKind, StationNeed } from '@/shared/station-types';
 
@@ -3690,8 +3690,8 @@ export type DispatcherPace = { account: string; reading: DispatcherPaceReading; 
 export type DispatcherRoute = { provider: 'claude' | 'deepseek'; word: string; park_at_peak: boolean; peak_until: string | null; /** The pacer's picture (`route.pace`, interface VI), or `null`/absent while no picture is drawn: the master controller's pace line reads only `words`, and draws nothing without them. */ pace?: DispatcherPace | null; /** How many plans the board's one Start (`dispatcher start`) would let go now — the plans held for their FIRST Start (`first_start.held`: approved, paused, never launched, and an epic's waiting judgment), counted by the dispatcher so the button is drawn for exactly the plans its press reaches. `undefined` against a build older than the field, which draws no Start. */ waiting?: number; /** The EPIC QUEUE's census (`route.epics`, `line_gate.census`): `paused` whether Pause all is on (no epic starts; an outing already out finishes), `planning_through` whether the operator has let PLANNING through the pause (`dispatcher epics run-planning`: planner outings launch while every phase and the queue stay held — true only under a pause, and `false` against a build older than the key, which holds planning under Pause all), and `running` how many epics of the queue have STARTED. The queue runs top down; no limit is drawn. `null` against a dispatcher build older than the field, where the controls are not drawn (the key is absent: another build talking, never a torn document); a key that IS there and does not read is refused by name — `paused` or `planning_through` not a flag, `running` not a whole count. */ epics: { paused: boolean; planning_through: boolean; running: number } | null };
 /** This home's daemon. `alive` is the LOCK, not the file: the daemon takes a blocking exclusive flock on `<home>/daemon.lock` before anything else, so an exclusive flock taken by a reader answers without blocking — refused means somebody holds it, and that somebody is the daemon. `pid` and `unit` are therefore only reported on the alive branch: a lock file nobody holds is a dead daemon's, whatever pid it still names, and the unit comes from `/proc/<pid>/cgroup` — the kernel's answer, the one thing the daemon's four-name environment cannot have been handed. */
 export type DispatcherDaemon = { alive: boolean; pid: number | null; unit: string | null };
-/** The whole picture, pushed on change over `/ws` by the dispatcher lane. It is the document's own keys — `plans`, `arcs`, `planners`, `cards`, `route`, `daemon`, `offpeak_at`, `home`, `generated_at` — with the frame's clock added as `at`, epoch MILLISECONDS (`Date.now()`), unlike every time inside. `offpeak_at` is always a stamp — the next DeepSeek off-peak moment, and the literal `none` when the clock cannot answer — so it is a string and never null. */
-export type DispatcherStateEvent = { kind: 'dispatcher_state'; arcs: DispatcherArc[]; plans: DispatcherPlan[]; planners: DispatcherPlanner[]; cards: DispatcherCard[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; home: string; generated_at: string; at: number };
+/** The whole picture, pushed on change over `/ws` by the dispatcher lane. It is the document's own keys — `plans`, `arcs`, `planners`, `cards`, `bugs`, `route`, `daemon`, `offpeak_at`, `home`, `generated_at` — with the frame's clock added as `at`, epoch MILLISECONDS (`Date.now()`), unlike every time inside. `offpeak_at` is always a stamp — the next DeepSeek off-peak moment, and the literal `none` when the clock cannot answer — so it is a string and never null. `bugs` is a fingerprint of the bug board's rows (`report_bugs.digest`) that no screen draws: it moves when a ticket, a proposal or a hunt row is written, so the lane speaks and the Proposed features face and the hunters section re-read; `null` from a dispatcher build older than the key. */
+export type DispatcherStateEvent = { kind: 'dispatcher_state'; arcs: DispatcherArc[]; plans: DispatcherPlan[]; planners: DispatcherPlanner[]; cards: DispatcherCard[]; bugs: string | null; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; home: string; generated_at: string; at: number };
 /** The verbs this server may relay: `stop`, `resume`, `schedule` (a stopped plan's Resume at a time — `offpeak`, an ISO timestamp, or `none` to clear), `park` (a designed plan set aside), `unpark` (handed back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word; restarts nothing and wakes nobody — the word is read when a chain is launched), `drop` (a plan taken out of the store with everything it holds of it — refused while a phase of it walks or a planner outing for it or its arc is live; the one verb no press undoes), `planner-resume` (a plan's stalled planner outing put back to work through the verb the house already has for it — `cut`, `judge`, or a `tell` of `continue` — read fresh off the store at the press; refused when nothing of the plan ended short), `arm-accept` / `disarm-accept` (the operator's "Accept when cut" on a designed plan — or on every designed plan of an arc — and its Cancel; the press carries `--by app:card` and, on a plan, the design stamp it read), `queue` (an epic moved in the queue — `--before` another epic, `--last`, or `--at` a place; an epic's verb alone, relayed only through `POST /arcs/:name/queue`), `epics` (the epic dial's word — `pause` or `resume`; a BOARD verb that names no plan or arc, relayed only through `POST /epics`, so its answer carries `plan: ""`) `start` (the board's one Start — every plan held for its first Start let go at once, the queue and the dial then ordering them; a BOARD verb too, relayed only through `POST /start`, answered with `plan: ""`), `hide` (plans, or an epic's open plans, paused and held out of the queue until shown — relayed only through `POST /hide`) and `unhide` (Show: the hidden plans take their turn in the queue — relayed only through `POST /unhide`); both take plan or epic names in the request body, and their answers carry `plan: ""`. Beside them stands `override` (the operator's lift of the usage pacer's hold for ONE plan, and nothing else — the card's `Override`, and `Turn off` with `--off`; both carry `--by app:card`, and the dispatcher refuses the lift inside a Claude session, which this server's relay never is), and `pause-planning` / `resume-planning` (the operator's brake on ONE feature's or ONE epic's designing and planning, and its lift — the card's `Pause planning` and `Resume planning`; both carry `--by app:card`, the dispatcher resolves the name plan first and then epic, and it refuses `resume-planning` inside a Claude session too, which this server's relay never is; relayed under `/plans/:name` and `/arcs/:name`). */
 export type DispatcherVerb = 'stop' | 'resume' | 'schedule' | 'park' | 'unpark' | 'model' | 'drop' | 'planner-resume' | 'arm-accept' | 'disarm-accept' | 'queue' | 'epics' | 'start' | 'hide' | 'unhide' | 'override' | 'pause-planning' | 'resume-planning';
 /** What one relayed verb did. A refusal is a RESULT, not an error: the dispatcher prints its refusals on STDOUT (`REFUSED <verb> <name>: <reason>`, exit 2 — `REFUSED epics '<word>': <reason>` for the board's `epics`, which names no plan and whose answer carries `plan: ""`; a not-found line, exit 1 — `no plan <bare>`, or `no plan or arc <bare>` from one of the six verbs an arc's own name also reaches), so `stdout` carries the dispatcher's own first line whole and the reader never gets our paraphrase. `reason` is present only when the dispatcher never got to answer: it timed out, or its binary could not be spawned. */
@@ -3754,12 +3754,86 @@ export type TicketSourceStats = { source: string; filed: number; open: number; f
 export type UnplacedTicket = { id: number; title: string; path: string; filed_at: string };
 /** `dispatcher bug stats --days N --json`, whole: the tickets filed in the window by source, the ones waiting for a board, and how many came back (`reopened`: a cleared ticket its detector opened again; `regressions`: a new ticket for a defect once fixed). */
 export type TicketStats = { days: number; by_source: TicketSourceStats[]; unplaced: UnplacedTicket[]; came_back: { reopened: number; regressions: number } };
-/** `GET /api/kanban-dispatch/dashboard?board=<id>|all&days=<n>`, whole: the board's own numbers and changelog (always present: they are this server's reads), and the two house parts, each of which may not have answered. Read by `useBugDashboard` and drawn by the kanban module's `BugDashboard`. */
-export type BugDashboardAnswer = { stats: KanbanStats; changelog: KanbanChangelogEntry[]; cases: BugDashboardPart<CasesStats>; tickets: BugDashboardPart<TicketStats> };
+/** `GET /api/kanban-dispatch/dashboard?board=<id>|all&days=<n>`, whole: the board's own numbers and changelog (always present: they are this server's reads), and the two house parts, each of which may not have answered. Read by `useBugDashboard` and drawn by the kanban module's `BugDashboard`. `hunts` is `dispatcher hunt status --json` (`HuntStatus`), a part of its own, so a dispatcher that cannot answer it blanks only the hunters' section. */
+export type BugDashboardAnswer = { stats: KanbanStats; changelog: KanbanChangelogEntry[]; cases: BugDashboardPart<CasesStats>; tickets: BugDashboardPart<TicketStats>; hunts: BugDashboardPart<HuntStatus> };
 /** What the dashboard is asked for: `scope` is the open board alone or every board not archived, `days` the window. The kanban panel keeps it, so it survives a visit to the Board face and a board switch. */
 export type BugDashboardView = { scope: 'board' | 'all'; days: 7 | 30 | 90 };
 /** The dashboard's reading as its face draws it: `loading` before the first answer, `unreachable` when the route itself did not answer (the whole face says so, with a retry), else the answer. `stale` is true while a newer answer is being fetched over the one drawn. */
 export type BugDashboardReading = { status: 'loading' } | { status: 'unreachable' } | { status: 'ready'; answer: BugDashboardAnswer; stale: boolean };
+// ---------------------------
+//----------------- BUG HUNTERS: the proposed features, and the hunts part of the dashboard ------------
+/** One finding on a proposal (`bug proposals --json`, `findings[]`): the file or `<database>.<table>` it names (`null` when it names none), what was found there, and when (ISO-8601 UTC). Drawn in an opened `ProposalRow`. */
+export type BugProposalFinding = { unit: string | null; words: string; found_at: string };
+/** A stopgap ticket filed for a proposal (`stopgaps[]`): the smallest thing that stops the harm while the rework waits. `state` is the ticket's own word (`filed`, `placed`, `unplaced`, `fixed`, `cleared`, `closed`); `board` and `card` are `null` until a board has taken it, and only then is it a press. `ticket` is a key, never shown (INV-76). */
+export type BugProposalStopgap = { ticket: number; title: string; state: string; board: string | null; card: string | null };
+/** One proposed feature as `GET /api/kanban-dispatch/proposals` answers it: `bug proposals --json`'s row plus `boardName`, the board whose repositories hold its `path`. `kind` is why it is not a ticket (`too-big` for one, or the `design` is wrong); `source` is who proposed it as a ticket's source is spelled (`hunter`, `chat`, `soul`, …) and `hunt` the hunter's kind when one did. An ended proposal carries its ending: `feature` once promoted (its `state` the roadmap's word for the feature, read at the read), `sent_back` once sent back as a ticket, `reason` once dismissed. `id` is a key for the routes and for React, never shown (INV-76). A promoted proposal's feature has `title` and `state` `null` once that feature has been removed from the roadmap. */
+export type BugProposal = {
+  id: number;
+  path: string;
+  boardName: string;
+  title: string;
+  words: string;
+  kind: 'too-big' | 'design';
+  priority: KanbanPriority;
+  state: 'open' | 'promoted' | 'sent-back' | 'dismissed';
+  hunt: string | null;
+  source: string;
+  proposed_at: string;
+  ended_at: string | null;
+  feature: { name: string; title: string | null; state: string | null } | null;
+  reason: string | null;
+  findings: BugProposalFinding[];
+  stopgaps: BugProposalStopgap[];
+  sent_back: { ticket: number; board: string | null; card: string | null } | null;
+};
+/** What the Proposed features face is asked for: `scope` is the open board alone or every board, `state` the open proposals or every one. The kanban panel keeps it, so it survives a visit to another face and a board switch. */
+export type ProposalsView = { scope: 'board' | 'all'; state: 'open' | 'all' };
+/** The proposals' reading as `useProposals` hands it and `ProposedFeatures` draws it: `loading` before the first answer, `unreachable` when the route did not answer, else the proposals in the server's order (high priority first, then the oldest). `stale` is true while a newer answer is being fetched over the one drawn. */
+export type ProposalsReading = { status: 'loading' } | { status: 'unreachable' } | { status: 'ready'; proposals: BugProposal[]; stale: boolean };
+
+/** One epic a proposal can be promoted under, as `ProposalPromoteDialog`'s `Select` lists it: the epic's `name` (what `promote` is sent as `arc`) and `title`, and the titles of the roadmap and the milestone it stands in, which the option says beside it. Flattened from `GET /api/roadmap` in the roadmap's own order, so the epics of one milestone stand together. */
+export type ProposalEpicChoice = { name: string; title: string; roadmap: string; milestone: string };
+/** The epics' reading inside the promote dialog: asked when the dialog opens, `unreachable` when the roadmap did not answer. */
+export type ProposalEpicsReading = { status: 'loading' } | { status: 'unreachable' } | { status: 'ready'; epics: ProposalEpicChoice[] };
+/** The newest night of hunting (`dispatcher hunt status --json`, `night`): the local date it opened on, whether it is still `open`, how many working minutes its sittings have used, and the dispatcher's own words for why it closed (`time spent`, `nothing left to hunt`, `stopped by the operator`, …), `null` while open. */
+export type HuntNight = { night: string; state: 'open' | 'closed'; opened_at: string; minutes_used: number; why: string | null };
+/** One hunter's standing on one project (`hunts[].projects[]`), every figure computed at the read: `total`, `covered`, `skipped` and `open` (not reached) are of the newest pass and counted in `unit_word`; `nights_left` is `null` before the pass's first sitting; `cause` is the fault's sentence when the project `could not be mapped`; `last` is its newest sitting (its `outcome` `null` while that sitting is still out). `project` is the folder, `name` what a person calls it. */
+export type HuntProjectStanding = {
+  project: string;
+  name: string;
+  unit_word: 'files' | 'tables';
+  state: 'not started' | 'hunting' | 'done' | 'could not be mapped' | 'nothing of its kind' | 'no database named';
+  pass: number | null;
+  total: number;
+  covered: number;
+  skipped: number;
+  open: number;
+  tickets: number;
+  proposals: number;
+  nights_left: number | null;
+  cause: string | null;
+  last: { night: string; minutes: number; outcome: string | null; covered: number } | null;
+};
+/** One hunter (`hunts[]`): its kind (`security`, `behaviour`, `ui`, `data`, `code`), the soul and model that wear it, whether it takes a turn (`runs`: it is in the config's `order`), and its standing on each project. */
+export type HuntHunter = { hunt: string; soul: string; model: string; runs: boolean; projects: HuntProjectStanding[] };
+/** One unit a hunter could not hunt (`skipped[]`, the newest 200): the file or table, whose hunt and which project (its folder), the hunter's reason, and when it was marked. `project` is the project's FOLDER here, and `POST /api/kanban-dispatch/hunts/reopen` takes the project's NAME in the config (`hunt reopen HUNT PROJECT UNIT` refuses a folder): `Hunt it again` maps the folder to its name through `hunts[].projects[]` (`project` → `name`) and sends `{ hunt, project: <that name>, unit }`. */
+export type HuntSkippedUnit = { hunt: string; project: string; unit: string; reason: string; marked_at: string };
+/** One sitting (`sittings[]`, the newest 20): the night, the hunter and its soul, the project (its folder), the working minutes, how it ended (`pass done`, `wound down`, `tickets filed`, `waiting`, `stopped`, `failed`; `null` while it is out) with the cause of a failure, and what it marked and filed, counted by the sitting. */
+export type HuntSittingRow = { night: string; hunt: string; soul: string; project: string; minutes: number; outcome: string | null; cause: string | null; covered: number; skipped: number; tickets: number; proposals: number };
+/** `dispatcher hunt status --json`, whole: the dashboard answer's `hunts` part, drawn by `DashboardHunters`. The nightly switch and its start (the box's local `HH:MM`), the newest night, the sitting out now (`deadline` ISO-8601 UTC), the turn that would be taken next, every hunter, the skipped units and the last sittings. */
+export type HuntStatus = {
+  nightly: boolean;
+  start: string;
+  minutes: number;
+  order: string[];
+  turns: 'project' | 'hunter' | 'nightly';
+  night: HuntNight | null;
+  sitting: { hunt: string; soul: string; project: string; started_at: string; deadline: string } | null;
+  next: { hunt: string; project: string; rehunt: boolean } | null;
+  hunts: HuntHunter[];
+  skipped: HuntSkippedUnit[];
+  sittings: HuntSittingRow[];
+};
 // ---------------------------
 //----------------- SPEND: a spend figure's two halves, decided once ------------
 /** A spend figure DECIDED and not yet worded — `spendParts` (`src/shared/spend.ts`) is its one maker, and `spendText` and `SpendPills` (`src/modules/dispatcher/`) are its two drawers, so a sentence and a row of pills can never disagree about which halves a record has. `paid` is the PAID dollars, `null` where no API billed (a figure of 0 means the work rode Claude, never "this cost nothing"). `tokens` is the CLAUDE half: `split` when the record carries `in` and `out` that ARE its total, `total` when only the total can be trusted (a pre-split record, or a sum over records half of which predate the split), `null` when it carries neither. A split's `cacheRead` is the part of `in` served from the prompt cache, or `null` where the record does not state it (a record from before the field, a caller that has none) — `cachePercent` turns it into the `in` pill's `(94% cache)`, and `null` draws no suffix rather than a `0%`. Client-only: the server's mirrored dispatcher block above never carries it. */

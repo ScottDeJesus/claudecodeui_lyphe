@@ -481,11 +481,16 @@
     "cards": {
       "title": "Board cards"
     },
+    "hunts": {
+      "title": "Bug hunters"
+    },
     "row": {
+      "soul": "Soul",
       "model": "Model",
       "effort": "Effort",
       "effortFollows": "{{effort}} · {{model}}’s default",
       "effortOwnPin": "{{effort}} · Hephaestus’s own pin",
+      "effortSoulPin": "{{effort}} · {{soul}}’s own pin",
       "pinned": "pinned",
       "defaultOf": "Default · {{value}}",
       "noFlag": "no flag",
@@ -493,6 +498,7 @@
       "shimBehind": "shim behind",
       "modelLabel": "{{name}} model",
       "effortLabel": "{{name}} effort",
+      "soulLabel": "{{name}} soul",
       "more": "Show more",
       "less": "Show less",
       "notSaved": "not saved"
@@ -502,6 +508,7 @@
       "dispatcher": "Dispatcher",
       "chain": "Chain",
       "sorter": "Card sort",
+      "hunt": "Bug hunt",
       "newSession": "new session",
       "claude": "Claude",
       "deepseek": "DeepSeek"
@@ -678,6 +685,7 @@
   },
   "kanban": {
     "loading": "Reading the board…",
+    "notAnswered": "The server did not answer, so nothing changed. Try again.",
     "unreachable": {
       "title": "The board could not be read",
       "message": "The server did not answer. Nothing has been lost — the board is wherever you left it.",
@@ -869,7 +877,129 @@
       "board": "Board",
       "dashboard": "Dashboard",
       "openHigh_one": "{{count}} high-priority card is open",
-      "openHigh_other": "{{count}} high-priority cards are open"
+      "openHigh_other": "{{count}} high-priority cards are open",
+      "proposed": "Proposed features",
+      "openHighProposals_one": "{{count}} high-priority proposal is open",
+      "openHighProposals_other": "{{count}} high-priority proposals are open"
+    },
+    "proposed": {
+      "loading": "Reading the proposals…",
+      "unreachable": {
+        "title": "The proposed features could not be read",
+        "message": "The server did not answer. Nothing has been lost: every proposal is as it was.",
+        "retry": "Try again"
+      },
+      "scope": {
+        "label": "Which boards",
+        "board": "This board",
+        "all": "All boards"
+      },
+      "state": {
+        "label": "Which proposals",
+        "open": "Open",
+        "all": "All"
+      },
+      "waiting_one": "{{count}} proposal is waiting for your call",
+      "waiting_other": "{{count}} proposals are waiting for your call",
+      "waitingNone": "No proposal is waiting for your call",
+      "about": "Work that is too big for one ticket, or that says the design itself is wrong. Promote one to the roadmap, send it back as a ticket, or dismiss it.",
+      "listLabel": "Proposed features",
+      "empty": {
+        "openTitle": "No proposed feature is waiting",
+        "allTitle": "Nothing has been proposed yet",
+        "message": "When a hunter or a chat finds work too big for a ticket, or a design that is wrong, it is proposed here for your call."
+      },
+      "kind": {
+        "too-big": "Too big for a ticket",
+        "design": "The design is wrong"
+      },
+      "proposer": {
+        "hunter": "A bug hunter",
+        "chat": "A chat",
+        "soul": "A soul at work",
+        "operator": "You",
+        "nightly": "The night's regression run",
+        "cerberus": "Cerberus"
+      },
+      "proposedAge": "Proposed {{age}}",
+      "findings_one": "{{count}} finding",
+      "findings_other": "{{count}} findings",
+      "stateWord": {
+        "promoted": "Promoted",
+        "sent-back": "Sent back as a ticket",
+        "dismissed": "Dismissed"
+      },
+      "folder": "Folder",
+      "findingsTitle": "Findings",
+      "noFindings": "No finding is on it yet.",
+      "noUnit": "No file or table named",
+      "found": "Found {{date}}",
+      "stopgapsTitle": "Stopgap tickets",
+      "stopgapsAbout": "Small fixes filed to stop the harm while this waits. Each lives on as a ticket of its own.",
+      "ticketState": {
+        "filed": "Waiting for a board",
+        "placed": "On its board",
+        "unplaced": "No board takes its folder",
+        "fixed": "Fixed",
+        "cleared": "Cleared",
+        "closed": "Closed"
+      },
+      "decide": "Your call",
+      "priorityLabel": "Priority",
+      "promote": "Promote to the roadmap",
+      "sendBack": "Send back as a ticket",
+      "dismiss": "Dismiss",
+      "ending": {
+        "promoted": "On the roadmap as “{{title}}”",
+        "promotedGone": "Promoted to the roadmap",
+        "featureState": {
+          "idea": "An idea",
+          "proposed": "Proposed",
+          "designing": "Being designed",
+          "in flight": "Being built",
+          "shipped": "Shipped"
+        },
+        "sentBackCard": "Open the card it became",
+        "sentBackWaiting": "Its ticket is waiting for a board",
+        "dismissed": "Dismissed: {{reason}}",
+        "dismissedNoReason": "Dismissed"
+      },
+      "promoteDialog": {
+        "title": "Promote to",
+        "accent": "the roadmap",
+        "about": "“{{title}}” becomes an idea under the epic you pick, with its words and findings as the goal. Nothing is designed until you send it to design.",
+        "epic": "Epic",
+        "epicPlaceholder": "Choose an epic…",
+        "epicHint": "{{roadmap}} · {{milestone}}",
+        "epicHelper": "Listed by roadmap, then by milestone.",
+        "epicChosen": "On the {{roadmap}} roadmap, under the milestone “{{milestone}}”.",
+        "loading": "Reading the roadmap…",
+        "unreachable": "The roadmap could not be read, so there is no epic to pick.",
+        "retry": "Try again",
+        "noEpics": "No roadmap has an epic yet. Add one on the Roadmap tab, then promote this.",
+        "confirm": "Promote",
+        "cancel": "Cancel"
+      },
+      "sendBackDialog": {
+        "title": "Send this back as a ticket?",
+        "message": "“{{title}}” is filed as a ticket with its words and findings, at the priority it has now, and lands on its board like any other. The proposal is closed.",
+        "stopgaps": "Its stopgap tickets stay as they are.",
+        "confirm": "Send back as a ticket",
+        "cancel": "Cancel"
+      },
+      "dismissDialog": {
+        "title": "Dismiss",
+        "accent": "this proposal",
+        "about": "“{{title}}” is closed and nothing is built. Its words and findings are kept.",
+        "stopgaps": "Its stopgap tickets stay as they are.",
+        "reason": "Why",
+        "reasonPlaceholder": "Why this should not be built",
+        "reasonHelper": "Required. It is kept with the proposal, so the next one to find this knows it was looked at.",
+        "reasonTooLong_one": "{{count}} character over the 500 a reason can hold",
+        "reasonTooLong_other": "{{count}} characters over the 500 a reason can hold",
+        "confirm": "Dismiss",
+        "cancel": "Cancel"
+      }
     },
     "dashboard": {
       "loading": "Reading the numbers…",
@@ -1023,6 +1153,121 @@
         "title_other": "{{count}} tickets are waiting for a board",
         "about_one": "No board names the folder it was filed against. Add that folder to a board's repositories and it is placed at once.",
         "about_other": "No board names the folders they were filed against. Add a folder to a board's repositories and its ticket is placed at once."
+      },
+      "hunters": {
+        "title": "Bug hunters",
+        "failed": "The bug hunters could not be read. {{error}}",
+        "kind": {
+          "security": "Security",
+          "behaviour": "Behaviour",
+          "ui": "UI",
+          "data": "Data",
+          "code": "Code"
+        },
+        "name": {
+          "security": "Security hunter",
+          "behaviour": "Behaviour hunter",
+          "ui": "UI hunter",
+          "data": "Data hunter",
+          "code": "Code hunter"
+        },
+        "tonight": {
+          "hunting": "Hunting now: {{hunter}} on {{project}}, winds down at {{time}}",
+          "next": "Next: {{hunter}} on {{project}}, tonight at {{time}} by the server's clock",
+          "nextNow": "Next: {{hunter}} on {{project}}, starting now",
+          "nothingNext": "Next: nothing is left to hunt",
+          "off": "Nightly hunting is off",
+          "offWhere": "It is switched on in Settings, under Agents.",
+          "nightOpen": "Tonight's hunt has used {{used}} minutes so far. Another night can be run once this one has closed.",
+          "nightClosed": "The last night, {{date}}, ended after {{used}} minutes: {{why}}.",
+          "noNight": "No night has run yet.",
+          "run": "Run a night now",
+          "stop": "Stop tonight's hunt"
+        },
+        "stopDialog": {
+          "title": "Stop tonight's hunt?",
+          "message": "The hunter finishes the file or table it has in hand, marks it and ends its turn. Tonight is then over: no other hunter takes a turn, and a stopped night cannot be started again until tomorrow.",
+          "confirm": "Stop tonight's hunt",
+          "cancel": "Keep hunting"
+        },
+        "soul": "worn by {{soul}}",
+        "notRunning": "Not taking a turn",
+        "state": {
+          "not started": "Not started",
+          "hunting": "Hunting",
+          "done": "Done",
+          "could not be mapped": "Could not be mapped",
+          "nothing of its kind": "Nothing of its kind",
+          "no database named": "No database named"
+        },
+        "quiet": {
+          "not started": "Its first pass has not begun.",
+          "nothing of its kind": "This project holds nothing of this hunter's kind.",
+          "no database named": "No database is named for this project, so there is no table to hunt."
+        },
+        "notMapped": "{{project}} could not be mapped, so nothing of it was hunted: {{cause}}",
+        "notMappedNoCause": "{{project}} could not be mapped, so nothing of it was hunted.",
+        "units": {
+          "files": "files",
+          "tables": "tables"
+        },
+        "pass": "Pass {{pass}} · {{total}} {{unit}}",
+        "parts": {
+          "covered": "Covered",
+          "skipped": "Skipped",
+          "open": "Not reached"
+        },
+        "partsLabel": "{{project}}, {{part}}: {{figure}} of {{total}} {{unit}}",
+        "tickets_one": "{{count}} ticket",
+        "tickets_other": "{{count}} tickets",
+        "proposals_one": "{{count}} proposal",
+        "proposals_other": "{{count}} proposals",
+        "filed": "{{tickets}} · {{proposals}} filed",
+        "last": "Last hunted {{date}} · {{outcome}}",
+        "neverHunted": "No sitting yet",
+        "outcome": {
+          "pass done": "Finished its pass",
+          "wound down": "Wound down at the time limit",
+          "tickets filed": "Reached the night's ticket limit",
+          "waiting": "Waiting on a usage limit",
+          "stopped": "Stopped",
+          "failed": "Failed",
+          "out": "Still hunting"
+        },
+        "nightsLeft_one": "about {{count}} night left",
+        "nightsLeft_other": "about {{count}} nights left",
+        "noProjects": "No project is listed for this hunter.",
+        "noHunters": "No hunter is set up yet.",
+        "skips": {
+          "title": "Skipped, with the reason",
+          "about": "What a hunter could not hunt. A skip never counts as covered.",
+          "empty": "Nothing has been skipped",
+          "columns": {
+            "unit": "File or table",
+            "reason": "Why it was skipped",
+            "hunter": "Hunter",
+            "project": "Project",
+            "when": "When"
+          },
+          "again": "Hunt it again",
+          "refused": "Not put back to be hunted. {{sentence}}",
+          "showAll": "Show all {{count}}",
+          "showNewest": "Show the newest {{count}} only"
+        },
+        "nights": {
+          "title": "The last sittings",
+          "about": "One row for each time a hunter sat down, the newest first.",
+          "empty": "No hunter has sat down yet",
+          "columns": {
+            "night": "Night",
+            "hunter": "Hunter",
+            "project": "Project",
+            "outcome": "How it ended",
+            "minutes": "Minutes",
+            "covered": "Covered",
+            "tickets": "Tickets"
+          }
+        }
       }
     },
     "toast": {

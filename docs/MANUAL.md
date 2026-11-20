@@ -10064,7 +10064,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /hom
 
 ## MAN-7417 — Agent Chains — what the panel shows, its states and layout, and the doors that are gone
 
-Agent Chains: the panel where the operator reads and changes the model and effort every soul and a board card's sorter and tweak builder launch at, and the `/api/agent-launch` relay behind it. It opens from Settings → Agents → Edit Agent Chains, in a window above Settings (MAN-7427). The table is `charters/launch.toml` (MAN-7407); `~/.claude/scripts/launch-table` is its one reader and writer (MAN-7415). The panel and the relay open no file: the census the CLI prints is the panel's whole data.
+Agent Chains: the panel where the operator reads and changes the model and effort every soul and a board card's sorter and tweak builder launch at, and the soul and model each of the five bug hunts wears, and the `/api/agent-launch` relay behind it. It opens from Settings → Agents → Edit Agent Chains, in a window above Settings (MAN-7427). The table is `charters/launch.toml` (MAN-7407); `~/.claude/scripts/launch-table` is its one reader and writer (MAN-7415). The panel and the relay open no file: the census the CLI prints is the panel's whole data.
 
 The data path, the hook and the rules that bite: MAN-7420. The window, its stand-ins and the row: MAN-7427. The routes and `LAUNCH_TABLE_BIN`: MAN-7418.
 
@@ -10089,6 +10089,10 @@ Every choice list is `census.choices`; the panel spells no model or effort word.
 | Souls | one row per `kind: "soul"`, census order (by name); count badge and "N pinned" | — |
 | Board cards | section `agent-cards`, title `agentLaunch.cards.title` ("Board cards"), after Souls: the `sorter` and `tweak` rows through `AgentLaunchRowItem` with `models` / `required` / `effortFollows` (below); drawn only when `cardRows` is non-empty | sorter `{model}` / `{effort}`, tweak `{model}` alone, never `null` (`onSaveCardRow` drops `null` and the tweak's effort, then calls the panel's `onSaveRow`) |
 
+| Bug hunters | section `agent-hunts`, title `agentLaunch.hunts.title`, after Board cards: the five `kind: "hunt"` rows (`hunt.<kind>`) in census order, through `AgentLaunchRowItem` with `souls` and `effortFollows`; drawn only when the census holds hunt rows (a table older than the hunts draws no section) | `{soul}` (never `null`) or `{model}` (a word, or `null` to clear the pin); never an effort (`onSaveHuntRow` drops it, then calls `onSaveRow`) |
+
+**Bug hunters — data.** `AgentLaunchPanel.tsx` derives `censusHunts` from `census.rows` (`kind: "hunt"`) and the soul list from `census.choices.hunt_souls ?? []`; no stand-in values. Settings → Agents' own hunters rows (when, how long, the turn order) are MAN-10068.
+
 **Board cards — data.** `AgentLaunchPanel.tsx` derives `cardRows` from `census.rows` (`kind` `sorter`, then `tweak`) and `cardModels` from `census.choices.sorter_models` / `tweak_models`; no stand-in values. The hook's `isCensus` requires both lists to be arrays (MAN-7420).
 
 **Row item props for these rows** (all optional on `AgentLaunchRowItem`):
@@ -10096,11 +10100,12 @@ Every choice list is `census.choices`; the panel spells no model or effort word.
 |---|---|
 | `models` | the model list for this row, replacing `census.choices.models` |
 | `required` | the lists offer no `Default · <value>` choice and wear no `pinned` mark: the row's words always stand in the table, `launch-table` refuses `null` |
-| `effortFollows` | the effort slot holds words, not a list: `agentLaunch.row.effortFollows` ("<effort> · <model>’s default") when `effort_pinned` is false, `agentLaunch.row.effortOwnPin` ("<effort> · Hephaestus’s own pin") when true; for the tweak, whose row holds a model alone |
+| `effortFollows` | the effort slot holds words, not a list: `agentLaunch.row.effortFollows` ("<effort> · <model>’s default") when `effort_pinned` is false; when true, `agentLaunch.row.effortOwnPin` ("<effort> · Hephaestus’s own pin") for the tweak, or `agentLaunch.row.effortSoulPin` ("<effort> · <soul>’s own pin") for a hunt; the tweak and a hunt hold no effort of their own |
+| `souls` | a hunt row alone: a third list, `Soul` (`agentLaunch.row.soulLabel` "<name> soul"), first and the row's full width, over `choices.hunt_souls`, no Default (the soul always stands); the model's `Default · <value>` then names the model the soul's own row resolves to |
 
 **A row** = name, the description beneath (two lines; "Show more" / "Show less" past `DESCRIPTION_CLAMP_CHARS` = 70, `aria-expanded`), a Model and an Effort control, its lanes.
 - Each control reads `pinned` (badge: the row's own table entry) or "Default · <value>". Its first choice is `Default · <value>`; choosing it clears the pin (`null`). The effort default is `defaults.effort[row.model]`, else "no flag".
-- A lane (`Agent call`, `Dispatcher`, `Chain`, `Card sort`; which lanes a row has is the census's, MAN-7415) prints every side as `model·effort` (`no flag` when `effort` is null).
+- A lane (`Agent call`, `Dispatcher`, `Chain`, `Card sort`, `Bug hunt`; which lanes a row has is the census's, MAN-7415) prints every side as `model·effort` (`no flag` when `effort` is null).
 - A side's `when` prints only where it says more than the model beside it: `always`, or a `when` equal to the model, prints nothing; `claude` / `deepseek` print "Claude" / "DeepSeek"; any other `when` prints as it is.
 - The lane's `note` sits beneath it. A lane whose `reach` is `new-session` wears a `new session` marker: an Agent call reads its definition once per session.
 
@@ -10128,7 +10133,7 @@ Every choice list is `census.choices`; the panel spells no model or effort word.
 ## draw order and layout
 1. Header: mark, title "Agent Chains" (the `<h2>` carries `titleId` when the window gives one), `census.file` (≥ 48rem), reload button (`data-agent-reload`; a native `title`, no `Tooltip`), and — only when the window gives `onClose` — a close button (`data-agent-close`, `autoFocus`).
 2. Refusal banner, outside the scroll.
-3. Body: warnings, reach notice, Defaults, Souls, Board cards. The scroll body carries 16rem bottom padding for the last row's open list.
+3. Body: warnings, reach notice, Defaults, Souls, Board cards, Bug hunters. The scroll body carries 16rem bottom padding for the last row's open list.
 
 | panel width | row columns |
 |---|---|
@@ -10149,11 +10154,11 @@ Mount: `app.use('/api/agent-launch', authenticateToken, createAgentLaunchModule(
 | route | body | runs |
 |---|---|---|
 | `GET /api/agent-launch` | — | `launch-table show` |
-| `PUT /api/agent-launch/rows/:name` | `{model?: string\|null, effort?: string\|null}`; at least one field | `set <name> [--model M] [--effort E]`; `null` → `default` |
+| `PUT /api/agent-launch/rows/:name` | `{model?: string\|null, effort?: string\|null, soul?: string}`; at least one field | `set <name> [--model M] [--effort E] [--soul S]`; `null` → `default`; `soul` (never `null`) is a hunt row's alone: the CLI refuses it on any other row, and refuses `effort` on a hunt row, each in its own sentence |
 | `PUT /api/agent-launch/defaults` | `{model?: string, effort?: {<model>: string\|null}, deepseek_effort?: string, dactyl_model?: string, dactyl_effort?: string, summarizer_model?: string, summarizer_effort?: string}`; at least one field | `defaults [--model M] [--effort <model>=<E\|none>]... [--deepseek-effort E] [--dactyl-model W] [--dactyl-effort E] [--summarizer-model W] [--summarizer-effort E]`; `null` → `none`; the dactyl's two and the summarizer's two cannot be cleared, and the CLI says so in a sentence |
 
 - A 200 body is the census the CLI printed, whole. A PUT answers the census read back AFTER the write, never the input (MAN-628).
-- `:name` matches `^[a-z][a-z0-9_]{0,63}$`. The routes check transport shape only; the vocabulary is Python's, so `PUT /rows/hermes` with `{"effort":"loud"}` answers 400 carrying the CLI's sentence.
+- `:name` matches `^(?:hunt\.)?[a-z][a-z0-9_]{0,63}$`: a soul's slug, `sorter`, `tweak`, or one of the five hunt rows `hunt.<kind>` (`security`, `behaviour`, `ui`, `data`, `code`). The census carries each hunt row (`kind: "hunt"`, its `soul`) and `choices.hunt_souls`. The routes check transport shape only; the vocabulary is Python's, so `PUT /rows/hermes` with `{"effort":"loud"}` answers 400 carrying the CLI's sentence.
 
 | the CLI | reason | status | body |
 |---|---|---|---|
@@ -10181,6 +10186,7 @@ The Agent Chains panel's data path, its hook and the rules a change to either mu
 | write, defaults | `api.agentLaunch.saveDefaults(change)` → `PUT /api/agent-launch/defaults`; `change` is an `AgentLaunchDefaultsChange` |
 | write deadline | `AGENT_LAUNCH_WRITE_TIMEOUT_MS` = 95 000 in `src/shared/api.ts`; the relay lets the CLI run 90 s (MAN-7416); a read keeps the default 30 s |
 | answer of a write | the census read back after it; the hook replaces the held census with it |
+| write, a hunt row | the same `saveRow`: `PUT /api/agent-launch/rows/hunt.<kind>` with `{soul}` and/or `{model}`, which the relay hands to `launch-table set hunt.<kind> --soul S --model M` (MAN-7418) |
 
 ## where each piece lives
 | piece | home |
@@ -10189,7 +10195,7 @@ The Agent Chains panel's data path, its hook and the rules a change to either mu
 | panel props | `onClose?: () => void` (draws the header's close button) · `titleId?: string` (the id the `<h2>` carries, so the window is named by it) |
 | parts | `AgentLaunchNotices` (warnings, reach notice) · `AgentLaunchDefaults` (mounts `AgentLaunchDactylField` and `AgentLaunchSummarizerField`, twins: a model list and an effort list each) · `AgentLaunchRowItem` · `AgentLaunchLanes` · `AgentLaunchChoice` (a slot is a list, or `said` words with no list, as the tweak's effort) |
 | hook | `useAgentLaunch()` → `{ census, error, saving, refresh, saveRow, saveDefaults }` |
-| types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading. Row `kind` is `'soul' \| 'sorter' \| 'tweak'`; lane `'agent' \| 'dispatcher' \| 'chain' \| 'sorter'`; `choices.sorter_models` / `choices.tweak_models` are the two board-card model lists |
+| types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading. Row `kind` is `'soul' \| 'sorter' \| 'tweak' \| 'hunt'` (a hunt row carries `soul`); lane `'agent' \| 'dispatcher' \| 'chain' \| 'sorter' \| 'hunt'`; `choices.sorter_models` / `choices.tweak_models` are the two board-card model lists; `choices.hunt_souls` (optional: a table older than the hunts lacks it) is every soul that may wear a hunt |
 
 ## hook contract
 - `census` is `null` until read; a failed call keeps the census already held.
@@ -10198,7 +10204,7 @@ The Agent Chains panel's data path, its hook and the rules a change to either mu
 - The hook keeps every in-flight write by name, oldest first; each write releases only its own entry. The same name pressed twice holds twice. The panel holds one row at a time: with two saves open the older row is live again.
 - A read that a newer call overtook is dropped (`epoch`): a reload begun before a save cannot land after it and restore the old picture. Writes are never dropped.
 - `readCensus(response)` wraps `readApiJson`: the server's `{ error }` passes through; a body that is not JSON, or is JSON that fails `isCensus`, throws "The launch table's API did not answer with a census (HTTP <status>)." Read and both writes use it.
-- `isCensus` is shallow on purpose: it checks `state`, `problems`, `rows`, `choices.models`, `choices.efforts`, `choices.dactyl_models`, `choices.summarizer_models`, `choices.sorter_models`, `choices.tweak_models`, `defaults.effort` only; the four model lists are there because the Dactyl and Summarizer fields and the sorter and tweak rows map them, so a census from a CLI older than the client gets the retry card and not a blank window. A field the panel starts to dereference belongs in it only if a body missing it could blank the window.
+- `isCensus` is shallow on purpose: it checks `state`, `problems`, `rows`, `choices.models`, `choices.efforts`, `choices.dactyl_models`, `choices.summarizer_models`, `choices.sorter_models`, `choices.tweak_models`, `defaults.effort`, and that `choices.hunt_souls` is absent or an array; the four model lists are there because the Dactyl and Summarizer fields and the sorter and tweak rows map them, so a census from a CLI older than the client gets the retry card and not a blank window. A field the panel starts to dereference belongs in it only if a body missing it could blank the window.
 
 ## rules
 - **A held row is not disabled.** A row or the Defaults block being saved is dimmed, pointer switched off, `aria-busy`, and its handlers return early. `disabled` or `fieldset disabled` drops keyboard focus off the trigger; a held row must not use either.
@@ -14212,3 +14218,43 @@ Returns `{width, threshold, ageDays, unreadable, saving, thresholdText, threshol
 - 2026-11-18: 1440×900 and 390×844, light and dark: no horizontal overflow, no console errors from the rows; new presses ≥ 44 px under a finger except the kit's list options.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useBugBoardSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugBoardRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/bug-board-settings-shots.mjs
+
+## MAN-10068 — Bug hunters settings — the seven Settings → Agents rows: files, handles, hook contract
+
+`RunnerBugHuntersRow.tsx` (Settings → Agents, drawn by `RunnerModelContent.tsx` directly under `RunnerBugBoardRow`: those rows say how the board's cards are worked, these who fills the board) is the operator's view of the bug hunters' settings, `~/.claude/charters/hunts.toml`. The file, its one writer and the crontab line: MAN-10057. The routes: MAN-10066. Which soul and model wear each hunt is the launch table's, edited in Edit Agent Chains (MAN-7417).
+
+## Data
+- `useBugHunters` reads and writes through `bugHuntersWire.ts`: `api.settings.bugHunters()` / `api.settings.saveBugHunters(change)` → `GET` / `PUT /api/kanban-dispatch/hunts/settings` (`dispatcher hunt config [--flag=value]... --json`). The change type `BugHuntsChange` is stated once, as `saveBugHunters`' parameter in `src/shared/api.ts` (the lint forbids `shared/api.ts` importing from a module), and derived in the wire with `Parameters<…>[0]`.
+- The PUT names only the fields it moves: `{nightly}`, `{start}`, `{minutes}`, `{ticketsPerNight}`, `{order}` (the kinds that take a turn, in turn order), `{projects}` (every name, in the new order), `{turns}`.
+- A refusal is a 409 whose `error` is the dispatcher's line. `reasonOf` drops the `REFUSED hunt config: ` lead and capitalises: `Minutes must be a whole number from 15 to 600, not 900`; any other sentence (the route's 400, which names the setting as the screen does — `Tickets a night must be a whole number` —, a 502, a thrown fetch) is kept as it came.
+
+## Rows
+Seven rows, one file, one hook. `HunterSetting`, `HunterTypedField`, `HunterUnknown` and `HunterWarning` live in `RunnerBugHuntersSetting.tsx`; the two ordered lists are `RunnerBugHuntersList.tsx` (the kit's `useSortable` plus up/down arrows). Strings: `agents.bugHunters.*` in `en/settings.json`.
+| row | handle (`data-runner-bug-hunters=`) | control | writes |
+|---|---|---|---|
+| Run the bug hunters nightly | `nightly` | `SettingsToggle` inside a 44 px label; the sentence under it is the whole night (start, minutes), and an amber line when no hunter takes a turn or the file holds no project | `{nightly}` |
+| When the night starts | `start` | `Input type="time"` `#runner-bug-hunters-start` | `{start}` |
+| Minutes a night | `minutes` | number `#runner-bug-hunters-minutes`, 15–600, step 5 | `{minutes}` |
+| Tickets a night | `tickets` | number `#runner-bug-hunters-tickets`, 1–50 | `{ticketsPerNight}` |
+| The hunters, in turn order | `hunters` | the five kinds as a sortable list, each with a turn `Switch` (`The <Kind> hunter takes a turn`); one switched off stands under the order marked `Sits out` | `{order}` |
+| The projects, in order | `projects` | the file's projects as a sortable list; added or removed only in the file | `{projects}` |
+| How the hunters take turns | `turns` | `Select` of `project` / `hunter` / `nightly` (`One project at a time` · `One hunter at a time` · `A different hunter each night`), each rule said in a sentence in the row | `{turns}` |
+
+- A refused change: the row gets `data-refused`, its last line is `[data-runner-bug-hunters-refusal]` (`role="alert"`, amber with its mark): `Not saved. <reason>`; a typed field wears the amber border (`invalid`). The value has already snapped back to the file's.
+- While no read has answered the section is ONE row (`data-runner-bug-hunters="unknown"`): loading, or `agents.bugHunters.unreadable`, with a retry.
+- No control is `disabled` mid-write; wrappers carry `aria-busy`. Under a finger every press is 44 px.
+
+## Hook contract — `useBugHunters()`
+Returns `{config, unreadable, saving, texts, refusals, setNightly, typeField, leaveField, setHunterTurn, moveHunter, reorderHunters, moveProject, reorderProjects, setTurns, refresh}`; the type `BugHunters` is the row's contract.
+- `config` `null` until a read succeeds. `configOf` is strict: `nightly` boolean, `start` string, `minutes` and `tickets_per_night` integers, `order` an array, `turns` one of `BUG_HUNTER_TURN_RULES`, every project `{name, path}` strings; anything else is no config (`unreadable`), never a default. `hunters` = the file's `order` (known kinds, first occurrence) taking a turn, then the rest of `BUG_HUNTER_KINDS` sitting out.
+- ONE FILE, ONE ORDER OF ANSWERS: writes run one after another through a promise queue, in the order made; each bumps `generation` at its start and end so a read asked before it is dropped; a read is not asked while a write is queued; only the last queued write's answer is drawn.
+- The switch, the turn rule and the two orders are drawn optimistically (`withChange`) and corrected by the answer. A typed field is not: its draft stands until the answer, then drops (only if the text is still the one sent); a typed write that succeeded while a later write still holds the paint folds its value into the held picture first, so the field never reads as snapped back.
+- A refused or failed write files the reason under its setting (`refusals[field]`) and re-reads the file, so the rows show what it holds. A new change to that setting, or typing in it, drops its reason.
+- `leaveField`: no draft sends nothing; a blank draft or one equal to the saved text drops the draft and writes nothing; a number goes as `Number(text)` unjudged (the route's or the dispatcher's sentence comes back).
+- `setHunterTurn` appends the kind to the end of the order or takes it out; `moveHunter` / `moveProject` swap with the neighbour (no neighbour, no write); `reorderHunters` / `reorderProjects` answer whether the dispatcher took it (the sortable keeps the drop until then).
+- Reads at mount, on window `focus` and on `visibilitychange` to visible; nothing polls.
+
+## Verify
+2026-11-19, from the screen at 1440×900 on :5183, `dispatcher hunt config --json` read after each: minutes 120→90→120 (200 each, the file followed); 900 → 409, `Not saved. Minutes must be a whole number from 15 to 600, not 900`, the field back to 120 and the file unchanged; Code's switch off (order `security,behaviour,ui,data`) and on (`…,code`); Security moved down and up; CloudCLI moved up and down. Screenshots at 1440×900 and 390×844.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/bugHuntersWire.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useBugHunters.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersSetting.tsx

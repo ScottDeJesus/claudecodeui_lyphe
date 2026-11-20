@@ -1,6 +1,6 @@
 /**
  * What `GET /api/kanban-dispatch/dashboard` answers: the board's own stats and changelog, and the cases
- * door's and the dispatcher's bug stats. Each house section is `{ ok: true, value } | { ok: false, error }`,
+ * door's and the dispatcher's bug stats, and the bug hunters' report (`dispatcher hunt status --json`). Each house section is `{ ok: true, value } | { ok: false, error }`,
  * so a door that did not answer blanks its own section and nothing else. The board's numbers are this
  * server's own reads and always arrive. It is a read: no transaction, no frame, no write.
  */
@@ -9,9 +9,11 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
 import { kanbanStatsService, type KanbanChangelogEntry, type KanbanStats } from '@/modules/kanban/index.js';
 import { readDispatcherJson, type DispatcherCommandDependencies } from '@/shared/dispatcher-command.js';
+import type { HuntStatus } from '@/shared/hunt-types.js';
 import { KANBAN_STATS_DAYS_DEFAULT, KANBAN_STATS_DAYS_MAX } from '@/shared/kanban-types.js';
 
 import { readCasesStats, readTicketStats, type CasesStats, type TicketStats } from './kanban-dispatch.dashboard-parts.js';
+import { readHuntStatus } from './kanban-dispatch.dashboard-hunts.js';
 
 /** The scope word for the whole install. Spelled out so a link that says `board=all` reads as what it does. */
 const ALL_BOARDS = 'all';
@@ -35,8 +37,8 @@ export type DashboardDependencies = { dispatcher: DispatcherCommandDependencies;
 /** A house section's answer. A failure carries the door's own sentence, so the page can say why a section is blank. */
 export type DashboardPart<Value> = { ok: true; value: Value } | { ok: false; error: string };
 
-/** The board's own numbers come first and cannot fail on their own; the two house sections each can fail alone. */
-export type DashboardAnswer = { stats: KanbanStats; changelog: KanbanChangelogEntry[]; cases: DashboardPart<CasesStats>; tickets: DashboardPart<TicketStats> };
+/** The board's own numbers come first and cannot fail on their own; the three house sections each can fail alone. */
+export type DashboardAnswer = { stats: KanbanStats; changelog: KanbanChangelogEntry[]; cases: DashboardPart<CasesStats>; tickets: DashboardPart<TicketStats>; hunts: DashboardPart<HuntStatus> };
 
 /** A query value may arrive repeated or as a nested object; only the first plain string counts. */
 function firstString(value: unknown): string | undefined {
@@ -104,12 +106,13 @@ export function createDashboardHandler(dependencies: DashboardDependencies): Req
       const stats = kanbanStatsService.stats(scope, days);
       const changelog = kanbanStatsService.changelog(scope);
 
-      const [cases, tickets] = await Promise.all([
+      const [cases, tickets, hunts] = await Promise.all([
         readPart<CasesStats>(['stats', '--days', String(days), '--json'], dependencies.cases, readCasesStats),
         readPart<TicketStats>(['bug', 'stats', '--days', String(days), '--json'], dependencies.dispatcher, readTicketStats),
+        readPart<HuntStatus>(['hunt', 'status', '--json'], dependencies.dispatcher, readHuntStatus),
       ]);
 
-      const answer: DashboardAnswer = { stats, changelog, cases, tickets };
+      const answer: DashboardAnswer = { stats, changelog, cases, tickets, hunts };
       response.json(answer);
     } catch (error) {
       next(error);

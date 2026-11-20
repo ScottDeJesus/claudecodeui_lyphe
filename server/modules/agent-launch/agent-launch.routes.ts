@@ -6,10 +6,10 @@ import type { AgentLaunchService } from './agent-launch.service.js';
 
 /**
  * A row's name as the CLI takes one: a soul's slug, `sorter` or `tweak`, the shape `~/.claude/agents/<name>.md`
- * and the table's `[soul.<slug>]` share. It is NOT a whitelist of the souls that exist — a new soul
+ * and the table's `[soul.<slug>]` share, or a hunt row, `hunt.<kind>`. It is NOT a whitelist of the souls that exist — a new soul
  * must not need an edit here — and the CLI answers a name it does not know in its own sentence.
  */
-const ROW_NAME = /^[a-z][a-z0-9_]{0,63}$/;
+const ROW_NAME = /^(?:hunt\.)?[a-z][a-z0-9_]{0,63}$/;
 
 /**
  * What a model word, an effort word or a model key may look like. This is a TOKEN fence and not the
@@ -47,11 +47,11 @@ function unknownKey(body: Record<string, unknown>, allowed: readonly string[]): 
   return Object.keys(body).find((key) => !allowed.includes(key)) ?? null;
 }
 
-/** A row's body — `{ model?: string | null, effort?: string | null }` — with at least one field. */
+/** A row's body — `{ model?: string | null, effort?: string | null, soul?: string }` — with at least one field. */
 function parseRowChange(body: unknown): Parsed<AgentLaunchRowChange> {
   if (!isRecord(body)) return { error: 'the body must be a JSON object' };
-  const stray = unknownKey(body, ['model', 'effort']);
-  if (stray !== null) return { error: `\`${stray.slice(0, 64)}\` is not a field of a row; a row takes model and effort` };
+  const stray = unknownKey(body, ['model', 'effort', 'soul']);
+  if (stray !== null) return { error: `\`${stray.slice(0, 64)}\` is not a field of a row; a row takes model, effort and soul` };
   const change: AgentLaunchRowChange = {};
   for (const field of ['model', 'effort'] as const) {
     const value = body[field];
@@ -62,7 +62,14 @@ function parseRowChange(body: unknown): Parsed<AgentLaunchRowChange> {
     }
     change[field] = value;
   }
-  if (Object.keys(change).length === 0) return { error: 'name at least one of model and effort' };
+  const soul = body.soul;
+  if (soul !== undefined) {
+    if (typeof soul !== 'string' || !WORD.test(soul)) {
+      return { error: "`soul` must be a soul's name; a hunt's soul cannot be cleared" };
+    }
+    change.soul = soul;
+  }
+  if (Object.keys(change).length === 0) return { error: 'name at least one of model, effort and soul' };
   return { change };
 }
 
@@ -148,16 +155,16 @@ export function createAgentLaunchRouter(
       }
     };
 
-  /** The whole census the window reads: the defaults, one row per soul, the card sorter and the tweak builder, each row's lanes. */
+  /** The whole census the window reads: the defaults, one row per soul, the card sorter and the tweak builder, each row's lanes and the five bug hunts. */
   router.get('/', relay(() => dependencies.census()));
 
-  /** Pin or clear one row's model and effort. */
+  /** Pin or clear one row's model and effort, or set a hunt row's soul. */
   router.put('/rows/:name', (request, response, next) => {
     // `params` is the repeated-parameter dictionary, so a value here is a string OR an array of
     // them; this route names one row, and anything that is not one string names no row.
     const name = request.params.name;
     if (typeof name !== 'string' || !ROW_NAME.test(name)) {
-      response.status(400).json({ error: 'a row name is lowercase letters, digits and underscores, beginning with a letter' });
+      response.status(400).json({ error: 'a row name is lowercase letters, digits and underscores, beginning with a letter, optionally after `hunt.`' });
       return;
     }
     const parsed = parseRowChange(request.body);

@@ -1,23 +1,27 @@
 import { CloudOff } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DashboardCases } from '@/modules/kanban/dashboard/DashboardCases';
 import { DashboardChangelog } from '@/modules/kanban/dashboard/DashboardChangelog';
 import { DashboardFlow } from '@/modules/kanban/dashboard/DashboardFlow';
+import { DashboardHunters } from '@/modules/kanban/dashboard/DashboardHunters';
 import { DashboardNumbers } from '@/modules/kanban/dashboard/DashboardNumbers';
 import { DashboardOldest } from '@/modules/kanban/dashboard/DashboardOldest';
 import { DashboardWaysIn } from '@/modules/kanban/dashboard/DashboardWaysIn';
 import { useBugDashboard } from '@/modules/kanban/dashboard/useBugDashboard';
+import { plainSentence, readDispatcherAnswer } from '@/modules/kanban/utils/dispatcherAnswer';
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
-import type { BugDashboardView } from '@/shared/types';
+import type { BugDashboardView, HuntSkippedUnit } from '@/shared/types';
 import { Banner, EmptyState, SegmentedControl, Select, Spinner } from '@/shared/ui';
 import { copyTextToClipboard } from '@/shared/utils';
 
 /**
  * THE BUGS VIEW'S DASHBOARD FACE: how the board stands, in the order a person asks it. How many are open and how bad;
- * is the board keeping up; what has waited longest; where the work comes from; what the night's cases say; what got
- * fixed. Last, and only while there are any, the tickets no board could take.
+ * is the board keeping up; what has waited longest; where the work comes from; what the night's cases say; what the
+ * bug hunters are on and how far they have got; what got fixed. Last, and only while there are any, the tickets no
+ * board could take.
  *
  * TWO CONTROLS, AND THEY STAY PUT. Which boards (this one, or all) and how far back (7, 30 or 90 days) stand at the
  * head in every state, a spinner and a failure included, so the way to ask a different question never moves. What
@@ -28,8 +32,12 @@ import { copyTextToClipboard } from '@/shared/utils';
  * answer replaces the one drawn without a spinner between them, and the face says it is busy to assistive tech only.
  *
  * A PART THAT DID NOT ANSWER BLANKS ITS OWN SECTION. The board's numbers are this server's and always arrive with the
- * answer; the cases and the tickets are the house's, and each may be a refusal. The section it feeds says the
- * refusal's sentence and draws no number; every other section stands.
+ * answer; the cases, the tickets and the hunts are the house's, and each may be a refusal. The section it feeds says
+ * the refusal's sentence and draws no number; every other section stands.
+ *
+ * THE HUNTERS' THREE PRESSES ARE THIS FACE'S WRITES, as the changelog's copy is: the section is handed each as a
+ * callback, with which one is out and the dispatcher's sentence for one that did not do what was asked, and calls no
+ * route itself.
  *
  * IT COMPOSES, IT DOES NOT BUILD. Every piece is the kit's, and each section is a file of its own that is handed its
  * part of the answer and fetches nothing.
@@ -47,6 +55,13 @@ type BugDashboardProps = {
 
 /** The windows offered, in days. */
 const WINDOWS: BugDashboardView['days'][] = [7, 30, 90];
+
+/**
+ * The night verbs' lines that say they did what was asked. Any other line did nothing and is said: a refusal, a
+ * `hunt night` that opened nothing because last night's hunter is still out, `hunt stop` with no night open, a second
+ * run on the same night. A run past a stale night prints CLOSED before OPENED, so CLOSED counts too.
+ */
+const NIGHT_DONE = /^(?:OPENED|CLOSED|STOPPED) night /;
 
 /** Rendered by KanbanPanel while its face is the dashboard. Nothing else mounts it. */
 export function BugDashboard({ boardId, view, onView, onOpenCard }: BugDashboardProps) {
@@ -76,6 +91,66 @@ export function BugDashboard({ boardId, view, onView, onOpenCard }: BugDashboard
     void copyChangelog();
   };
 
+  // Shared by the three presses: a press's state lands after the next render, so without this ref a second press in that
+  // gap would send the same request again.
+  const out = useRef(false);
+  const [huntNight, setHuntNight] = useState<{ busy: 'run' | 'stop' | null; sentence: string | null }>({ busy: null, sentence: null });
+  const [huntReopen, setHuntReopen] = useState<{ busy: HuntSkippedUnit | null; refusal: { unit: HuntSkippedUnit; sentence: string } | null }>({
+    busy: null,
+    refusal: null,
+  });
+
+  const pressNight = async (press: 'run' | 'stop', request: () => Promise<Response>) => {
+    if (out.current) return;
+    out.current = true;
+    setHuntNight({ busy: press, sentence: null });
+    const reply = await readDispatcherAnswer(request());
+    out.current = false;
+    const sentence = reply.ok ? (NIGHT_DONE.test(reply.line) ? null : plainSentence(reply.line)) : (reply.sentence ?? t('kanban.notAnswered'));
+    setHuntNight({ busy: null, sentence });
+    if (reply.ok) {
+      // The section draws the night from the answer, so it is read now rather than at the dispatcher's next frame.
+      retry();
+    }
+  };
+
+  const runNight = () => {
+    void pressNight('run', () => api.kanban.huntNight());
+  };
+
+  const stopNight = () => {
+    void pressNight('stop', () => api.kanban.huntStop());
+  };
+
+  const reopenUnit = async (unit: HuntSkippedUnit) => {
+    if (out.current) return;
+    // The skipped unit names its project by folder and reopen takes the config's name, so the name is looked up here. A
+    // folder with no config to match goes as it is, and the dispatcher refuses it in its own words.
+    let name = unit.project;
+    if (reading.status === 'ready' && reading.answer.hunts.ok) {
+      const hunters = reading.answer.hunts.value.hunts;
+      const found = [...hunters.filter((hunter) => hunter.hunt === unit.hunt), ...hunters]
+        .flatMap((hunter) => hunter.projects)
+        .find((project) => project.project === unit.project);
+      if (found) name = found.name;
+    }
+
+    out.current = true;
+    setHuntReopen({ busy: unit, refusal: null });
+    const reply = await readDispatcherAnswer(api.kanban.huntReopen({ hunt: unit.hunt, project: name, unit: unit.unit }));
+    out.current = false;
+    if (reply.ok) {
+      setHuntReopen({ busy: null, refusal: null });
+      retry();
+    } else {
+      setHuntReopen({ busy: null, refusal: { unit, sentence: reply.sentence ?? t('kanban.notAnswered') } });
+    }
+  };
+
+  const huntAgain = (unit: HuntSkippedUnit) => {
+    void reopenUnit(unit);
+  };
+
   const body = () => {
     if (reading.status === 'loading') {
       return (
@@ -99,6 +174,7 @@ export function BugDashboard({ boardId, view, onView, onOpenCard }: BugDashboard
 
     const { stats, changelog, cases, tickets } = reading.answer;
     const unplaced = tickets.ok ? tickets.value.unplaced : [];
+    const { hunts } = reading.answer;
 
     return (
       <>
@@ -107,6 +183,7 @@ export function BugDashboard({ boardId, view, onView, onOpenCard }: BugDashboard
         <DashboardOldest cards={stats.oldestOpen} allBoards={allBoards} onOpenCard={onOpenCard} />
         <DashboardWaysIn waysIn={stats.waysIn} tickets={tickets} days={view.days} />
         <DashboardCases cases={cases} days={view.days} onOpenCard={onOpenCard} />
+        <DashboardHunters hunts={hunts} night={huntNight} reopen={huntReopen} onRunNight={runNight} onStopNight={stopNight} onHuntAgain={huntAgain} />
         <DashboardChangelog entries={changelog} allBoards={allBoards} onOpenCard={onOpenCard} onCopyMarkdown={copyMarkdown} />
         {unplaced.length > 0 && (
           <div data-dashboard-unplaced>

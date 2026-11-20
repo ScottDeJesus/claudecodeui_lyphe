@@ -26,16 +26,19 @@ type AgentLaunchRowItemProps = {
   /** True for a row whose words always stand in the table (the sorter, the tweak): its lists offer no Default and wear no pinned mark. */
   required?: boolean;
   /**
-   * True for a row that holds a model alone (the tweak): its effort is said in words where the list would be, with whose word it
-   * is. `row.effort_pinned` picks the words: false is the table's default for the row's model, true is Hephaestus's own effort
-   * pin, which the tweak launches at when its model is the one his row gives him.
+   * True for a row whose effort is not its own to set (the tweak, a hunt): it is said in words where the list would be, with
+   * whose word it is. `row.effort_pinned` picks the words: false is the table's default for the row's model, true is the own
+   * effort pin of the soul that wears the row (Hephaestus for the tweak, `row.soul` for a hunt), which the row launches at when
+   * its model is the one that soul's row gives it.
    */
   effortFollows?: boolean;
+  /** Given for a hunt row alone: every soul that may wear it (`census.choices.hunt_souls`). The row then draws a third list, its soul. */
+  souls?: string[];
   onSave: (name: string, change: AgentLaunchRowChange) => Promise<void>;
 };
 
 /**
- * Used by `AgentLaunchPanel` for every soul and for the sorter and the tweak: one line of the launch table.
+ * Used by `AgentLaunchPanel` for every soul, for the sorter and the tweak, and for the five bug hunts: one line of the launch table.
  *
  * THREE THINGS: who it is (the name, with the description as secondary text, cut at two lines and
  * opened by a press, because a soul's description can run a page), what it launches at (the model and
@@ -47,6 +50,11 @@ type AgentLaunchRowItemProps = {
  * model list of its own (`models`), and the tweak's effort is not its row's to set (`effortFollows`): the slot says
  * the effort it will launch at and whose word that is (its model's default, or Hephaestus's own pin), so the row
  * still answers "at what?" in the place a reader looks for it and names the control that would change it.
+ *
+ * A HUNT IS THE TWEAK'S ROW WITH ONE MORE LIST: WHO WEARS IT (`souls`). The soul comes first, the row's full width, because
+ * the two words under it follow from it: a hunt with no model of its own rides its soul's, so its Default says that soul's
+ * model, and its effort is said as the tweak's is, naming the soul whose pin it is. The soul always stands in the table, so
+ * its list offers no Default; the model is a pin and can be cleared.
  *
  * SHOW MORE IS 44 PX UNDER A FINGER WITHOUT MOVING THE ROW. Its words stay one line of 24 px; under a finger a
  * transparent `::before` reaches 10 px above and below them, over the description and into the gap under it, where
@@ -61,7 +69,7 @@ type AgentLaunchRowItemProps = {
  * A shim that has fallen behind the table is marked on the row too, not only in the warnings above:
  * the warning says how many, the mark says which. So is a change the table refused.
  */
-export function AgentLaunchRowItem({ row, census, held, refused, models, required = false, effortFollows = false, onSave }: AgentLaunchRowItemProps) {
+export function AgentLaunchRowItem({ row, census, held, refused, models, required = false, effortFollows = false, souls, onSave }: AgentLaunchRowItemProps) {
   const { t } = useTranslation();
   // Whether the description is opened past its two lines. It cannot be derived: it is the reader's own press.
   const [expanded, setExpanded] = useState(false);
@@ -69,6 +77,9 @@ export function AgentLaunchRowItem({ row, census, held, refused, models, require
   const longDescription = row.description.length > DESCRIPTION_CLAMP_CHARS;
   // What clearing the effort pin would fall back to: the default for the model this row resolves to.
   const defaultEffort = census.defaults.effort[row.model] ?? null;
+  // What clearing the model pin would fall back to: the table's default, or for a hunt the model its soul's own row resolves to.
+  const defaultModel = (souls && census.rows.find((other) => other.kind === 'soul' && other.name === row.soul)?.model) || census.defaults.model;
+  const effortWord = row.effort ?? t('agentLaunch.row.noFlag');
   const save = (change: AgentLaunchRowChange) => {
     if (held) return;
     void onSave(row.name, change);
@@ -121,22 +132,38 @@ export function AgentLaunchRowItem({ row, census, held, refused, models, require
 
         <div className={cn('min-w-0 max-w-md', held && 'pointer-events-none opacity-60')}>
           <div className="grid grid-cols-1 gap-2 [@container(min-width:64rem)]:grid-cols-2 [@container(min-width:64rem)]:gap-3">
+            {souls && (
+              <div className="min-w-0 [@container(min-width:64rem)]:col-span-2" data-agent-hunt-soul>
+                <AgentLaunchChoice
+                  label={t('agentLaunch.row.soul')}
+                  ariaLabel={t('agentLaunch.row.soulLabel', { name: row.name })}
+                  choices={souls}
+                  current={row.soul ?? null}
+                  pinned={false}
+                  defaultWord={null}
+                  required
+                  onChange={(next) => next !== null && save({ soul: next })}
+                />
+              </div>
+            )}
             <AgentLaunchChoice
               label={t('agentLaunch.row.model')}
               ariaLabel={t('agentLaunch.row.modelLabel', { name: row.name })}
               choices={models ?? census.choices.models}
               current={row.model}
               pinned={row.model_pinned}
-              defaultWord={census.defaults.model}
+              defaultWord={defaultModel}
               required={required}
               onChange={(next) => save({ model: next })}
             />
             {effortFollows ? (
               <AgentLaunchChoice
                 label={t('agentLaunch.row.effort')}
-                said={row.effort_pinned
-                  ? t('agentLaunch.row.effortOwnPin', { effort: row.effort ?? t('agentLaunch.row.noFlag') })
-                  : t('agentLaunch.row.effortFollows', { effort: row.effort ?? t('agentLaunch.row.noFlag'), model: row.model })}
+                said={!row.effort_pinned
+                  ? t('agentLaunch.row.effortFollows', { effort: effortWord, model: row.model })
+                  : souls
+                    ? t('agentLaunch.row.effortSoulPin', { effort: effortWord, soul: row.soul })
+                    : t('agentLaunch.row.effortOwnPin', { effort: effortWord })}
               />
             ) : (
               <AgentLaunchChoice

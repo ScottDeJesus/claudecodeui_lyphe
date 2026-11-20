@@ -15,14 +15,16 @@ import { useKanbanLanes } from '@/modules/kanban/hooks/useKanbanLanes';
 import { useKanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
 import { useKanbanWalks } from '@/modules/kanban/hooks/useKanbanWalks';
 import { useLinkedTitles } from '@/modules/kanban/hooks/useLinkedTitles';
+import { ProposedFeatures } from '@/modules/kanban/proposed/ProposedFeatures';
+import { useProposals } from '@/modules/kanban/proposed/useProposals';
 import type { KanbanViewSort } from '@/modules/kanban/utils/cardModel';
 import { DONE_LANE_ID, kanbanLanes } from '@/modules/kanban/utils/lanePolicy';
-import type { BugDashboardView } from '@/shared/types';
+import type { BugDashboardView, ProposalsView } from '@/shared/types';
 import { EmptyState, Spinner, Tabs } from '@/shared/ui';
 
 /**
- * The Kanban tab's pane: the board's one row of chrome, the strip that switches its two faces (the
- * Board's lane rail and the Dashboard's numbers), and the four states the board can be in. A
+ * The Kanban tab's pane: the board's one row of chrome, the strip that switches its three faces (the
+ * Board's lane rail, the Dashboard's numbers and the Proposed features), and the four states the board can be in. A
  * reader's first sight is the leftmost lane and its count — where the work ready to be picked up lives.
  *
  * IT COMPOSES, IT DOES NOT BUILD. The lanes and their faces are the rail's; the hooks below are the
@@ -36,7 +38,7 @@ import { EmptyState, Spinner, Tabs } from '@/shared/ui';
  * the board sees both the lane a card left and the one it landed in; a Toast leaves, and a thing
  * that leaves cannot announce.
  *
- * THE VIEW SORT, THE COLLAPSED LANES, THE FACE AND WHAT THE DASHBOARD IS ASKED are the panel's own,
+ * THE VIEW SORT, THE COLLAPSED LANES, THE FACE AND WHAT THE DASHBOARD AND THE PROPOSALS ARE ASKED are the panel's own,
  * because they are per-SCREEN and not per-board: all survive a board switch, which is what makes
  * the second board open the way the first one was left. None is remembered across visits.
  */
@@ -82,10 +84,17 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
   const [sorts, setSorts] = useState<Record<string, KanbanViewSort>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [dialog, setDialog] = useState<KanbanBoardDialogMode>(null);
-  // Which of the view's two faces is drawn. The Board on every arrival: the dashboard is a look, the board is the work.
-  const [face, setFace] = useState<'board' | 'dashboard'>('board');
+  // Which of the view's three faces is drawn. The Board on every arrival: the other two are looks, the board is the work.
+  const [face, setFace] = useState<'board' | 'dashboard' | 'proposed'>('board');
   // Which boards and how far back the dashboard is asked for, kept here so a visit to the Board face does not reset it.
   const [dashboardView, setDashboardView] = useState<BugDashboardView>({ scope: 'board', days: 30 });
+  // Which boards and which proposals the Proposed features face is asked for, kept here for the same reason.
+  const [proposalsView, setProposalsView] = useState<ProposalsView>({ scope: 'board', state: 'open' });
+
+  // The proposals' ONE read, here and not in the face: the tab's count and the face's rows are then the same answer.
+  const proposals = useProposals(proposalsView.scope === 'all' ? 'all' : currentBoardId, proposalsView.state);
+  const openProposals = proposals.reading.status === 'ready' ? proposals.reading.proposals.filter((proposal) => proposal.state === 'open') : undefined;
+  const openHighProposals = openProposals?.filter((proposal) => proposal.priority === 'high').length;
 
   // The Dashboard tab's count: the open board's open high cards, off the cards this panel already holds, so the Board face asks for no dashboard read.
   const openHigh = board.loading ? undefined : lanes
@@ -201,7 +210,8 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
       );
     }
 
-    if (!onBoard) return <BugDashboard boardId={currentBoardId} view={dashboardView} onView={setDashboardView} onOpenCard={openDashboardCard} />;
+    if (face === 'dashboard') return <BugDashboard boardId={currentBoardId} view={dashboardView} onView={setDashboardView} onOpenCard={openDashboardCard} />;
+    if (face === 'proposed') return <ProposedFeatures view={proposalsView} onView={setProposalsView} reading={proposals.reading} onRetry={proposals.retry} onOpenCard={openDashboardCard} />;
 
     return (
       <KanbanBoardFace
@@ -239,16 +249,18 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
         onArchiveBoard={() => setDialog('archive')}
       />
 
-      {/* The two faces: a flat strip on the header's ground, capped so two words do not stretch across a desktop, 44 px
-          under a finger. The Dashboard's pill counts the open high cards, in amber and in words; none at zero. */}
+      {/* The three faces: a flat strip on the header's ground, capped so three names do not stretch across a desktop, 44 px
+          under a finger. The Dashboard's pill counts the open high cards, in amber and in words; none at zero. The Proposed
+          features' pill counts the open proposals in scope, and is amber, with its sentence, only while one of them is high. */}
       <div className="shrink-0 border-b border-border px-3 finger:[&_[role=tab]]:min-h-11">
-        <div className="w-full max-w-xs">
+        <div className="w-full max-w-md">
           <Tabs
             variant="underline" ariaLabel={t('kanban.faces.label')}
-            active={face} onChange={(id) => setFace(id === 'dashboard' ? 'dashboard' : 'board')}
+            active={face} onChange={(id) => setFace(id === 'dashboard' || id === 'proposed' ? id : 'board')}
             tabs={[
               { id: 'board', label: t('kanban.faces.board') },
               { id: 'dashboard', label: t('kanban.faces.dashboard'), count: openHigh, attention: openHigh ? t('kanban.faces.openHigh', { count: openHigh }) : undefined },
+              { id: 'proposed', label: t('kanban.faces.proposed'), count: openProposals?.length, attention: openHighProposals ? t('kanban.faces.openHighProposals', { count: openHighProposals }) : undefined },
             ]}
           />
         </div>

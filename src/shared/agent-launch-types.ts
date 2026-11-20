@@ -15,6 +15,8 @@
  * The vocabulary the table accepts, and the ONLY source of every choice list the panel draws.
  * The panel never spells `opus` or `xhigh` itself: a word the Python side adds arrives here first.
  * `sorter_models` and `tweak_models` are the model words the `sorter` and the `tweak` rows accept, each its own list.
+ * `hunt_souls` is every soul that may wear a bug hunt (every generated shim but the planners); a table older than the hunt
+ * rows does not carry it.
  */
 export type AgentLaunchChoices = {
   models: string[];
@@ -23,6 +25,7 @@ export type AgentLaunchChoices = {
   summarizer_models: string[];
   sorter_models: string[];
   tweak_models: string[];
+  hunt_souls?: string[];
 };
 
 /**
@@ -67,7 +70,7 @@ export type AgentLaunchSide = {
  * own sentence about the lane, or null when it has nothing to add.
  */
 export type AgentLaunchLane = {
-  lane: 'agent' | 'dispatcher' | 'chain' | 'sorter';
+  lane: 'agent' | 'dispatcher' | 'chain' | 'sorter' | 'hunt';
   reach: 'new-session' | 'next-launch';
   note: string | null;
   sides: AgentLaunchSide[];
@@ -96,10 +99,17 @@ export type AgentLaunchShim = {
  * and `null` is refused. The sorter holds a model (one of `choices.sorter_models`) and an effort; the tweak holds a model
  * alone (one of `choices.tweak_models`), and its `effort` is read and never sent: the table's default for that model, or,
  * with `effort_pinned` true, Hephaestus's own effort pin, which the tweak launches at when its model is the one his row gives him.
+ *
+ * A HUNT ROW (`kind: 'hunt'`, named `hunt.<kind>`, no shim) is one of the five bug hunts. It holds `soul`, the soul that wears it
+ * (one of `choices.hunt_souls`, always set), and an optional model: `model_pinned` false is a hunt riding the model the table gives
+ * that soul, and `null` clears the pin. Its `effort` is read and never sent, by the tweak's own rule: the table's default for the
+ * model, or, with `effort_pinned` true, its soul's own effort pin.
  */
 export type AgentLaunchRow = {
   name: string;
-  kind: 'soul' | 'sorter' | 'tweak';
+  kind: 'soul' | 'sorter' | 'tweak' | 'hunt';
+  /** A hunt row's wearer. Only a hunt row carries it. */
+  soul?: string;
   description: string;
   model: string;
   model_pinned: boolean;
@@ -145,9 +155,10 @@ export type AgentLaunchCensus = {
 
 /**
  * A change to one row's own pins. A field left out is untouched; a word pins it; `null` clears the
- * pin, so the row falls back to the defaults (the panel's "Default" choice).
+ * pin, so the row falls back to the defaults (the panel's "Default" choice). `soul` is a hunt row's alone: the soul
+ * that wears the hunt from its next sitting, which cannot be cleared.
  */
-export type AgentLaunchRowChange = { model?: string | null; effort?: string | null };
+export type AgentLaunchRowChange = { model?: string | null; effort?: string | null; soul?: string };
 
 /**
  * A change to the table's defaults. `effort` names one or more models: a word sets that model's

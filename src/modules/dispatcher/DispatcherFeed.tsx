@@ -37,6 +37,13 @@ import type { DispatcherArc, DispatcherCard, DispatcherDaemon, DispatcherLanePic
  * from — `plans`, `arcs`, `planners`, `cards`, the route, the daemon and the next off-peak moment —
  * with the document's own spellings left alone.
  *
+ * A FRAME IS NEWS EVEN WHEN THE EIGHT KEYS ARE NOT. The frame also carries `bugs`, a fingerprint of the bug board's
+ * rows that no screen draws, and the payload leaves it out with `home` and `generated_at`. A frame whose only change is
+ * `bugs` is still republished, and the readers of the dispatcher's rows — `useProposals` (the Proposed features face)
+ * and `useBugDashboard` (the hunters section) — re-read on it. What makes that publish new is its `received_at`
+ * (`Date.now()`), so a later change that publishes only when the eight keys differ must keep a frame-arrived signal for
+ * those readers, or a proposal or a hunt written outside the face will never reach an open screen.
+ *
  * TWO WAYS IN, AND THEY DO NOT FIGHT. The push is authoritative: every `dispatcher_state` frame is
  * republished. The REST seed exists for the gap the push cannot cover — the moment between mounting
  * and the watcher's next broadcast, which only happens on a CHANGE, so a quiet lane can leave a

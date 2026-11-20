@@ -127,8 +127,10 @@ export default function RunnerGeminiBudgetRow() {
         </Button>
       ) : (
         // `aria-busy` while a write is in flight. The input is never `disabled`: Chromium blurs a control the
-        // instant one lands, and the operator may already be typing the next amount.
-        <div aria-busy={saving}>
+        // instant one lands, and the operator may already be typing the next amount. The wrapper is the card's
+        // field width (`w-44`, as the CPU limit's and the board rows'): at `w-32` the field stayed beside its
+        // sentence on a phone and squeezed it into a column of 22 characters (measured at 390 px).
+        <div aria-busy={saving} className="w-44">
           <Field label={t('agents.runnerGeminiBudget.field', { defaultValue: 'USD per plan' })} htmlFor={FIELD_ID}>
             <Input
               id={FIELD_ID}
@@ -136,7 +138,8 @@ export default function RunnerGeminiBudgetRow() {
               inputMode="decimal"
               min={0}
               step={0.5}
-              className="w-32"
+              // 44 px under a finger: the kit's field is 36 px at every width.
+              className="finger:h-11"
               value={draft ?? dollars(usd)}
               aria-describedby={ABOUT_ID}
               onChange={(event) => setDraft(event.currentTarget.value)}

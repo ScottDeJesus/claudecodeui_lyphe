@@ -54,13 +54,15 @@ const SAID_MAX_CHARS = 300;
  * The CLI's `show`, `set` and `defaults` payload, carried WHOLE. This service does not reshape it:
  * every key in it belongs to the window, the window reads it by the name the CLI printed, and a translation
  * layer here would be a second place the census's shape is written down.
+ *
+ * It carries the hunt rows' `soul` and `choices.hunt_souls`, whose shape the client mirrors in `src/shared/agent-launch-types.ts`.
  */
 type AgentLaunchCensus = Record<string, unknown>;
 
 export type AgentLaunchService = {
-  /** The whole census the window reads: the defaults, one row per soul, the card sorter and the tweak builder, each row's lanes. */
+  /** The whole census the window reads: the defaults, one row per soul, the card sorter, the tweak builder and the five bug hunts, each row's lanes. */
   census(): Promise<AgentLaunchResult<AgentLaunchCensus>>;
-  /** Pin or clear one row's model and effort. Answers the census the CLI printed AFTER the write. */
+  /** Pin or clear one row's model and effort, or set a hunt row's soul. Answers the census the CLI printed AFTER the write. */
   setRow(name: string, change: AgentLaunchRowChange): Promise<AgentLaunchResult<AgentLaunchCensus>>;
   /** Change the table's defaults. Answers the census the CLI printed AFTER the write. */
   setDefaults(change: AgentLaunchDefaultsChange): Promise<AgentLaunchResult<AgentLaunchCensus>>;
@@ -150,11 +152,15 @@ async function ask(
   return { ok: true, value: payload };
 }
 
-/** The argv of `set`: `null` is the CLI's own word for "clear this pin", `default`. */
+/**
+ * The argv of `set`: `null` is the CLI's own word for "clear this pin", `default`. `soul` is a hunt row's alone and is never cleared.
+ * The CLI refuses `--soul` on a row that is not a hunt, and `--effort` on a hunt row, each in its own sentence: this side checks no word.
+ */
 function setRowArgv(name: string, change: AgentLaunchRowChange): string[] {
   const argv = ['set', name];
   if (change.model !== undefined) argv.push('--model', change.model ?? 'default');
   if (change.effort !== undefined) argv.push('--effort', change.effort ?? 'default');
+  if (change.soul !== undefined) argv.push('--soul', change.soul);
   return argv;
 }
 

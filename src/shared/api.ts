@@ -8,6 +8,7 @@ import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/a
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
 import type { CompanionSettings } from '@/shared/companion-types';
+import type { KanbanPriority } from '@/shared/kanban-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
 import type { StationAskAnswer } from '@/shared/station-types';
@@ -691,6 +692,14 @@ export const api = {
     // dispatcher that does not report it); the PUT takes any of the fields.
     bugBoard: () => get('/api/kanban-dispatch/settings'),
     saveBugBoard: (state: { width?: number; threshold?: number; ageDays?: number }) => put('/api/kanban-dispatch/settings', state),
+
+    // The bug hunters' settings, `~/.claude/charters/hunts.toml` — the nightly switch, its start, minutes and tickets a night,
+    // the hunters' turn order, the projects' order, and how turns are taken; host-wide, not a per-user preference. The
+    // routes relay `dispatcher hunt config` and both answer the config read back off the file; a refused value is a 409
+    // carrying the dispatcher's sentence.
+    bugHunters: () => get('/api/kanban-dispatch/hunts/settings'),
+    saveBugHunters: (state: { nightly?: boolean; start?: string; minutes?: number; ticketsPerNight?: number; order?: string[]; projects?: string[]; turns?: string }) =>
+      put('/api/kanban-dispatch/hunts/settings', state),
 
     // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
     // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
@@ -1490,6 +1499,17 @@ export const api = {
     dashboard: (board: string, days: number) => get(`/api/kanban-dispatch/dashboard?board=${encodeURIComponent(board)}&days=${days}`),
     // The changelog as Markdown (`text/markdown`, one dated line per card), what the dashboard's Copy as Markdown copies.
     changelogMarkdown: (board: string) => get(`/api/kanban/changelog?board=${encodeURIComponent(board)}&format=md`),
+    // The Proposed features face's one read: `board` a board id or `all`, `state` open or all. Answers `{ proposals: BugProposal[] }`.
+    proposals: (board: string, state: 'open' | 'all') => get(`/api/kanban-dispatch/proposals?board=${encodeURIComponent(board)}&state=${state}`),
+    // The four answers to a proposal. Each answers `{ line }`, or a 409 `{ error }` carrying the dispatcher's refusal.
+    promoteProposal: (id: number, arc: string) => post(`/api/kanban-dispatch/proposals/${id}/promote`, { arc }),
+    sendBackProposal: (id: number) => post(`/api/kanban-dispatch/proposals/${id}/send-back`, {}),
+    dismissProposal: (id: number, reason: string) => post(`/api/kanban-dispatch/proposals/${id}/dismiss`, { reason }),
+    setProposalPriority: (id: number, priority: KanbanPriority) => post(`/api/kanban-dispatch/proposals/${id}/priority`, { priority }),
+    // The dashboard's three hunter presses. Each answers `{ line }`, or a 409 `{ error }` carrying the dispatcher's refusal.
+    huntNight: () => post('/api/kanban-dispatch/hunts/night', {}),
+    huntStop: () => post('/api/kanban-dispatch/hunts/stop', {}),
+    huntReopen: (body: { hunt: string; project: string; unit: string }) => post('/api/kanban-dispatch/hunts/reopen', body),
     updateCard: (id: string, body: Record<string, unknown>) => patch(`/api/kanban/cards/${encodeURIComponent(id)}`, body),
     moveCard: (id: string, body: Record<string, unknown>) => post(`/api/kanban/cards/${encodeURIComponent(id)}/move`, body),
     archiveCard: (id: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/archive`, {}),

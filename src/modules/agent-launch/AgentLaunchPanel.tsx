@@ -41,6 +41,8 @@ type AgentLaunchPanelProps = {
  * card and the builder of a quick tweak. They are last because they are the newest question and the rarest
  * to change, and they are the same row item every soul is drawn with, with less to choose: their words always
  * stand in the table, so neither wears a pin nor offers a Default, and the tweak's effort is not its row's to set.
+ * Under them, BUG HUNTERS: the five hunts a night's hunters take turns at, each the same row item again with one more list, the soul
+ * that wears it. A table older than the hunts has no such row, and then no section is drawn.
  * A pinned row is the exception, so a pin is what stands out down the list.
  *
  * A WIDE PANEL IS A TABLE AND A NARROW ONE IS A STACK. The query is the panel's own width
@@ -97,6 +99,17 @@ export function AgentLaunchPanel({ onClose, titleId }: AgentLaunchPanelProps) {
     if (typeof change.model === 'string') clean.model = change.model;
     if (typeof change.effort === 'string' && row?.kind !== 'tweak') clean.effort = change.effort;
     if (clean.model === undefined && clean.effort === undefined) return Promise.resolve();
+    return onSaveRow(name, clean);
+  };
+  // The census's own hunt rows, in its order, and the souls it says may wear one.
+  const censusHunts = census?.rows.filter((row) => row.kind === 'hunt') ?? [];
+  const huntSouls = census?.choices.hunt_souls ?? [];
+  // A hunt holds a soul and an optional model — `soul` as a word, `model` as a word or `null` (the pin cleared) — and never an effort, which the CLI refuses on a hunt row.
+  const onSaveHuntRow = (name: string, change: AgentLaunchRowChange): Promise<void> => {
+    const clean: AgentLaunchRowChange = {};
+    if (typeof change.soul === 'string') clean.soul = change.soul;
+    if (change.model !== undefined) clean.model = change.model;
+    if (clean.soul === undefined && clean.model === undefined) return Promise.resolve();
     return onSaveRow(name, clean);
   };
 
@@ -208,6 +221,23 @@ export function AgentLaunchPanel({ onClose, titleId }: AgentLaunchPanelProps) {
                       held={saving === row.name}
                       refused={error !== null && last === row.name}
                       onSave={onSaveCardRow}
+                    />
+                  ))}
+                </AgentLaunchSection>
+              )}
+
+              {censusHunts.length > 0 && (
+                <AgentLaunchSection id="agent-hunts" title={t('agentLaunch.hunts.title')} count={censusHunts.length}>
+                  {censusHunts.map((row) => (
+                    <AgentLaunchRowItem
+                      key={row.name}
+                      row={row}
+                      census={census}
+                      souls={huntSouls}
+                      effortFollows
+                      held={saving === row.name}
+                      refused={error !== null && last === row.name}
+                      onSave={onSaveHuntRow}
                     />
                   ))}
                 </AgentLaunchSection>

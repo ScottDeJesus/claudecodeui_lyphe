@@ -82,6 +82,8 @@ export function AgentLaunchChoice(props: AgentLaunchChoiceProps) {
           </Badge>
         )}
       </div>
+      {/* A real space between the caption and its slot: the gap the grid draws is not text, and read as text the two ran together ("Efforthigh"). */}
+      {' '}
       {listed === null ? (
         <p className="flex min-h-9 items-center text-pretty text-xs text-muted-foreground finger:min-h-11" data-agent-choice-said>
           {props.said}

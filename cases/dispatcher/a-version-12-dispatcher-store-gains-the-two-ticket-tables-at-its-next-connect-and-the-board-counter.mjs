@@ -1,5 +1,6 @@
 // The live dispatcher store is at schema version 12 when the ticket line lands. Its next connect must give it the two
-// ticket tables in the seam's columns and their two indexes, stamp it 13 and keep every row it held; and because CloudCLI
+// ticket tables in the seam's columns and their two indexes, stamp it 13 or later (a later version appends its own
+// ticket columns after the seam's 21) and keep every row it held; and because CloudCLI
 // re-reads the board only when the board counter moves, both tables must carry the counter's triggers (they are
 // derived from `store._SCHEMA`, so a ticket table kept out of it would never wake the board).
 //
@@ -44,11 +45,11 @@ runCase(async (t) => {
 
   const wrong = [];
   const [version] = await rows(house, "SELECT value FROM meta WHERE key = 'schema_version'");
-  if (version?.value !== "13") wrong.push(`the store reads schema_version ${version?.value}, not 13`);
+  if (!(Number(version?.value) >= 13)) wrong.push(`the store reads schema_version ${version?.value}, not 13 or later`);
   const kept = await rows(house, "SELECT title FROM cards");
   if (kept.length !== 1 || kept[0].title !== "Kept card") wrong.push(`the card row was not kept: ${JSON.stringify(kept)}`);
   const cols = (await rows(house, "SELECT name FROM pragma_table_info('tickets')")).map((r) => r.name);
-  if (JSON.stringify(cols) !== JSON.stringify(TICKET_COLUMNS)) wrong.push(`tickets has the columns ${JSON.stringify(cols)}, not the seam's ${TICKET_COLUMNS.length}`);
+  if (JSON.stringify(cols.slice(0, TICKET_COLUMNS.length)) !== JSON.stringify(TICKET_COLUMNS)) wrong.push(`tickets has the columns ${JSON.stringify(cols)}, not the seam's ${TICKET_COLUMNS.length} first`);
   const keyCols = (await rows(house, "SELECT name, pk FROM pragma_table_info('ticket_keys') ORDER BY cid")).map((r) => `${r.name}:${r.pk}`);
   if (keyCols.join(",") !== "ticket_id:1,key:2") wrong.push(`ticket_keys reads ${keyCols.join(",") || "absent"}, not (ticket_id, key) as its primary key`);
   const indexes = (await rows(house, "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('ticket_keys_by_key', 'tickets_by_session')")).map((r) => r.name).sort();
@@ -66,5 +67,5 @@ runCase(async (t) => {
   }
 
   if (wrong.length > 0) return broken(wrong.join("; "));
-  return held("a version-12 store opened once reads version 13 with its card row kept, both ticket tables in the seam's columns, both indexes, six counter triggers, and a ticket with its key moved the counter by 2");
+  return held(`a version-12 store opened once reads version ${version.value} with its card row kept, both ticket tables in the seam's columns (tickets' 21 first), both indexes, six counter triggers, and a ticket with its key moved the counter by 2`);
 });

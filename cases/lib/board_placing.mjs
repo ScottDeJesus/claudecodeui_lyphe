@@ -10,7 +10,8 @@
 // The stand-in is a script in the case's scratch folder (DISPATCHER_BIN). It keeps a small store of its own in
 // state.json — the tickets `bug pending` lists and the notes `card notes` lists — and records every call it hears in
 // calls.jsonl, with stdin for the verbs that read it. It answers as the house does, only as much as the board reads:
-//   bug pending [--unplaced] --json   {"place": [...]} — tickets `filed`, plus `unplaced` ones under --unplaced
+//   bug pending [--unplaced] --json   {"place": [...]} — tickets `filed`, plus `unplaced` ones under --unplaced; a
+//                                     ticket seeded with `question` (a needs-you ticket's) lists it, as the house does
 //   bug placed ID --result -          stamps the ticket placed (or unplaced); a ticket carrying failStamps > 0 fails
 //                                     that many stamps first (exit 1, a stderr line), as a locked store would
 //   card notes --json                 the notes not yet applied, as a JSON list
@@ -38,7 +39,7 @@ if (a === "bug" && b === "pending") {
   log({ argv });
   const s = load(); const unplaced = argv.includes("--unplaced");
   const place = s.tickets.filter((t) => t.state === "filed" || (unplaced && t.state === "unplaced"))
-    .map(({ id, source, path, title, description, priority, shots, tags, lane }) => ({ id, source, path, title, description, priority, shots, tags, lane }));
+    .map(({ id, source, path, title, description, priority, shots, tags, lane, question }) => ({ id, source, path, title, description, priority, shots, tags, lane, question }));
   console.log(JSON.stringify({ place }));
 } else if (a === "bug" && b === "placed") {
   const input = stdin(); log({ argv, stdin: input });

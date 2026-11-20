@@ -3,6 +3,8 @@ import express from 'express';
 import { firstLine, runDispatcherCommand, type CommandDependencies } from '@/modules/dispatcher/index.js';
 
 import { createDashboardHandler, type DashboardDependencies } from './kanban-dispatch.dashboard.js';
+import { createHuntsRouter } from './kanban-dispatch.hunts.js';
+import { createProposalsRouter } from './kanban-dispatch.proposals.js';
 
 /** The dispatcher's command and the dashboard's two house doors, composed once by the module root (`kanban-dispatch.module.ts`), so this router reads no environment. */
 export type KanbanDispatchRouterDependencies = { commands: CommandDependencies; dashboard: DashboardDependencies };
@@ -106,7 +108,7 @@ function flagsFor(body: Record<string, unknown>): string[] {
 }
 
 /**
- * Builds the card-config relay and the dashboard read. It keeps no state and writes no file, because the dispatcher is the config's one writer; this router only relays and reads.
+ * Builds the card-config relay and the dashboard read, and mounts the bug hunters' and proposed features' relays. It keeps no state and writes no file, because the dispatcher is the config's one writer; this router only relays and reads.
  */
 export function createKanbanDispatchRouter(dependencies: KanbanDispatchRouterDependencies): express.Router {
   const router = express.Router();
@@ -139,6 +141,10 @@ export function createKanbanDispatchRouter(dependencies: KanbanDispatchRouterDep
 
   // The Bugs view's dashboard: the board's numbers and the two house parts, read only.
   router.get('/dashboard', createDashboardHandler(dependencies.dashboard));
+
+  // The bug hunters: their settings and nights (`dispatcher hunt …`), and the proposed features (`dispatcher bug proposal(s) …`).
+  router.use('/hunts', createHuntsRouter(dependencies.commands));
+  router.use('/proposals', createProposalsRouter(dependencies.commands));
 
   return router;
 }

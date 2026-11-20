@@ -120,7 +120,8 @@ function isDashboardAnswer(body: unknown): body is BugDashboardAnswer {
     Array.isArray(stats.waysIn) &&
     Array.isArray(body.changelog) &&
     isPart(body.cases) &&
-    isPart(body.tickets)
+    isPart(body.tickets) &&
+    isPart(body.hunts)
   );
 }
 

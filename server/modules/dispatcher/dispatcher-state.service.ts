@@ -56,6 +56,8 @@ const PROVIDERS: readonly DispatcherRoute['provider'][] = ['claude', 'deepseek']
  *
  * `cards` travels whole too: the board's card walks (`report_cards.py`), each matched to its board card on the client by board and card id; the dispatcher already drops an ending older than a day, so this server cuts nothing from it.
  *
+ * `bugs` travels whole: a fingerprint, nothing to draw, which moves when a ticket, a proposal or a hunt row is written.
+ *
  * Consumed by `dispatcher-watcher.service.ts` (which wraps it as the `dispatcher_state` frame,
  * adding exactly `kind` and the frame's own `at`) and by `dispatcher.routes.ts` (`GET /plans`). The
  * client never sees this type: it sees the frame.
@@ -65,6 +67,8 @@ export type DispatcherPicture = {
   arcs: DispatcherArc[];
   planners: DispatcherPlanner[];
   cards: DispatcherCard[];
+  /** The bug board's rows as one fingerprint (`report_bugs.digest`). No screen draws it: it is here so the picture changes when a ticket, a proposal or a hunt row is written, and the Proposed features face and the dashboard's hunters section, which re-read on the frame, hear of it. `null` from a dispatcher build older than the key. */
+  bugs: string | null;
   route: DispatcherRoute;
   daemon: DispatcherDaemon;
   offpeak_at: string;
@@ -131,6 +135,11 @@ function daemonOf(raw: unknown): DispatcherDaemon {
   };
 }
 
+/** The bug rows' fingerprint: `null` when the build sent none; a key that is there and is not text is refused by name. */
+function bugsOf(raw: unknown): string | null {
+  return raw === undefined ? null : need(raw, isTextOrNull, 'bugs');
+}
+
 /** The document, field by field, or a throw naming the field this build could not read. */
 function storeOf(body: unknown): DispatcherStore {
   const document = need(body, isRecord, 'document');
@@ -148,6 +157,8 @@ function storeOf(body: unknown): DispatcherStore {
     // Every card walk the dispatcher holds (`report_cards.cards`), read with the rest so a malformed one is refused at the same moment.
     // Absent from a build older than the key, which reads as no walks (`cardsOf`).
     cards: cardsOf(field(document, 'cards')),
+    // Absent from a build older than the key, which reads as null: the lane then simply does not speak for those rows.
+    bugs: bugsOf(field(document, 'bugs')),
     route: routeOf(field(document, 'route')),
     daemon: daemonOf(field(document, 'daemon')),
     offpeak_at: need(field(document, 'offpeak_at'), isText, 'offpeak_at'),
@@ -220,6 +231,7 @@ export function lanePictureOf(store: DispatcherStore): DispatcherPicture {
     arcs: arcsOnLane(store.arcs, plans),
     planners: store.planners,
     cards: store.cards,
+    bugs: store.bugs,
     route: store.route,
     daemon: store.daemon,
     offpeak_at: store.offpeak_at,

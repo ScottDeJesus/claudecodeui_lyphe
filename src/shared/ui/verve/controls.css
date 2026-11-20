@@ -597,4 +597,8 @@
 .vv-select--sm .vv-select__action { padding: 8px 10px; font-size: 13px; }
 @media (pointer: coarse), (max-width: 767.98px) {
   .vv-select--sm .vv-select__trigger { min-height: 44px; }
+  /* A choice is a press too: every row of the list, and the row that makes one, holds the same floor in both sizes
+     (a stock row is 39px and a dense one 31px). Both rows are flex with their items centred, so the words stay mid-row. */
+  .vv-select__option,
+  .vv-select__action { min-height: 44px; }
 }

@@ -356,7 +356,8 @@ Module internals of the `/api/agent-launch` relay. Its contract (routes, bodies,
 ## route checks — shape only
 | check | value |
 |---|---|
-| row name | `^[a-z][a-z0-9_]{0,63}$`; a shape, not a soul whitelist |
+| row name | `^(?:hunt\.)?[a-z][a-z0-9_]{0,63}$`; a shape, not a soul whitelist (`hunt.<kind>` names a hunt row) |
+| `soul` | a word (below), never `null`: a hunt's soul cannot be cleared; whether the row takes one is the CLI's to say |
 | word (`model`, `effort`, an `effort` map key, `deepseek_effort`, `dactyl_model`, `dactyl_effort`, `summarizer_model`, `summarizer_effort`) | `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`; a token fence, not the vocabulary — `-` first would read as a CLI flag; the dactyl's two and the summarizer's two have no `null` |
 | unknown body key | 400 |
 | `effort` map | at most 16 models (`EFFORT_MAP_MAX_ENTRIES`); more would overrun the OS argv limit; `{}` counts as no field |
@@ -380,11 +381,11 @@ Every failure is `AgentLaunchResult` `{ok: false, reason, message}`; the status 
 An error thrown outside these branches goes to the app's error handler.
 
 ## shared types — `server/shared/types.ts`
-`AgentLaunchResult<T>` · `AgentLaunchRowChange` · `AgentLaunchDefaultsChange`.
+`AgentLaunchResult<T>` · `AgentLaunchRowChange` (`{model?, effort?, soul?}`; `soul` → `--soul`) · `AgentLaunchDefaultsChange`.
 
 `AgentLaunchDefaultsChange` = `{model?, effort?, deepseek_effort?, dactyl_model?, dactyl_effort?, summarizer_model?, summarizer_effort?}`; the argv flags are `--dactyl-model` / `--dactyl-effort` and `--summarizer-model` / `--summarizer-effort`.
 
-The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort`, `choices.sorter_models`, `choices.tweak_models` included; row `kind` is `soul`, `sorter` or `tweak`, lane `agent`, `dispatcher`, `chain` or `sorter`), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
+The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort`, `choices.sorter_models`, `choices.tweak_models`, `choices.hunt_souls` included; row `kind` is `soul`, `sorter`, `tweak` or `hunt` (a hunt row carries `soul`), lane `agent`, `dispatcher`, `chain`, `sorter` or `hunt`), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts
 
@@ -17890,7 +17891,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.
 | timeouts | `card told` and `bug placed` 180 s (each sorts first: Jev, then maybe one tool-less Haiku); `notes`, `applied`, `config`, `bug pending` 20 s |
 
 ## Tell — `kanban-dispatch.tell.ts` (`tellEventOf`, `createCardTeller`)
-One `TELLS` table, first match wins; `write.actor === 'dispatcher'` (`DISPATCHER_ACTOR`), a write with no board, and a `card.created` whose actor is a ticket source (`chat`, `soul`, `nightly`, `cerberus`: `TICKET_SOURCES`, `isPlacedTicketCreation`) are never told; the placing stamp already wrote that card's row.
+One `TELLS` table, first match wins; `write.actor === 'dispatcher'` (`DISPATCHER_ACTOR`), a write with no board, and a `card.created` whose actor is a ticket source (`chat`, `soul`, `nightly`, `cerberus`, `hunter`: `TICKET_SOURCES`, `isPlacedTicketCreation`) are never told; the placing stamp already wrote that card's row.
 | write | event |
 |---|---|
 | `card.created` | `created` |
@@ -17943,6 +17944,8 @@ One `TELLS` table, first match wins; `write.actor === 'dispatcher'` (`DISPATCHER
 `GET /api/kanban-dispatch/settings`, `PUT /api/kanban-dispatch/settings` `{ width?, threshold?, ageDays? }` → `{ width, threshold, ageDays }` relayed from `dispatcher card config --json` (MAN-10005; `--age-days` for `ageDays`). `width` whole 1–4, `threshold` 0.50–0.99, `ageDays` whole 0–30 (0 turns ageing off); a body naming none, a non-object body or an out-of-bound value is 400 (checked here and by the dispatcher: exit 2 → 400); an unreadable or failing dispatcher is 502. `ageDays` answers `null` when the dispatcher prints no `age_days` (an older build); the other two are still a reading.
 
 `GET /api/kanban-dispatch/dashboard` mounts `createDashboardHandler` (`kanban-dispatch.dashboard.ts`, MAN-10052).
+
+`/api/kanban-dispatch/hunts` (`createHuntsRouter`: the hunters' settings, `night`, `stop`, `reopen`) and `/api/kanban-dispatch/proposals` (`createProposalsRouter`: the proposed features' listing and its promote, send-back, dismiss and priority) are mounted with `router.use`; their contract is MAN-10066.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.apply.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.cards.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.fields.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.notes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.tell.ts
 
@@ -17998,15 +18001,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/reposito
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useBoardProjects.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useBoardReposPrompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanBoards.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useLinkedTitles.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/walkModel.ts
 
-## MAN-10051 — Bugs view faces — the Board | Dashboard strip, src/modules/kanban/dashboard/ and its one live read
+## MAN-10051 — Bugs view faces — the Board | Dashboard | Proposed features strip, src/modules/kanban/dashboard/ and proposed/, their live reads and presses
 
-The Bugs view has two faces, switched by a strip under its header (`kanban.faces.*`): Board (the lane rail) and Dashboard (how the board stands). State: 2026-11-19, live over `GET /api/kanban-dispatch/dashboard` (MAN-10052).
+The Bugs view has three faces, switched by a strip under its header (`kanban.faces.*`): Board (the lane rail), Dashboard (how the board stands) and Proposed features. State: 2026-11-19, all three live: Board, Dashboard over `GET /api/kanban-dispatch/dashboard` (MAN-10052) with its Hunters section over the answer's `hunts` part, and Proposed features over `GET /api/kanban-dispatch/proposals`.
 
 ## Faces — `KanbanPanel.tsx`
-- `face` (`'board'` on every arrival) and `dashboardView` (`BugDashboardView`: `scope` `'board'|'all'`, `days` `7|30|90`, default `board`/30) are panel state. why: a visit to the Board face or a board switch keeps the dashboard's scope and window; neither is remembered across visits.
+- `face` (`'board' | 'dashboard' | 'proposed'`, `'board'` on every arrival), `proposalsView` (`ProposalsView`: `scope`, `state`, default `board`/`open`) and `dashboardView` (`BugDashboardView`: `scope` `'board'|'all'`, `days` `7|30|90`, default `board`/30) are panel state. why: a visit to the Board face or a board switch keeps the dashboard's scope and window; neither is remembered across visits.
 - `KanbanBoardFace.tsx` is the rail and its autonomy-off banner, moved out of the panel.
 - The Dashboard tab's count (`openHigh`) is the open board's open High cards, counted off the cards the panel already holds (`board.cardIds` of every lane but Done, `board.summaryOf(id).priority`), so the Board face asks for no dashboard read; none while the lanes load, no pill at 0.
-- `openDashboardCard(cardId, boardId)` (a dashboard row's press): selects `boardId` when it is not the open board, turns to the Board face, and `board.openCardOn(boardId, cardId)` (`useKanbanLanes`): the selection is held WITH its board, so it shows the moment that board is open.
+- `openDashboardCard(cardId, boardId)` (a dashboard row's press, and a stopgap's or a sent-back proposal's card on the Proposed features face): selects `boardId` when it is not the open board, turns to the Board face, and `board.openCardOn(boardId, cardId)` (`useKanbanLanes`): the selection is held WITH its board, so it shows the moment that board is open.
 
 ## Dashboard — `src/modules/kanban/dashboard/`
 | file | draws |
@@ -18020,13 +18023,37 @@ The Bugs view has two faces, switched by a strip under its header (`kanban.faces
 | `DashboardCases.tsx`, `DashboardCaseSentence.tsx` | per suite one row, the open regressions with their sentence, the operator's cases |
 | `DashboardChangelog.tsx` | the changelog lines; the Copy press only while there are lines |
 - After the sections, only while `tickets.value.unplaced` is not empty: a warn `Banner` naming each ticket no board could take, with its folder.
+- `DashboardHunters.tsx` (tonight's line, the two night presses, per-hunter groups), `DashboardHunterSkips.tsx`, `DashboardHunterNights.tsx`: the Hunters section, after the regression cases; see "Hunters section".
 - Wire types: `src/shared/types.ts` under `BUG DASHBOARD`; `KanbanStats` / `KanbanChangelogEntry` from the kanban types (MAN-10033).
 
-## The read — `useBugDashboard`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanBoardFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/proposed/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/dispatcherAnswer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-10069 — Bugs view faces — the Board | Dashboard | Proposed features strip — The read — `useBugDashboard`
+section: Bugs view faces — the Board | Dashboard | Proposed features strip, src/modules/kanban/dashboard/ and proposed/, their live reads and presses/001 The read — `useBugDashboard`
+
 - One `api.kanban.dashboard(scope, days)` on mount and on a change of scope or window; again on any `kanban_event` frame (`useWebSocket().subscribe`; any board, since All boards and the house parts are not one board's) and on each new `DISPATCHER_ALL_TOPIC` value (`useLiveTopic`; the value present at mount is not news). No timer.
 - Coalesced: one read out at a time; a frame or new question during it sets `owed`, and exactly one more read follows. An answer to a question no longer asked is never drawn. A drawn answer goes `stale: true` while the next is out and is replaced whole, never by a spinner.
-- A body that is not the route's shape (`isDashboardAnswer`: `stats.open/timeToFix/scope` records, `byDay/oldestOpen/waysIn/changelog` arrays, both parts `{ok:true,value}|{ok:false,error}`), a non-2xx or a throw is `unreachable`.
+- A body that is not the route's shape (`isDashboardAnswer`: `stats.open/timeToFix/scope` records, `byDay/oldestOpen/waysIn/changelog` arrays, the three parts `cases`, `tickets`, `hunts` each `{ok:true,value}|{ok:false,error}`), a non-2xx or a throw is `unreachable`.
 - In development `React.StrictMode` mounts twice, so the mount read shows twice in the network log; production reads once.
+
+## Proposed features — `src/modules/kanban/proposed/`
+- `ProposedFeatures.tsx` (the face: scope and state controls, the rows, the one question open over it, the four acts), `ProposalRow.tsx`, `ProposalPromoteDialog.tsx`, `ProposalDismissDialog.tsx`, `useProposals.ts`. Tab count = open proposals in scope, amber only while one is high (`kanban.faces.openHighProposals`).
+- `useProposals(scope, state)` → `{ reading: ProposalsReading, retry }` is called ONCE by `KanbanPanel`, so the tab count and the rows are one answer. `api.kanban.proposals(scope, state)` on mount, on a change of either, and on each new `DISPATCHER_ALL_TOPIC` value (not on `kanban_event`: proposals are the dispatcher's rows). That frame moves on a proposal write because `dispatcher status --json` carries `bugs`, a fingerprint of the ticket, proposal and hunt tables (`report_bugs.digest`), which the server's lane carries into its picture (`dispatcher-state.service.ts`) and compares before it speaks; the same frame tells the dashboard's hunters section of a sitting or a mark. The lane's payload (`DispatcherLanePicture`) leaves `bugs` out, so a `bugs`-only frame reaches these readers only because `DispatcherFeed` stamps every publish with a new `received_at`: a change to how the feed publishes keeps a frame-arrived signal for `useProposals` and `useBugDashboard`. The fingerprint's tickets read counts `proposal_id`, so `bug file --stopgap-for` on an already-filed ticket moves it. Reads are coalesced in `useBugDashboard`'s shape (asked / inFlight / owed). `scope` null (no board open) asks nothing. A body whose `proposals` is not an array of rows with `id`, `title`, `state`, `priority`, `findings[]`, `stopgaps[]` is `unreachable`. No timer.
+- The four acts (`api.kanban.setProposalPriority`, `promoteProposal(id, arc)`, `sendBackProposal`, `dismissProposal(id, reason)`): one out at a time (`busy` = the proposal's id, plus a ref so a double press sends once). An answer closes its question and calls `retry` at once (it coalesces with the dispatcher's frame); a refusal keeps the question open, says the dispatcher's sentence inside it (or on the row for a priority) and also calls `retry`, because a refusal usually means the proposal changed elsewhere. A refusal belongs to its act: opening or closing a question clears it. Dismiss waits with no reason and past 500 characters (`ProposalDismissDialog`'s `REASON_MAX`; the route answers 400 past 500) and sends the reason trimmed. A fault with no sentence says `kanban.notAnswered`.
+- `ProposalPromoteDialog` reads `api.roadmap.picture()` (`GET /api/roadmap`) each time it opens and flattens roadmaps → milestones → epics in their own order to `ProposalEpicChoice` (`arc` = the epic's `name`); epics under no milestone (`unplaced`) are left out. Try again re-reads. The kit's `Select` has no group headers: the hint says `roadmap · milestone`.
+- A stopgap's card and a sent-back proposal's card are presses through `openDashboardCard`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanBoardFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/proposed/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/dispatcherAnswer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-10070 — Bugs view faces — the Board | Dashboard | Proposed features strip — Hunters section — the presses in `BugDashboard.tsx`
+section: Bugs view faces — the Board | Dashboard | Proposed features strip, src/modules/kanban/dashboard/ and proposed/, their live reads and presses/002 Hunters section — the presses in `BugDashboard.tsx`
+
+- `hunts` is `reading.answer.hunts` (`dispatcher hunt status --json`); an `ok: false` part says its sentence and draws nothing. The next-night line says "by the server's clock" (`kanban.dashboard.hunters.tonight.next`), because `hunt status` gives `start` as the box's local `HH:MM`, not an instant.
+- `Run a night now` → `api.kanban.huntNight()` (no minutes: the night takes Settings' minutes); `Stop tonight's hunt` (behind its `ConfirmDialog`) → `api.kanban.huntStop()` (no `now`: the hunter winds down at its next clock). A 200 line counts as done only when it starts `OPENED night`, `CLOSED night` (a run past a stale night prints CLOSED first) or `STOPPED night` (`NIGHT_DONE`); any other line (`last night's hunter is still out — tonight opens nothing`, `tonight … is already open — nothing changed`, `no night is open`) and every 409 is said under the presses. Cleared by the next press and by an answer that did what was asked.
+- `Hunt it again` → `api.kanban.huntReopen({ hunt, project, unit })`. A skipped unit names its project by FOLDER and `hunt reopen` takes the config's NAME, so the name is looked up in `hunts.value.hunts[].projects[]` (that hunter's first); a folder with no match goes as it is and the dispatcher refuses it in its own words. A 409 is said on that unit's row.
+- `utils/dispatcherAnswer.ts`: `readDispatcherAnswer(request)` → `{ ok: true, line } | { ok: false, sentence | null }` for every press of both faces; `plainSentence` drops `REFUSED ` and the `hunt …:` / `bug …:` verb lead and capitalises.
+- Writes live in the two faces, never in the sections.
+- Wire types in `src/shared/types.ts`: `BugProposal`, `ProposalsView`, `ProposalsReading`, `ProposalEpicChoice`, `ProposalEpicsReading`, `HuntStatus`, `HuntHunter`, `HuntProjectStanding`, `HuntSkippedUnit`, `HuntSittingRow`, `HuntNight`.
 
 ## The card face and drawer
 - `useKanbanWalks(boardId, summaryOf)`: `cure` is the feed's `flow === 'cure'` (the face reads `Regression`); `aged` is `{ waitedDays, ridesAs }` for a `queued` feed card whose `rides_as` differs from the card's own priority, decided at LOOKUP (the lanes may load after the feed) and null when the card's priority is not loaded.
@@ -18034,11 +18061,11 @@ The Bugs view has two faces, switched by a strip under its header (`kanban.faces
 - Settings: `RunnerBugBoardRow` reads and writes `ageDays` through `useBugBoardSettings` (`setAgeDays`, whole 0–30) → `PUT /api/kanban-dispatch/settings` (MAN-10022).
 
 ## Verify
-The Bugs view on the dev server (`:5183`) through `withPage` (`cases/lib/app.mjs`) at 1440×900 and 390×844: Dashboard tab, All boards, `[data-bug-dashboard="ready"]` with `aria-busy="false"`; at 390 every press of the face is ≥ 44 px. 2026-11-19: no page errors; an oldest row opened its card's drawer on the Board face.
+The Bugs view on the dev server (`:5183`) through `withPage` (`cases/lib/app.mjs`) at 1440×900 and 390×844: Dashboard tab, All boards, `[data-bug-dashboard="ready"]` with `aria-busy="false"`; at 390 every press of the face is ≥ 44 px. 2026-11-19: no page errors; an oldest row opened its card's drawer on the Board face. Proposed features, 2026-11-20 on the live store: a proposal filed by `bug propose` from a chat-shaped shell drew on All boards (tab count 1); the promote dialog listed the 73 epics `dispatcher roadmap show` holds on milestones; the face's Dismiss press ended the proposal and the face redrew empty; a second dismiss through the route answered 409 `REFUSED bug proposal dismiss: "<title>" is already dismissed`. Hunters: the live `hunts` part drew every hunter and project; `hunts/reopen` of an unmade pass answered 409 with the dispatcher's sentence.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanBoardFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanBoardFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/proposed/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/dispatcherAnswer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-## MAN-10052 — kanban-dispatch dashboard route — GET /api/kanban-dispatch/dashboard: the board's stats and changelog beside the house's cases and tickets stats
+## MAN-10052 — kanban-dispatch dashboard route — GET /api/kanban-dispatch/dashboard: the board's stats and changelog beside the house's cases and tickets stats and the bug hunters' report
 
 `GET /api/kanban-dispatch/dashboard?board=<id>|all&days=<n>` is the Bugs view's Dashboard face's one read (MAN-10051 draws it). Handler: `createDashboardHandler(dependencies)` in `kanban-dispatch.dashboard.ts`, mounted by `kanban-dispatch.routes.ts` behind the mount's `authenticateToken`. A read: no transaction, no frame, no write.
 
@@ -18048,19 +18075,20 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /
 | `board` | absent, empty or `all` = every board not archived; else a board id, handed to the stats service, whose 404 (`KANBAN_BOARD_NOT_FOUND`) is the answer for an unknown one |
 | `days` | decimal; absent, unparsable or below 1 = `KANBAN_STATS_DAYS_DEFAULT` (30); above `KANBAN_STATS_DAYS_MAX` (365) clamped. Same forgiving rule as `GET /api/kanban/stats` (MAN-10033), so both answer the same window for one link |
 
-## Answer `{ stats, changelog, cases, tickets }`
+## Answer `{ stats, changelog, cases, tickets, hunts }`
 | key | source |
 |---|---|
 | `stats` | `kanbanStatsService.stats(scope, days)` through `@/modules/kanban/index.js` |
 | `changelog` | `kanbanStatsService.changelog(scope)`: newest 50, no `since` (the window does not cut it) |
 | `cases` | `cases stats --days <n> --json` through the cases door: `expandHome(CASES_BIN || ~/.claude/scripts/cases)`, `door: 'cases'`, composed in `kanban-dispatch.module.ts` as the roadmap module composes it |
 | `tickets` | `dispatcher bug stats --days <n> --json` through the module's dispatcher command |
+| `hunts` | `dispatcher hunt status --json` (no window: every hunter's newest pass) through the module's dispatcher command, read by `readHuntStatus` (`kanban-dispatch.dashboard-hunts.ts`) into `HuntStatus` (`server/shared/hunt-types.ts`, MAN-10066) |
 
 - The board's two parts are read FIRST and synchronously, so an unknown board is 404 before a house command runs.
-- `cases` and `tickets` run in parallel, each `readDispatcherJson(argv, door, 4 MiB)` (`@/shared/dispatcher-command.js`), then read field by field by `readCasesStats` / `readTicketStats` (`kanban-dispatch.dashboard-parts.ts`, which also holds their types). Each is `{ ok: true, value } | { ok: false, error }`: a door that failed (`cases stats exited 1`) or a body this build cannot read (`cases stats --days 30 --json answered no suites[1].night.held`) blanks its own section only, and logs `[kanban-dispatch] dashboard: <sentence>` once.
-- Both house reads are pure store reads under `VERB_TIMEOUT_MS` (20 s); measured 2026-11-19: `cases stats` 0.9 s, `bug stats` 0.2 s.
+- `cases`, `tickets` and `hunts` run in parallel, each `readDispatcherJson(argv, door, 4 MiB)` (`@/shared/dispatcher-command.js`), then read field by field by `readCasesStats` / `readTicketStats` (`kanban-dispatch.dashboard-parts.ts`, which also holds their types). Each is `{ ok: true, value } | { ok: false, error }`: a door that failed (`cases stats exited 1`) or a body this build cannot read (`cases stats --days 30 --json answered no suites[1].night.held`) blanks its own section only, and logs `[kanban-dispatch] dashboard: <sentence>` once.
+- All three house reads are pure store reads under `VERB_TIMEOUT_MS` (20 s); measured 2026-11-19: `cases stats` 0.9 s, `bug stats` 0.2 s, `hunt status` 0.2 s.
 
 ## Verify
-`GET /api/kanban-dispatch/dashboard?board=all&days=30` with the checks token (`api` in `cases/lib/app.mjs`): 200, `cases.ok` and `tickets.ok` true; `?board=b-nope` is 404.
+`GET /api/kanban-dispatch/dashboard?board=all&days=30` with the checks token (`api` in `cases/lib/app.mjs`): 200, `cases.ok`, `tickets.ok` and `hunts.ok` true; `?board=b-nope` is 404.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.dashboard-parts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.dashboard.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.dashboard-hunts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.dashboard-parts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.dashboard.ts

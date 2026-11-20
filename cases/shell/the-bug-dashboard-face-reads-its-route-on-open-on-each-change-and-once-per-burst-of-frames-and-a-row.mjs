@@ -54,6 +54,8 @@ function answerFor(scope, days) {
     changelog: [],
     cases: { ok: false, error: "cases stats did not answer for this case" },
     tickets: { ok: true, value: { days, by_source: [{ source: "chat", filed: 1, open: 1, fixed: 0, cleared: 0, closed: 0 }], unplaced: [], came_back: { reopened: 0, regressions: 0 } } },
+    // The route's fifth part since bug-hunters seam 10, which the face requires as it requires the other two.
+    hunts: { ok: false, error: "hunt status did not answer for this case" },
   };
 }
 
