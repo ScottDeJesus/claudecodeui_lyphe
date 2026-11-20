@@ -1,13 +1,13 @@
 import '@/modules/project-workspace/places/places.css';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type { ComponentType, CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionFace } from '@/modules/companion';
 import { OUT_OF_REACH } from '@/shared/constants';
-import type { Place, PlaceId, SwitcherAction } from '@/shared/types';
+import type { Place, PlaceId } from '@/shared/types';
 import { Button } from '@/shared/ui';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 
@@ -89,11 +89,14 @@ function placeAt(x: number, y: number): PlaceId | null {
   return (document.elementFromPoint(x, y)?.closest('[data-place]')?.getAttribute('data-place') as PlaceId | undefined) ?? null;
 }
 
+/** An act under the wheel: one of the applications' (the switcher's own list), or New project. */
+type WheelAct = { key: string; label: string; icon: ComponentType<{ className?: string }>; run: () => void };
+
 type PlacesWheelProps = {
   /** The places, in the wheel's order (the provider's list). */
   places: Place[];
-  /** The applications' acts, a row of presses under the wheel; none at the station. */
-  acts: SwitcherAction[];
+  /** The acts, a row of presses under the wheel: the applications', then New project; none at the station. */
+  acts: WheelAct[];
   /** The middle of the press it came out of, for the hairline that joins it to the wheel; null when a key summoned it. */
   from: { x: number; y: number } | null;
   /** The pointer still down from the press that opened it: letting go over a place goes there; elsewhere, the wheel stays up. */

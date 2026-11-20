@@ -47,6 +47,7 @@
     "wheel": "Places",
     "lastChat": "last chat",
     "here": "here",
+    "newProject": "New project",
     "trail": {
       "source": "Where you've been",
       "label": "Where you have been",
@@ -2074,10 +2075,11 @@
     "loading": "Loading CloudCLI",
     "settingUpWorkspace": "Setting up your workspace...",
     "chooseProject": "Choose Your Project",
-    "selectProjectDescription": "Select a project from the sidebar to start coding with Claude. Each project contains your chat sessions and file history.",
+    "selectProjectDescription": "Open a chat from Home, or start a new one there, to work in its project. Each project holds its chats and file history.",
     "tip": "Tip",
     "createProjectMobile": "Tap the menu button above to access projects",
     "createProjectDesktop": "Create a new project by clicking the folder icon in the sidebar",
+    "newProjectTip": "To make a folder a project, open the menu and press New project",
     "newSession": "New Session",
     "untitledSession": "Untitled Session",
     "projectFiles": "Project Files",
@@ -2376,7 +2378,7 @@
   "cerberus": {
     "loading": "Loading Cerberus…",
     "header": {
-      "eyebrow": "Cerberus · fleet health",
+      "eyebrow": "Fleet health",
       "headline": {
         "quiet": "All",
         "quietAccent": "quiet",

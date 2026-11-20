@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
   FileText,
+  FolderPlus,
   GitCommit,
   GitMerge,
   MessageSquare,
@@ -66,6 +67,8 @@ type CommandPaletteProps = {
    * runs the one chosen; what opening her means is the workspace's to say.
    */
   companionGroup: PaletteGroup;
+  /** Opens the new-project wizard, which makes a folder a project; drawn as the Actions group's New project row. */
+  onNewProject?: () => void;
   /**
    * The application switcher's five acts, from the switcher's own list (the one the radial draws), drawn
    * as the Applications group. The palette knows nothing of what an act does; it lists them and runs the
@@ -83,6 +86,7 @@ function CommandPalette({
   onShowRepoInGitTab,
   navRows,
   companionGroup,
+  onNewProject,
   switcherActions,
 }: CommandPaletteProps) {
   const [open, setOpen] = React.useState(false);
@@ -256,6 +260,12 @@ function CommandPalette({
                     <span className="text-xs text-muted-foreground">Select a project first</span>
                   )}
                 </CommandItem>
+                {onNewProject && (
+                  <CommandItem value="New project add folder create project" onSelect={() => run(onNewProject)}>
+                    <FolderPlus className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="flex-1">New project</span>
+                  </CommandItem>
+                )}
                 <CommandItem value="Toggle theme dark light mode" onSelect={() => run(toggleDarkMode)}>
                   <SunMoon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span className="flex-1">Toggle theme</span>

@@ -31,7 +31,7 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
     setActiveTab,
   } = useProjectCommandState();
   const { views } = useWorkspaceViews();
-  const { places } = usePlaces();
+  const { places, newProject } = usePlaces();
   const stationShowing = useStationShowing();
   const homeShowing = useHomeShowing();
 
@@ -105,6 +105,7 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
       onShowRepoInGitTab={showSelectedRepoInGitTab}
       navRows={navRows}
       companionGroup={companionGroup}
+      onNewProject={newProject}
       switcherActions={switcherActions}
     />
   );

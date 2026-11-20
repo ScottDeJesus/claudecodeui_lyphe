@@ -22,7 +22,7 @@ import { NotesPanel } from '@/modules/notes';
 import type { AppTab, CompanionPresence, FileOpenRequest, FilesRoot, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
-import { absolutePathIn, viewStandsAlone } from '@/shared/utils';
+import { absolutePathIn } from '@/shared/utils';
 import { useChatDeskSide } from '@/modules/project-workspace/hooks/useChatDeskSide';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
 import { useHiddenNavFallback } from '@/modules/project-workspace/hooks/useHiddenNavFallback';
@@ -34,6 +34,7 @@ import type { CoreDrawingInput } from '@/shared/context/CoreDrawingContext';
 import { ChatDesk } from '@/modules/project-workspace/ChatDesk';
 import ChatHead from '@/modules/project-workspace/ChatHead';
 import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
+import { ScreenHead } from '@/modules/project-workspace/ScreenHead';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
@@ -339,12 +340,12 @@ function WorkspaceMain({
   usePaletteOpsRegister({ openFile: handleFileOpen, openFileReference: resolvedFileOpen, readFileReference });
 
   if (isLoading) {
-    return <WorkspaceStateView mode="loading" isMobile={isMobile} onMenuClick={onMenuClick} />;
+    return <WorkspaceStateView mode="loading" />;
   }
 
-  // The body a pane that reads the open project draws when none is selected. Built once; WorkspaceMain's own
-  // header stands above it, so it brings none of its own.
-  const chooseProjectBody = <WorkspaceStateView mode="empty" showHeader={false} isMobile={isMobile} onMenuClick={onMenuClick} />;
+  // The body a pane that reads the open project draws when none is selected. Built once; the pane's head stands
+  // above it, so it brings none of its own.
+  const chooseProjectBody = <WorkspaceStateView mode="empty" />;
 
   // Chat names the open chat in the phone header; every other view names itself. An id the list does not
   // hold (a plugin's, while the plugin list loads or after the plugin is gone) has no name to give, so there
@@ -356,11 +357,11 @@ function WorkspaceMain({
     // the chat's side column. Only for a chat on screen in this pane: a floating chat, another view and a chat not yet begun have none.
     <SessionPanelProvider sessionId={activeTab === 'chat' && !floating ? (selectedSession?.id ?? null) : null} followupsApart={chatSide > 0}>
     <div className="flex h-full flex-col">
-      {/* The Chat view has a head of its own, at every width: the way back to the sessions home, and the chat's name. It is the first
-          line of the chat's own pane (`ChatDesk` below), so at a desk it stands over the chat and not over the column beside it. A view
-          that stands alone as the chat does (`viewStandsAlone`: the Bugs view) draws its own head too. Every other view keeps the
-          phone's strip (the drawer's button and the view's name), as does the Chat view while its chat floats. */}
-      {(activeTab === 'chat' ? floating : !viewStandsAlone(activeTab)) && (
+      {/* EVERY VIEW STANDS ALONE, at every width: a head with the way back, the view's name and the menu to every other place, and no
+          old sidebar, rail or phone's strip round it. The chat's head is the first line of the chat's own pane (`ChatDesk` below), so at
+          a desk it stands over the chat and not over the column beside it; the Bugs view draws its own (`BugHead`, in its panel); every
+          other view wears the one head here (`ScreenHead`). The phone's strip stays only for the Chat view while its chat floats. */}
+      {activeTab === 'chat' && floating && (
         <WorkspaceHeader
           selectedProject={selectedProject}
           selectedSession={selectedSession}
@@ -369,6 +370,10 @@ function WorkspaceMain({
           onMenuClick={onMenuClick}
           newSessionLabel={t('mainContent.newSession')}
         />
+      )}
+      {activeTab !== 'chat' && activeTab !== 'kanban' && (
+        // A plugin's view while the plugin list loads has no name in the list yet: its own id stands in.
+        <ScreenHead name={viewLabel ?? activeTab.replace('plugin:', '')} />
       )}
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">

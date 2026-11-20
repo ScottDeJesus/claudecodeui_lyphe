@@ -1,9 +1,12 @@
-import { House, MessageSquare, Settings } from 'lucide-react';
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { FolderPlus, House, MessageSquare, Settings } from 'lucide-react';
+import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { useBackToWorkspace, useCurrentApplication, useSwitcherActions } from '@/modules/app-switcher';
+import { usePaletteOps } from '@/modules/command-palette';
+import { ProjectCreationWizard } from '@/modules/project-creation-wizard';
 import { useProjectEffectsState, useProjectMainState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import { PlaceTrail } from '@/modules/project-workspace/places/PlaceTrail';
@@ -81,6 +84,8 @@ type PlacesValue = {
   places: Place[];
   /** Brings the wheel up out of `opener`; with `heldPointer`, the pointer still down from that press, which a release over a place spends. */
   openWheel: (opener: HTMLElement | null, heldPointer: number | null) => void;
+  /** Opens the new-project wizard, which makes a folder a project: the door the old sidebar's plus was. */
+  newProject: () => void;
 };
 
 const PlacesContext = createStableContext<PlacesValue | null>(import.meta.hot, 'PlacesContext', null);
@@ -115,6 +120,9 @@ export function usePlaces(): PlacesValue {
  * EVERY GO IS A DOOR THE APP ALREADY HAS: a page is `openHome` or `openStation`; a screen is the workspace's view brought forward at
  * the address it held (an application over the workspace stepped back first, as Kaylee's own opens do); a chat is the station's
  * "Open the chat" door (`openChatInWorkspace`), the one her orders use; Settings is the workspace's dialog.
+ *
+ * IT ALSO HOLDS THE NEW-PROJECT WIZARD (`newProject`): the old sidebar's plus was its only door, and no screen draws that sidebar
+ * now. The wheel offers it under its places and the palette among its acts.
  */
 export function PlacesProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -210,9 +218,18 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     ];
   }, [stationShowing, homeShowing, activeTab, lastChatId, lastChatTitle, sessionId, views, homeName, stationName, t, goHome, goStation, goScreen, goChat, openSettings]);
 
-  // The applications' acts: the list of applications always, and what can be done to the one in front while one is up. Not at the
-  // station, which covers the workspace an application stands over.
-  const acts = useMemo(() => (stationShowing ? [] : switcherActs.filter((act) => act.key !== 'chat' && !act.disabled)), [stationShowing, switcherActs]);
+  // THE NEW-PROJECT WIZARD, the one door to making a folder a project now that no screen draws the old sidebar whose plus it was.
+  // A made project is read into the lists as the sidebar's own did.
+  const paletteOps = usePaletteOps();
+  const [creatingProject, setCreatingProject] = useState(false);
+  const newProject = useCallback(() => setCreatingProject(true), []);
+
+  // The acts under the wheel: the applications' (the list of applications always, and what can be done to the one in front while one
+  // is up), then New project. None at the station, which covers the workspace an application stands over.
+  const acts = useMemo(() => (stationShowing ? [] : [
+    ...switcherActs.filter((act) => act.key !== 'chat' && !act.disabled),
+    { key: 'new-project', label: t('places.newProject', { defaultValue: 'New project' }), icon: FolderPlus, run: newProject },
+  ]), [stationShowing, switcherActs, t, newProject]);
 
   // THE WHEEL: up, folding away, or not drawn.
   const [wheel, setWheel] = useState<WheelState | null>(null);
@@ -352,7 +369,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     setTrailFrom(null);
   }, [trailFrom]);
 
-  const value = useMemo<PlacesValue>(() => ({ places, openWheel }), [places, openWheel]);
+  const value = useMemo<PlacesValue>(() => ({ places, openWheel, newProject }), [places, openWheel, newProject]);
 
   return (
     <PlacesContext.Provider value={value}>
@@ -362,6 +379,12 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       )}
       {trailFrom !== null && (
         <PlaceTrail steps={trail} hereKey={standing?.key ?? null} anchor={trailFrom} onGo={goBackTo} onClose={closeTrail} />
+      )}
+      {creatingProject && createPortal(
+        <Suspense fallback={null}>
+          <ProjectCreationWizard onClose={() => setCreatingProject(false)} onProjectCreated={() => void paletteOps.refreshProjects()} />
+        </Suspense>,
+        document.body,
       )}
     </PlacesContext.Provider>
   );

@@ -29,7 +29,7 @@ type CerberusHeaderProps = {
  * THE TAB'S HEADER: the answer before anyone clicks (`design/cerberus/Cerberus Tab.dc.html` :37-51).
  *
  * Read top to bottom on the left:
- * 1. the eyebrow, "Cerberus · fleet health";
+ * 1. the eyebrow, "Fleet health" (the screen's own head, over the tab, names Cerberus);
  * 2. the headline, the biggest thing on the tab: "All *quiet*", "One check *needs you*" or "3 checks
  *    *need you*". Its accent words are italic, never bold, since the display serif has no bold. They
  *    take the state's tone: the positive ink at quiet, the warn ink while anything needs you, so the call
