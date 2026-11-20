@@ -779,6 +779,18 @@ const addCompanionHandoverColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `companion_state.context_json`: how full Kaylee's conversation was at her CLI's last count (`CompanionContext` as JSON), which her
+ * core wears as its inner ring. It sits on the row so a restart, which leaves her asleep, still shows the conversation she will resume;
+ * it is nulled with `provider_session_id` and by Clear. NULL for none, which is every row before this column: the ring then shows its
+ * track until her next count.
+ */
+const addCompanionContextColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'context_json', 'TEXT');
+};
+
+/**
  * Adds `companion_log.attachments_json`: the files he attached to a typed line, as the wire's `CompanionAttachment[]` JSON — each one's
  * upload-store path, his name for it, the size and type read from the stored file and what she can do with it (`opens`), decided once at
  * the door. The records only, never the bytes: the files stay in the upload store, and her reader opens exactly the files named on the
@@ -803,6 +815,18 @@ const addSessionPermissionModeColumn = (db: Database): void => {
   const columnNames = sessionsTableInfo.map((column) => column.name);
 
   addColumnToTableIfNotExists(db, 'sessions', columnNames, 'permission_mode', 'TEXT');
+};
+
+/**
+ * Adds the `context_window` column: the context window, in tokens, the Claude SDK last reported for the model a session ran on (a
+ * turn's `result.modelUsage[model].contextWindow`). It was process memory alone, so after a restart every Claude chat's context was
+ * measured against the CONTEXT_WINDOW fallback until its next turn, and a 1M chat read as over full. Left NULL for pre-existing rows:
+ * until a turn reports one, the window the session's recorded model names stands in (`provider-token-usage.service.ts`).
+ */
+const addSessionContextWindowColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'context_window', 'INTEGER');
 };
 
 /**
@@ -908,6 +932,7 @@ export const runMigrations = (db: Database) => {
     addSessionEffortColumn(db);
     addSessionNameGivenColumn(db);
     addSessionPermissionModeColumn(db);
+    addSessionContextWindowColumn(db);
     addForkedFromSessionIdColumn(db);
     addSimpleListAtColumn(db);
     addSessionUserStateColumns(db);
@@ -957,6 +982,7 @@ export const runMigrations = (db: Database) => {
     addCompanionUnansweredColumn(db);
     addCompanionSessionShapeColumn(db);
     addCompanionHandoverColumn(db);
+    addCompanionContextColumn(db);
     addCompanionActionArmedFromColumn(db);
     addCompanionNoteShapeColumns(db);
     addCompanionLogAttachmentsColumn(db);

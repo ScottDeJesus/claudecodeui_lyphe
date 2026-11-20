@@ -1,6 +1,6 @@
 import { MessageSquarePlus, Send } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
-import type { MouseEvent } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { CompanionDraftFoldLine, CompanionDraftHead } from '@/modules/companion/CompanionDraftFoldLine';
@@ -37,6 +37,8 @@ type CompanionDraftCardProps = {
    * under it, and the field under all of it, giving way down to nothing. Absent (her panel), the card draws as it always has.
    */
   headLine?: boolean;
+  /** With `headLine`: a press at the head row's start, before the target (the station's back arrow, where the card stands open beside her core). */
+  lead?: ReactNode;
   /** Her panel's fold (`useDraftFold`): a chevron on the head row folds the card to that one row. Absent (the station), it never folds. */
   fold?: CompanionDraftFold;
 };
@@ -82,7 +84,7 @@ type CompanionDraftCardProps = {
  * with Use hers, never silently kept or dropped — and his own save coming back while he types on is his, never hers.
  * A refused send or save leaves everything on screen and says why.
  */
-export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit, onSend, onClear, onTargetPress, headLine = false, fold }: CompanionDraftCardProps) {
+export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit, onSend, onClear, onTargetPress, headLine = false, lead, fold }: CompanionDraftCardProps) {
   const { t } = useTranslation();
   const pushToast = useToast();
   const fieldId = useId();
@@ -364,6 +366,7 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
         {/* The head line's one row: the target and Steer's state, then the sends, which wrap under the target where the row is
             too short for both, 14 px apart, so the target's 12 px catch under a finger stays clear of them. */}
         <div data-companion-draft-head="" className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-3.5">
+          {lead}
           <div onClick={openField} className="flex min-w-0 flex-[1_1_12rem] cursor-text items-baseline gap-2 text-sm">
             {targetWords}
             {working}

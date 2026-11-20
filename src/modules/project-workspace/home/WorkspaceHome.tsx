@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCurrentApplication } from '@/modules/app-switcher';
-import { AccountWeekRing } from '@/modules/accounts';
-import { CompanionFace, useCompanion } from '@/modules/companion';
+import { CompanionCore, useCompanion } from '@/modules/companion';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
 import { RoadmapCircle } from '@/modules/roadmap';
@@ -39,8 +38,9 @@ type WorkspaceHomeProps = {
  *
  * - A CHAT, pressed, is brought forward in the workspace (`openChatInWorkspace`, the door Kaylee's own order to open a chat goes through). New chat is the
  *   workspace's new-chat screen; a chat closed or deleted here is let go of by the workspace as if its own list had removed it.
- * - KAYLEE'S CORE, docked at the foot on the start side, live as it is everywhere (`CompanionFace`): a press opens the station.
- *   Round it, the account's week as a hairline (`AccountWeekRing`): a press on that band opens the account switcher.
+ * - KAYLEE'S CORE, docked at the foot on the start side, live as it is everywhere and drawn as a chat's core is (`CompanionCore`): the
+ *   body with her conversation's context and the account's week as two rings on it. A press on the core opens the station; a press
+ *   on the outer ring's band opens the account switcher.
  * - THE MENU, at the head on the end side, is the one way to every other place (`PlacesMenu`): the screens, the station, Settings and the applications'
  *   acts. It is the same menu the chat's head and the station carry, so the way out of any page is in one place.
  * - THE ROADMAP'S CIRCLE, at the head on the start side, over Kaylee's core: small until pressed, then the whole stack over the home (`RoadmapCircle`,
@@ -101,25 +101,19 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
 
       {/* At a desk the foot is taller for the larger core, which keeps its middle under the roadmap's circle (66 px in). */}
       <footer className="flex h-[84px] flex-none items-center justify-between px-3 pb-[var(--safe-area-inset-bottom)] md:h-[100px] md:pl-7 md:pr-11">
-        {/* The core's own box: the account's week is a ring centred on it, under the core's press, so only the band outside the core
-            reaches it and opens the account switcher. */}
-        <span className="relative grid flex-none place-items-center" style={{ width: coreSize, height: coreSize }}>
-          <AccountWeekRing radius={coreSize / 2 + 4} />
-          <button
-            type="button"
-            data-home-core
-            aria-label={t('home.station', { name: companionName })}
-            title={t('home.station', { name: companionName })}
-            onClick={() => {
-              // The roadmap goes with the reader: the station's stack arrives from this page's circle.
-              doors.markRoadmapTravel('station');
-              openStation(doors.navigate);
-            }}
-            className="relative grid size-full place-items-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
-          >
-            <CompanionFace size={coreSize} />
-          </button>
-        </span>
+        {/* The inner ring is a reading here (the conversation is the station's): the core's press takes its band, and only the outer
+            ring's band, outside it, opens the account switcher. */}
+        <CompanionCore
+          size={coreSize}
+          label={t('home.station', { name: companionName })}
+          onPress={() => {
+            // The roadmap goes with the reader: the station's stack arrives from this page's circle.
+            doors.markRoadmapTravel('station');
+            openStation(doors.navigate);
+          }}
+          layered={!isMobile}
+          pressMarks={{ 'data-home-core': '' }}
+        />
       </footer>
 
       <RoadmapCircle rest={circle} returns={returns} />

@@ -854,3 +854,12 @@ export function coreGaugeScale(bodyRadius: number): number {
 export function coreGaugeRadius(bodyRadius: number, index: 0 | 1): number {
   return bodyRadius + CORE_GAUGE_GAPS[index] * (1 + 0.5 * (coreGaugeScale(bodyRadius) - 1));
 }
+
+/**
+ * The colour a lone core's context ring takes for how full its context is (`filled`, 0 to 1): quiet, then the warn ink from 80% (nearly
+ * full), then red from 95% (the next turn may not fit, or the companion is about to start fresh). One rule for every core that wears a
+ * context, read by the chat's core (`chat/composer/ChatCore`) and the companion's (`companion/CompanionCore`).
+ */
+export function coreContextTone(filled: number): 'quiet' | 'warn' | 'danger' {
+  return filled >= 0.95 ? 'danger' : filled >= 0.8 ? 'warn' : 'quiet';
+}

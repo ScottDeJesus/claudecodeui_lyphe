@@ -3,6 +3,7 @@ import type { CompanionLogRow, CompanionNoteRow, CompanionStateRow, CompanionWor
 import { sendToUser } from '@/modules/websocket/index.js';
 import type {
   CompanionAttachment,
+  CompanionContext,
   CompanionDraft,
   CompanionDraftTarget,
   CompanionFrame,
@@ -74,6 +75,8 @@ export type CompanionStoredState = {
   pending: CompanionStoredPending | null;
   walk: CompanionWalk | null;
   floor: string | null;
+  /** How full the conversation in `providerSessionId` was at her CLI's last count; `null` before its first count, and with no conversation. */
+  context: CompanionContext | null;
 };
 
 /** A draft as a caller hands it over: the store stamps `updatedAt`. Consumed by `companion.service.ts`, which writes the draft for the routes and her tools. */
@@ -125,8 +128,13 @@ export type CompanionEmittedFrame = Extract<
  */
 export type CompanionStore = {
   readState(): CompanionStoredState;
-  /** Her CLI conversation with the shape of her tools and prompt it began with, written together (`null`, `null` after Clear). No frame: a page has no use for it. */
+  /**
+   * Her CLI conversation with the shape of her tools and prompt it began with, written together (`null`, `null` after Clear). No frame of its
+   * own: a page has no use for it. A conversation let go of (`null`) takes its count with it, and `companion_context` with `null` says so.
+   */
   setProviderSession(providerSessionId: string | null, sessionShape: string | null): void;
+  /** How full her conversation is at her CLI's newest count (`session/companion-closing.ts`). `companion_context`, only when the count moved. */
+  setContext(context: CompanionContext): void;
   /** The handover her last refused resume left for her first message after the fresh start (`session/companion-handover.ts`), or `null` for none. No frame. */
   readHandover(): string | null;
   /** Stores the handover, or `null` to empty it (the launch that was handed the message that carried it is up, Clear). Kept on the row so a crash, or a launch that fails before `init`, does not lose it. No frame. */
@@ -201,6 +209,9 @@ const isDraft = (value: unknown): value is CompanionDraft =>
 
 const isWholeNumber = isWholeFrom(0);
 
+const isContext = (value: unknown): value is CompanionContext =>
+  isRecord(value) && isWholeNumber(value.used) && isWholeFrom(1)(value.closesAt);
+
 const isWalk = (value: unknown): value is CompanionWalk =>
   isRecord(value)
   && isSessionRef(value.session)
@@ -243,6 +254,7 @@ function toStoredState(userId: number, row: CompanionStateRow | null): Companion
     pending: readJsonColumn(userId, 'pending_json', row?.pending_json ?? null, isStoredPending),
     walk: readJsonColumn(userId, 'walk_json', row?.walk_json ?? null, isWalk),
     floor: row?.floor ?? null,
+    context: readJsonColumn(userId, 'context_json', row?.context_json ?? null, isContext),
   };
 }
 
@@ -319,8 +331,21 @@ export function createCompanionStore(userId: number): CompanionStore {
     readState: () => toStoredState(userId, companionDb.readState(userId)),
 
     setProviderSession(providerSessionId, sessionShape) {
-      // One statement: an id never stands with another conversation's shape.
-      companionDb.writeState(userId, { provider_session_id: providerSessionId, session_shape: sessionShape });
+      // One statement: an id never stands with another conversation's shape, nor a conversation let go of with its count.
+      if (providerSessionId !== null) {
+        companionDb.writeState(userId, { provider_session_id: providerSessionId, session_shape: sessionShape });
+        return;
+      }
+      const counted = companionDb.readState(userId)?.context_json != null;
+      companionDb.writeState(userId, { provider_session_id: null, session_shape: sessionShape, context_json: null });
+      if (counted) send({ kind: 'companion_context', context: null });
+    },
+
+    setContext(context) {
+      const before = readJsonColumn(userId, 'context_json', companionDb.readState(userId)?.context_json ?? null, isContext);
+      if (before !== null && before.used === context.used && before.closesAt === context.closesAt) return;
+      companionDb.writeState(userId, { context_json: JSON.stringify(context) });
+      send({ kind: 'companion_context', context });
     },
 
     readHandover: () => companionDb.readState(userId)?.handover ?? null,

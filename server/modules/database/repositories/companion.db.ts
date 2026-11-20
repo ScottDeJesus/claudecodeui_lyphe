@@ -42,6 +42,8 @@ export type CompanionStateRow = {
   session_shape: string | null;
   /** The handover of the conversation her last refused resume dropped (`companion/session/companion-handover.ts`); the first message after the fresh start carries it once, and the row is emptied when the launch that was handed that message reports `init`. NULL for none. */
   handover: string | null;
+  /** How full that conversation was at her CLI's last count, `CompanionContext` as JSON text; nulled with `provider_session_id` and by Clear. NULL before the first count. */
+  context_json: string | null;
   /** `CompanionSessionRef` as JSON text, or NULL. */
   focus_json: string | null;
   /** `CompanionDraft` as JSON text, or NULL. */
@@ -144,7 +146,7 @@ export type CompanionClearResult = {
 };
 
 /** Every state column the table holds besides the key: what a read returns and `writeState` may name. */
-const STATE_PATCH_COLUMNS = ['provider_session_id', 'session_shape', 'handover', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line', 'face_id', 'face_pending_id', 'face_error', 'avatar'] as const;
+const STATE_PATCH_COLUMNS = ['provider_session_id', 'session_shape', 'handover', 'context_json', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line', 'face_id', 'face_pending_id', 'face_error', 'avatar'] as const;
 
 const STATE_COLUMNS = `user_id, ${STATE_PATCH_COLUMNS.join(', ')}, updated_at`;
 const LOG_COLUMNS = 'id, user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json, attachments_json';
@@ -401,7 +403,7 @@ export const companionDb = {
   },
 
   /**
-   * Clear: deletes the account's log and its UNPINNED cards — a pinned card is his keep and survives it — and empties its state's conversation (its id, shape and handover), focus, draft,
+   * Clear: deletes the account's log and its UNPINNED cards — a pinned card is his keep and survives it — and empties its state's conversation (its id, shape, handover and how full it was), focus, draft,
    * pending action, unanswered messages and walkthrough — in one transaction. `floor` stays (which client holds the floor
    * is no part of her conversation), and so do her face columns (Clear wipes her memory, not her look), and so does `memory_forget_line`: log ids are AUTOINCREMENT and never reused, so the id of the line
    * the last forget of her memory used stays a true lower bound after the log it named is gone, and a line he says next always has a
@@ -427,7 +429,7 @@ export const companionDb = {
         db
           .prepare(
             `UPDATE companion_state
-             SET provider_session_id = NULL, session_shape = NULL, handover = NULL, focus_json = NULL, draft_json = NULL, walk_json = NULL, pending_json = NULL, unanswered_json = NULL, updated_at = ?
+             SET provider_session_id = NULL, session_shape = NULL, handover = NULL, context_json = NULL, focus_json = NULL, draft_json = NULL, walk_json = NULL, pending_json = NULL, unanswered_json = NULL, updated_at = ?
              WHERE user_id = ?`
           )
           .run(clearedAt, userId).changes > 0;

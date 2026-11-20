@@ -3,37 +3,44 @@ import { useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AccountWeekRing } from '@/modules/accounts';
-import { CompanionControls, CompanionFace, CompanionStatus, CompanionStopButton, useCompanion, useCompanionPresence } from '@/modules/companion';
+import { CompanionControls, CompanionCore, CompanionStatus, CompanionStopButton, useCompanion, useCompanionPresence } from '@/modules/companion';
 import { PlacesMenu } from '@/modules/project-workspace';
 import { SessionsHalo } from '@/modules/sidebar';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
 import { useNeedsCount } from '@/modules/station/context/StationNeedsContext';
 import { StationArrival } from '@/modules/station/StationArrival';
 import { StationConversationView } from '@/modules/station/StationConversation';
+import { StationDraftAlert } from '@/modules/station/StationDraftAlert';
 import { StationPortraitWords } from '@/modules/station/StationPortrait';
 import { StationTalk } from '@/modules/station/StationTalk';
 import { useStation } from '@/modules/station/context/StationContext';
 import type { CompanionLogEntry, CompanionPicture } from '@/shared/companion-types';
+import { CORE_BODY_SHARE } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { CompanionEars, CompanionPresence, CompanionSentenceRef } from '@/shared/types';
 import { Button, buttonVariants, Menu, Sheet } from '@/shared/ui';
-import { cn } from '@/shared/utils';
+import { cn, coreGaugeRadius } from '@/shared/utils';
 
 /** The square the companion's core is drawn in, in px: in the halo's middle, and alone as the mark at the head of one column. */
 const CORE_PX: Record<StationKayleeForm, number> = { beside: 64, under: 64, mark: 48 };
 
 /**
  * The same square at a desk, where the halo has the room for a larger core: in a halo of the usual width, and in the wide one the
- * companion's column carries on a wide screen (from `WIDE_HALO_PX`). The account's week, a ring just outside the square, still
- * stands inside the hoop's opening at each. A phone keeps `CORE_PX`.
+ * companion's column carries on a wide screen (from `WIDE_HALO_PX`). Its two rings, on its body, stand inside the hoop's opening at
+ * each. A phone keeps `CORE_PX`.
  */
 const CORE_AT_DESK_PX = 96;
 const CORE_IN_WIDE_HALO_PX = 112;
 const WIDE_HALO_PX = 360;
 
-/** How far outside the core's edge the account's week is drawn, in px. */
-const WEEK_GAP = 4;
+/** How far outside the core's outer ring its pointer stands, in px: clear of the ring's press. */
+const TURN_GAP = 10;
+
+/**
+ * How far the halo leans toward the reader at a desk: less than its own lean, so its opening has the room for the core's two rings and
+ * the bead of a draft on its orbit. A phone keeps the halo's own lean, round its smaller core.
+ */
+const HALO_LEAN_AT_DESK = 0.62;
 
 /** How long the core keeps its pointer on the panel after the companion places a thing there, in ms: as long as its mark stands. */
 const PLACING_LOOK_MS = 1900;
@@ -68,15 +75,12 @@ type StationKayleeViewProps = {
   presence: CompanionPresence;
   /** The side of the core's square, in px, where the page gives it a larger one than the form's own (a desk); absent, the form's own. */
   corePx?: number;
-  /** The core at the square it is drawn in, in px: `CompanionFace` on the page, `CompanionAvatar` on a fixture's presence. */
-  face: (px: number) => ReactNode;
-  /** The core, pressed: the way back to the sessions home. */
-  onHome: () => void;
   /**
-   * The account's week as a ring round the core, at the radius it is given in px (`AccountWeekRing` on the page): its band opens the
-   * account switcher. Absent on a fixture, which draws the core alone.
+   * The core at the square it is drawn in, in px, with its presses (`CompanionCore` on the page: the body the way back to the sessions
+   * home, the inner ring her conversation, the outer the accounts; a fixture's own drawing). `openConversation` opens the sheet the
+   * conversation press by the name opens, for the inner ring.
    */
-  week?: (radius: number) => ReactNode;
+  core: (px: number, openConversation: () => void) => ReactNode;
   /**
    * Which way the core is turned while the companion has just put a thing on the panel: the panel's bearing from the core in
    * degrees (0 to the end side, clockwise), drawn as a pointer just outside the core for as long as the panel wears the companion's
@@ -124,8 +128,11 @@ function clockOf(stamp: string): string {
  * THE COMPANION ON THE STATION'S SCENE: the core in its halo, the name with its few presses, and two lines. It is what the station is for
  * and the one thing that is always there; everything else on the scene is the panel, the roadmap and the box to type in.
  *
- * - THE CORE is the companion's own drawing, live as everywhere. It is a press: the way back to the sessions home. Round it stands THE
- *   HALO (`halo`), every chat a slot on a hoop; the slot at the front is read out under it, and pressed, opens its chat.
+ * - THE CORE is the companion's own drawing, live as everywhere, drawn as a chat's core is (`CompanionCore`): the body alone, with her
+ *   conversation's context and the account's week as two rings on it. The body is a press, the way back to the sessions home; at a desk
+ *   the inner ring opens her conversation and the outer the accounts. While she holds a draft for your Send, it waits as a bead on the
+ *   core's orbit and opens beside the core when pressed (`StationDraftAlert`). Round it stands THE HALO (`halo`), every chat a slot on a
+ *   hoop; the slot at the front is read out under it, and pressed, opens its chat.
  * - BY THE NAME, four presses, each a mark: the conversation, which opens the whole log in a sheet (it is not on the scene: the last
  *   line each way is what is usually wanted); the speaker, which says the latest answer again, for a reader who was out of the room;
  *   the ears, lit while they listen for the name; and the controls (the model, Live, the voice, Clear), the kit `Menu` whose panel
@@ -145,7 +152,7 @@ function clockOf(stamp: string): string {
  * `data-station-kaylee` reads the form. A pure view: `StationKaylee` below binds it.
  */
 export function StationKayleeView({
-  form, halo, name, presence, face, corePx, onHome, week, turnedTo = null, picture, speaking, controls, menu, stop, ears, onSayAgain, failedSentence, running, waiting, transcript,
+  form, halo, name, presence, core: drawCore, corePx, turnedTo = null, picture, speaking, controls, menu, stop, ears, onSayAgain, failedSentence, running, waiting, transcript,
 }: StationKayleeViewProps) {
   const { t } = useTranslation();
   const nameId = useId();
@@ -164,29 +171,20 @@ export function StationKayleeView({
     waiting !== null && waiting > 0 ? t('station.kaylee.waiting', { count: waiting }) : null,
   ].filter(Boolean).join(' · ');
   const px = corePx ?? CORE_PX[form];
+  // Its pointer stands just outside its outer ring, which the core measures from its body (`CompanionCore`).
+  const turnAt = Math.round(coreGaugeRadius(px * CORE_BODY_SHARE, 1)) + TURN_GAP;
   const core = (
-    // The core's own box: the account's week is centred on it, under the core's press, so only the band outside the core reaches it.
     <span className="relative grid shrink-0 place-items-center" style={{ width: px, height: px }}>
-      {week?.(px / 2 + WEEK_GAP)}
       {turnedTo !== null && (
-        // The instrument's own pointer, drawn outside the core's square, where a core this small has no room for it.
+        // The instrument's own pointer, drawn outside the core's rings, turned to what the companion just placed.
         <span
           aria-hidden="true"
           data-station-kaylee-turn={Math.round(turnedTo)}
           className="station-turn"
-          style={{ transform: `rotate(${turnedTo}deg) translateX(${px / 2 + 13}px)` }}
+          style={{ transform: `rotate(${turnedTo}deg) translateX(${turnAt}px)` }}
         />
       )}
-      <button
-        type="button"
-        data-station-kaylee-core=""
-        aria-label={t('station.kaylee.home')}
-        title={t('station.kaylee.home')}
-        onClick={onHome}
-        className="relative grid size-full place-items-center rounded-full outline-none transition-transform hover:scale-[1.04] focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
-      >
-        {face(px)}
-      </button>
+      {drawCore(px, () => setTranscriptOpen(true))}
     </span>
   );
 
@@ -323,6 +321,8 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
   const { setFocus, scrollMemory, placed, tier, phone } = useStation();
   // At a desk the core is larger, by the room its halo has; the mark at a column's head and a phone keep the form's own size.
   const corePx = form === 'mark' || phone ? CORE_PX[form] : haloWidth >= WIDE_HALO_PX ? CORE_IN_WIDE_HALO_PX : CORE_AT_DESK_PX;
+  // The core's outer ring, which a line to a chat's slot starts clear of.
+  const ringRadius = Math.round(coreGaugeRadius(corePx * CORE_BODY_SHARE, 1));
   const doors = useStationDoors();
   // The panel's bearing from the core, in degrees, while the companion has just placed a thing on it: the core's pointer stands
   // there for as long as its mark does (`PLACING_LOOK_MS`), then lets go. State, because the view draws from it; null otherwise.
@@ -366,11 +366,12 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
         <SessionsHalo
           enabled
           width={haloWidth}
+          lean={phone ? undefined : HALO_LEAN_AT_DESK}
           // A halo standing small, over the lines, writes no folder's name round itself.
           names={form === 'beside'}
           reading
           link={dealt}
-          coreRadius={corePx / 2}
+          coreRadius={ringRadius + 4}
           onOpenChat={(sessionId) => doors.openChatInWorkspace(sessionId)}
         >
           {core}
@@ -378,10 +379,19 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
       )}
       name={name}
       presence={presence}
-      face={(px) => <CompanionFace size={px} />}
-      onHome={onHome}
+      core={(px, openConversation) => (
+        <CompanionCore
+          size={px}
+          label={t('station.kaylee.home')}
+          onPress={onHome}
+          // Each ring a press of its own at a desk; on a phone and as the small mark the whole core is the way home.
+          layered={!phone && form !== 'mark'}
+          context={{ label: t('companion.log.label', { name }), onPress: openConversation }}
+          pressMarks={{ 'data-station-kaylee-core': '' }}
+          around={(outerRadius) => <StationDraftAlert ringRadius={outerRadius} still={form === 'mark'} />}
+        />
+      )}
       turnedTo={turnedTo}
-      week={(radius) => <AccountWeekRing radius={radius} />}
       picture={picture}
       speaking={voice.speaking}
       menu={<PlacesMenu here="station" triggerClassName={NAME_PRESS} />}

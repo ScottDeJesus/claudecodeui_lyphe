@@ -26,6 +26,7 @@ import { createToolDeps } from './tools/tool-deps.js';
  *   - a turn's start → the speech cache's new current turn, then `companion_turn`; its end → `companion_turn`;
  *   - her activity → `companion_activity`, and it is held here so the picture can say it;
  *   - her process's condition → `companion_process`;
+ *   - her CLI's count of the live conversation → her row and `companion_context`;
  *   - a line of the system's → a `system` log line.
  * And the readers a message is assembled from at push time: his settings, her focus, draft and walk, the roster,
  * what is on his screen and the sounds she may make (the voice settings' sound-tag list).
@@ -157,6 +158,8 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     onTurnInFlight: (inFlight) => restartHold.kayleeTurn(userId, inFlight),
     onHisWords: () => restartHold.spokenToKaylee(),
     onProcess: (process) => store.emit({ kind: 'companion_process', process }),
+    // How full her conversation is: kept on her row (a restart keeps it) and told to the pages; let go of with the conversation (`setProviderSession`).
+    onContext: (context) => store.setContext(context),
     onSystemLine: (text) => {
       store.appendLog({ role: 'system', text });
     },

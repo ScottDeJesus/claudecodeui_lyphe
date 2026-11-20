@@ -21,8 +21,9 @@ export { CompanionDraftCard } from '@/modules/companion/CompanionDraftCard';
 // The pieces the station composes, each defined with its consumers named:
 // the one state of hers (MAN-9089): this module's panel, button and face read it, and the station's head reads it for its status line.
 export { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
-// her face bound to the provider: the sessions home's docked core and the station's.
-export { CompanionFace } from '@/modules/companion/CompanionFace';
+// her core as a chat's is drawn, the body with her conversation's context and the account's week as two rings round it, each with its
+// press: the sessions home's docked core and the station's core in its halo.
+export { CompanionCore } from '@/modules/companion/CompanionCore';
 // her state in words with its dot: this module's panel header (CompanionHeader), and the station's head.
 export { CompanionStatus } from '@/modules/companion/CompanionStatus';
 // her controls (Stop, model, Live, Clear, this device's voice and ears): this module's panel header (CompanionHeader), and the station's head.

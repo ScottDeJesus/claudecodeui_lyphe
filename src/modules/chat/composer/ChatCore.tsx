@@ -18,7 +18,7 @@ import { resolveModelLabel, resolveModelOption } from '@/shared/modelLabels';
 import type { AstrolabeGauge, ProviderModelOption } from '@/shared/types';
 import { SignalLoop } from '@/shared/ui';
 import { OWNS_ESCAPE, overlayInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
-import { cn, coreGaugeRadius } from '@/shared/utils';
+import { cn, coreContextTone, coreGaugeRadius } from '@/shared/utils';
 
 /** The side of the square the chat's core is drawn in, in px: the size of the companion's own core docked on the sessions home. */
 const CORE_PX = 56;
@@ -37,13 +37,6 @@ const CORE_APART_MAX_PX = 128;
 
 /** The disc the rings open in round a core that stands apart: its side at most, in px. Wider than the docked one's, for the larger core. */
 const DISC_APART_PX = 300;
-
-
-/** From this share of the context window the ring takes the warn ink: the window is nearly full. */
-const CONTEXT_WARN = 0.8;
-
-/** From this share its ring is red: the window is all but full, and the next turn may not fit. */
-const CONTEXT_DANGER = 0.95;
 
 /** The disc the rings open in: its side at most, its side at least, and the air it keeps from the chat column's edges, in px. */
 const DISC_PX = 250;
@@ -293,7 +286,7 @@ export function ChatCore({
   const contextLabel = t('core.context', { defaultValue: 'Context · {{percent}}% used', percent: Math.round(filled * 100) });
   const week = useAccountWeek();
   const gauges = useMemo<AstrolabeGauge[]>(() => [
-    { value: context === null ? null : filled, tone: filled >= CONTEXT_DANGER ? 'danger' : filled >= CONTEXT_WARN ? 'warn' : 'quiet' },
+    { value: context === null ? null : filled, tone: coreContextTone(filled) },
     { value: week.percent === null ? null : Math.min(100, Math.max(0, week.percent)) / 100, tone: week.tone },
   ], [context, filled, week.percent, week.tone]);
 
@@ -361,7 +354,7 @@ export function ChatCore({
                 : <SignalLoop state={state === 'idle' || state === 'waiting' ? 'idle' : 'thinking'} size={28} />}
             </span>
             {/* The context's reading, for a script and a style: the ring itself is the core's own drawing, in orbit round it. */}
-            {context !== null && <span hidden data-chat-core-context={Math.round(filled * 100)} data-tone={filled >= CONTEXT_DANGER ? 'danger' : filled >= CONTEXT_WARN ? 'warn' : undefined} />}
+            {context !== null && <span hidden data-chat-core-context={Math.round(filled * 100)} data-tone={coreContextTone(filled) === 'quiet' ? undefined : coreContextTone(filled)} />}
           </button>
         </div>
       </div>

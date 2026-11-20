@@ -1,6 +1,6 @@
 import type { SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 
-import type { CompanionAttachment, CompanionModel, CompanionProcess } from '@/shared/companion-types.js';
+import type { CompanionAttachment, CompanionContext, CompanionModel, CompanionProcess } from '@/shared/companion-types.js';
 import type { ClaudeImageBlock } from '@/shared/image-attachments.js';
 
 import type { UnansweredMessage } from '../companion-unanswered.js';
@@ -49,6 +49,8 @@ export type CompanionSessionDeps = MessageReaders &
     /** True for a session born beside a predecessor that still answers (a handover boot): every push is held until the takeover's `resendUnanswered` (`companion-restart.ts`). Absent is false. */
     awaitingTakeover?: boolean;
     onProcess(process: CompanionProcess): void;
+    /** Her CLI counted the live conversation (`companion-closing.ts`): how full it is, which her core wears. A stand-in may leave it out. */
+    onContext?(context: CompanionContext): void;
     onSystemLine(text: string): void;
     /** A turn of hers is in flight or is not, her last turn included (which `onTurnStarted` and `onTurnEnded` keep from the page). The house holds a dev-server restart while one runs. A stand-in may leave it out. */
     onTurnInFlight?(inFlight: boolean): void;

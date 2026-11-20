@@ -1,21 +1,21 @@
+import { fallbackClaudeContextWindow } from '@/modules/providers/services/provider-token-usage.service.js';
 import type { AnyRecord } from '@/shared/types.js';
 
 import { contextWindowFor } from './claude-compaction-seams.js';
 
-/** The window a budget falls back to when the SDK has reported none and CONTEXT_WINDOW is unset. */
-const DEFAULT_CONTEXT_WINDOW = 160_000;
-
 /**
- * The window a budget is measured against: the one the SDK reported for the session's model when
- * known, else the server-wide CONTEXT_WINDOW setting (a fallback only).
+ * The window a budget is measured against: the one known for the session (the SDK's report, kept across
+ * restarts, or the 1M window its model names: `getReportedClaudeContextWindow`), else the fallback for a
+ * conversation holding `used` tokens (`fallbackClaudeContextWindow`: CONTEXT_WINDOW, or the 1M window once
+ * the conversation holds more than a standard one).
  *
  * Used by claude-runtime.provider.js for every `token_budget` it publishes.
  */
-export function resolveContextWindow(reportedContextWindow: number | null | undefined): number {
+export function resolveContextWindow(reportedContextWindow: number | null | undefined, used = 0): number {
   if (typeof reportedContextWindow === 'number' && Number.isFinite(reportedContextWindow) && reportedContextWindow > 0) {
     return reportedContextWindow;
   }
-  return Number.parseInt(process.env.CONTEXT_WINDOW ?? '', 10) || DEFAULT_CONTEXT_WINDOW;
+  return fallbackClaudeContextWindow(used);
 }
 
 /**

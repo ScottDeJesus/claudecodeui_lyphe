@@ -1,10 +1,9 @@
-import type { ComponentProps, MouseEvent, PointerEvent, SyntheticEvent } from 'react';
+import type { ComponentProps, MouseEvent, PointerEvent, ReactNode, SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionDraftCard, useCompanion } from '@/modules/companion';
 import { useStation } from '@/modules/station/context/StationContext';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
-import { StationArrival } from '@/modules/station/StationArrival';
 import type { CompanionDraft } from '@/shared/companion-types';
 import type { StationDensity, StationRegionProps, StationTier } from '@/shared/types';
 import { EmptyState, keepFieldFocus, keepFieldFocusWhileDisabled } from '@/shared/ui';
@@ -14,13 +13,15 @@ import { cn } from '@/shared/utils';
 type DraftCardProps = ComponentProps<typeof CompanionDraftCard>;
 
 type StationDockViewProps = {
-  /**
-   * The window's tier. Held over the box, the draft takes at most 36% of the window's height; at the `narrow` tier (a tablet, a
-   * phone) it holds itself to the frame that ends above the on-screen keyboard instead (`NARROW_FRAME_HOLD`).
-   */
+  /** The window's tier: in the section's form, at the `narrow` tier (a tablet, a phone) the dock holds itself to the frame that ends above the on-screen keyboard (`NARROW_FRAME_HOLD`). */
   tier: StationTier;
-  /** `full` (the scene, at every width): the held form, drawn only while a draft stands. `compact`: a section's form, with its quiet line when empty. */
+  /**
+   * `full` (the scene, at every width): the card alone, drawn only while a draft stands, in the box that opens it beside her core
+   * (`StationDraftAlert`), which gives it its room. `compact`: a section's form, with its quiet line when empty.
+   */
   density: StationDensity;
+  /** A press at the head line's start: the open card's back arrow (`StationDraftAlert`). */
+  lead?: ReactNode;
   /** The draft as the companion's picture holds it, or null while it holds none. */
   draft: CompanionDraft | null;
   /** Her name, for the card's words that say she changed the draft. */
@@ -50,9 +51,6 @@ type StationDockViewProps = {
  * never a fixed or absolute box of its own.
  */
 const NARROW_FRAME_HOLD = 'max-h-[calc((100dvh-var(--keyboard-height,0px))*0.6)]';
-
-/** The held draft's cap in the scene: at most 36% of the window's height, so the work above it keeps the most of it. */
-const HELD_CAP = 'max-h-[36vh]';
 
 /** The cap at compact: in the section at most 45% of it (the section's own rule), and at the narrow tier the keyboard's hold. */
 const COMPACT_CAP: Record<StationTier, string> = { wide: '', laptop: '', narrow: NARROW_FRAME_HOLD };
@@ -95,10 +93,9 @@ function keepFieldFocusInDockWhileDisabled(event: PointerEvent<HTMLElement>) {
 /**
  * THE DRAFT DOCK: the brief the companion composed for a chat, held out for your Send.
  *
- * - IN THE SCENE (full density, wide and laptop) it is HELD: drawn only while a draft stands, the card floating at the center's
- *   foot over the dock (the companion and the talk control), and it arrives from the dock on the spring and settles back into it
- *   when the draft is sent or cleared (`StationArrival`; the shell's held row opens and closes with it, so the work above moves
- *   with it and never jumps). With no draft there is nothing here at all: no line saying where a draft would go.
+ * - IN THE SCENE (full density, every width) it is the card alone, drawn only while a draft stands, inside the box that opens it
+ *   beside her core when its bead is pressed (`StationDraftAlert`): the box gives it its room, and the card gives way inside it.
+ *   With no draft there is nothing here at all: no line saying where a draft would go.
  * - AT COMPACT DENSITY (the one-column Conversation section) it is the section's: with a draft, the card; without one, one quiet
  *   line in the muted ink ("When Kaylee drafts a brief for a session, it waits here for your Send"), so the section keeps its room
  *   as drafts come and go.
@@ -109,7 +106,7 @@ function keepFieldFocusInDockWhileDisabled(event: PointerEvent<HTMLElement>) {
  * and the sends with Clear in one row at its head, a refusal under it, the field under all of it; the target's name is a press
  * (`onTargetPress`), "Show <chat> on the stage". Nothing of the brief is drawn twice.
  *
- * THE ROOM: held, at most 36% of the window's height, the card's field giving way inside it; in the section at most 45%
+ * THE ROOM: in the scene, the box it opens in, the card's field giving way inside it; in the section at most 45%
  * of it, its field keeping its 44px catch under a finger, and while you edit the brief the dock stands whole in the frame above the
  * keyboard (`NARROW_FRAME_HOLD`, the section's lifted cap, and `keepFieldFocusInDock` and `keepFieldFocusInDockWhileDisabled`
  * holding that through a press, a disabled Send's included). Under a finger every press of the card is a 44px catch.
@@ -117,7 +114,7 @@ function keepFieldFocusInDockWhileDisabled(event: PointerEvent<HTMLElement>) {
  * `data-station-dock` reads the state: `empty`, `session` or `new`. A pure view: `StationDock` below binds it, and the fixtures
  * draw it on their pictures (`fake/dock.ts`).
  */
-export function StationDockView({ tier, density, draft, name, targetWorking, onEdit, onSend, onClear, onTargetPress, scrollRef }: StationDockViewProps) {
+export function StationDockView({ tier, density, lead, draft, name, targetWorking, onEdit, onSend, onClear, onTargetPress, scrollRef }: StationDockViewProps) {
   const { t } = useTranslation();
   const label = t('station.dock.label', { name, defaultValue: '{{name}}’s draft' });
   const held = density === 'full';
@@ -132,6 +129,7 @@ export function StationDockView({ tier, density, draft, name, targetWorking, onE
         // The dock is drawn whenever it stands, so the field is always measured.
         visible
         headLine
+        lead={lead}
         onEdit={onEdit}
         onSend={onSend}
         onClear={onClear}
@@ -141,22 +139,19 @@ export function StationDockView({ tier, density, draft, name, targetWorking, onE
   );
 
   if (held) {
+    if (card === null) return null;
     return (
-      <StationArrival when={draft !== null} from="dock">
-        {/* Clear of the work above and of the dock below; the card floats (the scene's one floating shadow). */}
-        <div className="px-4 pb-4 pt-3">
-          <section
-            ref={scrollRef}
-            aria-label={label}
-            data-station-dock={draft === null ? 'empty' : draft.target.kind}
-            onMouseDown={keepFieldFocusInDock}
-            onPointerDown={keepFieldFocusInDockWhileDisabled}
-            className={cn('mx-auto flex w-full min-w-0 max-w-2xl flex-col [&_[data-companion-draft]]:shadow-[var(--shadow-overlay)]', tier === 'narrow' ? NARROW_FRAME_HOLD : HELD_CAP)}
-          >
-            {card}
-          </section>
-        </div>
-      </StationArrival>
+      // The card floats over the station, so it wears the one floating shadow; the box it opens in caps its height.
+      <section
+        ref={scrollRef}
+        aria-label={label}
+        data-station-dock={draft === null ? 'empty' : draft.target.kind}
+        onMouseDown={keepFieldFocusInDock}
+        onPointerDown={keepFieldFocusInDockWhileDisabled}
+        className="flex min-h-0 w-full min-w-0 flex-col [&_[data-companion-draft]]:shadow-[var(--shadow-overlay)]"
+      >
+        {card}
+      </section>
     );
   }
 
@@ -177,13 +172,13 @@ export function StationDockView({ tier, density, draft, name, targetWorking, onE
 }
 
 /**
- * The draft dock on the page, mounted by `StationShell`, handed the window's tier. It reads the draft and
+ * The draft dock on the page, mounted by `StationDraftAlert` in the box that opens beside her core, handed the window's tier and the box's back arrow. It reads the draft and
  * its verbs from the companion's provider, the target's live state from the station's sessions (the rows the left rail draws, never a poll
  * of its own) and the stage's press and the scroll memory from the station, and hands them to `StationDockView`. It reads
  * nothing on a clock: a new draft, a cleared one and the target starting or ending a turn each arrive as her picture's frames
  * and the station's session events.
  */
-export function StationDock({ tier, density }: StationRegionProps) {
+export function StationDock({ tier, density, lead }: StationRegionProps & { lead?: ReactNode }) {
   const { t } = useTranslation();
   const { picture, editDraft, sendDraft, clearDraft } = useCompanion();
   // Null until the rail's first read answers; the target is then found among its rows by `sessionId`.
@@ -202,6 +197,7 @@ export function StationDock({ tier, density }: StationRegionProps) {
     <StationDockView
       tier={tier}
       density={density}
+      lead={lead}
       draft={draft}
       name={name}
       targetWorking={targetWorking}
