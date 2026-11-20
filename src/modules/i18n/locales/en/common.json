@@ -4767,6 +4767,10 @@
     "clearConfirm": "Clear the conversation",
     "clearRefused": "{{name}}'s conversation wasn't cleared",
     "cancel": "Cancel",
+    "core": {
+      "context": "Context · {{percent}}% used",
+      "contextUncounted": "Context · not counted yet"
+    },
     "log": {
       "label": "Conversation with {{name}}",
       "you": "You",

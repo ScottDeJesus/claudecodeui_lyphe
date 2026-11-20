@@ -1,6 +1,6 @@
 import '@/modules/station/stationScene.css';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +10,6 @@ import { useStation } from '@/modules/station/context/StationContext';
 import { useLivePending } from '@/modules/station/hooks/useLivePending';
 import { StationArrival } from '@/modules/station/StationArrival';
 import { stationArrangementOf } from '@/modules/station/stationArrangement';
-import { StationDock } from '@/modules/station/StationDock';
 import { StationKaylee } from '@/modules/station/StationKaylee';
 import type { StationKayleeForm } from '@/modules/station/StationKaylee';
 import { StationStage } from '@/modules/station/StationStage';
@@ -25,6 +24,13 @@ import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 
 /** The companion's column beside the panel, in px, where the screen has room for two columns: the panel keeps the rest, about two thirds. */
 const KAYLEE_COLUMN: Record<'wide' | 'laptop', number> = { wide: 420, laptop: 340 };
+
+/**
+ * The panel's track at most, in px: its words run to 1,100 px, as a chat's do at a desk, with the panel's padding, edge and the air at
+ * its end. Past it the companion's column and the panel stand as one block in the middle of the screen, so what is on the panel uses
+ * the panel's width rather than a strip of it.
+ */
+const STAGE_TRACK_MAX = 1152;
 
 /** Where the roadmap's circle rests while a thing is on the panel: the middle of the companion's column, over the halo. */
 const CIRCLE_TOP = 66;
@@ -49,8 +55,6 @@ type StationScenePieces = {
   circle: (rest: RoadmapStackRest) => ReactNode;
   /** The action the companion holds for your word, as its card on its arrival; nothing while none stands. */
   action: ReactNode;
-  /** The draft the companion holds for your Send, on its arrival (`StationDock` on the page). */
-  draft: ReactNode;
   /** The one box: the field, the plus that attaches, the talk press and send (`StationTalk`'s `box`). */
   talk: ReactNode;
 };
@@ -88,11 +92,13 @@ type StationShellViewProps = {
  *   screen), and the companion has the middle: the halo over the lines, or beside them with the phone on its side.
  * - WITH A THING ON THE PANEL, WIDE AND LAPTOP: two columns. The companion's own at the start (the halo, the name, the lines under
  *   it), the roadmap over it as its small circle (`circle`); the panel takes the rest, a surface of its own, arriving on the lock
- *   spring.
+ *   spring, up to `STAGE_TRACK_MAX`. Past that the two columns stand as one block in the middle of the screen, and what is on the
+ *   panel runs to the panel's width.
  * - WITH A THING ON THE PANEL, ONE COLUMN (below 1024 px, and a phone): the companion is a mark at the head, the core alone with
  *   the lines beside it, and the panel has the screen under it. The roadmap is not drawn.
- * - AT THE FOOT, on the box's measure: what the companion holds out for your word (the action waiting on your yes, then the draft
- *   waiting on your Send), each row opening to its piece's height as it arrives and closing as it settles; then the one box.
+ * - AT THE FOOT, on the box's measure: the action the companion holds out for your yes, its row opening to the card's height as it
+ *   arrives and closing as it settles; then the one box. The draft waiting on your Send takes no room here: it is a bead on the
+ *   companion's core, and opens beside the core when pressed (`StationDraftAlert`).
  *
  * The companion's cell and the stage's cell are the same two boxes in every case: only their places on the grid change
  * (`stationScene.css`, keyed on `data-station-scene` and `data-station-arrangement`), so neither is re-parented and each keeps its
@@ -108,8 +114,21 @@ export function StationShellView({ arrangement, sideways, staged, scene }: Stati
   const column = twoColumns ? KAYLEE_COLUMN[arrangement] : 0;
   const form: StationKayleeForm = staged ? (twoColumns ? 'under' : 'mark') : phone && !sideways ? 'under' : 'beside';
   const haloWidth = form === 'beside' ? (phone ? HALO_ON_PHONE : HALO_BESIDE) : twoColumns ? Math.min(column - 40, 380) : HALO_ON_PHONE;
+  // The scene's width, for where the two columns' block starts once the panel has reached its most and the block stands in the middle.
+  const sceneRef = useRef<HTMLDivElement>(null);
+  const [sceneWidth, setSceneWidth] = useState(0);
+  useLayoutEffect(() => {
+    const box = sceneRef.current;
+    if (box === null) return undefined;
+    const measure = () => setSceneWidth(Math.round(box.getBoundingClientRect().width));
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(box);
+    return () => observer?.disconnect();
+  }, []);
+  const blockStart = staged && twoColumns ? Math.max(0, Math.round((sceneWidth - column - STAGE_TRACK_MAX) / 2)) : 0;
   // The roadmap's small circle: over the companion's column beside the panel, and at a phone's head while the panel is empty.
-  const circle = staged ? (twoColumns ? { cx: column / 2, cy: CIRCLE_TOP, radius: CIRCLE_RADIUS } : null) : phone ? CIRCLE_ON_PHONE : null;
+  const circle = staged ? (twoColumns ? { cx: blockStart + column / 2, cy: CIRCLE_TOP, radius: CIRCLE_RADIUS } : null) : phone ? CIRCLE_ON_PHONE : null;
 
   return (
     <div
@@ -119,15 +138,14 @@ export function StationShellView({ arrangement, sideways, staged, scene }: Stati
       style={{ bottom: 'var(--keyboard-height, 0px)' }}
     >
       <main data-station-body="" className="flex min-h-0 flex-1 flex-col pb-[var(--safe-area-inset-bottom)]">
-        <div data-station-scene={staged ? 'staged' : 'rest'} className="relative flex min-h-0 flex-1 flex-col">
-          <div data-station-scene-grid="" className="grid min-h-0 flex-1" style={{ '--kaylee-col': `${column}px` } as CSSProperties}>
+        <div ref={sceneRef} data-station-scene={staged ? 'staged' : 'rest'} className="relative flex min-h-0 flex-1 flex-col">
+          <div data-station-scene-grid="" className="grid min-h-0 flex-1" style={{ '--kaylee-col': `${column}px`, '--stage-max': `${STAGE_TRACK_MAX}px` } as CSSProperties}>
             {!staged && !phone && <div data-station-road="" className="min-h-0 min-w-0">{scene.road}</div>}
             <div data-station-kaylee-cell="" className="flex min-h-0 min-w-0 flex-col">{scene.kaylee(form, haloWidth)}</div>
             <div data-station-stage-cell="" className="flex min-h-0 min-w-0 flex-col">{scene.stage}</div>
           </div>
           <div data-station-foot="" className="mx-auto w-full max-w-[720px] shrink-0">
             <div data-station-held="" data-station-slot="action" className="px-3">{scene.action}</div>
-            <div data-station-held="" data-station-slot="dock">{scene.draft}</div>
             <div data-station-slot="talk">{scene.talk}</div>
           </div>
           {circle !== null && scene.circle(circle)}
@@ -234,8 +252,6 @@ export function StationShell() {
         road: <RoadmapStanding arriveFrom={ROADMAP_CIRCLE_AT_DESK} arrivals={arrivals} />,
         circle: (rest) => <RoadmapCircle rest={rest} />,
         action: <StationHeldAction />,
-        // The held form at every width: the draft stands over the box, never in a section of its own.
-        draft: <StationDock tier={tier} density="full" />,
         talk: <StationTalk tier={tier} density="full" part="box" />,
       }}
     />

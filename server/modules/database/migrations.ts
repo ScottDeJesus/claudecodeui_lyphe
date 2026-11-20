@@ -779,6 +779,18 @@ const addCompanionHandoverColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `companion_state.context_json`: how full Kaylee's conversation was at her CLI's last count (`CompanionContext` as JSON), which her
+ * core wears as its inner ring. It sits on the row so a restart, which leaves her asleep, still shows the conversation she will resume;
+ * it is nulled with `provider_session_id` and by Clear. NULL for none, which is every row before this column: the ring then shows its
+ * track until her next count.
+ */
+const addCompanionContextColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'context_json', 'TEXT');
+};
+
+/**
  * Adds `companion_log.attachments_json`: the files he attached to a typed line, as the wire's `CompanionAttachment[]` JSON — each one's
  * upload-store path, his name for it, the size and type read from the stored file and what she can do with it (`opens`), decided once at
  * the door. The records only, never the bytes: the files stay in the upload store, and her reader opens exactly the files named on the
@@ -957,6 +969,7 @@ export const runMigrations = (db: Database) => {
     addCompanionUnansweredColumn(db);
     addCompanionSessionShapeColumn(db);
     addCompanionHandoverColumn(db);
+    addCompanionContextColumn(db);
     addCompanionActionArmedFromColumn(db);
     addCompanionNoteShapeColumns(db);
     addCompanionLogAttachmentsColumn(db);

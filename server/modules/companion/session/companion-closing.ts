@@ -1,4 +1,4 @@
-import type { CompanionSettings } from '@/shared/companion-types.js';
+import type { CompanionContext, CompanionSettings } from '@/shared/companion-types.js';
 
 import { CLOSING_LINES, closingPoint, noticeText, tidyNote } from './companion-notice.js';
 import type { CompanionCli, CompanionContextReading } from './companion-process.js';
@@ -10,7 +10,7 @@ import type { CompanionCli, CompanionContextReading } from './companion-process.
  * this file is the machine, and `companion-session.ts` only calls into it.
  *
  * THE READING: at the end of every turn that left her process up, her CLI is asked for its own count of her context (`contextUsage`: a control
- * request, no API call). Her last turn begins only if, once the reading is back, the same launch is still live, no turn is in flight, no closing
+ * request, no API call). Each count of the live conversation, and the one at a launch's first `init`, is also told (`counted`): her core wears it. Her last turn begins only if, once the reading is back, the same launch is still live, no turn is in flight, no closing
  * is under way and the total is at or past `closingPoint`: she is never cut off mid-answer, and a word of his that started a turn meanwhile is
  * read again at that turn's end.
  *
@@ -58,6 +58,8 @@ type ClosingHooks = {
   conversationId(): string | null;
   say(line: string): void;
   readSettings(): Pick<CompanionSettings, 'operatorName' | 'name'>;
+  /** A count of the live conversation: its tokens and where she closes, for her core's inner ring. */
+  counted(context: CompanionContext): void;
 };
 
 /** One closing, from its start until she has started fresh. `lastTurn`: the notice was given (a wall's refusal gives none). `ended`: the last turn's end was taken, so a later report of it (the aborted result after the bound) is ignored. */
@@ -228,10 +230,17 @@ export function createClosing(userId: number, hooks: ClosingHooks) {
     }
   }
 
+  /** A reading of the conversation still live is what her core's inner ring shows: told as it lands, whatever it decides. */
+  function tell(launch: ClosingLaunch, reading: CompanionContextReading | null): void {
+    if (reading === null || hooks.live() !== launch) return;
+    attemptTo('show how full she is', () => hooks.counted({ used: reading.total, closesAt: closingPoint(reading) }), undefined);
+  }
+
   /** The reading at a turn's end, and the decision it feeds. */
   async function considerClosing(launch: ClosingLaunch): Promise<void> {
     if (attempt !== null) return;
     const reading = await read(launch);
+    tell(launch, reading);
     // Decided only now it is back: the launch may have ended, a word of his may have started a turn, another reading may have begun the closing.
     if (reading === null || attempt !== null || hooks.live() !== launch || hooks.turnInFlight()) return;
     const point = closingPoint(reading);
@@ -242,6 +251,7 @@ export function createClosing(userId: number, hooks: ClosingHooks) {
   async function announce(launch: ClosingLaunch): Promise<void> {
     const reading = await read(launch);
     if (hooks.live() !== launch) return;
+    tell(launch, reading);
     if (reading === null) return journal("her context could not be read at launch; each turn's end reads it again");
     journal(
       reading.cliCompacts

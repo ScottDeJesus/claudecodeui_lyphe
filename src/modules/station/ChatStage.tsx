@@ -143,7 +143,7 @@ export function ChatStageView({ focus, session, onOpenChat, failure = null, onRe
             />
             {said !== '' && reply.at !== null && <time dateTime={reply.at}>{said}</time>}
           </p>
-          <QuestionText text={reply.text} className="min-w-0 max-w-[46rem]" />
+          <QuestionText text={reply.text} className="min-w-0" />
         </section>
       )}
       <StageOpen name={t('station.chat.open', { defaultValue: 'Open the chat' })} data-station-chat-open="" onOpen={onOpenChat} />

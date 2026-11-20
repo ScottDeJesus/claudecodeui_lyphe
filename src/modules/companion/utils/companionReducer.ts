@@ -74,6 +74,9 @@ const isNote = (value: unknown): value is CompanionNote =>
 const isSettings = (value: unknown): value is CompanionPicture['settings'] =>
   isRecord(value) && isText(value.name) && isText(value.model) && typeof value.live === 'boolean';
 const isProcess = (value: unknown): value is CompanionPicture['process'] => isRecord(value) && isText(value.state);
+/** Her core's inner ring divides `used` by `closesAt`, so a count without both, or with nothing to close at, is refused. */
+const isContext = (value: unknown): value is NonNullable<CompanionPicture['context']> =>
+  isRecord(value) && isNumber(value.used) && value.used >= 0 && isNumber(value.closesAt) && value.closesAt > 0;
 const isActivity = (value: unknown): value is CompanionPicture['activity'] =>
   isRecord(value)
   && isText(value.phase)
@@ -127,7 +130,9 @@ export function isCompanionPicture(value: unknown): value is CompanionPicture {
     && Array.isArray(value.notes) && value.notes.every(isNote)
     && Array.isArray(value.log) && value.log.every(isEntry)
     && Array.isArray(value.work) && value.work.every(isWork)
-    && isFace(value.face);
+    && isFace(value.face)
+    // A server from before the count sends none: that reads as not counted, never as a picture to refuse.
+    && (value.context === undefined || orNull(isContext)(value.context));
 }
 
 /** A name or an id the open lands on is a word: an empty one would put `?runner=` or `#page=` on the page's address. */
@@ -231,6 +236,9 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
       return isSettings(frame.settings) ? { ...picture, settings: frame.settings } : picture;
     case 'companion_process':
       return isProcess(frame.process) ? { ...picture, process: frame.process } : picture;
+    // Her CLI counted the conversation, or the conversation was let go of (`null`): her core's inner ring follows.
+    case 'companion_context':
+      return orNull(isContext)(frame.context) ? { ...picture, context: frame.context } : picture;
     // The floor moved (or was written again by its holder): the page whose client id it is plays her voice, every other shows the text.
     case 'companion_floor':
       return isText(frame.floor) && frame.floor !== picture.floor ? { ...picture, floor: frame.floor } : picture;
@@ -248,6 +256,7 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
         pending: null,
         walk: null,
         focus: null,
+        context: null,
         turnId: null,
         activity: { phase: 'idle', session: null, files: null, walk: null },
       };
