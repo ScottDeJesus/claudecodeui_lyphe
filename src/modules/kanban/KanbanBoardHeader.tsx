@@ -30,7 +30,7 @@ import { ActionMenu, type ActionMenuItem, Select, Switch } from '@/shared/ui';
  * and mode right: WHICH board is the thing you read on arrival, and the autonomy switch is the
  * thing you change — a control you must never hit while reaching for the board's name.
  *
- * "Autonomy" is spelled out beside the switch rather than left to the toggle alone, because the
+ * "Runs itself" is spelled out beside the switch rather than left to the toggle alone, because the
  * word is the only thing that says which of two boards you are about to get: with it off the
  * faces are title, priority and tags; with it on they carry questions, issues, steps, holds
  * and spend. A bare toggle is a switch whose two positions the reader has to discover by pressing

@@ -81,7 +81,7 @@ const BAND_BADGE = 'block sm:hidden md:block min-[900px]:hidden';
 const REGISTERS: VitalRegister[] = [
   { key: 'building', glyph: '▶\uFE0E', wordsKey: 'kanban.vitals.building', words: 'building now', tone: 'positive', loud: false },
   { key: 'awaitingAnswer', glyph: '?', wordsKey: 'kanban.vitals.awaitingAnswer', words: 'waiting on your answer', tone: 'warn', loud: true },
-  { key: 'queued', glyph: '◇', wordsKey: 'kanban.vitals.queued', words: 'queued in To Do', tone: 'neutral', loud: false },
+  { key: 'queued', glyph: '◇', wordsKey: 'kanban.vitals.queued', words: 'waiting to start', tone: 'neutral', loud: false },
   { key: 'lessonsPendingEstate', glyph: '💡', wordsKey: 'kanban.vitals.lessonsPending', words: 'lessons to review, across every board', tone: 'neutral', loud: false },
   { key: 'memoryPendingEstate', glyph: '✎', wordsKey: 'kanban.vitals.memoryPending', words: 'memories to review, across every board', tone: 'neutral', loud: false },
 ];

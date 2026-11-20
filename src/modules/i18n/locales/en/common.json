@@ -700,7 +700,7 @@
       "switcher": "Board",
       "actions": "Board actions",
       "noBoard": "No board",
-      "autonomy": "Autonomy",
+      "autonomy": "Runs itself",
 
       "newBoard": "New board",
       "rename": "Rename",
@@ -831,7 +831,9 @@
     },
     "decisions": {
       "title_one": "Decided for you · {{count}}",
-      "title_other": "Decided for you · {{count}}"
+      "title_other": "Decided for you · {{count}}",
+      "showAll_one": "Show {{count}} more",
+      "showAll_other": "Show {{count}} more"
     },
     "scenarios": {
       "title": "Scenarios",
@@ -1276,8 +1278,8 @@
       "boardCreated": "Board created",
       "boardRenamed": "Board renamed",
       "boardArchived": "Board archived — nothing was deleted",
-      "autonomyOn": "Autonomy on",
-      "autonomyOff": "Autonomy off",
+      "autonomyOn": "Runs itself — on",
+      "autonomyOff": "Runs itself — off",
       "reposSaved": "Repositories saved",
       "cardArchived": "Card archived",
       "laneCleared": "The lane's cards were archived",

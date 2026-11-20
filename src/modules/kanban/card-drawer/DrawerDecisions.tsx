@@ -1,7 +1,8 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { KanbanCardDetail } from '@/shared/kanban-types';
+import { Button } from '@/shared/ui';
 import { formatRelativeTime } from '@/shared/utils';
 
 /**
@@ -15,7 +16,13 @@ import { formatRelativeTime } from '@/shared/utils';
  * A RECORD, SO IT IS QUIET. No tone, no press: the choice in ink, the question it answered above
  * it in the calm ink, and when. It is drawn only when there is one — a card on which nothing was
  * decided has no empty place saying so.
+ *
+ * THE NEWEST FIVE, THEN A PRESS FOR THE REST. A long walk can note a dozen forks, and the newest are
+ * the ones a reader came for; the heading still counts them all, and one press (44 px under a
+ * finger) draws every one.
  */
+
+const KEPT_DECISIONS = 5;
 
 type DrawerDecisionsProps = {
   /** The open card, as the shell read it. This block fetches nothing. */
@@ -26,6 +33,7 @@ type DrawerDecisionsProps = {
 export function DrawerDecisions({ detail }: DrawerDecisionsProps) {
   const { t } = useTranslation();
   const headingId = useId();
+  const [showAll, setShowAll] = useState(false);
 
   // Only the rows a walk noted for the reader: one with a `questionId` is a question he answered,
   // and that answer already stands in the question's own row above.
@@ -33,6 +41,8 @@ export function DrawerDecisions({ detail }: DrawerDecisionsProps) {
   const decisions = [...noted].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   if (decisions.length === 0) return null;
+  const drawn = showAll ? decisions : decisions.slice(0, KEPT_DECISIONS);
+  const hidden = decisions.length - drawn.length;
 
   return (
     <div className="flex flex-col gap-2" role="group" aria-labelledby={headingId} data-drawer-decisions>
@@ -40,7 +50,7 @@ export function DrawerDecisions({ detail }: DrawerDecisionsProps) {
         {t('kanban.decisions.title', { count: decisions.length })}
       </h4>
       <ul className="flex flex-col gap-3">
-        {decisions.map((decision) => (
+        {drawn.map((decision) => (
           <li key={decision.id} className="flex flex-col gap-0.5 border-l border-border pl-3">
             <span className="text-xs leading-snug text-muted-foreground">{decision.question}</span>
             <span className="text-sm leading-snug text-foreground">{decision.choice.join(' · ')}</span>
@@ -48,6 +58,16 @@ export function DrawerDecisions({ detail }: DrawerDecisionsProps) {
           </li>
         ))}
       </ul>
+      {hidden > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start text-muted-foreground finger:min-h-11 finger:min-w-11"
+          onClick={() => setShowAll(true)}
+        >
+          {t('kanban.decisions.showAll', { count: hidden })}
+        </Button>
+      )}
     </div>
   );
 }
