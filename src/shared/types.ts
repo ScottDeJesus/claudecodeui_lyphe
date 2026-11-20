@@ -4559,3 +4559,12 @@ export type PlaceTrailStep = {
   label: string;
   kind: 'page' | 'screen' | 'chat';
 };
+
+//----------------- SOUNDS: the app's sound set (src/shared/sounds) ------------
+
+/**
+ * One of the app's sounds, by the moment it marks: a question or a permission prompt waiting in a chat (`asking`), a plan on the roadmap
+ * stopped on an ask (`planAsks`), a turn ended (`finished`), and Kaylee's ears opening and closing a recording (`listenOpen`,
+ * `listenClose`). Played by `shared/sounds`; named by `shared/utils.ts`'s notification sounds and the companion module's earcons.
+ */
+export type SoundName = 'asking' | 'planAsks' | 'finished' | 'listenOpen' | 'listenClose';

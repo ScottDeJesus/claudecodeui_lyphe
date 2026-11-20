@@ -3,7 +3,8 @@ import { extendTailwindMerge, validators } from 'tailwind-merge';
 
 import { CORE_GAUGE_GAPS } from '@/shared/constants';
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
-import type { AffectedAreasTrouble, ChatAttachment, DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
+import { playSound } from '@/shared/sounds';
+import type { AffectedAreasTrouble, ChatAttachment, DispatcherModelWord, Project, ProjectSession, SlashCommand, SoundName } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -184,36 +185,12 @@ const getAudioContext = (): AudioContext | null => {
   return audioContext;
 };
 
-/** Schedules one synthesized sine tone on the shared context. Private to `playNotificationSound`. */
-const playTone = (
-  context: AudioContext,
-  frequency: number,
-  startsAt: number,
-  duration: number,
-  peakVolume: number,
-): void => {
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-
-  oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(frequency, startsAt);
-
-  // Shape the volume so the synthesized tone starts and stops cleanly.
-  gain.gain.setValueAtTime(0.0001, startsAt);
-  gain.gain.exponentialRampToValueAtTime(peakVolume, startsAt + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + duration);
-
-  oscillator.connect(gain);
-  gain.connect(context.destination);
-  oscillator.start(startsAt);
-  oscillator.stop(startsAt + duration + 0.02);
-};
-
 /**
- * Plays the two-tone notification chime, honouring the user's preference unless `force`
- * is set (settings previews pass `force` so the user can hear the sound while it is off).
+ * Plays a notification sound from the app's set (`shared/sounds`): by default `asking`, a question or a permission prompt waiting in
+ * a chat; `planAsks` for a plan on the roadmap stopped on an ask; `finished` for a turn that ended. Honours the user's preference
+ * unless `force` is set (settings previews pass `force` so the user can hear the sound while it is off).
  */
-export const playNotificationSound = async ({ force = false } = {}): Promise<void> => {
+export const playNotificationSound = async ({ force = false, sound = 'asking' }: { force?: boolean; sound?: SoundName } = {}): Promise<void> => {
   if (!force && !isNotificationSoundEnabled()) {
     return;
   }
@@ -228,17 +205,15 @@ export const playNotificationSound = async ({ force = false } = {}): Promise<voi
       await context.resume();
     }
 
-    const now = context.currentTime;
-    playTone(context, 740, now, 0.12, 0.075);
-    playTone(context, 988, now + 0.11, 0.16, 0.06);
+    await playSound(context, sound);
   } catch (error) {
     // Browsers may block audio until the page receives a user gesture.
     console.warn('Unable to play notification sound:', error);
   }
 };
 
-/** Plays the chime for a finished assistant turn; named for the chat call site it serves. */
-export const playChatCompletionSound = (options = {}): Promise<void> => playNotificationSound(options);
+/** Plays the sound for a finished assistant turn (`finished`); named for the chat call site it serves. */
+export const playChatCompletionSound = ({ force = false } = {}): Promise<void> => playNotificationSound({ force, sound: 'finished' });
 
 // ---------------------------
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { playEarcon } from '@/modules/companion/utils/earcons';
+import { playEarcon, readyEarcons } from '@/modules/companion/utils/earcons';
 import { encodeWav } from '@/modules/companion/utils/earsAudio';
 import { ensurePageAudioContext, heldAudioContext } from '@/modules/companion/utils/earsContext';
 import { createEarsEngine } from '@/modules/companion/utils/earsEngine';
@@ -80,6 +80,7 @@ export function useEars(input: { picture: CompanionPicture | null; clientId: str
     try {
       const context = ensurePageAudioContext();
       setAudioContext(context);
+      readyEarcons(context);
       if (context.state === 'suspended') context.resume().catch((error: unknown) => console.warn('[Companion] Her ears could not wake the page\'s audio:', error));
     } catch (error) {
       console.warn('[Companion] Her ears could not make an audio context:', error);
