@@ -74,7 +74,6 @@ export function DrawerStepStages({ stages, onRead }: DrawerStepStagesProps) {
                 size="sm"
                 className="h-7 shrink-0 px-2 finger:h-11"
                 aria-label={t('kanban.stages.transcriptOf', { soul: name, stage: stage.name })}
-                // FILL: onReadStage
                 onClick={() => onRead(stage)}
               >
                 {t('kanban.stages.transcript')}

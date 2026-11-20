@@ -4,6 +4,7 @@ import type { KanbanBoard, KanbanCardDetail } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
 import { DISPATCHER_ACTOR } from './kanban-dispatch.cards.js';
+import { isPlacedTicketCreation } from './kanban-dispatch.tickets.js';
 
 /**
  * The longest text field the dispatcher takes; it refuses a longer one as `card_told.TEXT_MAX`.
@@ -17,6 +18,14 @@ const EXIT_REFUSED = 2;
 const TOLD_FIELDS: readonly string[] = ['title', 'description', 'body', 'priority'];
 
 export type TellEvent = 'created' | 'queued' | 'updated' | 'answered' | 'stopped' | 'board-off';
+
+/**
+ * The four tells that start or change work need the switch on both at the write and at the send, so a
+ * switch turned off while one waits in its chain withdraws it. `stopped` and `board-off` are not here:
+ * they are told whatever the switch reads, because a stop is always safe and is the board's only way to
+ * halt a walk already out once the switch is off.
+ */
+const NEEDS_AUTONOMY_AT_SEND: ReadonlySet<TellEvent> = new Set(['created', 'queued', 'updated', 'answered']);
 
 /** A tell to send. Only board-off concerns the board alone; every other tell names its card too. */
 type Tell =
@@ -33,6 +42,8 @@ type CardRecord = {
   body: string;
   tags: KanbanCardDetail['tags'];
   priority: KanbanCardDetail['priority'];
+  status: KanbanCardDetail['status'];
+  archived: boolean;
   attachments: string[];
 };
 type AnswerRecord = { question: string; selected: string[]; other: string };
@@ -78,8 +89,8 @@ const TELLS: readonly { event: TellEvent; when: (write: KanbanWriteEvent) => boo
   }, // card.moved to not_ready or done by a person; card.archived -> stopped
   {
     event: 'board-off',
-    when: (write) => write.kind === 'board.updated' && write.payload.autonomy === false,
-  }, // board.updated turning autonomy off -> board-off
+    when: (write) => (write.kind === 'board.updated' || write.kind === 'board.archived') && write.payload.autonomy === false,
+  }, // board.updated turning autonomy off, or board.archived of a board that ran itself -> board-off
 ];
 
 /**
@@ -117,14 +128,19 @@ export function createCardTeller(dependencies: CardTellerDependencies): (write: 
 
 /**
  * The tell a write should send, or null when it is not one to tell. The dispatcher's own notes are
- * never told back to it, and a write with no board has nothing to dispatch.
+ * never told back to it, and a write with no board has nothing to dispatch. A card a bug ticket placed
+ * is never told `created`: the placing stamp already wrote its row.
  */
 function tellFor(write: KanbanWriteEvent): Tell | null {
-  if (write.actor === DISPATCHER_ACTOR || write.boardId === null) {
+  if (write.actor === DISPATCHER_ACTOR || write.boardId === null || isPlacedTicketCreation(write)) {
     return null;
   }
   const event = tellEventOf(write);
   if (event === null) {
+    return null;
+  }
+  const board = kanbanBoardsService.getBoard(write.boardId);
+  if (board === null || (NEEDS_AUTONOMY_AT_SEND.has(event) && !board.autonomy)) {
     return null;
   }
   if (event === 'board-off') {
@@ -167,13 +183,14 @@ function queueTell(tell: Tell, chains: Map<string, Promise<void>>, dependencies:
 }
 
 /**
- * Sends one tell, or nothing when the board is gone or, for every tell but board-off, has autonomy
- * off. Both are read here rather than at the write, so a switch turned off while the tell waited
- * in its chain is honoured.
+ * Sends one tell, or nothing when the board is gone. The four tells that start or change work
+ * (NEEDS_AUTONOMY_AT_SEND) need the switch on at the send too, so a switch turned off while one of them
+ * waited in its chain withdraws it. `stopped` and `board-off` are sent whatever the switch reads, because
+ * a stop is always safe and is the board's only way to halt a walk already out once the switch is off.
  */
 async function sendTell(tell: Tell, dependencies: CardTellerDependencies): Promise<void> {
   const board = kanbanBoardsService.getBoard(tell.boardId);
-  if (board === null || (tell.event !== 'board-off' && !board.autonomy)) {
+  if (board === null || (NEEDS_AUTONOMY_AT_SEND.has(tell.event) && !board.autonomy)) {
     return;
   }
   const record = tell.event === 'board-off' ? { board: boardOf(board) } : recordOf(board, tell);
@@ -226,6 +243,8 @@ function cardOf(card: KanbanCardDetail): CardRecord {
     body: cutText(card.body),
     tags: card.tags,
     priority: card.priority,
+    status: card.status,
+    archived: card.archived,
     attachments: attachmentPaths(card.id, card.attachments),
   };
 }

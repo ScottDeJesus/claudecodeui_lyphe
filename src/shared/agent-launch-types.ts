@@ -15,6 +15,8 @@
  * The vocabulary the table accepts, and the ONLY source of every choice list the panel draws.
  * The panel never spells `opus` or `xhigh` itself: a word the Python side adds arrives here first.
  * `sorter_models` and `tweak_models` are the model words the `sorter` and the `tweak` rows accept, each its own list.
+ * `hunt_souls` is every soul that may wear a bug hunt (every generated shim but the planners); a table older than the hunt
+ * rows does not carry it.
  */
 export type AgentLaunchChoices = {
   models: string[];
@@ -23,6 +25,7 @@ export type AgentLaunchChoices = {
   summarizer_models: string[];
   sorter_models: string[];
   tweak_models: string[];
+  hunt_souls?: string[];
 };
 
 /**
@@ -67,7 +70,7 @@ export type AgentLaunchSide = {
  * own sentence about the lane, or null when it has nothing to add.
  */
 export type AgentLaunchLane = {
-  lane: 'agent' | 'dispatcher' | 'chain' | 'metis' | 'sorter';
+  lane: 'agent' | 'dispatcher' | 'chain' | 'sorter' | 'hunt';
   reach: 'new-session' | 'next-launch';
   note: string | null;
   sides: AgentLaunchSide[];
@@ -85,8 +88,8 @@ export type AgentLaunchShim = {
 };
 
 /**
- * One row of the launch table: a soul, Metis (`kind: 'metis'`, with no shim), or one of the two rows a board card's
- * walk launches at — the card sorter (`kind: 'sorter'`) and the tweak builder (`kind: 'tweak'`), after her and with no shim.
+ * One row of the launch table: a soul, or one of the two rows a board card's walk launches at — the card sorter
+ * (`kind: 'sorter'`) and the tweak builder (`kind: 'tweak'`), with no shim.
  *
  * `model` and `effort` are what the row RESOLVES to; `model_pinned` and `effort_pinned` say whether
  * the row's own table entry set them (a pin) or they came from `defaults`. Clearing a pin is sending
@@ -96,10 +99,17 @@ export type AgentLaunchShim = {
  * and `null` is refused. The sorter holds a model (one of `choices.sorter_models`) and an effort; the tweak holds a model
  * alone (one of `choices.tweak_models`), and its `effort` is read and never sent: the table's default for that model, or,
  * with `effort_pinned` true, Hephaestus's own effort pin, which the tweak launches at when its model is the one his row gives him.
+ *
+ * A HUNT ROW (`kind: 'hunt'`, named `hunt.<kind>`, no shim) is one of the five bug hunts. It holds `soul`, the soul that wears it
+ * (one of `choices.hunt_souls`, always set), and an optional model: `model_pinned` false is a hunt riding the model the table gives
+ * that soul, and `null` clears the pin. Its `effort` is read and never sent, by the tweak's own rule: the table's default for the
+ * model, or, with `effort_pinned` true, its soul's own effort pin.
  */
 export type AgentLaunchRow = {
   name: string;
-  kind: 'soul' | 'metis' | 'sorter' | 'tweak';
+  kind: 'soul' | 'sorter' | 'tweak' | 'hunt';
+  /** A hunt row's wearer. Only a hunt row carries it. */
+  soul?: string;
   description: string;
   model: string;
   model_pinned: boolean;
@@ -112,7 +122,7 @@ export type AgentLaunchRow = {
 /**
  * What the shims' regeneration said after a write.
  *
- * `ran` is false when nothing needed regenerating (a Metis-only change) or the table was a scratch
+ * `ran` is false when nothing needed regenerating or the table was a scratch
  * copy; `ok` is false when the generator failed — the write is kept either way. `said` is the
  * generator's last stdout line, or the tail of its error, at most 300 characters.
  */
@@ -123,7 +133,7 @@ export type AgentLaunchRegen = {
 };
 
 /**
- * The whole picture: the table's state, its defaults, one row per soul then Metis, and — on the
+ * The whole picture: the table's state, its defaults, one row per soul and one each for the card sorter and tweak builder, and — on the
  * census a write answers with — the regeneration.
  *
  * `state` is `file` for a table read off disk, `absent` when there is none, `malformed` when it could
@@ -145,9 +155,10 @@ export type AgentLaunchCensus = {
 
 /**
  * A change to one row's own pins. A field left out is untouched; a word pins it; `null` clears the
- * pin, so the row falls back to the defaults (the panel's "Default" choice).
+ * pin, so the row falls back to the defaults (the panel's "Default" choice). `soul` is a hunt row's alone: the soul
+ * that wears the hunt from its next sitting, which cannot be cleared.
  */
-export type AgentLaunchRowChange = { model?: string | null; effort?: string | null };
+export type AgentLaunchRowChange = { model?: string | null; effort?: string | null; soul?: string };
 
 /**
  * A change to the table's defaults. `effort` names one or more models: a word sets that model's

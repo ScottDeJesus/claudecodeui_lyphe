@@ -219,7 +219,6 @@ export type GatewayEventKind =
   | 'session_upserted'
   | 'loading_progress'
   | 'soul_launch_state'
-  | 'kanban_metis_state'
   | 'kanban_event'
   | 'notes_changed'
   | 'followups_changed'
@@ -393,9 +392,9 @@ export type DispatcherCardState = 'told' | 'queued' | 'walking' | 'asking' | 'do
 /** One case a card's walk wrote or ran, its word derived at the dispatcher's read and never stored (INV-172). */
 export type DispatcherCardCase = { suite: string; name: string; word: string };
 /** One stage entry of the card's walk, read off its chain record as a walking phase's stages are (`phase_chain.stage_rows`); `cost_usd` is paid dollars. */
-export type DispatcherCardStage = { name: string; soul: string | null; launch_id: string | null; status: string | null; verdict: string | null; cost_usd: number };
-/** One board card the dispatcher walks, as `dispatcher status --json`'s `cards` lists it (`report_cards.py`): `board`/`card` are the board's own ids, `hold` is the sentence a queued card waits on (null otherwise), `waits_on` the dispatcher's row id of the card it waits for. Read by `dispatcher-card.reader.ts`. */
-export type DispatcherCard = { board: string; card: string; title: string; state: DispatcherCardState; flow: 'bug' | 'change' | 'tweak' | null; part: 'whole' | 'fix' | 'change'; sorted_by: string | null; confidence: number | null; hold: string | null; waits_on: number | null; chain_id: string | null; cases: DispatcherCardCase[]; stages: DispatcherCardStage[] };
+export type DispatcherCardStage = { name: string; soul: string | null; launch_id: string | null; status: string | null; verdict: string | null; cost_usd: number; /** The sitting's own tokens: its spend when it rode the Claude subscription, where `cost_usd` is 0. */ tokens_in: number; tokens_out: number };
+/** One board card the dispatcher walks, as `dispatcher status --json`'s `cards` lists it (`report_cards.py`): `board`/`card` are the board's own ids, `hold` is the sentence a queued card waits on (null otherwise), `waits_on` the dispatcher's row id of the card it waits for. Read by `dispatcher-card.reader.ts`. `flow` `cure` is the night's cure walk of a regression; `waited_days` and `rides_as` say how long a queued card has waited and the priority it is taken at once ageing moved it (null on any other card, and from a dispatcher build older than them). */
+export type DispatcherCard = { board: string; card: string; title: string; state: DispatcherCardState; flow: 'bug' | 'change' | 'tweak' | 'cure' | null; part: 'whole' | 'fix' | 'change'; sorted_by: string | null; confidence: number | null; hold: string | null; waits_on: number | null; waited_days: number | null; rides_as: 'high' | 'medium' | 'low' | null; chain_id: string | null; cases: DispatcherCardCase[]; stages: DispatcherCardStage[] };
 /** The two causes a phase's or a plan's `stalled` word carries (`report_stall`): `dispatcher_down` when no daemon holds the home, so nothing can record anything, and `ended_unrecorded` when one does and has not. Both are answered by Resume, which wakes or starts the daemon. */
 export type DispatcherStall = 'dispatcher_down' | 'ended_unrecorded';
 /** The plan's word, in ONE precedence: `complete`, `hidden`, `scheduled`, `paused`, `queued`, `stalled`, `live`, `parked`, else `idle`. `hidden` is a plan the operator hid (`DispatcherPlan.hidden` says since when): held out of the queue and paused until he Shows it, and it outranks every word below it — an hour armed for it fires into a refusal, so a card reading `scheduled` over it would promise a start nothing makes. `stalled` is a released plan (approved, unpaused) whose only running work has ENDED with nothing to record it — never `live`, because nothing is moving it; `DispatcherPlan.stalled` says why. `scheduled` outranks the pause flag on purpose — a paused plan with an hour set is going to start by itself, and calling it merely `paused` would hide the one fact the operator needs. `paused` and `queued` are told apart by whether a walk ever launched: a paused plan that has run is stopped mid-plan, one that never launched is still waiting at the gate. */
@@ -432,8 +431,8 @@ export type DispatcherPace = { account: string; reading: DispatcherPaceReading; 
 export type DispatcherRoute = { provider: 'claude' | 'deepseek'; word: string; park_at_peak: boolean; peak_until: string | null; /** The pacer's picture (`route.pace`, interface VI), or `null`/absent while no picture is drawn: the master controller's pace line reads only `words`, and draws nothing without them. */ pace?: DispatcherPace | null; /** How many plans the board's one Start (`dispatcher start`) would let go now — the plans held for their FIRST Start (`first_start.held`: approved, paused, never launched, and an epic's waiting judgment), counted by the dispatcher so the button is drawn for exactly the plans its press reaches. `undefined` against a build older than the field, which draws no Start. */ waiting?: number; /** The EPIC QUEUE's census (`route.epics`, `line_gate.census`): `paused` whether Pause all is on (no epic starts; an outing already out finishes), `planning_through` whether the operator has let PLANNING through the pause (`dispatcher epics run-planning`: planner outings launch while every phase and the queue stay held — true only under a pause, and `false` against a build older than the key, which holds planning under Pause all), and `running` how many epics of the queue have STARTED. The queue runs top down; no limit is drawn. `null` against a dispatcher build older than the field, where the controls are not drawn (the key is absent: another build talking, never a torn document); a key that IS there and does not read is refused by name — `paused` or `planning_through` not a flag, `running` not a whole count. */ epics: { paused: boolean; planning_through: boolean; running: number } | null };
 /** This home's daemon. `alive` is the LOCK, not the file: the daemon takes a blocking exclusive flock on `<home>/daemon.lock` before anything else, so an exclusive flock taken by a reader answers without blocking — refused means somebody holds it, and that somebody is the daemon. `pid` and `unit` are therefore only reported on the alive branch: a lock file nobody holds is a dead daemon's, whatever pid it still names, and the unit comes from `/proc/<pid>/cgroup` — the kernel's answer, the one thing the daemon's four-name environment cannot have been handed. */
 export type DispatcherDaemon = { alive: boolean; pid: number | null; unit: string | null };
-/** The whole picture, pushed on change over `/ws` by the dispatcher lane. It is the document's own keys — `plans`, `arcs`, `planners`, `cards`, `route`, `daemon`, `offpeak_at`, `home`, `generated_at` — with the frame's clock added as `at`, epoch MILLISECONDS (`Date.now()`), unlike every time inside. `offpeak_at` is always a stamp — the next DeepSeek off-peak moment, and the literal `none` when the clock cannot answer — so it is a string and never null. */
-export type DispatcherStateEvent = { kind: 'dispatcher_state'; arcs: DispatcherArc[]; plans: DispatcherPlan[]; planners: DispatcherPlanner[]; cards: DispatcherCard[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; home: string; generated_at: string; at: number };
+/** The whole picture, pushed on change over `/ws` by the dispatcher lane. It is the document's own keys — `plans`, `arcs`, `planners`, `cards`, `bugs`, `route`, `daemon`, `offpeak_at`, `home`, `generated_at` — with the frame's clock added as `at`, epoch MILLISECONDS (`Date.now()`), unlike every time inside. `offpeak_at` is always a stamp — the next DeepSeek off-peak moment, and the literal `none` when the clock cannot answer — so it is a string and never null. `bugs` is a fingerprint of the bug board's rows (`report_bugs.digest`) that no screen draws: it moves when a ticket, a proposal or a hunt row is written, so the lane speaks and the Proposed features face and the hunters section re-read; `null` from a dispatcher build older than the key. */
+export type DispatcherStateEvent = { kind: 'dispatcher_state'; arcs: DispatcherArc[]; plans: DispatcherPlan[]; planners: DispatcherPlanner[]; cards: DispatcherCard[]; bugs: string | null; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; home: string; generated_at: string; at: number };
 /** The verbs this server may relay: `stop`, `resume`, `schedule` (a stopped plan's Resume at a time — `offpeak`, an ISO timestamp, or `none` to clear), `park` (a designed plan set aside), `unpark` (handed back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word; restarts nothing and wakes nobody — the word is read when a chain is launched), `drop` (a plan taken out of the store with everything it holds of it — refused while a phase of it walks or a planner outing for it or its arc is live; the one verb no press undoes), `planner-resume` (a plan's stalled planner outing put back to work through the verb the house already has for it — `cut`, `judge`, or a `tell` of `continue` — read fresh off the store at the press; refused when nothing of the plan ended short), `arm-accept` / `disarm-accept` (the operator's "Accept when cut" on a designed plan — or on every designed plan of an arc — and its Cancel; the press carries `--by app:card` and, on a plan, the design stamp it read), `queue` (an epic moved in the queue — `--before` another epic, `--last`, or `--at` a place; an epic's verb alone, relayed only through `POST /arcs/:name/queue`), `epics` (the epic dial's word — `pause` or `resume`; a BOARD verb that names no plan or arc, relayed only through `POST /epics`, so its answer carries `plan: ""`) `start` (the board's one Start — every plan held for its first Start let go at once, the queue and the dial then ordering them; a BOARD verb too, relayed only through `POST /start`, answered with `plan: ""`), `hide` (plans, or an epic's open plans, paused and held out of the queue until shown — relayed only through `POST /hide`) and `unhide` (Show: the hidden plans take their turn in the queue — relayed only through `POST /unhide`); both take plan or epic names in the request body, and their answers carry `plan: ""`. Beside them stands `override` (the operator's lift of the usage pacer's hold for ONE plan, and nothing else — the card's `Override`, and `Turn off` with `--off`; both carry `--by app:card`, and the dispatcher refuses the lift inside a Claude session, which this server's relay never is), and `pause-planning` / `resume-planning` (the operator's brake on ONE feature's or ONE epic's designing and planning, and its lift — the card's `Pause planning` and `Resume planning`; both carry `--by app:card`, the dispatcher resolves the name plan first and then epic, and it refuses `resume-planning` inside a Claude session too, which this server's relay never is; relayed under `/plans/:name` and `/arcs/:name`). */
 export type DispatcherVerb = 'stop' | 'resume' | 'schedule' | 'park' | 'unpark' | 'model' | 'drop' | 'planner-resume' | 'arm-accept' | 'disarm-accept' | 'queue' | 'epics' | 'start' | 'hide' | 'unhide' | 'override' | 'pause-planning' | 'resume-planning';
 /** What one relayed verb did. A refusal is a RESULT, not an error: the dispatcher prints its refusals on STDOUT (`REFUSED <verb> <name>: <reason>`, exit 2 — `REFUSED epics '<word>': <reason>` for the board's `epics`, which names no plan and whose answer carries `plan: ""`; a not-found line, exit 1 — `no plan <bare>`, or `no plan or arc <bare>` from one of the six verbs an arc's own name also reaches), so `stdout` carries the dispatcher's own first line whole and the reader never gets our paraphrase. `reason` is present only when the dispatcher never got to answer: it timed out, or its binary could not be spawned. */
@@ -508,50 +507,6 @@ export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
 export type SoulLaunchSnapshot = { launch_id: string; launched_by: string | null; dispatcher_work: boolean; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; model: string; blocked: boolean; /** Set while the launch is waiting for the box's CPU to have room (`hooks/plan_runner/pacer/cpu_marker.py`'s marker, read while its launcher is alive and its soul has not started): the pin says "Waiting for CPU" with an Override instead of `running`. `null` otherwise. */ cpu_wait: DispatcherCpuWait | null; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null; tokens_in: number | null; tokens_out: number | null };
 /** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending, oldest first. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
-// ---------------------------
-//----------------- KANBAN METIS: the session a board launches ------------
-
-/**
- * One Metis session — a board's own autonomous builder, spawned detached by
- * `modules/kanban-metis` and watched after every server restart.
- *
- * `sessionId` is the uuid handed to `claude --session-id`, and it is the identity everywhere:
- * the state directory under `~/.claude/state/kanban-metis/`, the address of every route, the
- * transcript lookup, and the input to the derived lease owner. The board MINTS it, which is why
- * no launch-id-to-session-id translation exists anywhere on this path.
- *
- * `owner` is the lease owner every build-lease verb compares against — `sha256(sessionId)`
- * truncated to sixteen lowercase hex, DERIVED rather than minted, so a resumed or re-adopted
- * session comes back as the same owner and can still refresh the leases it holds.
- *
- * `model` is the `--model` flag the child was actually given (`deepseek-flash`, or the Claude word
- * the launch table gives Metis) and `provider` says which endpoint it bills; the pair is settled at
- * spawn from the board's own `deepseekFlash`, never re-derived here, because the switch applies at
- * the NEXT spawn.
- *
- * `lastActivityAt` is `child.log`'s mtime, not a heartbeat the child writes: the child is
- * detached and owns its own log file descriptor, so its log's stamp is the only liveness signal
- * that survives a server restart. `pid` is a fact to show and, for a live session, to signal.
- * Every timestamp is epoch MILLISECONDS.
- */
-export type KanbanMetisSession = {
-  sessionId: string;
-  boardId: string;
-  boardName: string;
-  provider: 'deepseek' | 'claude';
-  model: string;
-  owner: string;
-  launchedBy: 'operator' | 'driver';
-  state: 'running' | 'completed' | 'stopped' | 'failed';
-  pid: number | null;
-  startedAt: number;
-  endedAt: number | null;
-  lastActivityAt: number;
-  exitCode: number | null;
-};
-
-/** The whole picture, pushed on change over `/ws`. `sessions` is ordered by `startedAt` ascending, oldest first. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a session. */
-export type KanbanMetisStateEvent = { kind: 'kanban_metis_state'; sessions: KanbanMetisSession[]; at: number };
 // ---------------------------
 //----------------- UNIVERSE: the estate map and its live activity ------------
 /**
@@ -2605,10 +2560,13 @@ export type DeepseekBalance =
   | { reachable: true; available: boolean; currency: string; total: string; checkedAt: number }
   | { reachable: false; reason: string };
 
+// The bug hunters' contracts (proposed features, the dashboard's hunts part) live in a sibling, as kanban-types.ts does: this file is past its size cap.
+export type { BugProposal, BugProposalFinding, BugProposalRecord, BugProposalStopgap, HuntHunter, HuntNight, HuntProjectStanding, HuntSittingRow, HuntSkippedUnit, HuntStatus } from './hunt-types.js';
+
 // ---------------------------
 //----------------- AGENT LAUNCH RELAY: the launch table, through its CLI ------------
-// The launch table (`~/.claude/charters/launch.toml`) says which model and effort every soul, and Metis,
-// launches at. Its one reader and writer is the hooks' `launch_table` package, and this server only runs
+// The launch table (`~/.claude/charters/launch.toml`) says which model and effort every soul, the card sorter and the tweak
+// builder launch at. Its one reader and writer is the hooks' `launch_table` package, and this server only runs
 // that package's CLI (`~/.claude/scripts/launch-table`): it never opens the file. So the census
 // Settings → Agents → Edit Agent Chains draws is carried WHOLE as the CLI printed it, and its shape is written down once, in Python
 // (`hooks/launch_table/census.py`) and mirrored for the client in `src/shared/types.ts`. The
@@ -2622,33 +2580,20 @@ export type DeepseekBalance =
  *  - `unreadable`   the CLI exited 0 and what it printed was not the one JSON object its contract promises.
  *
  * Nothing that produces one of these throws: a caller branches on `ok`. Read by the relay's service and
- * routes (the status each reason earns) and by kanban-metis's spawn (a failed resolve blocks a launch).
+ * routes (the status each reason earns).
  */
 export type AgentLaunchResult<T> =
   | { ok: true; value: T }
   | { ok: false; reason: 'refused' | 'unreachable' | 'unreadable'; message: string };
 
 /**
- * What `launch-table resolve <name> --side <side>` answers: the `--model` word and the `--effort` word a
- * launch of `name` takes on that side. `effort` is `null` when no `--effort` flag is due, so the CLI's own
- * effortLevel applies. On the `deepseek` side `model` is the house's DeepSeek model word and `effort` is
- * the one house-wide DeepSeek effort. Read by the relay's service, which checks the shape, and by
- * kanban-metis's env service, which turns it into a child's argv.
- */
-export type AgentLaunchResolved = {
-  name: string;
-  side: 'claude' | 'deepseek';
-  model: string;
-  effort: string | null;
-};
-
-/**
  * One row's edit, as `PUT /api/agent-launch/rows/:name` carries it and `launch-table set` takes it. A field
  * left out is left alone; a `null` clears that pin (the CLI's `default`), so the row falls back to the table's
  * defaults. The words themselves are not checked on this side. Read by the relay's routes (the body's shape)
  * and its service (the argv).
+ * `soul` is a hunt row's alone (`hunt.<kind>`): the soul that wears that bug hunt, passed to `launch-table set` as `--soul`; it cannot be cleared, so it is never `null`.
  */
-export type AgentLaunchRowChange = { model?: string | null; effort?: string | null };
+export type AgentLaunchRowChange = { model?: string | null; effort?: string | null; soul?: string };
 
 /**
  * An edit of the table's defaults, as `PUT /api/agent-launch/defaults` carries it and `launch-table defaults`

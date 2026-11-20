@@ -48,7 +48,7 @@ function keyOf(target: SubagentTranscriptTarget | null): string | null {
  * abandoned read is ignored.
  *
  * Read by the chat module's `subagents/SubagentTranscriptView.tsx`, which is opened by the chat's own
- * rows and by the kanban module's `KanbanMetisPanel.tsx`, whose `'metis'` target is a board session.
+ * rows and by the kanban card drawer's step transcripts, which open a `soul` target.
  */
 export function useSubagentTranscript(
   sessionId: string | null,
@@ -57,7 +57,7 @@ export function useSubagentTranscript(
 ): { result: SubagentTranscriptResult | null; failed: boolean } {
   // The poll refreshes a transcript the reader is watching, so it is paced on the window they are
   // watching it in: a hidden opener throttles its timers (to one a minute after a while). Outside
-  // the chat (the kanban board's Metis panel) this is the global window.
+  // the chat (the kanban card drawer's step transcripts) this is the global window.
   const hostWindow = useHostWindow();
   const [latest, setLatest] = useState<TranscriptRead | null>(null);
   /** The newest read's number. A ref, because bumping it must not repaint anything by itself. */
@@ -82,12 +82,10 @@ export function useSubagentTranscript(
     const run = async (): Promise<void> => {
       let next: SubagentTranscriptResult;
       try {
-        // ONE ROUTE PER KIND, and the three are mutually exclusive. An agent row is addressed
-        // through the chat's own session id; a launcher soul by its launch id; a board's Metis by
-        // the session id the board minted, which IS its target id — so a Metis read needs no chat
-        // session, and is never sent down the agent route.
+        // ONE ROUTE PER KIND, and the two are mutually exclusive. An agent row is addressed
+        // through the chat's own session id; a launcher soul by its launch id. A soul read needs
+        // no chat session, and is never sent down the agent route.
         if (kind === 'soul') next = await api.subagentTranscripts.soul(id);
-        else if (kind === 'metis') next = await api.subagentTranscripts.metis(id);
         else next = await api.subagentTranscripts.agent(agentSessionId, id);
       } catch {
         if (cancelled || tokenRef.current !== token) return;

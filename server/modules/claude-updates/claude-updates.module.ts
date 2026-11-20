@@ -14,7 +14,7 @@
  * (`findApplicationRoot`), where `server.listening` is a fact only it holds, and where
  * `supervised-boot.ts` is already the one voice on whether this process can hand itself over.
  * `readClaudeActivity` is handed in for the same reason — the question "is any Claude work running?"
- * is answered from the run registry, the session hosts, Metis and the process list, and this module
+ * is answered from the run registry, the session hosts and the process list, and this module
  * knows none of them.
  */
 

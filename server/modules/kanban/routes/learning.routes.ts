@@ -2,29 +2,21 @@ import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 
 import { KANBAN_LESSON_STATUSES, lessonNotFound } from '../kanban-lessons.service.js';
-import type { KanbanLessonInput, KanbanLessonsService } from '../kanban-lessons.service.js';
+import type { KanbanLessonsService } from '../kanban-lessons.service.js';
 
 /**
- * The lesson routes: the corpus a build learned, and the one place a person reviews it.
+ * The lesson routes: the read of what a build learned, and the one place a person reviews it.
  *
- * Four of the five handlers call exactly one service verb and shape the answer — the index, the
- * by-id read and the two reviews. The fifth, the stage, is the only one with a body to read, and
- * its checks are transport checks: the service decides whether a card exists, never whether a name
- * is a string.
- *
- * THE REVIEW IS THE FENCE, and it is not enforced here. Both mounts carry this router — the
- * operator's `/api/kanban` behind `authenticateToken` and the child's `/api/kanban-pm` behind
- * `kanbanMetisSecretGuard` — so a refusal written in a handler would be a refusal a second mount
- * could forget. It lives in the guard, ahead of the router, where the door itself is
- * (`kanban-metis.routes.ts`'s `REVIEW_PATH`). Nothing in this file knows which mount it serves.
+ * Four handlers, each one service verb: the index, the by-id read and the two reviews. Lessons are
+ * staged by the `/learn` spill sweep, not through a route. The router has one mount, `/api/kanban`
+ * behind `authenticateToken`.
  */
 
 /** The dependencies this route package needs. `kanban.routes.ts` hands them over. */
 export type LearningRouteDependencies = { lessons: KanbanLessonsService };
 
 /**
- * The index read's default and ceiling: 100 back unless a caller asks for more, 500 at the most —
- * the same bounds `kanban-pm-tools-lessons.ts` declares for the tool door, so the two cannot drift.
+ * The index read's default and ceiling: 100 back unless a caller asks for more, 500 at the most.
  */
 const LESSON_LIMIT_DEFAULT = 100;
 const LESSON_LIMIT_MAX = 500;
@@ -92,37 +84,6 @@ function parseLimit(value: unknown): number | undefined | null {
   return parsed >= 1 && parsed <= LESSON_LIMIT_MAX ? parsed : null;
 }
 
-/** The stage body read into the service's input, or the sentence saying which field is wrong. */
-function readLessonInput(body: Record<string, unknown>): KanbanLessonInput | string {
-  const { name, summary, trigger, body: text, tags, cardId, kind } = body;
-
-  if (typeof name !== 'string' || name === '') return 'a lesson name is required';
-  if (typeof summary !== 'string') return 'summary must be a string';
-  if (typeof trigger !== 'string' || trigger === '') return 'a lesson trigger is required';
-  if (text !== undefined && typeof text !== 'string') return 'body must be a string';
-  if (cardId !== undefined && cardId !== null && typeof cardId !== 'string') {
-    return 'cardId must be a string or null';
-  }
-  if (kind !== undefined && kind !== 'note' && kind !== 'skill_draft') {
-    return "kind must be 'note' or 'skill_draft'";
-  }
-  if (tags !== undefined) {
-    if (!Array.isArray(tags) || tags.some((tag) => typeof tag !== 'string')) {
-      return 'tags must be an array of strings';
-    }
-  }
-
-  return {
-    name,
-    summary,
-    trigger,
-    body: text as string | undefined,
-    tags: tags as string[] | undefined,
-    cardId: cardId as string | null | undefined,
-    kind: kind as 'note' | 'skill_draft' | undefined,
-  };
-}
-
 export function createLearningRoutes(dependencies: LearningRouteDependencies): Router {
   const router = express.Router();
   const { lessons } = dependencies;
@@ -147,16 +108,6 @@ export function createLearningRoutes(dependencies: LearningRouteDependencies): R
     response.json({
       lessons: lessons.listLessons({ status, limit: limit ?? LESSON_LIMIT_DEFAULT }),
     });
-  }));
-
-  router.post('/lessons', handle((request, response) => {
-    const input = readLessonInput((request.body ?? {}) as Record<string, unknown>);
-    if (typeof input === 'string') {
-      response.status(400).json({ error: input });
-      return;
-    }
-
-    response.status(201).json({ lesson: lessons.stageLesson(input) });
   }));
 
   router.get('/lessons/:lessonId', handle<{ lessonId: string }>((request, response) => {

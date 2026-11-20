@@ -602,7 +602,7 @@
     "error": "Error: {{error}}",
     "agentChains": {
       "label": "Agent chains",
-      "description": "The model and effort every soul, and Metis, launches at in each lane.",
+      "description": "The model and effort every soul, the card sorter and the tweak builder launch at in each lane.",
       "button": "Edit Agent Chains",
       "loadFailed": "Agent Chains could not be loaded.",
       "reload": "Reload the page"
@@ -731,6 +731,102 @@
         "field": "{{min}} to {{max}}",
         "fieldLabel": "Sort confidence, from {{min}} to {{max}}",
         "outOfBounds": "Not saved: use {{min}} to {{max}}."
+      },
+      "ageDays": {
+        "label": "Days before a waiting card moves up a priority",
+        "description_one": "A card waiting in To Do is taken one priority higher for every day it has waited, up to high. A low card that has waited long enough goes ahead of a high card typed today. The priority shown on the card is never changed. Takes effect at the next card.",
+        "description_other": "A card waiting in To Do is taken one priority higher for every {{count}} days it has waited, up to high. A low card that has waited long enough goes ahead of a high card typed today. The priority shown on the card is never changed. Takes effect at the next card.",
+        "descriptionOff": "Off: a card waiting in To Do is taken at the priority it shows, however long it has waited, so a low card can wait behind every new high one. Takes effect at the next card.",
+        "unreported": "This dispatcher does not report the number yet, so its value is unknown.",
+        "off": "Off",
+        "option_one": "{{count}} day",
+        "option_other": "{{count}} days",
+        "selectLabel": "Days before a waiting board card moves up a priority"
+      }
+    },
+    "bugHunters": {
+      "unreadable": "The bug hunters’ settings could not be read from the dispatcher, so they are unknown. This is not the same as off. They are retried whenever this page regains focus.",
+      "notSaved": "Not saved. {{sentence}}",
+      "bounds": "{{min}} to {{max}}",
+      "moveUp": "Move {{name}} up. Now {{position}} of {{total}}.",
+      "moveDown": "Move {{name}} down. Now {{position}} of {{total}}.",
+      "nightly": {
+        "label": "Run the bug hunters nightly",
+        "noHunter": "Nothing will be hunted: no hunter takes a turn. Switch one on below.",
+        "noProject": "Nothing will be hunted: ~/.claude/charters/hunts.toml names no project. Add one there.",
+        "descriptionOn_one": "Every night at {{start}} the hunters search the projects below for bugs, one hunter at a time, for up to {{count}} minute, and file what they find on the bug board. A hunter only reads: it changes no file and no data.",
+        "descriptionOn_other": "Every night at {{start}} the hunters search the projects below for bugs, one hunter at a time, for up to {{count}} minutes, and file what they find on the bug board. A hunter only reads: it changes no file and no data.",
+        "descriptionOff": "Off: no night starts by itself. A night started by hand with Run a night now, on the bug board’s Dashboard, still uses the settings below. A hunter only reads: it changes no file and no data."
+      },
+      "start": {
+        "label": "When the night starts",
+        "description": "The time of day the first hunter starts, by this box’s own clock. A night that is already running is not cut short by a new time. Takes effect at the next start.",
+        "descriptionOff": "The time of day the first hunter starts, by this box’s own clock. Nothing starts at it while the nightly run is off.",
+        "field": "The box’s local time"
+      },
+      "minutes": {
+        "label": "Minutes a night",
+        "description_one": "The hunters work for {{count}} minute a night between them, counted only while one is working. When the time is up, the hunter at work finishes the file it is on and stops. Takes effect at the next night.",
+        "description_other": "The hunters work for {{count}} minutes a night between them, counted only while one is working. When the time is up, the hunter at work finishes the file it is on and stops. Takes effect at the next night.",
+        "fieldLabel": "Minutes a night, from {{min}} to {{max}}"
+      },
+      "tickets": {
+        "label": "Tickets a night",
+        "description_one": "A hunter ends its turn once it has filed {{count}} ticket in a night, so one night cannot flood the bug board. What it had not reached waits for its next turn.",
+        "description_other": "A hunter ends its turn once it has filed {{count}} tickets in a night, so one night cannot flood the bug board. What it had not reached waits for its next turn.",
+        "fieldLabel": "Tickets a night, from {{min}} to {{max}}"
+      },
+      "hunters": {
+        "label": "The hunters, in turn order",
+        "description": "One hunter works at a time, in this order. Drag a hunter, or use its arrows, to move it. A hunter that is switched off sits out every night. Which soul does each hunt is set in Edit Agent Chains.",
+
+        "sitsOut": "Sits out",
+        "turnLabel": "The {{name}} hunter takes a turn",
+        "kinds": {
+          "security": {
+            "name": "Security",
+            "looksFor": "Who can reach it, what it trusts and what it leaks."
+          },
+          "behaviour": {
+            "name": "Behaviour",
+            "looksFor": "Whether what runs does what it says it does."
+          },
+          "ui": {
+            "name": "UI",
+            "looksFor": "Every screen, at desktop and phone width, light and dark."
+          },
+          "data": {
+            "name": "Data",
+            "looksFor": "Stored rows: orphans, duplicates and impossible values. Only in a project that names a database."
+          },
+          "code": {
+            "name": "Code",
+            "looksFor": "The logic itself: wrong branches, swallowed errors and races."
+          }
+        }
+      },
+      "projects": {
+        "label": "The projects, in order",
+        "description": "The hunters go through the projects in this order. Drag a project, or use its arrows, to move it. A project is added or removed in ~/.claude/charters/hunts.toml, where its folder and its databases are named.",
+        "none": "The file names no project, so the hunters have nothing to search."
+      },
+      "turns": {
+        "label": "How the hunters take turns",
+        "description": "Changing the rule loses no progress: each hunter carries on where it stopped. Takes effect at the next turn.",
+        "rules": {
+          "project": {
+            "name": "One project at a time",
+            "sentence": "the first hunter finishes a project, then the next hunter takes that same project."
+          },
+          "hunter": {
+            "name": "One hunter at a time",
+            "sentence": "a hunter finishes every project before the next hunter starts."
+          },
+          "nightly": {
+            "name": "A different hunter each night",
+            "sentence": "each night the next hunter in the order goes first."
+          }
+        }
       }
     },
     "weeklyStop": {

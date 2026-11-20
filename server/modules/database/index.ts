@@ -84,9 +84,6 @@ export { githubTokensDb } from '@/modules/database/repositories/github-tokens.js
 // The Kanban board's repositories: used by the kanban module — its board verbs mint through
 // `kanbanIdsDb`, its cards are summarised through `kanbanCardsDb`, its audit log is appended
 // through `kanbanEventsDb` by the one write seam.
-// The card's approval, written by the approve gate: one statement, so an approval and the
-// promotion a `not_ready` card takes with it cannot land apart.
-export { kanbanApprovalsDb } from '@/modules/database/repositories/kanban-approvals.db.js';
 export { kanbanBoardsDb } from '@/modules/database/repositories/kanban-boards.db.js';
 export { kanbanCardTagsDb } from '@/modules/database/repositories/kanban-card-tags.db.js';
 export { kanbanCardsDb } from '@/modules/database/repositories/kanban-cards.db.js';
@@ -101,13 +98,9 @@ export type { KanbanCardRow } from '@/modules/database/repositories/kanban-cards
 export { kanbanChecklistDb } from '@/modules/database/repositories/kanban-checklist.db.js';
 export { kanbanEventsDb } from '@/modules/database/repositories/kanban-events.db.js';
 export { kanbanIdsDb } from '@/modules/database/repositories/kanban-ids.db.js';
-// The lesson store and the per-session usage ledger: what a build learned, staged for a person's
-// review, and what each Metis session spent as its transcript grew. Neither is a card's child, so
-// neither is reached through a card's read.
+// The lesson store: what a build learned, staged for a person's review. It is not a card's child,
+// so it is not reached through a card's read.
 export { kanbanLearningDb } from '@/modules/database/repositories/kanban-learning.db.js';
-// The two card leases, as compare-and-set statements on the card's own columns: the column names
-// are a claim's, the verdict is the statement's `changes`.
-export { kanbanLeasesDb } from '@/modules/database/repositories/kanban-leases.db.js';
 // A card's questions and the decisions their answers became. The two travel together because an
 // answer writes both in one mutate callback.
 export { kanbanQuestionsDb } from '@/modules/database/repositories/kanban-questions.db.js';
@@ -115,6 +108,15 @@ export { kanbanQuestionsDb } from '@/modules/database/repositories/kanban-questi
 // kanban module's roster verb hands the dispatcher when it compares a card with the rest of its board.
 export { kanbanRosterDb } from '@/modules/database/repositories/kanban-roster.db.js';
 export type { KanbanRosterCard } from '@/modules/database/repositories/kanban-roster.db.js';
+// The board's numbers: read-only statements behind the kanban module's stats and changelog — open cards, cards fixed and
+// opened in a window with who filed them, and the changelog lines of finished cards. Nothing here writes.
+export { kanbanStatsDb } from '@/modules/database/repositories/kanban-stats.db.js';
+export type {
+  KanbanStatsChangelogRow,
+  KanbanStatsCreatedRow,
+  KanbanStatsFixedRow,
+  KanbanStatsOpenRow,
+} from '@/modules/database/repositories/kanban-stats.db.js';
 // The memory-intake lane's own table: proposals to write a memory into one of five destinations,
 // each waiting on a person's approval. It is not a board table and no board reads it.
 export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candidates.db.js';

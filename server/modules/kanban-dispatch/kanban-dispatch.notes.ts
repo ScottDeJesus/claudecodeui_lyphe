@@ -16,13 +16,16 @@ export type NoteBody =
   | { kind: 'tags'; add: string[]; remove: string[] }
   | { kind: 'question'; text: string; options: string[]; free: boolean }
   | { kind: 'decision'; question: string; choice: string }
-  | { kind: 'text'; field: 'plan' | 'closingRemarks'; value: string }
+  | { kind: 'text'; field: 'plan' | 'closingRemarks' | 'changelog'; value: string }
   | { kind: 'shot'; path: string; name: string }
   | { kind: 'tokens'; delta: { tokensIn: number; tokensOut: number; cacheRead: number; cacheCreate: number } }
   | { kind: 'card'; title: string; description: string; tags: string[]; priority: KanbanPriority }
   | { kind: 'board'; board: string }
   | { kind: 'link'; target: string; tags: string[]; decision: NoteDecision | null }
   | { kind: 'close'; target: string; closingRemarks: string };
+
+/** The field a text note writes: the plan, the closing remarks, or the changelog line. */
+type TextField = Extract<NoteBody, { kind: 'text' }>['field'];
 
 /** A note as the board applies it: where it lands (id, board, card, title) plus what it does. */
 export type DispatcherNote = { id: number; board: string; card: string; title: string } & NoteBody;
@@ -112,13 +115,24 @@ function readDecision(payload: Payload): PayloadReading {
   return { kind: 'decision', ...decision.value };
 }
 
-/** Plan or closing remarks, never both: a note naming both or neither cannot say which field to write. */
+/** The payload keys a text note may carry, each with the field it writes. */
+const TEXT_FIELDS: readonly { key: string; field: TextField }[] = [
+  { key: 'plan', field: 'plan' },
+  { key: 'closing_remarks', field: 'closingRemarks' },
+  { key: 'changelog', field: 'changelog' },
+];
+
+/** Plan, closing remarks or the changelog line, exactly one, since a note naming several or none cannot say which field to write. */
 function readText(payload: Payload): PayloadReading {
-  const plan = payload['plan'];
-  const remarks = payload['closing_remarks'];
-  if (isText(plan) && !isText(remarks)) return { kind: 'text', field: 'plan', value: plan };
-  if (!isText(plan) && isText(remarks)) return { kind: 'text', field: 'closingRemarks', value: remarks };
-  return 'exactly one of plan or closing_remarks must be a string';
+  const present = TEXT_FIELDS.flatMap(({ key, field }) => {
+    const value = payload[key];
+    return isText(value) ? [{ field, value }] : [];
+  });
+  const [only, ...rest] = present;
+  if (only === undefined || rest.length > 0) {
+    return 'exactly one of plan, closing_remarks or changelog must be a string';
+  }
+  return { kind: 'text', field: only.field, value: only.value };
 }
 
 /** A screenshot; its path must be absolute, since a relative one resolves against wherever the board runs. */

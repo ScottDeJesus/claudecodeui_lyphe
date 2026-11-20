@@ -1,7 +1,6 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FAKE_DECISIONS } from '@/modules/kanban/utils/walkFixtures';
 import type { KanbanCardDetail } from '@/shared/kanban-types';
 import { formatRelativeTime } from '@/shared/utils';
 
@@ -28,9 +27,9 @@ export function DrawerDecisions({ detail }: DrawerDecisionsProps) {
   const { t } = useTranslation();
   const headingId = useId();
 
-  // FILL: decisions — `detail.decisions`, the rows a walk noted for the reader (no `questionId`:
-  // a question the reader answered already shows its answer in its own row above).
-  const noted = FAKE_DECISIONS[detail.id] ?? [];
+  // Only the rows a walk noted for the reader: one with a `questionId` is a question he answered,
+  // and that answer already stands in the question's own row above.
+  const noted = detail.decisions.filter((decision) => decision.questionId === null);
   const decisions = [...noted].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   if (decisions.length === 0) return null;

@@ -31,10 +31,14 @@ function isCensus(body: unknown): body is AgentLaunchCensus {
     isRecord(choices) &&
     Array.isArray(choices.models) &&
     Array.isArray(choices.efforts) &&
-    // The Dactyl and Summarizer fields map these lists, so a census from a CLI older than the client must be
+    // The Dactyl and Summarizer fields and the sorter and tweak rows map these lists, so a census from a CLI older than the client must be
     // refused here, with the retry card, and not reach the panel and blank the window.
     Array.isArray(choices.dactyl_models) &&
     Array.isArray(choices.summarizer_models) &&
+    Array.isArray(choices.sorter_models) &&
+    Array.isArray(choices.tweak_models) &&
+    // Optional: a table older than the hunt rows carries no list, and then no hunt section is drawn.
+    (choices.hunt_souls === undefined || Array.isArray(choices.hunt_souls)) &&
     isRecord(defaults) &&
     isRecord(defaults.effort)
   );
@@ -67,6 +71,10 @@ async function readCensus(response: Response): Promise<AgentLaunchCensus> {
  * newest write still in flight, so a save that finishes never releases the hold of one that has not;
  * `error` is the server's own sentence and never a paraphrase of it. A failed call keeps the census
  * that was already held, and the next call that succeeds clears the sentence.
+ *
+ * A hunt row's change carries `soul` and `model` and goes through the same `saveRow`
+ * (`PUT /api/agent-launch/rows/hunt.<kind>`), which the server hands to
+ * `launch-table set hunt.<kind> --soul --model`.
  *
  * EVERY WRITE ANSWERS WITH THE CENSUS READ BACK AFTER IT, so a save replaces the held picture with the
  * one the table confirmed rather than patching the old one. A READ that a newer call overtook is

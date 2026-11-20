@@ -27,7 +27,8 @@ import { NOTES_CLIENT_KEY_INDEX_SQL, NOTES_SCHEMA_SQL } from '@/modules/database
 import { NOTIFICATION_HISTORY_SCHEMA_SQL } from '@/modules/database/notification-history-schema.js';
 import { migrateProvenanceColumnToLegacyId } from '@/modules/database/migrations-legacy-id.js';
 import { addColumnToTableIfNotExists, getTableInfo, tableExists } from '@/modules/database/migrations-columns.js';
-import { migrateKanbanBoardRepos } from '@/modules/database/migrations-board-dispatch.js';
+import { migrateKanbanBoardRepos, purgeRetiredBoardSchema } from '@/modules/database/migrations-board-dispatch.js';
+import { migrateKanbanCardDoneColumns } from '@/modules/database/migrations-kanban-done.js';
 import { visibleProjectPathSql } from '@/shared/hidden-project-paths.js';
 
 const SQLITE_UUID_SQL = `
@@ -847,35 +848,6 @@ const ensureProjectsForSessionPaths = (db: Database): void => {
 };
 
 /**
- * Adds the two columns `kanban_boards` gained after it was already on disk: the board's OWN
- * DeepSeek Flash switch (whether a Metis this board launches runs on Flash or on Claude) and its
- * concurrency dial (how many of them it may run at once).
- *
- * A separate function and not a line in the projects or sessions bodies: those rebuild a table
- * these columns have nothing to do with, and a kanban column filed under a projects rebuild is a
- * column nobody reading this table would think to open. The guard and the column read are its own
- * for exactly that reason.
- *
- * It has to exist because `kanban-schema.ts` is `IF NOT EXISTS` end to end: the declaration there
- * builds the columns on a scratch database and changes NOTHING on the operator's live `auth.db`,
- * which already has `kanban_boards`. This is the half that reaches an existing one.
- *
- * Existing boards keep `0` for the switch — autonomy and the DeepSeek switch are independent, and a
- * board that was running its builds on Claude yesterday does not silently start spending Flash
- * today — and `1` for the dial, which is the value the driver's own default carried before this
- * column existed, so no live board changes how many sessions it runs.
- */
-const migrateKanbanBoardsColumns = (db: Database): void => {
-  if (!tableExists(db, 'kanban_boards')) {
-    return;
-  }
-
-  const columnNames = getTableInfo(db, 'kanban_boards').map((column) => column.name);
-  addColumnToTableIfNotExists(db, 'kanban_boards', columnNames, 'deepseek_flash', 'INTEGER NOT NULL DEFAULT 0');
-  addColumnToTableIfNotExists(db, 'kanban_boards', columnNames, 'concurrency', 'INTEGER NOT NULL DEFAULT 1');
-};
-
-/**
  * Adds `tags` to a `cron_jobs` table already on disk: a JSON array of short words saying what a
  * job is FOR at a glance (`cleanup`, `backup`). `CRON_JOBS_TABLE_SCHEMA_SQL` is `IF NOT EXISTS`,
  * so its declaration reaches only a fresh database; this is the half that reaches the live one.
@@ -952,8 +924,11 @@ export const runMigrations = (db: Database) => {
     db.exec(CRON_SYNC_RUNS_TABLE_SCHEMA_SQL);
     // After the projects rebuild above: the boards table references projects(project_id).
     db.exec(KANBAN_SCHEMA_SQL);
-    migrateKanbanBoardsColumns(db);
     migrateKanbanBoardRepos(db);
+    // A card's arrival in Done and its changelog line: two added columns, and done_at filled once for cards already done.
+    migrateKanbanCardDoneColumns(db);
+    // After the board's own script and its added columns, the columns and table nothing reads any more are dropped, once, after a dated copy of the database.
+    purgeRetiredBoardSchema(db);
     // The memory lane's own table, in its own script — it is not a board table, so it is not in
     // KANBAN_SCHEMA_SQL above. It sits here, after the projects rebuild, for the same reason the
     // board's script does: nothing in this lane references `projects`.

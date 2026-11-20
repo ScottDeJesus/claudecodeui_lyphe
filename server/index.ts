@@ -241,7 +241,7 @@ const claudeUpdates = createClaudeUpdatesModule({
     requestReboot,
     onRebootFailed,
     // The automatic install's gate: no Claude work in flight anywhere on this machine. Composed here
-    // because the answer spans the run registry, the session hosts, Metis and the process list, none
+    // because the answer spans the run registry, the session hosts and the process list, none
     // of which the updates module may name.
     readClaudeActivity,
 });
@@ -400,7 +400,7 @@ app.use('/api/kanban-dispatch', authenticateToken, kanbanDispatch.router);
 const heal = createHealModule();
 app.use('/api/heal', authenticateToken, heal.router);
 
-// The launch table — the model and effort every soul, and Metis, launches at — and the doors that pin a
+// The launch table — the model and effort every soul, the card sorter and the tweak builder launch at — and the doors that pin a
 // row or move a default (protected: a save regenerates the shims every session reads). Built inline
 // like the heal lane, and for the same reason: no timer, no socket. The server never opens the table;
 // the routes run its own CLI and carry back the census it prints.

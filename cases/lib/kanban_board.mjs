@@ -6,8 +6,8 @@
 //   const { requests } = await openBoard(page);          // every /api/kanban* answer is this file's; the tab is the board
 //   await faceOf(page, CARDS.bug.id).waitFor();
 //
-// EVERY BOARD REQUEST IS ANSWERED HERE AND NOTHING REACHES THE SERVER: `/api/kanban/…`, `/api/kanban-metis/…` and
-// `/api/kanban-dispatch/…`, reads and writes alike. A read gets this file's board; a write gets `{}` and is counted in
+// EVERY BOARD REQUEST IS ANSWERED HERE AND NOTHING REACHES THE SERVER: `/api/kanban/…` and `/api/kanban-dispatch/…`,
+// reads and writes alike. A read gets this file's board; a write gets `{}` and is counted in
 // `requests`, so a case can say a press wrote nothing. The live board, its cards and its database are never touched.
 //
 // THE BOARD is one board with autonomy on and one repo, holding one card per lane and one card per flow tag, and the
@@ -15,15 +15,17 @@
 // by id. The vitals are five distinct numbers, so a register drawn from the wrong key reads the wrong number.
 
 const WAIT_MS = 30000;
-// Read off src/ and the live page 2026-11-18: the rail's Kanban view, the home's Menu and its Kanban entry.
-const RAIL_KANBAN = 'nav[aria-label="Views"] button[aria-label="Kanban"]';
+// Read off src/ and the live page 2026-11-18: the rail's Kanban view, the home's Menu and its Kanban entry. The view is
+// named Bugs since a4e2af52 (2026-11-19, `nav.kanban` in en/common.json); both names are found.
+const RAIL_KANBAN = 'nav[aria-label="Views"] :is(button[aria-label="Bugs"], button[aria-label="Kanban"])';
+const VIEW_NAME = /^\s*(Bugs|Kanban)\s*$/;
 const HOME_MENU = 'button[aria-label="Menu"]';
 const MENU_ENTRY = ':is([role="menu"], [role="dialog"]) :is(button, [role="menuitem"])';
-const KANBAN = /\/api\/kanban(-metis|-dispatch)?(\/|$|\?)/;
+const KANBAN = /\/api\/kanban(-dispatch)?(\/|$|\?)/;
 const AT = "2026-11-18T12:00:00.000Z";
 
 export const BOARD = {
-  id: "case-board-0001", name: "Case board", projectId: null, autonomy: true, deepseekFlash: false, concurrency: 1,
+  id: "case-board-0001", name: "Case board", projectId: null, autonomy: true,
   repos: ["/home/lyphe/.claude"], sortOrder: 0, archived: false, createdAt: AT, updatedAt: AT,
 };
 
@@ -33,8 +35,7 @@ export const VITALS = { building: 1, awaitingAnswer: 2, queued: 3, lessonsPendin
 const card = (id, title, status, tags, extra = {}) => ({
   id, boardId: BOARD.id, title, status, priority: "medium", sortOrder: 0, tags,
   openQuestions: 0, openIssues: 0, checklistDone: 1, checklistTotal: 3, buildTokens: 0,
-  approved: false, archived: false, buildLeaseAt: null, buildOwner: null, planLeaseAt: null, planOwner: null,
-  leaseState: "none", createdAt: AT, updatedAt: AT, ...extra,
+  archived: false, createdAt: AT, updatedAt: AT, ...extra,
 });
 
 /** The cards, by role. Ids are opaque on purpose: no word a reader should see is spelled in one. */
@@ -53,12 +54,14 @@ export const NOTE_LINES = [
   "BEFORE: done cards of the cases area — nothing similar",
 ];
 
-/** The open card's detail: the summary and a ledger that would light every control the drawer ever drew. */
+/** The open card's detail: the summary and a ledger that would light every control the drawer ever drew. `doneAt` and
+ *  `changelog` are on every detail the server answers since the board's two columns (bug-board-ways-in-and-dashboard,
+ *  seam 8); the drawer reads `changelog` as a string, so a detail without it is a shape the server no longer sends. */
 export function detailOf(summary) {
   return {
     ...summary,
     description: "The hint says its repo path where it means an absolute one.", body: "", plan: "Fix the hint.",
-    closingRemarks: "", approvedAt: null,
+    closingRemarks: "", doneAt: null, changelog: "",
     buildTokensIn: 1200, buildTokensOut: 340, buildTokensCacheRead: 9000, buildTokensCacheCreate: 450,
     questions: [], issues: [], decisions: [], attachments: [],
     checklist: [
@@ -93,8 +96,6 @@ function answer(url, method) {
     const found = all().find((c) => c.id === decodeURIComponent(one[1]));
     return found ? { card: detailOf(found) } : null;
   }
-  if (pathname === "/api/kanban-metis/sessions") return { sessions: [] };
-  if (/\/driver$/.test(pathname)) return { concurrency: 1, concurrencyMax: 4 };
   if (pathname.startsWith("/api/kanban/lessons")) return { lessons: [] };
   if (pathname.startsWith("/api/kanban/events")) return { events: [], nextCursor: null };
   return {};
@@ -117,7 +118,7 @@ export async function openBoard(page) {
     await page.locator(`${RAIL_KANBAN}:visible`).first().click({ timeout: WAIT_MS });
   } else {
     await page.locator(`${HOME_MENU}:visible`).first().click();
-    await page.locator(MENU_ENTRY, { hasText: /^\s*Kanban\s*$/ }).first().click({ timeout: WAIT_MS });
+    await page.locator(MENU_ENTRY, { hasText: VIEW_NAME }).first().click({ timeout: WAIT_MS });
   }
   await page.getByRole("combobox", { name: "Board" }).or(page.getByRole("button", { name: "Board" })).first()
     .waitFor({ timeout: WAIT_MS });

@@ -1,8 +1,6 @@
 import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 
-import { kanbanWriteContext } from '@/shared/kanban-types.js';
-
 import type { KanbanBoardsService } from '../kanban-boards.service.js';
 import { vitalsCounts } from '../kanban-vitals.service.js';
 
@@ -81,14 +79,12 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
- * The board routes: the board list, its create, update and select, its per-status counts, its
- * claimable count, the five registers of its vitals strip, the lookup that resolves a project to
- * its board, and the board's audit log.
+ * The board routes: the board list, its create, update and select, its per-status counts, the five
+ * registers of its vitals strip, the lookup that resolves a project to its board, and the board's
+ * audit log.
  *
- * Auth is the mount's (`authenticateToken` in `server/index.ts`, `kanbanMetisSecretGuard` for
- * `/api/kanban-pm`): no file here imports a guard. Every write verb takes the optional trailing
- * context and the route hands it `kanbanWriteContext(response)` — the actor the mount's guard
- * stamped, so an event's actor is `'metis'` through the Metis door and `'operator'` everywhere else.
+ * Auth is the mount's (`authenticateToken` in `server/index.ts`): no file here imports a guard. A
+ * write is the operator's, so no handler passes a write context.
  *
  * These handlers parse, call one service verb and shape the answer. No transaction, no database
  * handle, and no board policy lives here. The card routes are Phase 3's and are a sibling file.
@@ -124,10 +120,7 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
       }
 
       response.json({
-        board: boards.createBoard(
-          { name: body.name, projectId: body.projectId ?? null, repos: body.repos },
-          kanbanWriteContext(response)
-        ),
+        board: boards.createBoard({ name: body.name, projectId: body.projectId ?? null, repos: body.repos }),
       });
     })
   );
@@ -139,8 +132,6 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
       const patch: {
         name?: string;
         autonomy?: boolean;
-        deepseekFlash?: boolean;
-        concurrency?: number;
         projectId?: string | null;
         archived?: boolean;
         repos?: string[];
@@ -159,26 +150,6 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
           return;
         }
         patch.autonomy = body.autonomy;
-      }
-      if (body.deepseekFlash !== undefined) {
-        // `true`/`false` and nothing else. A `"yes"` coerced here would be a board whose model the
-        // server guessed at, and the spawn reads this field to decide what the child runs on.
-        if (typeof body.deepseekFlash !== 'boolean') {
-          response.status(400).json({ error: 'deepseekFlash must be a boolean' });
-          return;
-        }
-        patch.deepseekFlash = body.deepseekFlash;
-      }
-      if (body.concurrency !== undefined) {
-        // A NUMBER and nothing else — the clamp is the service's (`[0, KANBAN_CONCURRENCY_MAX]`), so
-        // a `99` arrives as the ceiling rather than as a 400: the caller asked for "as many as you
-        // will give me", and the board's answer to that is the top of its range. A string is refused
-        // here, because `"3"` coerced would be a dial the server guessed at.
-        if (typeof body.concurrency !== 'number' || !Number.isFinite(body.concurrency)) {
-          response.status(400).json({ error: 'concurrency must be a number' });
-          return;
-        }
-        patch.concurrency = body.concurrency;
       }
       if (body.projectId !== undefined) {
         if (typeof body.projectId !== 'string' && body.projectId !== null) {
@@ -204,7 +175,7 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
       }
 
       response.json({
-        board: boards.updateBoard(request.params.boardId, patch, kanbanWriteContext(response)),
+        board: boards.updateBoard(request.params.boardId, patch),
       });
     })
   );
@@ -212,7 +183,7 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
   router.post(
     '/boards/:boardId/select',
     handle<{ boardId: string }>((request, response) => {
-      response.json(boards.selectBoard(request.params.boardId, kanbanWriteContext(response)));
+      response.json(boards.selectBoard(request.params.boardId));
     })
   );
 
@@ -220,15 +191,6 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
     '/boards/:boardId/lanes',
     handle<{ boardId: string }>((request, response) => {
       response.json({ lanes: boards.laneCounts(request.params.boardId) });
-    })
-  );
-
-  router.get(
-    '/boards/:boardId/claimable',
-    handle<{ boardId: string }>((request, response) => {
-      // A count, never the cards: the driver needs the green light, and the child re-reads the
-      // lane itself through the board's own verbs once it wakes.
-      response.json({ claimable: boards.claimableCount(request.params.boardId) });
     })
   );
 

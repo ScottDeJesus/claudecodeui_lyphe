@@ -13,9 +13,9 @@ import { memoryIntakeService } from './memory.service.js';
  * targets are derived from a candidate at approve time. So this composition root names the one
  * service instance and hands it over.
  *
- * It is mounted at exactly ONE place, and that is the point of the module: the board's router is
- * reachable from a second door (`/api/kanban-pm`, guarded by a Metis's derived secret), and this lane
- * must not be. A mount is impossible to forget and impossible to reach by accident.
+ * It is mounted at exactly ONE place, `/api/memory`, as a lane of its own beside the board rather than
+ * a route of the board's: the memory lane is not a board table, and a mount of its own is impossible to
+ * reach by accident through another router.
  *
  * IT ALSO STARTS THE LANE'S QUEUE DOOR — the sweep over the spill files a session without any verb of
  * its own drops for review. That is a timer rather than a request, and its own module owns every rule

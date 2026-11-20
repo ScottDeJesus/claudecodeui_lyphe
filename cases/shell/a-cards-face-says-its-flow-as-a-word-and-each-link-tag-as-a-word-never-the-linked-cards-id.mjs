@@ -38,11 +38,16 @@ runCase(async (t) => {
     if (!face.flow.test(text)) return broken(`the face of ${title} (tag ${face.card.tags[0]}) does not say "${face.flowWord}": ${JSON.stringify(text)}`);
     if (RAW_LINK.test(text)) return broken(`the face of ${title} prints its raw link tag: ${JSON.stringify(text)}`);
     if (text.includes(LINKED_ID)) return broken(`the face of ${title} prints the linked card's bare id ${LINKED_ID}`);
-    const press = el.locator(PRESS).filter({ hasText: face.link });
-    const presses = await press.count();
-    if (presses === 0) return broken(`the face of ${title} has no press saying "${face.linkWord}" for its ${face.card.tags[1].split(":")[0]} link`);
-    await press.first().scrollIntoViewIfNeeded();
-    const box = await press.first().boundingBox();
+    // Each press is judged by its DRAWN text (innerText), never by `hasText`, which reads textContent: there the word and
+    // the linked card's title, set in sibling elements, run together ("Split fromSweep…") and a `\bfrom\b` cannot match.
+    const all = el.locator(PRESS);
+    let press = null;
+    for (let i = 0; i < (await all.count()); i++) {
+      if (face.link.test(await all.nth(i).innerText())) { press = all.nth(i); break; }
+    }
+    if (press === null) return broken(`the face of ${title} has no press saying "${face.linkWord}" for its ${face.card.tags[1].split(":")[0]} link`);
+    await press.scrollIntoViewIfNeeded();
+    const box = await press.boundingBox();
     if (!box) return broken(`the "${face.linkWord}" press on ${title} is not drawn at 390 wide`);
     if (box.height < FINGER_PX - 0.5 || box.width < FINGER_PX - 0.5) {
       return broken(`the "${face.linkWord}" press on ${title} is ${Math.round(box.width)}x${Math.round(box.height)} px at 390 wide, under the ${FINGER_PX} px a finger needs`);

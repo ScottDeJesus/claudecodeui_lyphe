@@ -204,7 +204,7 @@ immediately hand `subscribe` to the hook that does the real work:
 The call sites the table does not row — `SessionProtectionContext.tsx`, `useSessionPresence.ts`,
 `useRestartOnInstalledCli.ts`, `useGitDelegation.ts`, `useUniverseStream.ts`, `useSimpleChatList.ts`,
 `SessionHostLivenessContext.tsx` (mounted by `App` directly under `WebSocketProvider`, MAN-8122),
-`useSimpleChatRemove.ts` and the kanban panel's three (`useKanbanMetis.ts`, `useKanbanLanes.ts`,
+`useSimpleChatRemove.ts` and the kanban panel's two (`useKanbanLanes.ts`,
 `KanbanCardDrawer.tsx`) — take `subscribe` or `sendMessage` straight into their own hooks rather than
 owning a slice of the frame vocabulary; re-grep before quoting the number, because it grows with
 every such arc.
@@ -334,12 +334,9 @@ in `server/shared/types.ts`.**
 `history_truncated`, `task_notification`, `compaction`.
 
 **`GatewayEventKind` (`server/shared/types.ts`) — produced by the gateway, no provider involved:**
-`chat_subscribed`, `chat_steer_accepted`, `session_upserted`, `loading_progress`, `soul_launch_state`, `kanban_metis_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
-`kanban_metis_state` is `server/modules/kanban-metis`'s own frame — a board's live Metis
-sessions, pushed on change the same way `soul_launch_state` is (`kanban-metis.module.ts`'s
-polled lane) — and it has no row in the consumption table below for the same reason
-`kanban_event` does not: neither name is in `useChatRealtimeHandlers.ts`'s excused
-`case` group at `:191-195`. Both still carry no `sessionId` of their own, but neither reaches
+`chat_subscribed`, `chat_steer_accepted`, `session_upserted`, `loading_progress`, `soul_launch_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
+`kanban_event` has no row in the consumption table below: its name is not in
+`useChatRealtimeHandlers.ts`'s excused `case` group at `:191-195`. It still carries no `sessionId` of its own, but it does not reach
 the transcript: the append path admits a row only when the frame carries a run's `seq`
 (`useChatRealtimeHandlers.ts:253`), and a gateway-produced kind never does.
 
@@ -704,7 +701,7 @@ flowchart TD
     SET --> E6["soul_launch_state"]
     SET --> E7["universe_map"]
     SET --> E8["universe_activity"]
-    SET --> E9["kanban_metis_state"]
+
     SET --> E14["roadmap_state"]
     SET --> E12["notes_changed"]
     SET --> E13["simple_list_changed"]
@@ -716,9 +713,9 @@ flowchart TD
   end
 ```
 
-There are twelve broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), the session host's `session_host_liveness` (`host-liveness.ts`, session-host MAN-695: pushed the moment a chat gains its first or loses its last host, and sent once to each socket, held until the hosts are re-adopted), and FIVE STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
+There are eleven broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), the session host's `session_host_liveness` (`host-liveness.ts`, session-host MAN-695: pushed the moment a chat gains its first or loses its last host, and sent once to each socket, held until the hosts are re-adopted), and FOUR STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
-feeds of the estate, the systemd journal and the Claude transcripts. The four polled lanes — the launcher-souls lane, a board's own Metis sessions, the dispatcher's plans and the roadmap — read and put a frame on the wire only when the picture actually changed — the first two on a two-second tick, the dispatcher's and the roadmap on a write to the files they read (MAN-9543), and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
+feeds of the estate, the systemd journal and the Claude transcripts. The three polled lanes — the launcher-souls lane, the dispatcher's plans and the roadmap — read and put a frame on the wire only when the picture actually changed — the launcher-souls lane on a two-second tick, the dispatcher's and the roadmap on a write to the files they read (MAN-9543), and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
 instead of being suppressed as unchanged — the frame carries the whole picture, so a client
 receiving it twice receives it once. All of them reach `connectedClients` through the websocket
@@ -752,7 +749,7 @@ it anyway would be ten frames a second saying nothing.
 Reasoning that belongs to the four lanes' shared mechanism — why two of them poll and two are poked by a watch, and what the backstop
 is for — lives at `polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
 directory, how it classifies a soul and which provider its pin paints — is
-[docs/MANUAL.md (dispatch-souls)](../MANUAL.md). A board's own Metis lane has no write-up of its own yet.
+[docs/MANUAL.md (dispatch-souls)](../MANUAL.md).
 
 A socket joins `connectedClients` when `handleChatConnection` runs
 (`chat-websocket.service.ts`) and leaves on close — closing a tab removes a
@@ -938,7 +935,7 @@ it.
    ([docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what").
    **That `case` group names the lanes; it is not what stops them.** What stops them is the
    stamp: a row joins the transcript only if a numeric `seq` says the RUN wrote it, and no
-   sessionless lane frame carries one (`writtenByRun` at `:253`). A lane that is not in the group — `dispatcher_state`, `kanban_event`, `kanban_metis_state` — is stopped by the stamp all the same, which is the point: the group lagged the lanes it was meant to fence, and the frame
+   sessionless lane frame carries one (`writtenByRun` at `:253`). A lane that is not in the group — `dispatcher_state`, `kanban_event` — is stopped by the stamp all the same, which is the point: the group lagged the lanes it was meant to fence, and the frame
    that slipped past it landed in the viewed transcript with no `id`, where the store's
    `removeOptimisticUserEchoes` read `id.startsWith` off `undefined` and threw inside the
    websocket listener — losing that frame and every frame after it, and freezing the open chat
@@ -2053,11 +2050,6 @@ How rows are claimed:
 - OpenCode avoids the race up front: its synchronizer falls back to
   `findLatestPendingAppSession` to claim the newest app row for that project still missing a
   provider id.
-- Not every transcript on disk reaches this pipeline at all. A Claude transcript whose `cwd`
-  resolves under `~/.claude/kanban-metis/<boardId>/` is refused before any row is created — it
-  belongs to a Metis session the Kanban board's own driver launched and reads by session id
-  directly, never through this app's session list. See
-  [server/modules/providers/MANUAL.md (README)](../../server/modules/providers/MANUAL.md)'s Claude scan-roots row.
 
 `session-synchronizer.service.ts` adds two guarantees beyond indexing. Concurrent callers
 share one scan (opening the UI fires `/api/projects` and `/api/projects/archived` at once),
@@ -4325,11 +4317,7 @@ the server reports the file still growing (`inFlight`), and stops re-reading onc
 `Agent` row resolves through `GET
 /api/providers/sessions/:sessionId/subagents/:toolUseId/transcript`; a soul row through `GET
 /api/dispatch-souls/launches/:launchId/transcript` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)
-§"The routes and the frame"); and the view's third target kind, a board's Metis, through `GET
-/api/kanban-metis/sessions/:sessionId/transcript` — opened from outside this module entirely, by
-the kanban module's `KanbanMetisConversation.tsx` (mounted beside the fleet list by
-`KanbanMetisPanel.tsx` once a row is opened) with `sessionId` null, since a board's Metis belongs to
-no chat ([docs/MANUAL.md (kanban)](../MANUAL.md) §"The pilot panel"). Only the newest 100 entries draw at first, with a "show earlier" step
+§"The routes and the frame"). Only the newest 100 entries draw at first, with a "show earlier" step
 of 100 more, because a single entry can expand into a diff and mounting all 1000 the server may hold
 at once would be a thousand tool renderers the moment the row opens. The entries reuse the same
 drawing the panel uses: `tools/SubagentNote.tsx` for prose and reasoning, `ToolRenderer` in
@@ -5976,10 +5964,11 @@ knows which surface it is, so the opt-in is one class there — `MARKDOWN_CARDS_
 `src/shared/constants.ts`, spelled `'chat-md-cards'` — and the paint is a stylesheet scoped to that
 class, side-effect imported by `Markdown.tsx`. It changes no DOM: the class rides the wrapper and
 nothing under it moves, so **a miss is today's markup** still holds byte for byte and
-`probe-shapes-baseline.mjs` is untouched by the cards. Four call sites in three files carry it —
-`MessageComponent`'s two bodies (the assistant reply, the tool-use text), `ThinkingRow`'s body, and
-`MarkdownContent`, which is every tool markdown body. A user message bubble and a tool error
-deliberately do not.
+`probe-shapes-baseline.mjs` is untouched by the cards. It rides `MessageComponent`'s two bodies (the
+assistant reply, the tool-use text), `ThinkingRow`'s body, `MarkdownContent` (every tool markdown
+body), and Kaylee's cards (`CompanionNotes` in the companion module, `cardBodies` in the station
+module, both drawing card text through the chat's `Markdown`). A user message bubble and a tool
+error deliberately do not.
 
 **Three layers, in this order.** Tailwind Typography paints from the prose container; the `Plain*`
 component's own class string paints next; on a carded surface `markdownCards.css` paints last. It
@@ -6846,7 +6835,6 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `session_upserted` | gateway | Sidebar delta. Owned by the projects state, not by chat. |
 | `loading_progress` | gateway | Project scan progress. |
 | `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
-| `kanban_metis_state` | gateway | The board's Metis sessions, the whole picture, pushed on change: `sessions` oldest first, each with its `pid` and its `child.log`'s last activity; `at` is epoch milliseconds. |
 | `kanban_event` | gateway | The board frame: one Kanban write has committed, and this is what it left behind — the event, the card (null for a board-level write) and the board's lane totals after it. Built only by `writeKanban` (`modules/kanban/kanban-write.service.ts`), after the transaction commits. `boardId` is null for a write against the estate (a lesson staged with no card), and every consumer tests it first. |
 | `notes_changed` | gateway | A note was created, replaced or deleted. `{ kind, at }` only: it names no note and no account, so a client that hears it reads its own list again. No `seq` and no `sessionId`, so it never becomes a transcript row. |
 | `followups_changed` | gateway | A chat's follow-up was filed, closed or reopened. Names the chat by its app session id under `appSessionId` — deliberately not `sessionId`, which would set the workspace's unread mark (`useProjectsState`). A widget re-reads when the id is its own chat's and ignores the frame otherwise. No `seq`. |

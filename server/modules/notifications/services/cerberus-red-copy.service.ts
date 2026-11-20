@@ -122,8 +122,10 @@ function oneLine(text: string): string {
 /**
  * How long, in the tab's units: minutes under an hour, hours (and minutes, unless `wholeHours`) under a day, whole
  * days past that. `wholeHours` is for a reminder, whose minutes past the hour are only the tick it landed on.
+ * Exported through the module's barrel for the red watch's tickets (`modules/cerberus/red-watch-tickets.ts`),
+ * which say a span as the push says it.
  */
-function spanText(minutes: number, wholeHours = false): string {
+export function spanText(minutes: number, wholeHours = false): string {
   if (minutes >= MINUTES_PER_DAY) return `${Math.floor(minutes / MINUTES_PER_DAY)} d`;
   if (minutes >= MINUTES_PER_HOUR) {
     const hours = Math.floor(minutes / MINUTES_PER_HOUR);

@@ -56,17 +56,6 @@ export type KanbanBoard = {
   name: string;
   projectId: string | null;
   autonomy: boolean;
-  /** This board's OWN DeepSeek Flash switch, read at every spawn to decide whether the Metis this
-   *  board launches runs on Flash or on Claude. The host-wide flag file
-   *  (`~/.claude/state/deepseek_flash.flag`) is NEVER consulted for anything this board launches —
-   *  two boards on one host must be able to run different models, and a switch that is a file the
-   *  whole box shares cannot say that. */
-  deepseekFlash: boolean;
-  /** This board's own Metis dial: how many sessions it may run at once, clamped to
-   *  `[0, KANBAN_CONCURRENCY_MAX]` at every read and every write. Zero is a real value and means the
-   *  board spawns NOTHING. Read from the row at CALL time — by the driver's tick and by the
-   *  spawner's gate alike — so moving it moves the board without a restart. */
-  concurrency: number;
   /** The absolute paths of the git repositories this board's cards are built in, each a directory
    *  inside a git work tree (checked at the PATCH, `kanban-board-repos.ts`). The dispatcher walks a
    *  card in them, the first being where the walk runs. A board whose autonomy is on names at least
@@ -89,27 +78,6 @@ export type KanbanBoard = {
  * frame builder, and `src/shared/kanban-types.ts`.
  */
 export type KanbanLaneCount = { status: KanbanStatus; total: number };
-
-/**
- * How a card's build lease reads right now, computed SERVER-side from `build_lease_at` against
- * `KANBAN_LEASE_STALE_SECONDS`. The client maps this through and never re-derives it from
- * `buildLeaseAt` — two clocks computing one truth is a badge that disagrees with the API.
- *
- * Consumers: the summary mapper in `kanban-cards.db.ts`, the lease verbs in
- * `kanban-leases.service.ts`, and `src/shared/kanban-types.ts`.
- */
-export type KanbanLeaseState = 'none' | 'held' | 'stale';
-
-/** How long a build lease may go unrefreshed before it reads stale. The ONE home for this number.
- *  Consumers: the summary mapper in kanban-cards.db.ts, and kanban-leases.service.ts. */
-export const KANBAN_LEASE_STALE_SECONDS = 40;
-
-/** The tag that puts a To-do card in the operator's own court: the Metis orient read lists it under
- *  `awaiting_you`, never as work to claim, so the board's claimable count must not count it either —
- *  a board whose only To-do cards are tagged is a board with nothing for a session to do. Compared
- *  trimmed and lower-cased. Consumers: `kanban-boards.db.ts` (`countClaimable`) and the Metis MCP's
- *  orient projection. */
-export const KANBAN_OPERATOR_SCHEDULED_TAG = 'operator-scheduled';
 
 /** How many cards a lane page holds when the caller names no limit. The ONE home for the number.
  *  Consumers: `routes/card.routes.ts` (it clamps), `kanban-cards.service.ts` (the default), and
@@ -137,79 +105,16 @@ export const KANBAN_SORT_ORDER_GAP = 1000;
 export const KANBAN_SORT_ORDER_MIN_GAP = 1e-6;
 
 /**
- * How many Metis sessions one board may run at once — the dial's ceiling, and its ONE home.
- *
- * `[0, 6]` (operator ruling 2026-09-18: the panel's dial moves 1 to 6), and the ceiling exists for
- * the outcome rather than for the number: two children of one board share a cwd
- * (`~/.claude/kanban-metis/<boardId>/`) and claim cards against each other through the lease CAS, so
- * a board runs in parallel only as far as its owner says. Zero is inside the range and means the dial
- * is OFF — a board that is never spawned for; the panel's stepper never sets it, a PATCH still may.
- *
- * Consumers: `kanban-boards.db.ts` (the row mapper), `kanban-boards.service.ts` (a PATCH),
- * `metis-driver.service.ts` (the tick's comparison) and the driver route, which hands it to the panel
- * as `concurrencyMax` so the client's stepper stops where the clamp does without a second copy.
- */
-export const KANBAN_CONCURRENCY_MAX = 6;
-
-/**
- * What a board's dial reads as until something moves it — the column's own `DEFAULT 1`, quoted here
- * so a caller that has to fall back falls back to what the database would have handed it.
- *
- * Consumers: {@link clampKanbanConcurrency}.
- */
-export const KANBAN_CONCURRENCY_DEFAULT = 1;
-
-/**
- * The ONE clamp on the dial, applied wherever a value enters — off a row, or in a patch about to be
- * written.
- *
- * `NaN` falls back rather than propagating, and that is the whole reason this is a function instead
- * of a `Math.min` at each site: every comparison the dial takes part in is `live < dial`, so a `NaN`
- * makes each of them FALSE and puts a child on the board on every tick — a broken number turned into
- * maximum fan-out. A fractional value is truncated for the same family of reasons: half a session is
- * not a thing, and a caller that sent `2.5` meant a whole number.
- */
-export function clampKanbanConcurrency(value: number): number {
-  if (!Number.isFinite(value)) return KANBAN_CONCURRENCY_DEFAULT;
-  return Math.min(Math.max(Math.trunc(value), 0), KANBAN_CONCURRENCY_MAX);
-}
-
-/**
  * The optional trailing argument every WRITE verb takes. An absent actor means `'operator'`.
  *
- * It exists so that a real identity is a CALLER change rather than a schema change: the routes
- * hand over the actor their mount's guard stamped (`kanbanWriteContext`), and a caller with no
- * stamp passes nothing. A lease owner is a different concept and travels separately.
+ * No route stamps an actor: a route's write is the operator's and passes no context. The intake
+ * door (`kanban-intake`) and the board-dispatch module (`kanban-dispatch`, actor `dispatcher`) pass
+ * their own.
  *
- * Consumers: every write verb in `server/modules/kanban/`, and the write seam's `actor` field.
+ * Consumers: every write verb in `server/modules/kanban/`, the write seam's `actor` field, the
+ * intake door and the board-dispatch module.
  */
 export type KanbanWriteContext = { actor?: string };
-
-/** The audit actor of every write that arrives through the `kanban-pm` door — the one a board's Metis
- *  holds a credential for. Her approvals and archives are real acts the operator did not do, and the
- *  activity spine must say so. Consumers: `kanbanMetisSecretGuard` (stamps it once the credential
- *  checks out). */
-export const KANBAN_METIS_ACTOR = 'metis';
-
-/** The `response.locals` key a mount's guard stamps the caller's actor under. Request-scoped on
- *  purpose: it travels with the request through every continuation (a multipart upload's callback
- *  included), and a client cannot set it. Consumers: `kanbanMetisSecretGuard` (writes) and
- *  `kanbanWriteContext` (reads). */
-export const KANBAN_ACTOR_LOCAL = 'kanbanActor';
-
-/**
- * The write context a route hands its service verb: the actor the mount's guard stamped on this
- * request, or `undefined` when no guard stamped one — which the verbs read as `'operator'`, so the
- * operator's own `/api/kanban` mount (no stamp) behaves exactly as before.
- *
- * Consumers: the card, detail, board and attachment route files, for every WRITE verb they call.
- */
-export function kanbanWriteContext(response: {
-  locals: Record<string, unknown>;
-}): KanbanWriteContext | undefined {
-  const actor = response.locals[KANBAN_ACTOR_LOCAL];
-  return typeof actor === 'string' && actor !== '' ? { actor } : undefined;
-}
 
 /**
  * Every event kind the seam may record — the `kanban_events.kind` vocabulary, and with it the
@@ -231,8 +136,6 @@ export type KanbanEventKind =
   | 'card.moved'
   | 'card.archived'
   | 'card.restored'
-  | 'card.approved'
-  | 'card.unapproved'
   | 'tag.added'
   | 'tag.removed'
   | 'question.added'
@@ -245,24 +148,17 @@ export type KanbanEventKind =
   | 'checklist.removed'
   | 'attachment.added'
   | 'attachment.removed'
-  | 'lease.build_claimed'
-  | 'lease.build_refreshed'
-  | 'lease.build_released'
-  | 'lease.plan_claimed'
-  | 'lease.plan_released'
   | 'lesson.staged'
-  | 'lesson.reviewed'
-  | 'metis.nudged';
+  | 'lesson.reviewed';
 
 /**
- * One card as a lane renders it: the row, its tags, its four rolled-up counts, and the lease
- * state the server decided.
+ * One card as a lane renders it: the row, its tags, and its four rolled-up counts.
  *
  * `buildTokens` is every token the build moved — input, output and both cache counters summed,
  * so the panel formats one number rather than four and the card never does token math.
  *
  * Consumers: `kanban-cards.db.ts` (`getSummary`), `kanban-boards.service.ts` and the write seam
- * (the frame's `card`), `kanban-leases.service.ts`, and `src/shared/kanban-types.ts`.
+ * (the frame's `card`), and `src/shared/kanban-types.ts`.
  */
 export type KanbanCardSummary = {
   id: string;
@@ -277,14 +173,7 @@ export type KanbanCardSummary = {
   checklistDone: number;
   checklistTotal: number;
   buildTokens: number;
-  approved: boolean;
   archived: boolean;
-  buildLeaseAt: string | null;
-  buildOwner: string | null;
-  planLeaseAt: string | null;
-  planOwner: string | null;
-  /** Computed server-side from `build_lease_at`; the client never re-derives it. */
-  leaseState: KanbanLeaseState;
   createdAt: string;
   updatedAt: string;
 };
@@ -383,7 +272,9 @@ export type KanbanAttachment = {
  * counters broken out, and the five child collections.
  *
  * It is built once per card open, from one transaction's worth of reads, so a card cannot render
- * a checklist row that disagrees with the count on its face.
+ * a checklist row that disagrees with the count on its face. `doneAt` is stamped by the move into
+ * Done and cleared by a move out, so it is a fact no later edit of the card (which moves
+ * `updated_at`) can disturb.
  *
  * Consumers: `kanban-cards.service.ts`'s `getCard`, the card-detail route, and
  * `src/shared/kanban-types.ts`.
@@ -393,7 +284,10 @@ export type KanbanCardDetail = KanbanCardSummary & {
   body: string;
   plan: string | null;
   closingRemarks: string;
-  approvedAt: string | null;
+  /** When the card last arrived in Done (ISO-8601 UTC); null while it is not in Done. */
+  doneAt: string | null;
+  /** The one line a person reads about what the finished card changed; '' until a walk or a person writes it. */
+  changelog: string;
   buildTokensIn: number;
   buildTokensOut: number;
   buildTokensCacheRead: number;
@@ -422,22 +316,10 @@ export type KanbanEventRow = {
 };
 
 /**
- * The answer to a lease claim, refresh or release: whether it was granted, and the card as it
- * stands after the attempt.
- *
- * A claim against a fresh foreign lease is `{ granted: false }` with the current card — a
- * verdict, never an exception. The card travels either way so the caller can repaint from one
- * response instead of following a refusal with a read.
- *
- * Consumers: `kanban-leases.service.ts`, the four lease routes, and `src/shared/kanban-types.ts`.
- */
-export type KanbanLeaseResult = { granted: boolean; card: KanbanCardSummary };
-
-/**
  * One lesson: what a build learned, staged for a person's review before any later session reads it
  * back.
  *
- * The lifecycle is one-way and its two ends have OPPOSITE actors: a build (or the spill sweep)
+ * The lifecycle is one-way and its two ends have OPPOSITE actors: the `/learn` spill sweep
  * stages, a person reviews, and only an approved lesson reaches a session again. `status` is
  * carried as a plain string and not a union — today `staged`, `approved` or `rejected` — because
  * that vocabulary grew a value twice. `draftPath` is set ONLY for a
@@ -471,8 +353,8 @@ export type KanbanLesson = {
  * corpus so the panel could draw fifty titles. `body` and `draftPath` arrive from the by-id read for
  * the one lesson the operator opens.
  *
- * Consumers: `kanban-learning.db.ts` (the lean projection), `kanban-lessons.service.ts` (`listLessons`
- * and `approvedIndex`), the lesson list route, and `src/shared/kanban-types.ts`.
+ * Consumers: `kanban-learning.db.ts` (the lean projection), `kanban-lessons.service.ts`
+ * (`listLessons`), the lesson list route, and `src/shared/kanban-types.ts`.
  */
 export type KanbanLessonLean = {
   id: string;
@@ -489,39 +371,14 @@ export type KanbanLessonLean = {
 };
 
 /**
- * What one Metis session has spent, as the reader last counted it.
- *
- * One row per session, upserted as the session's transcript grows: the four token counters are
- * TOTALS for the session, never a delta — the watcher subtracts the stored row from what it counted
- * now — and `byteOffset` is where the main transcript's cursor stood at that write, recorded and never
- * read back to resume. `boardId` and `cardId` are provenance and may be null: a session whose card
- * has been deleted keeps its row.
- *
- * Consumers: `kanban-learning.db.ts` (the upsert and the by-session read),
- * `metis-telemetry.service.ts` (the writer), the vitals and cost reads, and
- * `src/shared/kanban-types.ts`.
- */
-export type KanbanSessionUsage = {
-  sessionId: string;
-  boardId: string | null;
-  cardId: string | null;
-  tokensIn: number;
-  tokensOut: number;
-  cacheRead: number;
-  cacheCreate: number;
-  byteOffset: number;
-  updatedAt: string;
-};
-
-/**
  * Five counts the board header shows as a strip of registers, read in one request rather than
  * derived by the panel from five lists it would otherwise have to fetch whole.
  *
  * THREE of them are BOARD-scoped, because they are counts of THIS board's cards: `building` (cards in
- * the Building lane — `status = 'active'` — which is where a build lease puts them and where they
- * stay until the builder moves them on, lease live or not), `awaitingAnswer` (cards with a question
- * still unanswered) and `queued` (cards in To Do — `status = 'todo'` — waiting for the dispatcher to
- * take them up). TWO are ESTATE-wide, because the rows behind them belong to no board at all:
+ * the Building lane — `status = 'active'` — where a card stays while its walk is out), `awaitingAnswer`
+ * (cards with a question still unanswered) and `queued` (cards in To Do — `status = 'todo'` — waiting
+ * for the dispatcher to take them up). TWO are ESTATE-wide, because the rows behind them belong to no
+ * board at all:
  * `lessonsPendingEstate` counts staged lessons and `memoryPendingEstate` counts pending memory
  * candidates across the whole install.
  *
@@ -539,3 +396,9 @@ export type KanbanVitals = {
   lessonsPendingEstate: number;
   memoryPendingEstate: number;
 };
+
+/**
+ * The board's stats and changelog shapes live in a sibling, since this file is past the house's
+ * size ceiling; re-exported so a caller imports every board shape from here.
+ */
+export * from './kanban-stats-types.js';

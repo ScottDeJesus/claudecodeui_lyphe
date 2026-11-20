@@ -4,7 +4,6 @@ import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 import multer from 'multer';
 
-import { kanbanWriteContext } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
 import {
@@ -28,12 +27,9 @@ import type { KanbanAttachmentsService } from '../kanban-attachments.service.js'
  * lists an attachment must be able to download it, and nothing was ever able to produce those
  * bytes. Healed means deleted: that route and its body parsing are gone.
  *
- * Auth is the mount's (`authenticateToken` for `/api/kanban`, `kanbanMetisSecretGuard` for
- * `/api/kanban-pm`): the write verbs here take the guard's stamped actor through
- * `kanbanWriteContext(response)`. The DELETE is refused at the
- * child's door, ahead of this router (`kanban-metis.routes.ts`'s `OPERATOR_BYTES`) — an unattended
- * session does not destroy an operator's uploaded file. Reading and uploading are not refused: they
- * are how a build sees the screenshot it was handed.
+ * Auth is the mount's (`authenticateToken` for `/api/kanban`), and a write is the operator's: the
+ * write verbs here pass no context. Reading and uploading are how a build sees the screenshot it
+ * was handed.
  */
 
 /** The dependencies this route package needs. `kanban.routes.ts` hands them over. */
@@ -133,8 +129,7 @@ function uploadAttachment(
       try {
         const attachment = dependencies.attachments.addAttachment(
           request.params.cardId,
-          { filename: file.originalname, mime: file.mimetype, bytes: file.buffer },
-          kanbanWriteContext(response)
+          { filename: file.originalname, mime: file.mimetype, bytes: file.buffer }
         );
         response.status(201).json({ attachment });
       } catch (thrown) {
@@ -188,8 +183,7 @@ function downloadAttachment(
  * The removal: the row and its file, or a 404 for an attachment that is not there.
  *
  * It is the only one of the three with no bytes in the request or the answer — it names what it
- * destroyed and says so. On the `kanban-pm` mount it never runs: the guard refuses the method
- * before the router is reached.
+ * destroyed and says so.
  */
 function removeAttachment(
   dependencies: AttachmentRouteDependencies
@@ -197,8 +191,7 @@ function removeAttachment(
   return handle<{ cardId: string; attachmentId: string }>((request, response) => {
     const removed = dependencies.attachments.removeAttachment(
       request.params.cardId,
-      request.params.attachmentId,
-      kanbanWriteContext(response)
+      request.params.attachmentId
     );
     if (!removed) throw attachmentNotFound(request.params.attachmentId);
 

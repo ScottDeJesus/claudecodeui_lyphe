@@ -24,7 +24,7 @@
     "git": "Git",
     "tasks": "任務",
     "browser": "瀏覽器",
-    "kanban": "看板",
+    "kanban": "缺陷",
     "universe": "宇宙"
   },
   "kanban": {

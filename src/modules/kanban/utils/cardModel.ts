@@ -7,8 +7,10 @@ import type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/
  * disagree about what a signal means.
  *
  * WHAT IT DECIDES, AND WHAT IT REFUSES TO. It formats spend into the string the card PAINTS, so
- * the card never does token math. What a card's WALK adds to the face — the flow's word, the hold
- * and the links — is laid over this model by `withWalkFace` (`utils/walkModel`). And it
+ * the card never does token math. What a card's WALK adds to the face — the kind's word (a flow's,
+ * or `Regression` for the night's cure), the hold, how an aged card rides
+ * (`waiting 4 days · rides as medium`) and the links — is laid over this model by `withWalkFace`
+ * (`utils/walkModel`), because each is read off the dispatcher's feed and not off the card. And it
  * drops every signal entirely when autonomy is off, which is the whole mechanism behind an
  * autonomy-off face being title, priority and tags — not a second render path in the component.
  */

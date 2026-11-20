@@ -203,8 +203,7 @@ export function validateMemoryArgs(input: unknown): MemoryCandidateInput {
  *
  * The provenance column is UNVERIFIED, and the resolver is the only translation of it — three
  * lookups that end with the id unchanged when nothing knows it. Display only: nothing in this module
- * gates on it. It drives `isMine`/`mineFirst` in the panel, so dropping it would silently un-sort the
- * operator's own proposals among everyone's.
+ * gates on it, and the panel lists rows in the repository's newest-first order without reading it.
  *
  * EVERY row leaves this module through here — list, by-id, stage, review — so no caller has to
  * remember to translate, and the list read and the by-id read of one candidate can never disagree

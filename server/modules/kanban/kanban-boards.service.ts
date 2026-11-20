@@ -1,7 +1,7 @@
+import path from 'node:path';
+
 import { kanbanBoardsDb, kanbanEventsDb, kanbanIdsDb, projectsDb } from '@/modules/database/index.js';
 import {
-  clampKanbanConcurrency,
-  KANBAN_LEASE_STALE_SECONDS,
   type KanbanBoard,
   type KanbanEventRow,
   type KanbanLaneCount,
@@ -72,14 +72,51 @@ function requireReposForAutonomy(autonomy: boolean, repos: readonly string[]): v
   }
 }
 
+/** The answer when no repository of a board holds a folder. Real path lengths are at least 1, so -1 cannot collide. */
+const NO_REPO_MATCH = -1;
+
 /**
- * The board verbs: create, list, read, update, select, resolve for a project, count a board's
- * cards per status, nudge, and read the audit log.
+ * Orders two values by `<` and `>` rather than `localeCompare`, so the order a sort produces does not depend on the
+ * machine's locale and the same two ids always sort the same way.
+ */
+function compareAscending<T extends string | number>(left: T, right: T): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+/**
+ * The length of the longest of a board's repositories that holds the target folder, or NO_REPO_MATCH when none does.
+ *
+ * A repository holds the folder when it IS the folder or the folder sits under it. The separator test is what keeps
+ * `/a/bc` out of `/a/b`; the longest match is what lets a deeper board on a nested folder win over a shallower one.
+ */
+function longestContainingRepo(board: KanbanBoard, target: string): number {
+  let longestMatchLength = NO_REPO_MATCH;
+  for (const repo of board.repos) {
+    const resolvedRepo = path.resolve(repo);
+    const repoPrefix = resolvedRepo.endsWith(path.sep) ? resolvedRepo : resolvedRepo + path.sep;
+    const holdsTarget = target === resolvedRepo || target.startsWith(repoPrefix);
+    if (holdsTarget && resolvedRepo.length > longestMatchLength) {
+      longestMatchLength = resolvedRepo.length;
+    }
+  }
+  return longestMatchLength;
+}
+
+/** The names of the fields a board patch sets, in a fixed order; a field left undefined was not asked to change. */
+function setFieldsOf(patch: { name?: string; autonomy?: boolean; projectId?: string | null; archived?: boolean; repos?: string[] }): string[] {
+  return (['name', 'autonomy', 'projectId', 'archived', 'repos'] as const).filter((field) => patch[field] !== undefined);
+}
+
+/**
+ * The board verbs: create, list, read, update, select, resolve for a project, resolve a folder to its board, count a
+ * board's cards per status, and read the audit log.
  *
  * EVERY write here goes through `writeKanban` — no verb in this file opens a transaction, inserts
  * an event or broadcasts. A write verb threads `context?.actor` straight into the seam, so the
- * actor on an audit row is the caller's own — `'metis'` through the Metis door, `'operator'` when
- * the route stamped none — without a signature moving.
+ * actor on an audit row is the one the caller passed (the intake door and the dispatcher pass
+ * their own) and `'operator'` when it passed none.
  *
  * Consumers: `routes/board.routes.ts` (every board route), and the barrel, which is how a future
  * in-process MCP adapter calls the same verbs.
@@ -142,11 +179,6 @@ export const kanbanBoardsService = {
    * hopeful write, so the board cannot change between them. Archiving is its own event kind,
    * because "the board was archived" is what the audit log is read for.
    *
-   * `concurrency` is CLAMPED on the way in — `[0, KANBAN_CONCURRENCY_MAX]`, through the one clamp
-   * the read side uses too — so the number this returns is the number every later tick compares
-   * against, and a `99` is stored as the ceiling it was read back as rather than as a value the board
-   * would fan out to. Zero is a real setting: it means the board spawns nothing.
-   *
    * A board that runs itself must name a repository, because the dispatcher builds each card in the
    * board's repositories, and a board with none would take cards it has nowhere to build. The check
    * reads the board inside the transaction so that the autonomy and repos it judges are the ones the
@@ -157,8 +189,6 @@ export const kanbanBoardsService = {
     patch: {
       name?: string;
       autonomy?: boolean;
-      deepseekFlash?: boolean;
-      concurrency?: number;
       projectId?: string | null;
       archived?: boolean;
       repos?: string[];
@@ -166,34 +196,52 @@ export const kanbanBoardsService = {
     context?: KanbanWriteContext
   ): KanbanBoard {
     const name = patch.name === undefined ? undefined : requireBoardName(patch.name);
-    const concurrency =
-      patch.concurrency === undefined ? undefined : clampKanbanConcurrency(patch.concurrency);
     // Outside the transaction: normalising the paths runs git, and a write should not hold the
     // database while a subprocess runs.
     const repos = patch.repos === undefined ? undefined : requireBoardRepos(patch.repos);
+    // An archived board does not run itself: archiving turns its autonomy off in the same write, and the audit row says
+    // so (`{autonomy: false}`), so the dispatcher hears `board-off` and withdraws the cards it had not yet walked.
+    const archiving = patch.archived === true;
+    const wasRunning = archiving && kanbanBoardsDb.getBoard(boardId)?.autonomy === true;
+    const autonomy = archiving ? false : patch.autonomy;
+    // An archive names the switch only when it turned a running board off; any other write names it only when it set it.
+    let auditedAutonomy: Record<string, unknown>;
+    if (archiving) {
+      auditedAutonomy = wasRunning ? { autonomy: false } : {};
+    } else {
+      auditedAutonomy = autonomy === undefined ? {} : { autonomy };
+    }
+    // A board.updated write names the fields its patch set (as card.updated does), so a listener can tell a change of
+    // folders or a restore from a rename. An archive keeps its one-key payload.
+    const payload = archiving ? auditedAutonomy : { ...auditedAutonomy, fields: setFieldsOf(patch) };
 
     return writeKanban(
       {
         kind: patch.archived === true ? 'board.archived' : 'board.updated',
         boardId,
         actor: context?.actor,
-        // Named in the audit row, so a listener (the board-dispatch module) can tell the autonomy switch moving from a rename.
-        payload: patch.autonomy === undefined ? {} : { autonomy: patch.autonomy },
+        // Named in the audit row, so a listener (the board-dispatch module) can tell the autonomy switch moving from a rename, and an archive that turned it off.
+        payload,
       },
       () => {
         if (patch.projectId !== undefined && patch.projectId !== null) requireProject(patch.projectId);
 
-        if (patch.autonomy === true || repos !== undefined) {
+        if (autonomy === true || repos !== undefined) {
           const current = requireBoard(boardId);
-          requireReposForAutonomy(patch.autonomy ?? current.autonomy, repos ?? current.repos);
+          // An archived board does not run itself; one restored in this same write (`archived: false`) may.
+          if (autonomy === true && (patch.archived ?? current.archived)) {
+            throw new AppError('An archived board cannot run itself; restore it first.', {
+              code: 'KANBAN_BOARD_ARCHIVED',
+              statusCode: 409,
+            });
+          }
+          requireReposForAutonomy(autonomy ?? current.autonomy, repos ?? current.repos);
         }
 
         const board = kanbanBoardsDb.updateBoard({
           id: boardId,
           name,
-          autonomy: patch.autonomy,
-          deepseekFlash: patch.deepseekFlash,
-          concurrency,
+          autonomy,
           projectId: patch.projectId,
           archived: patch.archived,
           repos,
@@ -229,24 +277,6 @@ export const kanbanBoardsService = {
   },
 
   /**
-   * The operator's "go now": one audit row on the board, and nothing else.
-   *
-   * A nudge collapses a driver's sleep, and that is the whole act against a driver
-   * that ticks on an interval: the caller records that a human asked, and wakes the loop itself
-   * (`kanban-metis.routes.ts` schedules the tick on the next macrotask). The write is here rather
-   * than in that route because every write on this board goes through the seam, which is what makes
-   * a nudge visible in the audit log and on the wire like every other act — the caller that wakes
-   * the driver is the only thing this verb does not do.
-   */
-  nudgeBoard(boardId: string, context?: KanbanWriteContext): void {
-    writeKanban({ kind: 'metis.nudged', boardId, actor: context?.actor }, () => {
-      // Inside the transaction, so a nudge for a board that is gone is a 404 rather than an audit
-      // row naming a board nothing can be nudged on.
-      requireBoard(boardId);
-    });
-  },
-
-  /**
    * The live board labelled with a project, or null.
    *
    * A board's `project_id` is a LABEL — which project this board is about — never a filter, and
@@ -257,26 +287,41 @@ export const kanbanBoardsService = {
     return kanbanBoardsDb.getBoardByProject(projectId);
   },
 
+  /**
+   * The live board a folder belongs to, or null when no board names it.
+   *
+   * A board names the repositories its cards are built in; the folder belongs to the board whose repos hold the LONGEST
+   * folder that is the folder itself or contains it, so a board on `/a/b` wins over a board on `/a` for `/a/b/c`. On a
+   * tie a board that runs itself comes first (a ticket placed there is walked), then the oldest board. Archived boards
+   * are never chosen. A relative or empty path is refused as null rather than resolved against this server's cwd: the
+   * path comes from outside the process.
+   */
+  boardForPath(folder: string): KanbanBoard | null {
+    if (folder.trim() === '' || !path.isAbsolute(folder)) return null;
+    const target = path.resolve(folder);
+
+    const candidates: { board: KanbanBoard; matchedPathLength: number }[] = [];
+    for (const board of kanbanBoardsDb.listBoards(false)) {
+      const matchedPathLength = longestContainingRepo(board, target);
+      if (matchedPathLength !== NO_REPO_MATCH) candidates.push({ board, matchedPathLength });
+    }
+
+    candidates.sort(
+      (left, right) =>
+        right.matchedPathLength - left.matchedPathLength ||
+        Number(right.board.autonomy) - Number(left.board.autonomy) ||
+        compareAscending(left.board.createdAt, right.board.createdAt) ||
+        compareAscending(left.board.id, right.board.id)
+    );
+
+    const best = candidates[0];
+    return best === undefined ? null : best.board;
+  },
+
   /** Five rows, one per status, over the board's live cards. Missing board, 404. */
   laneCounts(boardId: string): KanbanLaneCount[] {
     requireBoard(boardId);
     return kanbanBoardsDb.laneCounts(boardId);
-  },
-
-  /**
-   * How many cards on this board an autonomous session could claim right now.
-   *
-   * It is the driver's green light: a board whose autonomy is on but whose claimable count is zero
-   * gets no child, because a session that wakes to find nothing to do is a session that burns a
-   * conversation to read an empty lane. Like `laneCounts` this is a READ — no transaction, no
-   * audit row, no frame — so the driver can ask it every tick without writing anything.
-   *
-   * `KANBAN_LEASE_STALE_SECONDS` is the same dial the card summaries and the lease verbs use, so
-   * "stale" means one thing on this server rather than two.
-   */
-  claimableCount(boardId: string): number {
-    requireBoard(boardId);
-    return kanbanBoardsDb.countClaimable(boardId, KANBAN_LEASE_STALE_SECONDS);
   },
 
   /** The audit log, newest first. The limit is the route's to clamp — this reads what it is given. */

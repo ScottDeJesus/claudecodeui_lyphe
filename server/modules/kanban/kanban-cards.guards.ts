@@ -1,5 +1,5 @@
 import { kanbanBoardsDb, kanbanCardsDb, type KanbanCardRow } from '@/modules/database/index.js';
-import type { KanbanCardSummary } from '@/shared/kanban-types.js';
+import { KANBAN_CHANGELOG_MAX_CHARS, type KanbanCardSummary } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
 /**
@@ -89,6 +89,30 @@ export function requireTitle(title: string): string {
   if (trimmed.length === 0) {
     throw new AppError('A card needs a title.', {
       code: 'KANBAN_CARD_TITLE_REQUIRED',
+      statusCode: 400,
+    });
+  }
+  return trimmed;
+}
+
+/** Either break character starts a second line wherever the changelog is rendered, so either one is refused. */
+const CHANGELOG_LINE_BREAK_PATTERN = /[\r\n]/;
+
+/**
+ * A card's changelog line is ONE line a person reads in a list of finished work, so a line break or a
+ * paragraph is refused rather than silently cut. Empty is allowed: it clears the line.
+ */
+export function requireChangelog(changelog: string): string {
+  const trimmed = changelog.trim();
+  if (CHANGELOG_LINE_BREAK_PATTERN.test(trimmed)) {
+    throw new AppError('A changelog entry is one line.', {
+      code: 'KANBAN_CHANGELOG_INVALID',
+      statusCode: 400,
+    });
+  }
+  if (trimmed.length > KANBAN_CHANGELOG_MAX_CHARS) {
+    throw new AppError(`A changelog entry is at most ${KANBAN_CHANGELOG_MAX_CHARS} characters.`, {
+      code: 'KANBAN_CHANGELOG_INVALID',
       statusCode: 400,
     });
   }

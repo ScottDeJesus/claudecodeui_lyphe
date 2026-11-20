@@ -4,8 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { DrawerStepStages } from '@/modules/kanban/card-drawer/DrawerStepStages';
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
-import { FAKE_STEP_OF } from '@/modules/kanban/utils/walkFixtures';
-import type { KanbanWalk, KanbanWalkStage } from '@/modules/kanban/utils/walkModel';
+import { flowOf, type KanbanFlow, type KanbanWalk, type KanbanWalkStage } from '@/modules/kanban/utils/walkModel';
 import type { KanbanCardDetail, KanbanChecklistItem } from '@/shared/kanban-types';
 import { Button, Input, Meter } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -66,6 +65,21 @@ const STATES = {
 /** Forward, and round: a step marked done by mistake is one press from being open again. */
 const NEXT_STATE = { pending: 'active', active: 'done', done: 'pending' } satisfies Record<ChecklistState, ChecklistState>;
 
+/** The place in a flow's step list a sitting of that flow belongs under, or `null` when no step of it does. */
+function stepIndexOf(stageName: string, flow: KanbanFlow | null): number | null {
+  if (flow === null) return null;
+  if (flow === 'tweak') {
+    if (stageName === 'tweak' || stageName === 'tweak-undo') return 1;
+    return null;
+  }
+  if (stageName === 'diagnose') return 1;
+  if (stageName === 'scenarios') return 2;
+  if (stageName === 'builder' || stageName === 'fix-pass' || stageName.startsWith('fix-pass-')) return 3;
+  if (/^athena-\d+$/.test(stageName)) return 4;
+  if (stageName === 'prometheus') return 5;
+  return null;
+}
+
 /** Rendered by KanbanCardDrawer while autonomy is on. Nothing else mounts it. */
 export function DrawerChecklist({ detail, writes, walk, onReadStage }: DrawerChecklistProps) {
   const { t } = useTranslation();
@@ -76,14 +90,16 @@ export function DrawerChecklist({ detail, writes, walk, onReadStage }: DrawerChe
   const total = detail.checklist.length;
   const done = detail.checklist.filter((item) => item.state === 'done').length;
 
-  // FILL: stagesByStep — which of the walk's sittings are drawn under which step, by the stage's
+  // Which of the walk's sittings are drawn under which step, by the stage's
   // name and the card's flow. A bug and a change: `diagnose` under the second step, `scenarios`
   // the third, `builder` and every `fix-pass` the fourth, every `athena-<n>` the fifth, the docs
   // sitting the sixth. A tweak: `tweak` and `tweak-undo` under the second. A sitting no step of
   // THIS list claims (a tweak's, on a card that moved to the full flow) is `unplaced`.
+  // The docs sitting is the walk's `prometheus` stage, and a card no walk has sorted (no flow tag) claims none.
+  const flow = flowOf(detail.tags)?.flow ?? null;
   const stepOf = (stage: KanbanWalkStage): number | null => {
-    const index = FAKE_STEP_OF[stage.name];
-    return index !== undefined && index < total ? index : null;
+    const index = stepIndexOf(stage.name, flow);
+    return index !== null && index < total ? index : null;
   };
   const stages = walk?.stages ?? [];
   const stagesOf = (index: number) => stages.filter((stage) => stepOf(stage) === index);

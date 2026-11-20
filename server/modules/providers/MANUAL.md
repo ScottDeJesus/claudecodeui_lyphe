@@ -304,8 +304,8 @@ Command forms currently used by the providers are:
     transcript's mtime moves on idle bookkeeping writes, not just messages
 - Make the sync resilient to partial, malformed, or missing provider files.
 - Returning `null` from `synchronizeFile` (or refusing a path before the scan reads it) is
-  also how a provider excludes a session it does not own from ever getting a row — see
-  Claude's board-launched-Metis refusal in the scan-roots table above. Refuse on the
+  also how a provider excludes a session it does not own from ever getting a row (Claude's
+  refusal of a compacted-away transcript, MAN-8054). Refuse on the
   extractor's own returned `cwd`, not on a guessed path shape, and refuse it BEFORE the
   file is read to EOF so an excluded transcript costs no more than any other skip.
 - The orchestration service runs all provider synchronizers and only advances
@@ -315,7 +315,7 @@ Current session sync roots are:
 
 | Provider | Scan Roots | Metadata Helpers / Notes |
 | --- | --- | --- |
-| Claude | `~/.claude/projects/**/*.jsonl` | Title: the transcript's own first (`extractSessionTitle`, forward scan, the last `custom-title`, else the last `ai-title`, else the last `last-prompt`); `~/.claude/history.jsonl` supplies the name only when the transcript holds none. A stored name other than `Untitled Claude Session` is kept as it is. Refuses to enrol (never mints a `sessions`/`projects` row for) a transcript whose `cwd` resolves under `KANBAN_METIS_SESSION_ROOT` (`~/.claude/kanban-metis/<boardId>/`) — a board-launched Metis session the Kanban board's own driver owns and reads by session id instead; see `isUnder`/`KANBAN_METIS_SESSION_ROOT` in `claude-session-synchronizer.provider.ts`. |
+| Claude | `~/.claude/projects/**/*.jsonl` | Title: the transcript's own first (`extractSessionTitle`, forward scan, the last `custom-title`, else the last `ai-title`, else the last `last-prompt`); `~/.claude/history.jsonl` supplies the name only when the transcript holds none. A stored name other than `Untitled Claude Session` is kept as it is. |
 | Codex | `~/.codex/sessions/**/*.jsonl` | Uses `~/.codex/session_index.jsonl` for title lookup and the last `task_complete` message for a fallback title. |
 | Cursor | `~/.cursor/projects/**/*.jsonl` | Uses sibling `worker.log` to recover `workspacePath`, then derives the session title from the first user prompt. |
 | OpenCode | `~/.local/share/opencode/opencode.db` | Reads active sessions/messages/parts from OpenCode's shared SQLite database and stores `jsonl_path` as `null` so deleting one app session cannot remove the shared DB. |

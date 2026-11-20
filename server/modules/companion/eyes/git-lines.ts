@@ -79,14 +79,26 @@ export function shownPath(filePath: string): string {
   return filePath.replace(/[\s\u0085]+/g, ' ');
 }
 
+/**
+ * `text` as a markdown code span, so a renderer shows it as written (`__init__.py` is not emphasis, `**` is not bold) and the chat's
+ * renderer draws a path as its file chip. The fence is one backtick longer than the longest backtick run inside, and padded with a
+ * space when the text starts or ends with a backtick, per CommonMark. Consumed by `fileLine`.
+ */
+function codeSpan(text: string): string {
+  const longest = (text.match(/`+/g) ?? []).reduce((max, run) => Math.max(max, run.length), 0);
+  const fence = '`'.repeat(longest + 1);
+  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : '';
+  return fence + pad + text + pad + fence;
+}
+
 /** The refusal that names a file the deny rule withholds and says its diff is never read. */
 export function withheldSentence(filePath: string): string {
   return `${shownPath(filePath)} is withheld: its name or place marks it as a secret, so its diff is never read, by you or by a reader. Tell him it is his to open.`;
 }
 
-/** One file as a status line: `<state> <path>`, ` · staged` when it is, and ` · withheld` when its diff would not be read. */
+/** One file as a status line: ``<state> `<path>` `` — the path a code span (see `codeSpan`), ` · staged` when it is, and ` · withheld` when its diff would not be read. */
 export function fileLine(file: ChangedFile, withheld: boolean): string {
-  return `${file.state} ${shownPath(file.path)}${file.staged ? ' · staged' : ''}${withheld ? ' · withheld (a secret by its name)' : ''}`;
+  return `${file.state} ${codeSpan(shownPath(file.path))}${file.staged ? ' · staged' : ''}${withheld ? ' · withheld (a secret by its name)' : ''}`;
 }
 
 /** A changed file's section header, `=== <state> <path>`. */

@@ -1,6 +1,5 @@
 import { KANBAN_STATUSES, type KanbanCardDetail, type KanbanCardSummary, type KanbanLaneCount, type KanbanStatus } from '@/shared/kanban-types.js';
 
-import { whenWords } from './eyes-answer.js';
 import { clipLine, counted } from './line-words.js';
 
 /**
@@ -8,7 +7,7 @@ import { clipLine, counted } from './line-words.js';
  * no I/O. The board's own reader (`kanban-reads.ts`) fetches; this file only says it.
  *
  * NEVER A CARD'S BUILD TOKENS (ruling 1). A `KanbanCardSummary` carries `buildTokens` and a detail the four counters of it,
- * and no function here reads them: a card is said by its title, lane, priority, tags, checklist, questions and approval.
+ * and no function here reads them: a card is said by its title, lane, priority, tags, checklist and questions.
  * Consumed by `kanban-reads.ts` alone.
  */
 
@@ -88,7 +87,7 @@ function questionLine(index: number, question: KanbanCardDetail['questions'][num
 
 /**
  * Everything of a card but its description, as lines: the title, then its lane, priority and tags, its checklist, its open
- * questions and whether he approved it. Consumed by `kanban-reads.ts`, which puts the description after it.
+ * questions. Consumed by `kanban-reads.ts`, which puts the description after it.
  */
 export function cardFacts(card: KanbanCardDetail): string {
   const open = card.questions.filter((question) => !question.answered);
@@ -100,13 +99,11 @@ export function cardFacts(card: KanbanCardDetail): string {
           ...open.slice(0, QUESTIONS_SHOWN).map((question, index) => questionLine(index + 1, question)),
           ...(open.length > QUESTIONS_SHOWN ? [`And ${open.length - QUESTIONS_SHOWN} more.`] : []),
         ].join('\n');
-  const approved = card.approved ? `Approved${card.approvedAt === null ? '' : ` ${whenWords(card.approvedAt)}`}.` : 'Not approved.';
   const checklist = card.checklistTotal === 0 ? 'No checklist.' : `Checklist: ${card.checklistDone} of ${card.checklistTotal} done.`;
   return [
     clipLine(card.title, 200),
     `${LANE_WORDS[card.status]} · ${card.priority} priority · ${tagWords(card.tags)} · card ${card.id}`,
     checklist,
     questions,
-    approved,
   ].join('\n');
 }

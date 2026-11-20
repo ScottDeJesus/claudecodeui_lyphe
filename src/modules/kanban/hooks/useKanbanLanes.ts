@@ -51,6 +51,8 @@ export type KanbanLanes = {
   /** The one card the drawer is open on, or null — held here so board and drawer share it. */
   selectedCardId: string | null;
   openCard: (cardId: string | null) => void;
+  /** Opens a card on the board it names, which may not be the open board yet: the selection waits for that board. */
+  openCardOn: (boardId: string, cardId: string) => void;
   /**
    * The board's live region: the sentence whoever made the move composed, and a sequence number
    * that changes on EVERY announcement. The number is not decoration — a live region is heard
@@ -153,6 +155,7 @@ export function useKanbanLanes(boardId: string | null, specs: KanbanLaneSpec[], 
     (cardId: string | null) => setSelection(cardId === null ? null : { boardId, cardId }),
     [boardId]
   );
+  const openCardOn = useCallback((onBoard: string, cardId: string) => setSelection({ boardId: onBoard, cardId }), []);
   const announce = useCallback(
     (sentence: string) => setAnnouncement((held) => ({ text: sentence, seq: held.seq + 1 })),
     []
@@ -169,6 +172,7 @@ export function useKanbanLanes(boardId: string | null, specs: KanbanLaneSpec[], 
     loadMore: feed.loadMore,
     selectedCardId,
     openCard,
+    openCardOn,
     announcement,
     announce,
     applyCard,

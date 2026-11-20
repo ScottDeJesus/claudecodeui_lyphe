@@ -33,7 +33,7 @@ import { useToast } from '@/shared/context/ToastContext';
  *
  * A REFUSAL IS A VERDICT, NOT AN ERROR: the server's own message travels in the body, and the
  * toast carries it whole rather than replacing it with a generic sentence that says nothing about
- * which rule was met. That is what makes a 409 from the approve gate legible as the gate's verdict
+ * which rule was met. That is what makes a 409 legible as the rule that refused the write
  * rather than as a failed save.
  */
 
@@ -65,8 +65,6 @@ export type KanbanMutations = {
   clearLane: (cardIds: string[]) => Promise<void>;
   addTag: (cardId: string, tag: string) => Promise<KanbanCardSummary | null>;
   removeTag: (cardId: string, tag: string) => Promise<KanbanCardSummary | null>;
-  approveCard: (cardId: string) => Promise<KanbanCardSummary | null>;
-  unapproveCard: (cardId: string) => Promise<KanbanCardSummary | null>;
   answerQuestion: (
     questionId: string,
     input: { selected: string[]; other?: string }
@@ -202,16 +200,6 @@ export function useKanbanMutations({ applyCard }: KanbanMutationOptions): Kanban
     [writeCard]
   );
 
-  const approveCard = useCallback(
-    (cardId: string) => writeCard(() => api.kanban.approveCard(cardId)),
-    [writeCard]
-  );
-
-  const unapproveCard = useCallback(
-    (cardId: string) => writeCard(() => api.kanban.unapproveCard(cardId)),
-    [writeCard]
-  );
-
   // The ledger verbs below answer with their OWN row, and put nothing back: the drawer paints what
   // the shell's one fetch returned, so a write that did not land leaves that fetch's state standing
   // — the same "nothing changed" a revert would produce, without a second copy to keep right.
@@ -309,8 +297,6 @@ export function useKanbanMutations({ applyCard }: KanbanMutationOptions): Kanban
     clearLane,
     addTag,
     removeTag,
-    approveCard,
-    unapproveCard,
     answerQuestion,
     fileIssue,
     resolveIssue,

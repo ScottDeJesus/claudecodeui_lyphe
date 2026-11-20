@@ -206,7 +206,7 @@ export function StationKayleeView({
       <div className={cn('flex min-w-0 flex-col gap-1.5', under ? 'min-h-0 w-full items-center text-center' : 'flex-1 items-start')}>
         {yours !== null && !mark && (
           <div data-station-kaylee-yours="" className={cn('flex min-w-0 max-w-full flex-col', under ? 'items-center' : 'items-start')}>
-            <p className="max-w-full truncate text-sm text-foreground">{yoursWords}</p>
+            <p className="max-w-full whitespace-pre-wrap break-words text-sm text-foreground">{yoursWords}</p>
             <p className={EYEBROW}>
               {[t('companion.log.you'), yours.via === null ? null : t(yours.via === 'spoken' ? 'companion.log.spoken' : 'companion.log.typed'), clockOf(yours.at)].filter(Boolean).join(' · ')}
             </p>
@@ -271,7 +271,7 @@ export function StationKayleeView({
         <div className={cn('flex min-w-0 max-w-full', mark ? 'items-baseline gap-2' : 'flex-col', under ? 'items-center' : !mark && 'items-start')}>
           <CompanionStatus presence={presence} emphasis={mark ? 'panel' : 'station'} />
           {/* The mark is one line where the other forms have two: the state, then what was last heard, in the room that is left. */}
-          {mark && yours !== null && <p data-station-kaylee-yours="" className="min-w-0 truncate text-sm text-muted-foreground">{yoursWords}</p>}
+          {mark && yours !== null && <p data-station-kaylee-yours="" className="min-w-0 whitespace-pre-wrap break-words text-sm text-muted-foreground">{yoursWords}</p>}
           {failedSentence !== null && (
             <p data-station-kaylee-failed="" data-tone="warn" title={failedSentence} className="flex min-w-0 items-start gap-1.5 text-xs leading-snug text-tone-ink">
               <span aria-hidden="true">▲</span>

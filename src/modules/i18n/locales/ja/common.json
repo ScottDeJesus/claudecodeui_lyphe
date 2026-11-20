@@ -24,7 +24,7 @@
     "git": "Git",
     "tasks": "タスク",
     "browser": "Browser",
-    "kanban": "カンバン",
+    "kanban": "バグ",
     "universe": "宇宙"
   },
   "kanban": {

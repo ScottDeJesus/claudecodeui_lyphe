@@ -1,11 +1,5 @@
 import { getConnection } from '@/modules/database/connection.js';
-import {
-  clampKanbanConcurrency,
-  KANBAN_OPERATOR_SCHEDULED_TAG,
-  type KanbanBoard,
-  type KanbanLaneCount,
-  type KanbanStatus,
-} from '@/shared/kanban-types.js';
+import { type KanbanBoard, type KanbanLaneCount, type KanbanStatus } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
 /**
@@ -24,8 +18,6 @@ type KanbanBoardRow = {
   name: string;
   project_id: string | null;
   autonomy: number;
-  deepseek_flash: number;
-  concurrency: number;
   repos: string;
   sort_order: number;
   archived: number;
@@ -35,7 +27,7 @@ type KanbanBoardRow = {
 
 /** Every column of a board, in one spelling, so no query is the odd one out. */
 const BOARD_COLUMNS =
-  'id, name, project_id, autonomy, deepseek_flash, concurrency, repos, sort_order, archived, created_at, updated_at';
+  'id, name, project_id, autonomy, repos, sort_order, archived, created_at, updated_at';
 
 /** A corrupt repos column reads as no repos, so one bad row cannot fail the list of every board. */
 function parseRepos(value: string): string[] {
@@ -55,15 +47,9 @@ function parseRepos(value: string): string[] {
 /**
  * One SQLite row to the `KanbanBoard` the rest of the server speaks.
  *
- * `autonomy`, `deepseekFlash` and `archived` become real booleans here and nowhere else: a `0`
- * reaching the wire is a panel whose autonomy switch reads as stuck, which is what the check
- * asserting `autonomy=False` exists to catch.
- *
- * `concurrency` is CLAMPED here, and this mapper is the right place for it: every read of a board
- * row in the whole server passes through this one conversion, so a value written by hand, left
- * behind by an older schema or set absurdly by a future caller cannot reach a comparison without
- * meeting the clamp first. The writes clamp too (`kanban-boards.service.ts`), because a number that
- * is never in range should not be stored either.
+ * `autonomy` and `archived` become real booleans here and nowhere else: a `0` reaching the wire is
+ * a panel whose autonomy switch reads as stuck, which is what the check asserting `autonomy=False`
+ * exists to catch.
  */
 function toKanbanBoard(row: KanbanBoardRow): KanbanBoard {
   return {
@@ -71,8 +57,6 @@ function toKanbanBoard(row: KanbanBoardRow): KanbanBoard {
     name: row.name,
     projectId: row.project_id,
     autonomy: row.autonomy === 1,
-    deepseekFlash: row.deepseek_flash === 1,
-    concurrency: clampKanbanConcurrency(row.concurrency),
     repos: parseRepos(row.repos),
     sortOrder: row.sort_order,
     archived: row.archived === 1,
@@ -85,8 +69,6 @@ function toKanbanBoard(row: KanbanBoardRow): KanbanBoard {
 const BOARD_PATCH_COLUMNS = {
   name: 'name',
   autonomy: 'autonomy',
-  deepseekFlash: 'deepseek_flash',
-  concurrency: 'concurrency',
   repos: 'repos',
   projectId: 'project_id',
   archived: 'archived',
@@ -97,8 +79,6 @@ export type KanbanBoardUpdatePatch = {
   id: string;
   name?: string;
   autonomy?: boolean;
-  deepseekFlash?: boolean;
-  concurrency?: number;
   repos?: string[];
   projectId?: string | null;
   archived?: boolean;
@@ -124,10 +104,6 @@ export const kanbanBoardsDb = {
    * and that is the order the board switcher would render. The gap is 1000 so a later reorder
    * can splice a board between two others by midpoint without renumbering, the same rule the
    * cards' `sort_order` follows.
-   *
-   * `deepseek_flash` and `concurrency` are left to their columns' own defaults: a new board runs on
-   * Claude and one session at a time, both of which are GOVERNORS its owner turns on rather than
-   * settings a create has any business guessing at `0` or `4` for.
    */
   insertBoard(input: {
     id: string;
@@ -295,39 +271,5 @@ export const kanbanBoardsDb = {
 
     const totals = new Map(rows.map((row) => [row.status, row.total]));
     return BOARD_STATUSES.map((status) => ({ status, total: totals.get(status) ?? 0 }));
-  },
-
-  /**
-   * How many of a board's live cards an autonomous session could pick up right now.
-   *
-   * A card is claimable when it is `todo` and not tagged `operator-scheduled`, or when it is
-   * `active` on a lease that has gone stale — an `active` card whose owner died mid-build is work
-   * nobody is doing, and leaving it out would strand it until an operator noticed. A card on a
-   * FRESH lease is somebody else's and is not counted, which is what keeps two sessions off one
-   * card. A To-do card the operator tagged `operator-scheduled` is in his court, never a
-   * session's: counting it would make the driver spawn a Metis every cooldown to find nothing to
-   * do. An `active` card keeps counting with or without the tag — an orphan is resumed, not skipped.
-   *
-   * `staleSeconds` is the caller's dial and the ISO-8601 UTC seconds bound is derived HERE from
-   * `Date.now()`: `build_lease_at` is TEXT in that same format, so the comparison below is
-   * lexicographic — and correct only because the format is fixed-width and UTC. A `Date` bound
-   * here would compare a string against an object and match nothing, which reads as "no orphaned
-   * leases" forever.
-   */
-  countClaimable(boardId: string, staleSeconds: number): number {
-    const db = getConnection();
-    const staleBefore = new Date(Date.now() - staleSeconds * 1000).toISOString();
-    const row = db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM kanban_cards c
-         WHERE c.board_id = ? AND c.archived = 0
-           AND ( (c.status = 'todo' AND NOT EXISTS (
-                   SELECT 1 FROM kanban_card_tags t
-                   WHERE t.card_id = c.id AND lower(trim(t.tag)) = ?))
-              OR (c.status = 'active' AND (c.build_lease_at IS NULL OR c.build_lease_at < ?)) )`
-      )
-      .get(boardId, KANBAN_OPERATOR_SCHEDULED_TAG, staleBefore) as { n: number };
-
-    return row.n;
   },
 };

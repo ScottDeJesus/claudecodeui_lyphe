@@ -43,7 +43,6 @@ runCase(async (t: { defer: (cleanup: () => unknown) => void }) => {
       questions: kanban.kanbanQuestionsService,
       checklist: kanban.kanbanChecklistService,
       attachments: kanban.kanbanAttachmentsService,
-      leases: kanban.kanbanLeasesService,
       lessons: kanban.kanbanLessonsService,
       memoryPending: () => 0,
     } as any)

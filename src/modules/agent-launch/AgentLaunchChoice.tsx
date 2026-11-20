@@ -41,7 +41,7 @@ type AgentLaunchChoiceProps = {
 
 /**
  * One of a row's two slots — its model or its effort — marked pinned or default, and changed in
- * place. Used by `AgentLaunchRowItem`, for every soul, for Metis, and for the sorter and the tweak.
+ * place. Used by `AgentLaunchRowItem`, for every soul and for the sorter and the tweak.
  *
  * THE LIST IS THE TABLE'S OWN VOCABULARY plus one choice that is not a word: Default, which clears the
  * pin and says what it would fall back to. A row that is not pinned selects that choice, so the
@@ -82,6 +82,8 @@ export function AgentLaunchChoice(props: AgentLaunchChoiceProps) {
           </Badge>
         )}
       </div>
+      {/* A real space between the caption and its slot: the gap the grid draws is not text, and read as text the two ran together ("Efforthigh"). */}
+      {' '}
       {listed === null ? (
         <p className="flex min-h-9 items-center text-pretty text-xs text-muted-foreground finger:min-h-11" data-agent-choice-said>
           {props.said}

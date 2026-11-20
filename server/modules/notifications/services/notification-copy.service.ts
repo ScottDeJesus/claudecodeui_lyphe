@@ -478,6 +478,13 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     headline: 'Not running',
     body: [readText(meta.detail), 'Open the Roadmap tab'].filter((part): part is string => part !== null).join(' · '),
   })],
+  // A board card the dispatcher's walk finished (`kanban-dispatch.word.ts`): its title is the headline, the body the one changelog line
+  // the walk left and the board's name. A card a person filed is a look (`stop`); a ticket the house filed is a `record`, kept for the
+  // station's strip and never pushed. No session name is sent, so the title is the card's own.
+  ['bug.fixed', ({ meta }) => ({
+    headline: `Fixed: ${readText(meta.title) ?? 'a card'}`,
+    body: [readText(meta.changelog), readText(meta.boardName)].filter((part): part is string => part !== null).join(' · '),
+  })],
   ['push.enabled', () => ({ headline: 'Push notifications enabled', body: 'Push notifications are now enabled!' })],
 ]);
 

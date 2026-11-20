@@ -9,8 +9,7 @@
  * `DEEPSEEK_MODEL` is passed to the CLI VERBATIM. A Claude alias sent to this endpoint is mapped by the
  * vendor to a different model than the one named, while the CLI's own tally still says the alias.
  *
- * Consumers: `server/modules/kanban-metis` (a Flash board's Metis) and `server/modules/companion`
- * (Kaylee, when her model is DeepSeek), both through this module's barrel.
+ * Consumer: `server/modules/companion` (Kaylee, when her model is DeepSeek), through this module's barrel.
  */
 export const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/anthropic';
 export const DEEPSEEK_MODEL = 'deepseek-flash';

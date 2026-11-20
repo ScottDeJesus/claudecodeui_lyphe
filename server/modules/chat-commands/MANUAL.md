@@ -20,7 +20,7 @@ Consumers are `toolsets` (the launch hook hands out the credential; its command 
 | --- | --- |
 | value | `chatCredential(appSessionId)` = hex HMAC-SHA256 of `toolset:${appSessionId}`, keyed by `JWT_SECRET` (exported by `server/modules/auth/index.ts` for this) |
 | one per chat, shared | a chat carries ONE credential (`CLOUDCLI_TOOLSET_TOKEN`, with `CLOUDCLI_TOOLSET_URL`), and every command it runs sends that same one. There is no second credential and no second derivation: a new command's door mounts `chatCredentialGuard` and nothing else |
-| the `toolset:` prefix | the scheme's history, kept byte for byte. The digest is already in the environment of every chat that was launched, so a different derivation would lock all of them out of every command door until their next process. It also keeps the credential from standing in for the `kanban-pm` door's, derived the same way |
+| the `toolset:` prefix | the scheme's history, kept byte for byte. The digest is already in the environment of every chat that was launched, so a different derivation would lock all of them out of every command door until their next process. |
 | stored | nowhere: the launch hands the digest to the CLI, the guard recomputes it. A restart changes nothing; a chat that ended is a row that is gone |
 | compared | `chatCredentialMatches`: `crypto.timingSafeEqual` after a length check |
 | scope | one chat. A model holding it cannot act as another chat. The operator's JWT never enters a CLI's environment, and the operator's own mounts (`/api/notes`, `/api/toolsets`) refuse this credential (401 from `authenticateToken`) |

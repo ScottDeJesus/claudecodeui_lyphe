@@ -36,7 +36,7 @@ export type KanbanPriority = 'low' | 'medium' | 'high';
  * One board row, with the booleans SQLite stores as 0 or 1 already converted.
  *
  * `autonomy` is what the board header's switch reads: OFF hides the questions lane, every card
- * signal, the approve control, the leases, the checklist, the token chips and the issues — it
+ * signal, the checklist, the token chips and the issues — it
  * hides nothing on the server and skips no write.
  */
 export type KanbanBoard = {
@@ -44,17 +44,6 @@ export type KanbanBoard = {
   name: string;
   projectId: string | null;
   autonomy: boolean;
-  /** This board's OWN DeepSeek Flash switch, read at every spawn to decide whether the Metis this
-   *  board launches runs on Flash or on Claude. The host-wide flag file
-   *  (`~/.claude/state/deepseek_flash.flag`) is NEVER consulted for anything this board launches —
-   *  two boards on one host must be able to run different models, and a switch that is a file the
-   *  whole box shares cannot say that. */
-  deepseekFlash: boolean;
-  /** This board's own Metis dial: how many sessions it may run at once, clamped by the server to
-   *  `[0, KANBAN_CONCURRENCY_MAX]` at every read and every write — the ceiling reaches the client as
-   *  the driver reading's `concurrencyMax`, never as a copy here. Zero is a real value and means the
-   *  board spawns NOTHING, so the panel draws it as a number rather than as an absence. */
-  concurrency: number;
   /** The absolute paths of the git repositories the board's cards are built in. The server checks
    *  each is a directory inside a git work tree, and refuses autonomy on for a board that names
    *  none (409 `KANBAN_BOARD_NEEDS_REPOS`). */
@@ -74,17 +63,7 @@ export type KanbanBoard = {
 export type KanbanLaneCount = { status: KanbanStatus; total: number };
 
 /**
- * How a card's build lease reads right now, computed SERVER-side from `build_lease_at`.
- *
- * The panel maps this value through and NEVER re-derives it from `buildLeaseAt`: two clocks
- * computing one truth is a badge that disagrees with the API. `buildLeaseAt` and `buildOwner`
- * stay on the wire for tooltip TEXT only, never for a decision.
- */
-export type KanbanLeaseState = 'none' | 'held' | 'stale';
-
-/**
- * One card as a lane renders it: the row, its tags, its four rolled-up counts, and the lease state
- * the server decided.
+ * One card as a lane renders it: the row, its tags and its four rolled-up counts.
  *
  * `buildTokens` is every token the build moved (input, output and both cache counters summed), so
  * the panel formats one number rather than four and the card never does token math.
@@ -102,14 +81,7 @@ export type KanbanCardSummary = {
   checklistDone: number;
   checklistTotal: number;
   buildTokens: number;
-  approved: boolean;
   archived: boolean;
-  buildLeaseAt: string | null;
-  buildOwner: string | null;
-  planLeaseAt: string | null;
-  planOwner: string | null;
-  /** Computed server-side from `build_lease_at`; the client never re-derives it. */
-  leaseState: KanbanLeaseState;
   createdAt: string;
   updatedAt: string;
 };
@@ -117,9 +89,6 @@ export type KanbanCardSummary = {
 /**
  * One question on a card, with its options and answer as parsed arrays rather than the JSON text
  * SQLite holds.
- *
- * A card with zero unanswered questions is what the approve gate lets through, so the drawer's
- * question group is the control that unlocks approval.
  */
 export type KanbanQuestion = {
   id: string;
@@ -194,14 +163,16 @@ export type KanbanAttachment = {
  * counters broken out, and the five child collections.
  *
  * It is fetched once when the card is opened and never cached between opens, so the drawer cannot
- * render a checklist row that disagrees with the count on its face.
+ * render a checklist row that disagrees with the count on its face. `doneAt` is stamped by the
+ * move into Done and cleared by a move out.
  */
 export type KanbanCardDetail = KanbanCardSummary & {
   description: string;
   body: string;
   plan: string | null;
   closingRemarks: string;
-  approvedAt: string | null;
+  doneAt: string | null;
+  changelog: string;
   buildTokensIn: number;
   buildTokensOut: number;
   buildTokensCacheRead: number;
@@ -225,16 +196,6 @@ export type KanbanEventRow = {
 };
 
 /**
- * The answer to a lease claim, refresh or release: whether it was granted, and the card as it
- * stands after the attempt.
- *
- * A claim against a fresh foreign lease is `{ granted: false }` with the current card — a verdict,
- * never an error — so the panel repaints from this one response instead of following a refusal
- * with a read.
- */
-export type KanbanLeaseResult = { granted: boolean; card: KanbanCardSummary };
-
-/**
  * Every event kind the seam may record, mirrored from `server/shared/kanban-types.ts` where it is
  * declared beside the frame's own shapes.
  *
@@ -252,8 +213,6 @@ export type KanbanEventKind =
   | 'card.moved'
   | 'card.archived'
   | 'card.restored'
-  | 'card.approved'
-  | 'card.unapproved'
   | 'tag.added'
   | 'tag.removed'
   | 'question.added'
@@ -266,22 +225,17 @@ export type KanbanEventKind =
   | 'checklist.removed'
   | 'attachment.added'
   | 'attachment.removed'
-  | 'lease.build_claimed'
-  | 'lease.build_refreshed'
-  | 'lease.build_released'
-  | 'lease.plan_claimed'
-  | 'lease.plan_released'
   | 'lesson.staged'
-  | 'lesson.reviewed'
-  | 'metis.nudged';
+  | 'lesson.reviewed';
 
 /**
  * One lesson: what a build learned, staged for a person's review before any later session reads it
  * back.
  *
- * The lifecycle is one-way and its two ends have OPPOSITE actors: a build stages, a person reviews,
- * and only an approved lesson reaches a session again. `status` is carried as a plain string and
- * not a union — today `staged`, `approved` or `rejected` — because that vocabulary grew a value twice.
+ * The lifecycle is one-way and its two ends have OPPOSITE actors: the /learn sweep stages, a
+ * person reviews, and only an approved lesson reaches a session again. `status` is carried as a
+ * plain string and not a union — today `staged`, `approved` or `rejected` — because that vocabulary
+ * grew a value twice.
  * `draftPath` is set ONLY for a `kind='skill_draft'` lesson, whose body also landed as a `SKILL.md`
  * file to promote, and `cardId` is nullable because a lesson outlives the card it was learned on.
  */
@@ -318,25 +272,6 @@ export type KanbanLessonLean = {
   source: string;
   createdAt: string;
   reviewedAt: string | null;
-};
-
-/**
- * What one Metis session has spent, as the reader last counted it.
- *
- * One row per session, upserted as the session's transcript grows: the four counters are TOTALS,
- * never a delta, and `byteOffset` is where the main transcript's read cursor stood at that write —
- * recorded for the reader, never read back to resume.
- */
-export type KanbanSessionUsage = {
-  sessionId: string;
-  boardId: string | null;
-  cardId: string | null;
-  tokensIn: number;
-  tokensOut: number;
-  cacheRead: number;
-  cacheCreate: number;
-  byteOffset: number;
-  updatedAt: string;
 };
 
 /**
@@ -378,3 +313,9 @@ export type KanbanBoardEvent = {
   lanes: KanbanLaneCount[];
   at: number;
 };
+
+/**
+ * The board's stats and changelog shapes live in a sibling mirror, since this file is past the
+ * house's size ceiling; re-exported so the panel imports every board shape from here.
+ */
+export * from '@/shared/kanban-stats-types';

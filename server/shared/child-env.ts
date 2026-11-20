@@ -27,8 +27,8 @@ const DISPATCHED_SOUL_MARK = ['PLAN_RUNNER_CHILD', 'PLAN_RUNNER_RUN_ID'] as cons
 /**
  * Consumers: every server module that launches a child for the user — the provider runtimes (claude, codex,
  * cursor, opencode), the Shell tab's terminal (`websocket`), the dispatcher and roadmap verbs the cards relay,
- * heal, compaction, jev, deepseek usage, browser-use, project clone, the agent routes and launcher, kanban-metis,
- * cerberus diagnosis and the settings switches. They share this one subtraction so no launcher forgets a name.
+ * heal, compaction, jev, deepseek usage, browser-use, project clone, the agent routes and launcher, cerberus
+ * diagnosis and the settings switches. They share this one subtraction so no launcher forgets a name.
  * `extra` is applied AFTER it, so a caller that must state one of the removed names still can.
  */
 export function userFacingEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {

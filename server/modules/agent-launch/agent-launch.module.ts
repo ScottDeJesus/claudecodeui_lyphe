@@ -4,7 +4,6 @@ import path from 'node:path';
 import type { Router } from 'express';
 
 import { expandHome } from '@/shared/utils.js';
-import type { AgentLaunchResolved, AgentLaunchResult } from '@/shared/types.js';
 
 import { createAgentLaunchRouter } from './agent-launch.routes.js';
 import { createAgentLaunchService, type AgentLaunchService } from './agent-launch.service.js';
@@ -22,8 +21,7 @@ export type AgentLaunchModule = { router: Router };
 
 /**
  * The one service, built on first use. The environment is read here and nowhere below it, which is
- * what lets the lane be proven against a scratch CLI without a real table behind it. The router and
- * `resolveLaunchSide` both ask through it, so the two never disagree about which CLI they run.
+ * what lets the lane be proven against a scratch CLI without a real table behind it. The router asks through it.
  */
 let service: AgentLaunchService | null = null;
 
@@ -43,15 +41,4 @@ function launchService(): AgentLaunchService {
  */
 export function createAgentLaunchModule(): AgentLaunchModule {
   return { router: createAgentLaunchRouter(launchService()) };
-}
-
-/**
- * The model and effort a launch of `name` takes on one side of the DeepSeek switch, asked of the
- * same CLI the routes run. Never throws: a failed ask is a result the caller turns into its own refusal.
- */
-export function resolveLaunchSide(
-  name: string,
-  side: AgentLaunchResolved['side'],
-): Promise<AgentLaunchResult<AgentLaunchResolved>> {
-  return launchService().resolveSide(name, side);
 }

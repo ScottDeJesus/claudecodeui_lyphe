@@ -448,8 +448,7 @@ export const browserUseService = {
   },
 
   async registerAgentMcp() {
-    // The three-install resolver lives in `server/shared/mcp-command.ts`, because kanban-metis
-    // resolves the same three branches for its own stdio server.
+    // The three-install resolver (a sibling `.js`, a sibling `.ts`, else the `cloudcli` binary) lives in `server/shared/mcp-command.ts`.
     const { command, args } = resolveMcpCommand('browser-use-mcp', 'browser-use-mcp');
     await Promise.all(LEGACY_MCP_SERVER_NAMES.map((name) => removeMcpServerFromAllProviders(name)));
     const results = await providerMcpService.addMcpServerToAllProviders({

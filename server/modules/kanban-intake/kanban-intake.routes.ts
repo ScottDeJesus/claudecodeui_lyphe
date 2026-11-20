@@ -13,7 +13,7 @@
  * own env file, so a
  * rotation needs no restart and no second copy exists.
  *
- * What lands: cards go to the Backlog (`not_ready`) at the priority the body names (`low` | `medium` | `high`),
+ * What lands: cards go to To do (`todo`), since only the owner's reports reach this door and his report is his approval, at the priority the body names (`low` | `medium` | `high`),
  * `medium` when it names none; an unknown priority is a 400. Every write through this door is
  * stamped with the actor `restorly`, so the activity spine never reads them as the operator's own acts.
  */
@@ -126,7 +126,7 @@ function parseIntakeCard(body: Record<string, unknown>): IntakeCard | string {
   return { boardId, title, description, tags, priority: parsedPriority.priority };
 }
 
-/** The door's router: the secret guard first, then the one POST that files a card in the Backlog. */
+/** The door's router: the secret guard first, then the one POST that files a card in To do. */
 export function createKanbanIntakeRouter(): Router {
   const router = express.Router();
   const readSecret = createIntakeSecretReader(kanbanIntakeEnvFile());
@@ -160,7 +160,7 @@ export function createKanbanIntakeRouter(): Router {
       const context: KanbanWriteContext = { actor: INTAKE_ACTOR };
       const created = kanbanCardsService.createCard(
         parsed.boardId,
-        { title: parsed.title, description: parsed.description, status: 'not_ready', priority: parsed.priority },
+        { title: parsed.title, description: parsed.description, status: 'todo', priority: parsed.priority },
         context
       );
 

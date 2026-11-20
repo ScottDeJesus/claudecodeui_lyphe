@@ -1,0 +1,79 @@
+/* Verve readings paint — the rules for the two pieces a number is read FROM: Readout (one figure and its name,
+ * Astrolabe's Readout and ReadoutRow) and DayBars (one or two series over named days).
+ *
+ * The ninth paint file, opened rather than squeezed in: data.css stood at 220 lines and these two would carry it
+ * past its ceiling (MANUAL rule 6). The next file opens the same way again.
+ *
+ * Same contract as its siblings. A library class string carries `vv-<name>` plus layout utilities and nothing else;
+ * colour comes from tokens.css; no rule here declares a `--tone-*` property, because tone is a token swap (rule 4).
+ * Both pieces only READ the swap: a toned figure and a toned bar take `--tone-ink` and `--tone-dot` from their own
+ * `data-tone`.
+ *
+ * Imported once, for side effect, from src/shared/ui/index.ts — after data.css and before board.css, which keeps the
+ * last word. The place is free: nothing here shares a selector with a sibling sheet.
+ */
+
+/* ---------------------------------------------------------------- Readout */
+/* The label is the telemetry caption (`--text-caption`: mono, upper-case, tracked, faint). The figure is mono and
+ * tabular in `--ink-strong`: 24px at `md`, and at `lg` the panel's one large number, 44px and light, as Astrolabe
+ * draws a display figure. The unit rides the figure's baseline, small and muted. */
+.vv-readout { gap: 4px; }
+.vv-readout__label {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.14em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+.vv-readout__main { gap: 6px; }
+.vv-readout__value {
+  color: var(--ink-strong);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  line-height: 1.1;
+}
+.vv-readout[data-size='lg'] .vv-readout__value { font-size: 44px; font-weight: 300; letter-spacing: -0.02em; line-height: 1; }
+.vv-readout__unit { color: var(--ink-muted); font-family: var(--font-mono); font-size: 12px; }
+.vv-readout__note { color: var(--ink-muted); font-size: 12.5px; line-height: 1.35; }
+/* No reading: the dash in the faint ink, which still holds 4.5:1 on every ground (Astrolabe's `opacity-dim` does not,
+ * on the light one). */
+.vv-readout[data-unknown] .vv-readout__value { color: var(--ink-faint); font-weight: 300; }
+/* A toned figure: the tone's ink, and its glyph before it at half the figure's size, so the state reads in greyscale.
+ * `data-tone` is only ever set for a tone that is not neutral (Readout.tsx). */
+.vv-readout[data-tone] .vv-readout__value { color: var(--tone-ink); }
+.vv-readout[data-tone] .vv-readout__value::before { content: var(--tone-glyph) ' '; font-size: 0.5em; vertical-align: 0.3em; }
+
+/* ---------------------------------------------------------------- DayBars */
+/* The legend names each series with its mark, its word and its total; the scale's sentence stands at its far end.
+ * The plot is one row of day columns; each column holds one side per series, the first growing up to the zero rule
+ * and the second hanging down from it. A bar is the series' `--tone-dot`, or the accent with no tone, at full strength
+ * on every day and with nothing behind it but the plot's own ground: a faded bar, or one on a tinted column, falls under
+ * the 3:1 a drawn shape needs on the light ground. Today is marked UNDER its column instead, by a short rule in the gap
+ * between the plot and its dates; a pointer's hover draws the same rule, fainter, under the column it is over. */
+.vv-daybars { gap: 6px; }
+.vv-daybars__legend { gap: 2px 14px; color: var(--ink-muted); font-size: 12px; }
+.vv-daybars__names { gap: 2px 14px; }
+.vv-daybars__series { gap: 5px; }
+.vv-daybars__mark { color: var(--tone-dot, var(--accent)); font-size: 9px; }
+.vv-daybars__total { color: var(--ink); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 500; }
+.vv-daybars__peak { font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.vv-daybars__plot { position: relative; gap: 4px; }
+.vv-daybars[data-dense] .vv-daybars__plot { gap: 1px; }
+.vv-daybars__side[data-side='up'] { align-items: flex-end; }
+/* The rule is one pixel, and the second series starts under it. */
+.vv-daybars__side[data-side='down'] { align-items: flex-start; margin-top: 1px; }
+.vv-daybars__bar { border-radius: 2px 2px 0 0; background: var(--tone-dot, var(--accent)); }
+.vv-daybars__side[data-side='down'] .vv-daybars__bar { border-radius: 0 0 2px 2px; }
+.vv-daybars__day { position: relative; }
+.vv-daybars__day[data-today]::after,
+.vv-daybars__day:hover::after { content: ''; position: absolute; right: 0; bottom: -4px; left: 0; height: 2px; border-radius: 1px; }
+.vv-daybars__day[data-today]::after { background: var(--ink-muted); }
+@media (hover: hover) {
+  .vv-daybars__day:not([data-today]):hover::after { background: var(--border-strong); }
+}
+.vv-daybars__zero { position: absolute; right: 0; left: 0; height: 1px; background: var(--border-strong); pointer-events: none; }
+.vv-daybars__axis { color: var(--ink-faint); font-family: var(--font-mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
