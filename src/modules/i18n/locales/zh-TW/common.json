@@ -43,7 +43,9 @@
       "switcher": "看板",
       "actions": "看板操作",
       "noBoard": "無看板",
-      "autonomy": "自主",
+      "autonomyOn": "開",
+      "autonomyOff": "關",
+      "autonomySwitch": "開啟或關閉此看板",
       "newBoard": "新增看板",
       "rename": "重新命名",
       "archive": "封存",
@@ -83,8 +85,8 @@
       "boardCreated": "已建立看板",
       "boardRenamed": "看板已重新命名",
       "boardArchived": "看板已封存——沒有刪除任何內容",
-      "autonomyOn": "自主模式已開啟",
-      "autonomyOff": "自主模式已關閉",
+      "autonomyOn": "此看板已開啟",
+      "autonomyOff": "此看板已關閉",
       "cardArchived": "卡片已封存",
       "laneCleared": "該欄的卡片已封存"
     }

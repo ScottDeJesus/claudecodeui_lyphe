@@ -43,7 +43,9 @@
       "switcher": "ボード",
       "actions": "ボードの操作",
       "noBoard": "ボードなし",
-      "autonomy": "自律",
+      "autonomyOn": "オン",
+      "autonomyOff": "オフ",
+      "autonomySwitch": "このボードのオン／オフを切り替え",
       "newBoard": "新しいボード",
       "rename": "名前を変更",
       "archive": "アーカイブ",
@@ -83,8 +85,8 @@
       "boardCreated": "ボードを作成しました",
       "boardRenamed": "ボード名を変更しました",
       "boardArchived": "ボードをアーカイブしました（削除はされていません）",
-      "autonomyOn": "自律モードをオンにしました",
-      "autonomyOff": "自律モードをオフにしました",
+      "autonomyOn": "このボードはオンです",
+      "autonomyOff": "このボードはオフです",
       "cardArchived": "カードをアーカイブしました",
       "laneCleared": "レーンのカードをアーカイブしました"
     }

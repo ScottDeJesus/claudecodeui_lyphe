@@ -43,7 +43,9 @@
       "switcher": "Board",
       "actions": "Board-Aktionen",
       "noBoard": "Kein Board",
-      "autonomy": "Autonomie",
+      "autonomyOn": "An",
+      "autonomyOff": "Aus",
+      "autonomySwitch": "Dieses Board ein- oder ausschalten",
       "newBoard": "Neues Board",
       "rename": "Umbenennen",
       "archive": "Archivieren",
@@ -84,8 +86,8 @@
       "boardCreated": "Board angelegt",
       "boardRenamed": "Board umbenannt",
       "boardArchived": "Board archiviert – nichts wurde gelöscht",
-      "autonomyOn": "Autonomie an",
-      "autonomyOff": "Autonomie aus",
+      "autonomyOn": "Dieses Board ist an",
+      "autonomyOff": "Dieses Board ist aus",
       "cardArchived": "Karte archiviert",
       "laneCleared": "Die Karten der Spalte wurden archiviert"
     }

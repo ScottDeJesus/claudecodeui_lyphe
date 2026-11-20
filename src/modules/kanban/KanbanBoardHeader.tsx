@@ -30,11 +30,11 @@ import { ActionMenu, type ActionMenuItem, Select, Switch } from '@/shared/ui';
  * and mode right: WHICH board is the thing you read on arrival, and the autonomy switch is the
  * thing you change — a control you must never hit while reaching for the board's name.
  *
- * "Runs itself" is spelled out beside the switch rather than left to the toggle alone, because the
+ * "On" or "Off" is spelled out beside the switch rather than left to the toggle alone, because the
  * word is the only thing that says which of two boards you are about to get: with it off the
  * faces are title, priority and tags; with it on they carry questions, issues, steps, holds
  * and spend. A bare toggle is a switch whose two positions the reader has to discover by pressing
- * it.
+ * it. The switch is this board's alone: its cards wait on it and on nothing else, the queue's Pause all included.
  *
  * IT IS THE BOARD'S ONE SWITCH. Which model a walk rides is the house's setting and not a board's,
  * so nothing else stands beside it. What a self-running board is built IN is its repositories,
@@ -127,16 +127,15 @@ export function KanbanBoardHeader({
           width on a phone and the cluster still sits right on a desktop. */}
       <div className="ml-auto flex shrink-0 items-center gap-3">
         {/* The word and the control are one thing to a reader and two to the accessibility tree:
-            the span is what an eye reads, `label` is what a screen reader announces, and they are
-            deliberately the same word so the two never describe different switches.
+            the span is what an eye reads, `label` is what a screen reader announces; the span reads the switch's position, On or Off, and `label` names what it switches, this board.
             `text-muted-foreground` is the repo's name for `--ink-muted`; `text-ink-muted` is not
             a class this Tailwind config builds and compiles to nothing at all. */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">{t('kanban.board.autonomy')}</span>
+          <span className="text-xs font-medium text-muted-foreground">{t(autonomy ? 'kanban.board.autonomyOn' : 'kanban.board.autonomyOff')}</span>
           <Switch
             checked={autonomy}
             onChange={onToggleAutonomy}
-            label={t('kanban.board.autonomy')}
+            label={t('kanban.board.autonomySwitch')}
             disabled={!hasBoard}
           />
         </div>

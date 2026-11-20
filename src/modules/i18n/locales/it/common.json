@@ -43,7 +43,9 @@
       "switcher": "Bacheca",
       "actions": "Azioni sulla bacheca",
       "noBoard": "Nessuna bacheca",
-      "autonomy": "Autonomia",
+      "autonomyOn": "Attivo",
+      "autonomyOff": "Disattivo",
+      "autonomySwitch": "Attiva o disattiva questa bacheca",
       "newBoard": "Nuova bacheca",
       "rename": "Rinomina",
       "archive": "Archivia",
@@ -85,8 +87,8 @@
       "boardCreated": "Bacheca creata",
       "boardRenamed": "Bacheca rinominata",
       "boardArchived": "Bacheca archiviata: non è stato eliminato nulla",
-      "autonomyOn": "Autonomia attiva",
-      "autonomyOff": "Autonomia disattivata",
+      "autonomyOn": "Questa bacheca è attiva",
+      "autonomyOff": "Questa bacheca è disattivata",
       "cardArchived": "Scheda archiviata",
       "laneCleared": "Le schede della colonna sono state archiviate"
     }

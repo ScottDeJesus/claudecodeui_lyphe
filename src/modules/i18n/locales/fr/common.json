@@ -43,7 +43,9 @@
       "switcher": "Tableau",
       "actions": "Actions du tableau",
       "noBoard": "Aucun tableau",
-      "autonomy": "Autonomie",
+      "autonomyOn": "Activé",
+      "autonomyOff": "Désactivé",
+      "autonomySwitch": "Activer ou désactiver ce tableau",
       "newBoard": "Nouveau tableau",
       "rename": "Renommer",
       "archive": "Archiver",
@@ -85,8 +87,8 @@
       "boardCreated": "Tableau créé",
       "boardRenamed": "Tableau renommé",
       "boardArchived": "Tableau archivé — rien n'a été supprimé",
-      "autonomyOn": "Autonomie activée",
-      "autonomyOff": "Autonomie désactivée",
+      "autonomyOn": "Ce tableau est activé",
+      "autonomyOff": "Ce tableau est désactivé",
       "cardArchived": "Carte archivée",
       "laneCleared": "Les cartes de la colonne ont été archivées"
     }
