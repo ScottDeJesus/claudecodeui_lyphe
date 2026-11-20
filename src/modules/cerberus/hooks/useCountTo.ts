@@ -16,7 +16,7 @@ function easeOutCubic(progress: number): number {
  * the new one over 1.4 s, easing out, one step a frame. A target that changes mid-count counts on from
  * where the eye is, not from where the last count began. With motion reduced it answers `target` at once.
  *
- * Used by `CerberusHeader` for the "N of M checks passing" count.
+ * Used by the fleet's Opening (`FleetOpening`) for the "N of M checks passing" count.
  */
 export function useCountTo(target: number): number {
   const hostWindow = useHostWindow();

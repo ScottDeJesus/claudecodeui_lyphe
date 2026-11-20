@@ -116,6 +116,9 @@
   transition: background-color 0.35s var(--ease-spring), color 0.3s;
 }
 .vv-tabs__tab:hover { color: var(--ink-mid); }
+/* A tab with a mark draws it before its word, the two on one line; below the large breakpoint the mark stands alone. */
+.vv-tabs__tab:has(> .vv-tabs__icon) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.vv-tabs__icon { width: 15px; height: 15px; flex: none; }
 /* Filled AND lifted, not merely a different grey: the chosen tab differs in elevation too. */
 .vv-tabs__tab[aria-selected='true'] {
   background: var(--surface);

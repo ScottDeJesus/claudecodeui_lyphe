@@ -15,7 +15,7 @@ import { SelectedCheck } from '@/modules/cerberus/sheet/SelectedCheck';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import { hms, isWholeTime } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCell, CerberusCheckView, CerberusDiagnosisView, CerberusNodeView, CerberusServiceView } from '@/shared/cerberus-types';
-import { Sheet } from '@/shared/ui';
+import { Rule, Sheet } from '@/shared/ui';
 
 // The prototype's stagger: the raw line rises first, the rows 60 ms after it, and the check with its
 // history 120 ms after. Inline, as `tailwind.config.js` says beside `shape-rise`, so no class order can
@@ -41,7 +41,7 @@ type CheckSheetProps = {
   check: string;
   /** The moment the lookup opens on, epoch ms: the minute a service row's cell was pressed on. Omitted, now. */
   lookupAt?: number;
-  /** The run a Needs-you card's strip or a What happened row opened the sheet on, which its Fix output shows until a Run now is pressed in the sheet. Omitted, the check's latest run within the hour. */
+  /** The run a need's strip opened the sheet on, which its Fix output shows until a Run now is pressed in the sheet. Omitted, the check's latest run within the hour. */
   run?: string;
   /** Mute, pressed for the check the sheet shows. The root opens its Mute dialog in front of the sheet. Absent, no Mute is offered. */
   onMute?: (check: CerberusCheckView) => void;
@@ -278,7 +278,7 @@ function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, service
       {detail !== null && <CheckFixes fixes={detail.fixes ?? []} run={detail.run ?? null} onRunStarted={(runId) => followStartedRun(selectedId, runId)} />}
 
       {error === 'gone' ? (
-        <p className="rounded-xl border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">
+        <p className="text-[13px] text-muted-foreground">
           {t('cerberus.sheet.gone')}
         </p>
       ) : (
@@ -322,9 +322,7 @@ function SheetSection({ title, children }: { title: string; children: ReactNode 
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
-      <h4 id={headingId} className="m-0 text-xs font-normal uppercase tracking-[0.14em] text-muted-foreground">
-        {title}
-      </h4>
+      <Rule id={headingId} level={4}>{title}</Rule>
       {children}
     </section>
   );

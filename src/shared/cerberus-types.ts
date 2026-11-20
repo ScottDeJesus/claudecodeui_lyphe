@@ -150,7 +150,7 @@ export type CerberusCheckView = {
 
 /**
  * One service on one node: its worst status folded from its checks, the checks themselves, a strip
- * of recent cells, and the counts the header row prints. `total` leaves out `not_enabled` checks,
+ * of recent cells, and the counts its pill and its machine's lit span read. `total` leaves out `not_enabled` checks,
  * which `notEnabled` counts on their own, and retired checks are in no count; `needsYou` is the
  * warn, failing and denied ones that are not muted.
  */
@@ -172,7 +172,7 @@ export type CerberusServiceView = {
 };
 
 /**
- * One project assigned to a node, as the node card lists it: the project's id (what
+ * One project assigned to a node, as a machine's Opening lists it: the project's id (what
  * `PUT /api/projects/:projectId/node` takes), its custom name or else its folder's name, and its folder on
  * this machine.
  */

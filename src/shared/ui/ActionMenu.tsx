@@ -65,7 +65,7 @@ type ActionMenuProps = {
 
 /**
  * The "…" overflow menu on a row, card or panel. Used by the app-switcher, chat, dispatcher, kanban, mcp,
- * roadmap and sidebar modules, and by the cerberus module for a node card's "Run a project here", whose
+ * roadmap and sidebar modules, and by the cerberus module for a machine's "Run a project here", whose
  * items are the projects that can move onto the node.
  */
 export function ActionMenu({
@@ -149,7 +149,7 @@ export function ActionMenu({
 
     const closeOnViewportChange = () => setMenuOpen(false);
     // The capture listener hears EVERY scroll under the window, the menu's own list among them. A list
-    // capped to scroll (the cerberus node card's "Run a project here") closed the moment the reader
+    // capped to scroll (the cerberus machine's "Run a project here") closed the moment the reader
     // scrolled it, so a scroll inside the menu is the reader moving through it, not the page moving.
     const closeOnPageScroll = (event: Event) => {
       if (menuRef.current?.contains(event.target as Node)) return;
@@ -230,7 +230,7 @@ export function ActionMenu({
     const gap = 6;
     const margin = 8;
     // `align` is a horizontal anchor, so the portal path clamps the same two edges the in-place
-    // `right-0` / `left-0` do. One mount passes `align="left"`: the cerberus node card's "Run a project
+    // `right-0` / `left-0` do. One mount passes `align="left"`: the cerberus machine's "Run a project
     // here", whose trigger stands at its section's left edge. Every other caller takes the default
     // `right`. Without this, that menu would open right-aligned against its trigger and never say so.
     const anchor = align === 'left' ? trigger.left : trigger.right - width;

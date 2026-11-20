@@ -62,7 +62,7 @@ export function CheckRows({ checks, selectedKey, serviceName, onSelect }: CheckR
     <ul
       ref={boxRef}
       aria-label={t('cerberus.sheet.checksOf', { service: serviceName })}
-      className="m-0 max-h-[min(260px,32dvh)] list-none divide-y divide-border overflow-y-auto overflow-x-hidden rounded-xl border border-border p-0"
+      className="m-0 max-h-[min(260px,32dvh)] list-none divide-y divide-border overflow-y-auto overflow-x-hidden border-y border-border p-0"
     >
       {checks.map((check) => {
         const selected = check.key === selectedKey;

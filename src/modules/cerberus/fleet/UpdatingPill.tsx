@@ -11,8 +11,8 @@ import { Badge } from '@/shared/ui';
  * 1.6 s, as a thing in progress does elsewhere on the tab; with reduced motion it stands still. A narrow
  * row cuts the sentence with an ellipsis rather than wrap, as `StatusPill` cuts its own.
  *
- * Used by this module's `NodeCard`, on a list row and on an open grid card, before the warden line. A
- * collapsed tile has no room for a pill, so its line says "Updating its warden" instead.
+ * Used by a machine's Opening (`NodeOpening`), before the warden line. A machine's mark has no room for a
+ * pill, so its line says "Updating its warden" instead.
  */
 export function UpdatingPill({ updating }: { updating: NonNullable<CerberusNodeView['updating']> }) {
   const { t } = useTranslation();

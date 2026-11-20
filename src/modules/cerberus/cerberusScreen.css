@@ -1,0 +1,19 @@
+/*
+ * THE CERBERUS SCREEN'S OPENINGS (FleetOpening, NodeOpening): what they hold stands on the Opening's own ground, parted by hairlines,
+ * with no frame of its own. Needs listed together are parted by a hairline; What happened is the design system's Trace, each bead in
+ * its line's tone, the newest filled. The core's still body stands in while no drawing of it has loaded.
+ */
+
+.cerberus-needs > .cerberus-need + .cerberus-need { border-top: 1px solid var(--hairline); }
+
+.cerberus-trace .ast-trace-bead[data-tone='positive'] { border-color: var(--pos-dot); }
+.cerberus-trace .ast-trace-bead[data-tone='warn'] { border-color: var(--warn-dot); }
+.cerberus-trace .ast-trace-bead[data-tone='danger'] { border-color: var(--danger-dot); }
+.cerberus-trace .ast-trace-bead[data-tone='info'] { border-color: var(--info-dot); }
+.cerberus-trace .ast-trace-item[data-latest='true'] .ast-trace-bead[data-tone='positive'] { background: var(--pos-dot); }
+.cerberus-trace .ast-trace-item[data-latest='true'] .ast-trace-bead[data-tone='warn'] { background: var(--warn-dot); }
+.cerberus-trace .ast-trace-item[data-latest='true'] .ast-trace-bead[data-tone='danger'] { background: var(--danger-dot); }
+.cerberus-trace .ast-trace-item[data-latest='true'] .ast-trace-bead[data-tone='info'] { background: var(--info-dot); }
+
+/* The core while no drawing of it has loaded: a still bead of the chrome. */
+.cerberus-core-still { background: radial-gradient(circle at 35% 30%, var(--chrome-highlight), var(--chrome-mid) 55%, var(--chrome-dark)); }

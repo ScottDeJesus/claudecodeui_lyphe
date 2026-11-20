@@ -1,10 +1,12 @@
 import type { TFunction } from 'i18next';
+import { Play } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
+import { IconWord } from '@/modules/cerberus/IconWord';
 import type { CerberusCatalogEntryView, CerberusRunView } from '@/shared/cerberus-types';
-import { Button } from '@/shared/ui';
+import { Button, Rule } from '@/shared/ui';
 
 /** What an entry does on its own, as the sheet says it: its capped reason, "Runs on its own · at most 2 runs an hour", or "Offered · you press it". */
 function autoLine(t: TFunction, { capped, auto, limit }: CerberusCatalogEntryView): string {
@@ -48,17 +50,17 @@ export function CheckFixes({ fixes, run, onRunStarted }: CheckFixesProps) {
 
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
-      <h4 id={headingId} className="m-0 text-xs font-normal uppercase tracking-[0.14em] text-muted-foreground">{t('cerberus.fix.sheet.title')}</h4>
+      <Rule id={headingId} level={4}>{t('cerberus.fix.sheet.title')}</Rule>
       {fixes.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">
+        <p className="text-[13px] text-muted-foreground">
           {t('cerberus.fix.sheet.none')} {t('cerberus.diagnosis.hint')}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col divide-y divide-border">
           {fixes.map((entry) => {
             const busy = starting.includes(entry.id) || going?.entry === entry.id;
             return (
-              <li key={entry.id} className="flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl border border-border px-3.5 py-3">
+              <li key={entry.id} className="flex flex-wrap items-center gap-x-3 gap-y-2.5 py-3">
                 <div className="min-w-0 flex-[1_1_240px]">
                   <p className="text-sm font-medium [overflow-wrap:anywhere]">{entry.name}</p>
                   <p className="font-mono text-[11px] text-muted-foreground [overflow-wrap:anywhere]">{t('cerberus.fix.command', { cmd: entry.cmd })}</p>
@@ -70,10 +72,12 @@ export function CheckFixes({ fixes, run, onRunStarted }: CheckFixesProps) {
                   disabled={going !== null && !busy}
                   busy={busy}
                   // One width for both words, so the row does not reflow when a run starts or ends.
-                  className="min-w-24"
+                  className="min-w-24 finger:size-11 finger:min-w-0 finger:px-0"
+                  aria-label={busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')}
+                  title={busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')}
                   onClick={() => onRun(entry)}
                 >
-                  {busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')}
+                  <IconWord icon={Play} word={busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')} />
                 </Button>
               </li>
             );

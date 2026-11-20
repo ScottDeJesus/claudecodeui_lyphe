@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import { Play } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +13,7 @@ import type { CerberusCatalogEntryView, CerberusNeed, CerberusRunView } from '@/
 import type { CerberusSheetTarget, Tone } from '@/shared/types';
 import { Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
+import { IconWord } from '@/modules/cerberus/IconWord';
 
 /**
  * The strip's tone, icon and first line. A going run is info and wears no icon: its words say it. An
@@ -81,7 +83,7 @@ type NeedFixProps = {
  *
  * The button is a 44 px catch under a finger (a touch screen, or a window under 768 px), the house's touch floor.
  *
- * For Fleet's `NeedsYouCard`, once per card (its `NeedCard`, which the station's check stage draws too).
+ * For `NeedCard`, once per need (in a machine's Opening, and on the station's check stage).
  */
 export function NeedFix({ need, leaving, onOpen }: NeedFixProps) {
   const { t } = useTranslation();
@@ -156,9 +158,11 @@ export function NeedFix({ need, leaving, onOpen }: NeedFixProps) {
           disabled={leaving}
           busy={starting}
           onClick={(event) => onRun(fix, event.currentTarget)}
-          className="h-auto min-h-9 max-w-full whitespace-normal py-1.5 text-left finger:min-h-11"
+          className="h-auto min-h-9 max-w-full whitespace-normal py-1.5 text-left finger:size-11 finger:min-h-11 finger:px-0"
+          aria-label={starting ? t('cerberus.catalog.running') : t('cerberus.fix.run', { name: fix.name })}
+          title={starting ? t('cerberus.catalog.running') : t('cerberus.fix.run', { name: fix.name })}
         >
-          {starting ? t('cerberus.catalog.running') : t('cerberus.fix.run', { name: fix.name })}
+          <IconWord icon={Play} word={starting ? t('cerberus.catalog.running') : t('cerberus.fix.run', { name: fix.name })} />
         </Button>
       )}
     </>

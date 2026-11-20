@@ -88,8 +88,8 @@ type UpdateWardensDialogProps = {
  * when the batch's read says so. With no release built (`latest` null) there is nothing to offer, and it draws
  * nothing.
  *
- * For the cerberus module's `CerberusPanel`, which hosts one and opens it from the header's Update wardens
- * button.
+ * For the cerberus module's `CerberusPanel`, which hosts one and opens it from the fleet's Opening (`FleetOpening`, the
+ * core's): its Update wardens button.
  */
 export function UpdateWardensDialog({ open, onClose }: UpdateWardensDialogProps) {
   if (!open) return null;

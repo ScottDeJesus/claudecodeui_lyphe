@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 
 import { cn } from '@/shared/utils';
 
@@ -9,6 +9,11 @@ type RuleProps = {
   id?: string;
   /** Its heading level: 3 for a section, 4 for a group inside one. */
   level?: 3 | 4;
+  /**
+   * The heading, for a section that hands focus to it when the press that held focus is gone (a row moved away). Given, the heading
+   * takes focus from script (`tabIndex` -1) and never from Tab.
+   */
+  headingRef?: Ref<HTMLHeadingElement>;
   /** What stands at the line's end: the section's figure (a count, a small ring) or the one press that adds to it. */
   end?: ReactNode;
   /** The figure's tone, when what it counts is owed (warn) or wrong (danger) or finished (positive). */
@@ -21,13 +26,14 @@ type RuleProps = {
  * readouts inside an Opening, never stands alone as a divider, and carries at its end what its section counts or the one press that
  * adds to it, so a section needs no second line of its own.
  *
- * Used by the kanban module's open bug (each of its sections) and its dashboard (each of its groups).
+ * Used by the kanban module's open bug (each of its sections) and its dashboard (each of its groups), and by the cerberus module's
+ * Openings, its check sheet and its History.
  */
-export function Rule({ children, id, level = 3, end, endTone, className }: RuleProps) {
+export function Rule({ children, id, level = 3, headingRef, end, endTone, className }: RuleProps) {
   const Heading = level === 4 ? 'h4' : 'h3';
   return (
     <div className={cn('ast-hrule', className)}>
-      <Heading id={id} className="ast-hrule-label">
+      <Heading ref={headingRef} id={id} tabIndex={headingRef === undefined ? undefined : -1} className="ast-hrule-label">
         {children}
       </Heading>
       <span className="ast-hrule-line" aria-hidden="true" />

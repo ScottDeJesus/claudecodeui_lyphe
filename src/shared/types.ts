@@ -5,7 +5,7 @@ import type { NavigateFunction } from 'react-router-dom';
 
 import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
-import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
+import type { CerberusStatus } from '@/shared/cerberus-types';
 import type { CompanionLogEntry, CompanionMouthPiece, CompanionSessionRef } from '@/shared/companion-types';
 import type { KanbanChangelogEntry, KanbanPriority, KanbanStats } from '@/shared/kanban-types';
 import type { RoadmapEpic, RoadmapFeature, RoadmapMilestone } from '@/shared/roadmap-types';
@@ -3164,8 +3164,8 @@ export type SessionPanelInput = { kind: SessionPanelKind | null; title: string |
 // `src/modules/cerberus/StatusMarks.tsx`. Nothing else in the tab decides a status's tone, icon or shape.
 
 /**
- * The shape of a status's minute cell, and of a service's square in a collapsed node card. The shape
- * carries the status alongside its colour, with the word in the mark's tooltip (MAN-578):
+ * The shape of a status's minute cell. The shape carries the status alongside its colour, with the
+ * word in the mark's tooltip (MAN-578):
  * - `soft`: the tone's wash with no edge. Passing.
  * - `outline`: the wash inside the tone's edge. Close to the limit.
  * - `solid`: filled with the tone's dot. Failing and refused.
@@ -3198,7 +3198,7 @@ export type CerberusEnrollInput = { name: string; desc?: string };
 // ---------------------------
 
 //----------------- CERBERUS NODE PROJECTS ------------
-// What a node card's projects section (`src/modules/cerberus/fleet/NodeProjects.tsx`) hears back when it
+// What a machine's projects section (`src/modules/cerberus/fleet/NodeProjects.tsx`) hears back when it
 // moves a project onto its node, or back to this server (`PUT /api/projects/:projectId/node`).
 
 /**
@@ -3235,105 +3235,42 @@ export type FleetStatus = Exclude<CerberusStatus, 'not_enabled'> | 'fixing' | 'u
 export type CerberusMark = CerberusStatus | 'fixing';
 
 /**
- * The bucket a node's status falls in for counting and filtering: `needs` is failing, denied,
- * fixing and warn; `updating` is updating, paused and enrolling; every other status is its own bucket. `ok`
- * is a bucket the status bar counts but no filter button selects.
+ * The group a node's word falls in: `needs` is failing, denied, fixing and warn; `updating` is updating,
+ * paused and enrolling; every other word is its own group. Cerberus's instrument stands its rings on
+ * these: Needs you, Updating, Passing (`ok`), and Silent for the rest.
  */
 export type FleetGroup = 'needs' | 'unknown' | 'muted' | 'updating' | 'empty' | 'ok';
 
-/** What the toolbar's filter buttons select: every node, or one bucket that is not plain passing. */
-export type FleetFilter = 'all' | Exclude<FleetGroup, 'ok'>;
-
-/** One filter button's live reading: which filter it is and how many nodes it holds right now. */
-export type FleetFilterGroup = { group: FleetFilter; count: number };
-
-/** One service of a node as the fleet lists it: its worst word and the counts its header row prints. */
-export type FleetService = {
-  service: string;
-  label: string | null;
-  status: CerberusStatus;
-  counts: CerberusServiceView['counts'];
-};
+/**
+ * What the fleet is doing, as Cerberus's core says it by its form (`CerberusInstrument`): a fix running on a machine (`fixing`, the
+ * core writes toward that machine's mark), a check needing a person (`needs`, the listening dish), a warden updating or a machine
+ * enrolling (`updating`, thinking), or nothing (`quiet`, the tide). Worked out by the cerberus module's `CerberusPanel`.
+ */
+export type FleetDoing = { kind: 'fixing'; nodeId: string } | { kind: 'needs' } | { kind: 'updating' } | { kind: 'quiet' };
 
 /**
- * One node as the Fleet views draw it. `status` is the node's own word (see `FleetStatus`), `link` is
- * the node's warden link as the read model states it, and `search` is the lower-cased text a search
- * box matches against — node id, description, service ids and labels. The warden version, the minute
- * cells and the checks stay on the overview's `CerberusNodeView`, found by `id`.
+ * One node as the fleet ranks it (`fleetItems`, worst first). `status` is the node's own word (see
+ * `FleetStatus`). The warden, the services, their minute cells and the checks stay on the overview's
+ * `CerberusNodeView`, found by `id`.
  */
 export type FleetItem = {
   id: string;
   desc: string | null;
   role: 'hub' | 'node';
-  link: CerberusNodeView['link'];
   status: FleetStatus;
   /** Who started the fix running on the node, while its `status` is `fixing`: "Fix running on its own" or "Fix running". Null otherwise. */
   fixBy: 'auto' | 'you' | null;
-  services: FleetService[];
-  search: string;
 };
-
-/**
- * How a spoke is drawn: `dashed` for a node with no result, `amber` (solid) for one that needs
- * attention, `plain` for every other. Selection is the view's own state and is not part of it.
- */
-export type RingSpokeKind = 'dashed' | 'amber' | 'plain';
-
-/**
- * One node placed in the rings, in pixels from the box's top-left corner. `ring` is 0 for the inner
- * ring, `angleDeg` the spoke's direction from the centre (0 = right, clockwise) and `length` its
- * reach in pixels. `dot` is the dot's diameter, `live` is whether the node's warden link is up (the
- * spoke carries a beat) and `labelled` whether its name is written beside it without being selected.
- */
-export type RingsNode = {
-  item: FleetItem;
-  ring: number;
-  x: number;
-  y: number;
-  angleDeg: number;
-  length: number;
-  dot: number;
-  spoke: RingSpokeKind;
-  live: boolean;
-  labelled: boolean;
-};
-
-/**
- * The rings, laid out for one box. `hub` is the hub item when the list handed in held it, drawn at
- * `center`; `guides` are the circles' radii in pixels; `nodes` are those that fit, worst first on the
- * inner ring, and `total` how many nodes there were around the hub, so `nodes.length < total` means
- * the rest are in Grid.
- */
-export type RingsLayout = {
-  center: { x: number; y: number };
-  hub: FleetItem | null;
-  guides: { radius: number }[];
-  nodes: RingsNode[];
-  total: number;
-};
-
-/**
- * How the Fleet view lays its nodes out: the toolbar's Grid · List · Rings. The view holds the choice;
- * the toolbar draws it.
- */
-export type FleetLayout = 'grid' | 'list' | 'rings';
-
-/**
- * One node as a page of the Fleet view draws it: its item, the overview's own node behind it (its
- * warden, its services and their minutes, which the item leaves behind), and whether it stands open.
- * The view builds the page; Grid and List draw it.
- */
-export type FleetEntry = { item: FleetItem; node: CerberusNodeView; open: boolean };
 
 /**
  * What opens the Cerberus check sheet, in `CheckSheet`'s own terms: the node, the service, the check
  * by its ID within the service (`session.valid`, its key after the first `/`), and the moment to look
  * up, epoch ms, left out for now. The caller resolves the check where it holds the data, so it is
- * never empty. A Fleet minute cell hands the check that set the minute — the service's worst check,
+ * never empty. A service's minute cell hands the check that set the minute — the service's worst check,
  * else its first, for a minute no check set — looked up at the moment the minute's word was reached
  * (`CerberusCell.at`, the moment the sheet's own strip uses), and now for the minute still running. A
- * Needs-you card, or a service row pressed as a whole, hands its check and now. The tab's root holds one and hands its fields to `CheckSheet` as they are.
- * A Needs-you card's run strip also hands `run`, the id of the run it shows, which the sheet's Fix output
+ * need, or a service row pressed as a whole, hands its check and now. The tab's root holds one and hands its fields to `CheckSheet` as they are.
+ * A need's run strip also hands `run`, the id of the run it shows, which the sheet's Fix output
  * opens on.
  */
 export type CerberusSheetTarget = { node: string; service: string; check: string; lookupAt?: number; run?: string };

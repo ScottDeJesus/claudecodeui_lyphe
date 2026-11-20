@@ -1,9 +1,11 @@
 import type { TFunction } from 'i18next';
+import { BookPlus, Play } from 'lucide-react';
 import { memo, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useDiagnosis } from '@/modules/cerberus/hooks/useDiagnosis';
+import { IconWord } from '@/modules/cerberus/IconWord';
 import { FixOutput } from '@/modules/cerberus/sheet/FixOutput';
 import { MarkIcon } from '@/modules/cerberus/StatusMarks';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
@@ -15,7 +17,7 @@ import { Badge, Button, CardFoldBody, Collapsible, CollapsibleTrigger, FoldChevr
 import { cn } from '@/shared/utils';
 
 /** The card's frame and its eyebrows: Fix output's, so the two cards the sheet stacks read as one family. */
-const FRAME = 'overflow-hidden rounded-xl border border-border bg-card';
+const FRAME = 'overflow-hidden border-y border-border';
 const EYEBROW = 'm-0 text-xs font-normal uppercase tracking-[0.14em] text-muted-foreground';
 
 /** The proposal arrives just after the summary it follows from: the prototype's .18 s, inline so no class order resets it. */
@@ -113,11 +115,11 @@ function RanLine({ run, t }: { run: CerberusRunView; t: TFunction }) {
 function ReadingDiagnosis({ eyebrowId, t }: { eyebrowId: string; t: TFunction }) {
   return (
     <section aria-labelledby={eyebrowId} aria-busy="true" className={FRAME}>
-      <div className="flex items-center justify-between gap-2.5 border-b border-border px-3.5 py-3">
+      <div className="flex items-center justify-between gap-2.5 border-b border-border py-3">
         <h4 id={eyebrowId} className={EYEBROW}>{t('cerberus.diagnosis.eyebrow')}</h4>
         <div className="vv-skeleton h-[22px] w-24 flex-none rounded-full" />
       </div>
-      <div className="flex flex-col gap-3 px-3.5 pb-3.5 pt-3">
+      <div className="flex flex-col gap-3 pb-3.5 pt-3">
         <div className="vv-skeleton h-3 w-4/5" />
         {[0, 1, 2].map((row) => <div key={row} className="vv-skeleton h-3.5 w-2/3" />)}
       </div>
@@ -129,7 +131,7 @@ function ReadingDiagnosis({ eyebrowId, t }: { eyebrowId: string; t: TFunction })
 function UnreadDiagnosis({ eyebrowId, onRetry, t }: { eyebrowId: string; onRetry: () => void; t: TFunction }) {
   return (
     <section aria-labelledby={eyebrowId} className={FRAME}>
-      <div className="flex flex-col gap-2.5 px-3.5 py-3">
+      <div className="flex flex-col gap-2.5 py-3">
         <h4 id={eyebrowId} className={EYEBROW}>{t('cerberus.diagnosis.eyebrow')}</h4>
         <UnreachableBanner onRetry={onRetry} />
       </div>
@@ -138,7 +140,7 @@ function UnreadDiagnosis({ eyebrowId, onRetry, t }: { eyebrowId: string; onRetry
 }
 
 type DiagnosisPanelProps = {
-  /** The diagnosis the sheet shows: the check's newest (`CerberusCheckDetail.diagnosis`), or the one a Needs-you card opened it on. */
+  /** The diagnosis the sheet shows: the check's newest (`CerberusCheckDetail.diagnosis`), or the one a need opened it on. */
   diagnosisId: string;
   /** Another run holds the check (a catalog fix's, not this diagnosis's one-off): Run it once waits, disabled, as `CheckFixes`' entries do. */
   held: boolean;
@@ -198,7 +200,7 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
 
   return (
     <section aria-labelledby={eyebrowId} className={cn(FRAME, 'motion-safe:animate-[vv-pop_.5s_theme(transitionTimingFunction.enter)_both]')}>
-      <div className="flex items-center justify-between gap-2.5 border-b border-border px-3.5 py-3">
+      <div className="flex items-center justify-between gap-2.5 border-b border-border py-3">
         <h4 id={eyebrowId} className={EYEBROW}>{t('cerberus.diagnosis.eyebrow')}</h4>
         <div role="status">
           {/* Keyed by where it stands, so the pill an ended diagnosis lands on springs in, once. */}
@@ -206,7 +208,7 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 px-3.5 pb-3.5 pt-3">
+      <div className="flex flex-col gap-3 pb-3.5 pt-3">
         {/* A diagnosis that was not given the node's reads says so: its answer rests on Cerberus's record alone. */}
         <p className="text-[12.5px] text-muted-foreground">
           {/* A view with no `by` (an older server's) is `'you'`'s: only an `'auto'` one says it started on its own. */}
@@ -268,7 +270,7 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
 
         {proposal !== null && (
           <div
-            className="flex flex-col gap-2.5 rounded-[10px] border border-border bg-background p-3.5 motion-safe:animate-[vv-pop_.55s_theme(transitionTimingFunction.enter)_both]"
+            className="flex flex-col gap-2.5 border-t border-border pt-3.5 motion-safe:animate-[vv-pop_.55s_theme(transitionTimingFunction.enter)_both]"
             style={PROPOSAL_ENTER}
           >
             <h5 className={EYEBROW}>{t('cerberus.diagnosis.proposal.title')}</h5>
@@ -284,15 +286,17 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
                     size="sm"
                     disabled={held && !starting}
                     busy={starting}
-                    className="min-w-28 finger:h-11"
+                    className="min-w-28 finger:size-11 finger:min-w-0 finger:px-0"
+                    aria-label={starting ? t('cerberus.catalog.running') : t('cerberus.diagnosis.proposal.runOnce')}
+                    title={starting ? t('cerberus.catalog.running') : t('cerberus.diagnosis.proposal.runOnce')}
                     onClick={() => void runOnce()}
                   >
-                    {starting ? t('cerberus.catalog.running') : t('cerberus.diagnosis.proposal.runOnce')}
+                    <IconWord icon={Play} word={starting ? t('cerberus.catalog.running') : t('cerberus.diagnosis.proposal.runOnce')} />
                   </Button>
                 )}
                 {offerPromote && (
-                  <Button variant="tonal" size="sm" className="finger:h-11" onClick={promote}>
-                    {t('cerberus.diagnosis.proposal.addToCatalog')}
+                  <Button variant="tonal" size="sm" className="finger:size-11 finger:px-0" aria-label={t('cerberus.diagnosis.proposal.addToCatalog')} title={t('cerberus.diagnosis.proposal.addToCatalog')} onClick={promote}>
+                    <IconWord icon={BookPlus} word={t('cerberus.diagnosis.proposal.addToCatalog')} />
                   </Button>
                 )}
               </div>

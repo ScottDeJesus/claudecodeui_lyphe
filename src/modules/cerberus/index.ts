@@ -22,7 +22,7 @@ export { useCerberusNeedOf } from '@/modules/cerberus/context/CerberusContext';
 // (`wholeValue`: the stage is where the rail's cut line stands whole), and "Open the check" is
 // Cerberus's own sheet on it, over the station's right side. Both read the provider App mounts; the sheet's target is
 // `CerberusSheetTarget` (src/shared/types.ts).
-export { NeedCard } from '@/modules/cerberus/fleet/NeedsYouCard';
+export { NeedCard } from '@/modules/cerberus/fleet/NeedCard';
 export { CheckSheet } from '@/modules/cerberus/sheet/CheckSheet';
 
 // The Cerberus tab's pane, mounted by src/modules/project-workspace (WorkspaceMain): the fleet's

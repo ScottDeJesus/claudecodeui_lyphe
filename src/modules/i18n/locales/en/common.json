@@ -2378,6 +2378,14 @@
   },
   "cerberus": {
     "loading": "Loading Cerberus…",
+    "ring": {
+      "instrument": "The fleet",
+      "core": "The fleet",
+      "silent": "Silent",
+      "enrolling": "Enrolling",
+      "services": "Services",
+      "more": "{{count}} more"
+    },
     "header": {
       "eyebrow": "Fleet health",
       "headline": {
@@ -2413,76 +2421,25 @@
     "fleet": {
       "tabs": {
         "fleet": "Fleet",
-        "history": "History",
-        "fleetHint": "Worst first · click a node to open it",
-        "historyHint": "Look up any check at any moment"
-      },
-      "layouts": {
-        "grid": "Grid",
-        "list": "List",
-        "rings": "Rings",
-        "label": "Fleet layout"
+        "history": "History"
       },
       "filters": {
-        "all": "All",
         "needs": "Needs you",
-        "unknown": "No result",
-        "muted": "Muted",
         "updating": "Updating",
-        "empty": "Nothing assigned",
-        "label": "{{name}} · {{count}}",
-        "title": "Filter the fleet"
+        "empty": "Nothing assigned"
       },
-      "searchPlaceholder": "Find a node or service",
-      "expandAll": "Expand all",
-      "collapseAll": "Collapse all",
       "bar": {
-        "passing": "{{count}} passing",
         "needs_one": "{{count}} needs you",
-        "needs_other": "{{count}} need you",
-        "unknown": "{{count}} no result",
-        "muted": "{{count}} muted",
-        "updating": "{{count}} updating",
-        "empty": "{{count}} with nothing assigned",
-        "emptyTip": "{{count}} nothing assigned"
-      },
-      "nodes_one": "{{count}} node · worst first",
-      "nodes_other": "{{count}} nodes · worst first",
-      "showing": "Showing {{shown}} of {{total}} · worst first",
-      "showMore": "Show {{count}} more",
-      "noMatch": "No node or service matches “{{query}}”.",
-      "noneInGroup": "No nodes in this group right now.",
-      "legend": {
-        "unknown": "No result — unknown",
-        "squares": "Squares are services · open a node for its last 30 minutes"
-      },
-      "rings": {
-        "hubSub": "Cerberus",
-        "hubTitle": "{{name}} · Cerberus",
-        "dotTip": "{{name}} · {{text}}",
-        "partial": "Rings show {{shown}} of {{total}}. The rest are in Grid.",
-        "note_one": "{{count}} node around center · problems sit on the inner ring",
-        "note_other": "{{count}} nodes around center · problems sit on the inner ring",
-        "legend": {
-          "title": "Every warden reports to center",
-          "body": "Each dot is a node; its line is the warden's connection. The worst nodes sit on the inner ring. Click any dot for its services.",
-          "needs": "Needs you · solid line",
-          "unknown": "No result · dashed line"
-        }
+        "needs_other": "{{count}} need you"
       }
     },
     "needs": {
       "title": "Needs you",
-      "count_one": "{{count}} check",
-      "count_other": "{{count}} checks",
       "word": "· {{word}}",
       "where": "{{service}} · {{node}} · since {{time}}",
       "whereNoSince": "{{service}} · {{node}}",
       "mute": "Mute",
       "unmute": "Unmute",
-      "quiet": "Nothing needs you",
-      "quietPassing_one": "{{passing}} of {{count}} check passing.",
-      "quietPassing_other": "{{passing}} of {{count}} checks passing.",
       "mutedTitle": "Muted · {{count}}",
       "mutedItem": "{{label}} · {{service}}",
       "mutedMeta": "Until {{time}} · {{left}} · {{reason}}"
@@ -2501,12 +2458,8 @@
       "mutedCheck": "Passing · muted check",
       "allPassing_one": "Its service is passing",
       "allPassing_other": "All {{count}} services passing",
-      "squareTip": "{{label}} · {{text}}",
-      "moreSquares": "+{{count}}",
-      "emptyTitle": "Nothing to watch yet",
       "emptyLead": "Nothing to watch yet.",
       "emptyMessage": "Its warden is reporting. Assign a service to {{node}} and its checks show up here.",
-      "waitingTitle": "Waiting to hear from it",
       "waitingLead": "Waiting to hear from it.",
       "waitingMessage": "It shows up here as soon as its warden says hello.",
       "sessions_one": "{{count}}\u00a0session\u00a0running\u00a0here",
@@ -2547,7 +2500,6 @@
     },
     "activity": {
       "title": "What happened",
-      "nothingYet": "Nothing has happened yet.",
       "fix": {
         "ranAuto": "Ran on its own: “{{name}}”",
         "ranYou": "You ran “{{name}}”",
@@ -2675,7 +2627,6 @@
     },
     "catalog": {
       "tab": "Catalog",
-      "tabHint": "Fixes Cerberus can offer, or run on its own",
       "intro": "Each entry pairs a check with a fix. Cerberus offers it when the check fails. Entries set to run on their own do so within their limit, and every run's output is kept. Anything that reaches outside the fleet stays a step you take.",
       "count_one": "{{count}} entry · {{auto}} run on their own",
       "count_other": "{{count}} entries · {{auto}} run on their own",
@@ -2745,11 +2696,9 @@
       },
       "headline": "One fix",
       "headlineAccent": "running",
-      "quiet": "Fixes set to auto-run will run on their own and show up below.",
       "fleet": {
         "runningAuto": "Fix running on its own",
-        "running": "Fix running",
-        "legend": "Fix running or updating"
+        "running": "Fix running"
       }
     },
     "diagnosis": {
@@ -2924,12 +2873,10 @@
       "liftsTomorrow": "Lifts on its own at {{time}} tomorrow"
     },
     "tours": {
-      "tab": "Tours",
-      "tabHint": "Affected areas on DocuSketch tours"
+      "tab": "Tours"
     },
     "bulletins": {
       "tab": "Bulletins",
-      "tabHint": "What Claude read in each carrier's SERVPRO bulletin",
       "refresh": "Refresh",
       "trouble": {
         "retry": "Try again",
@@ -3172,7 +3119,6 @@
     },
     "uploads": {
       "tab": "Uploads",
-      "tabHint": "What happens when someone uses the Uploads page",
       "loading": "Reading the upload runs…",
       "head": {
         "eyebrow": "Upload runs",
@@ -3621,7 +3567,6 @@
     },
     "scheduling": {
       "tab": "Scheduling",
-      "tabHint": "What happens when someone schedules a visit in Restorly",
       "loading": "Reading the scheduling sessions…",
       "head": {
         "eyebrow": "Scheduling in Restorly",

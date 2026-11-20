@@ -23,9 +23,9 @@ import { cn } from '@/shared/utils';
  * the status, at the one stroke that still reads at 12 px. The caller gives it its size, its flow and any
  * motion.
  *
- * Used here by `StatusGlyph` and `StatusPill`, and by every other mark drawn from a look: the rings' hub and
- * labels (`fleet/RingMarks`, `fleet/FleetRings`), a Needs-you card's run strip (`fleet/NeedFix`), Fix
- * output's pill (`sheet/FixOutput`) and the diagnosis panel's Failed pill (`sheet/DiagnosisPanel`).
+ * Used here by `StatusGlyph` and `StatusPill`, and by every other mark drawn from a look: a need's run strip
+ * (`fleet/NeedFix`), Fix output's pill (`sheet/FixOutput`) and the diagnosis panel's Failed pill
+ * (`sheet/DiagnosisPanel`).
  */
 export function MarkIcon({ icon: Icon, className }: { icon: LucideIcon; className?: string }) {
   return <Icon aria-hidden strokeWidth={2.25} className={cn('flex-none', className)} />;
@@ -59,8 +59,8 @@ const CELL_PAINT: Record<CerberusCellShape, string> = {
 
 /**
  * The round glyph's three sizes, from the prototype, and the icon each holds: `sm` (a 20px round, a 12px
- * icon) a collapsed node card, `md` (24px, 14px) a Needs-you card, a check row, the lookup sentence, `lg`
- * (32px, 18px) the quiet "Nothing needs you".
+ * icon), `md` (24px, 14px) a need, a check row, the lookup sentence, `lg` (32px, 18px) the lookup's
+ * headline answer.
  */
 const GLYPH_SIZE = {
   sm: { round: 'size-5', icon: 'size-3' },
@@ -79,7 +79,7 @@ const GLYPH_SIZE = {
  * the fixing wrench, and says "Updating its warden", never "Fix running".
  *
  * Used by `SentenceRow` in `sheet/LookupMoment.tsx` (the status at an asked moment: `LookupSentence` and
- * `LookupMoment`), `sheet/CheckRows`, `fleet/NodeCard` and `fleet/NeedsYouCard`.
+ * `LookupMoment`), `sheet/CheckRows` and `fleet/NeedCard`.
  */
 export function StatusGlyph({ status, size = 'md', decorative = false, still = false, label }: {
   status: CerberusMark;
@@ -118,8 +118,7 @@ type StatusCellProps = Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
  * stretches it (`flex-1`), a service row fixes it (7×22). The caller also gives it its role. It is
  * an image named by its word unless the caller makes it an option of a list, as `MinuteCells` does.
  *
- * Used by `sheet/MinuteCells` (the sheet and History), `fleet/ServiceRow` and `fleet/FleetStatusBar`
- * (its segments and the legend's key cells, drawn the same way).
+ * Used by `sheet/MinuteCells` (the sheet and History) and `fleet/ServiceRow`.
  */
 export function StatusCell({ status, label, className, ...spanProps }: StatusCellProps) {
   const { t } = useTranslation();
@@ -131,28 +130,6 @@ export function StatusCell({ status, label, className, ...spanProps }: StatusCel
       {...spanProps}
       data-tone={look.tone}
       className={cn('block rounded-[2px]', CELL_PAINT[look.cell], className)}
-    />
-  );
-}
-
-/**
- * A service in a collapsed node card: a 10px square in its status's cell shape. It names itself on
- * hover and to assistive tech. `label` is the service and how it stands ("Shadow connector · All 4
- * checks passing"), and defaults to the bare word.
- *
- * Used by `fleet/NodeCard` (a collapsed card's services).
- */
-export function StatusSquare({ status, label }: { status: CerberusMark; label?: string }) {
-  const { t } = useTranslation();
-  const look = markLook(status);
-  const name = label ?? t(look.wordKey);
-  return (
-    <span
-      role="img"
-      aria-label={name}
-      title={name}
-      data-tone={look.tone}
-      className={cn('block size-2.5 flex-none rounded-[3px]', CELL_PAINT[look.cell])}
     />
   );
 }

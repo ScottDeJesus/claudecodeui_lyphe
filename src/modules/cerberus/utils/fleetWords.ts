@@ -1,15 +1,15 @@
-// The sentences the Fleet view says about a node and a service: the one line under a node's name, its
-// warden line, and the pill of a service row. They live in one file because a node card, a service row
-// and the rings' panel each say them, and a service's sentence is also the name of its square in a
-// collapsed card. Every word is a key in `en/common.json` under `cerberus`; a label, a node name and a
+// The sentences Cerberus says about a node and a service: the one line under a machine's name, its
+// warden line, and the pill of a service row. They live in one file because a machine's mark, its
+// Opening and a service row each say them, and the fleet's Opening says the fleet's headline and a
+// mute's time left. Every word is a key in `en/common.json` under `cerberus`; a label, a node name and a
 // version are the data's own and go in as variables, never as keys. Like `activityEvents.ts`, it takes
 // `t` and the moment `now` from its caller, so a sentence is a function of what it is handed.
 import type { TFunction } from 'i18next';
 
-import { STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
+import { RUN_LOOK, STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
 import { agoParts, hm } from '@/modules/cerberus/utils/cerberusTime';
-import type { CerberusNodeView, CerberusRunView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
-import type { FleetItem } from '@/shared/types';
+import type { CerberusNodeView, CerberusOverview, CerberusRunView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
+import type { FleetItem, Tone } from '@/shared/types';
 
 /** The words a check needs a person for: the three the read model counts in `needsYou`. */
 const NEEDS_A_PERSON: ReadonlySet<CerberusStatus> = new Set(['warn', 'failing', 'denied']);
@@ -21,13 +21,21 @@ function lowerWord(t: TFunction, status: CerberusStatus): string {
 
 /**
  * "12 s ago", "4 min ago", "just now": how long before `now` a moment was. The warden line below says
- * it of a heartbeat, and the tab's header (`CerberusHeader`) of the last result center received.
+ * it of a heartbeat, and the fleet's Opening (`FleetOpening`) of the last result center received.
  */
 export function agoPhrase(t: TFunction, ms: number, now: number): string {
   const parts = agoParts(ms, now);
   if (parts === 'now') return t('cerberus.time.justNow');
   const key = { s: 'secondsAgo', min: 'minutesAgo', h: 'hoursAgo', d: 'daysAgo' }[parts.unit];
   return t(`cerberus.time.${key}`, { count: parts.n });
+}
+
+/** "48 min left", "1 h 12 min left": how long a mute has before it lifts on its own, never under a minute. Said by the fleet's and a machine's muted rows. */
+export function muteTimeLeft(t: TFunction, until: number, now: number): string {
+  const minutes = Math.max(1, Math.ceil((until - now) / 60_000));
+  return minutes >= 60
+    ? t('cerberus.time.hoursMinutesLeft', { hours: Math.floor(minutes / 60), minutes: minutes % 60 })
+    : t('cerberus.time.minutesLeft', { count: minutes });
 }
 
 /** "Fix running on its own" or "Fix running", by who started the run: a node's line, a service's pill and a square's name. */
@@ -127,7 +135,7 @@ export function nodeLine(t: TFunction, item: FleetItem, node: CerberusNodeView):
  * Whether a node's warden is restarting for an update: its link is `paused`, which the read model lays over a
  * node from the update's `restarting` step until the update ends (its new hello, the launcher's rollback hello,
  * or the update's failure) and which outranks silent and never. Its heartbeat is then not a sign of life to
- * breathe for, and its warden line says so. Read by `wardenLine` and by the node card's heartbeat dot.
+ * breathe for, and its warden line says so. Read by `wardenLine` and by a machine's Opening's heartbeat dot.
  */
 export function isRestarting(node: CerberusNodeView): boolean {
   return node.link === 'paused';
@@ -167,4 +175,22 @@ export function sessionsTail(t: TFunction, node: CerberusNodeView): string | nul
   // client) says nothing, where `sessions <= 0` would have called `undefined` a count and drawn a raw key.
   if (node.link !== 'reporting' || !(node.sessions > 0)) return null;
   return ` ·\u00a0${t('cerberus.node.sessions', { count: node.sessions })}`;
+}
+
+/**
+ * The fleet's answer in a few words, a lead and its accent: "All *quiet*", "One check *needs you*", "3 checks *need you*", or "One
+ * fix *running*" when the only check needing you has its fix going. The accent takes the state's tone: the positive ink at quiet, the
+ * warn ink while anything needs you (so the call to act is never in the passing green), a fix's own info ink while one runs. Its
+ * number is `counts.needsYou`, the same count the wheel's Cerberus mark shows, so the two never disagree.
+ *
+ * Said by the panel's core Opening (`CerberusPanel`), as its title.
+ */
+export function fleetHeadline(t: TFunction, overview: CerberusOverview): { lead: string; accent: string; tone: Tone } {
+  const needs = overview.counts.needsYou;
+  const onlyRun = needs === 1 ? overview.needsYou[0]?.run ?? null : null;
+  if (onlyRun !== null && onlyRun.result === null) {
+    return { lead: t('cerberus.fix.headline'), accent: t('cerberus.fix.headlineAccent'), tone: RUN_LOOK.going.tone };
+  }
+  if (needs === 0) return { lead: t('cerberus.header.headline.quiet'), accent: t('cerberus.header.headline.quietAccent'), tone: 'positive' };
+  return { lead: t('cerberus.header.headline.needs', { count: needs }), accent: t('cerberus.header.headline.needsAccent', { count: needs }), tone: 'warn' };
 }

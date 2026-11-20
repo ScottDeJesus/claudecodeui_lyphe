@@ -17,14 +17,14 @@ function isWardens(body: unknown): body is CerberusWardens {
  * It follows the catalog's rules (`useCatalogRead`): a read takes a ticket and an answer older than the newest
  * one applied is dropped, so a read that left before a batch's start cannot land after the start's re-read and
  * put "Wardens up to date" back over a batch that is running. Only a good answer replaces what is held; a read
- * that fails keeps the last one, and the header draws nothing while there has been none, since with no answer
- * there is no release to offer.
+ * that fails keeps the last one, and the fleet's Opening draws no button while there has been none, since with
+ * no answer there is no release to offer.
  *
  * `readWardens` resolves when the read has answered or failed, and never rejects. The provider's `refresh`
  * starts it beside the overview's read and does not wait for it. Used by `CerberusProvider`.
  */
 export function useWardensRead(): { wardens: CerberusWardens | null; readWardens: () => Promise<void> } {
-  // The last good answer, null until one comes: the header's button and the dialog both wait for it, and
+  // The last good answer, null until one comes: the fleet's Opening's button and the dialog both wait for it, and
   // "not read yet" must never look like "nothing to update".
   const [wardens, setWardens] = useState<CerberusWardens | null>(null);
 
