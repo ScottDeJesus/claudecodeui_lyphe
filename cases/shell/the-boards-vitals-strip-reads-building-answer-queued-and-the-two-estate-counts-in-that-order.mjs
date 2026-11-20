@@ -1,4 +1,4 @@
-// The board's vitals strip says five counts, in one order: building now, waiting on your answer, queued in To Do, then
+// The board's vitals strip says five counts, in one order: building now, waiting on your answer, waiting to start (To Do), then
 // the two estate backlogs, lessons and memories. Nothing on it speaks of approval or of cards to claim: the Approve gate
 // and the claim queue are gone from the board (kanban-bug-dispatcher, the board's screens).
 //
@@ -19,7 +19,7 @@ const WAIT_MS = 30000;
 const EXPECTED = [
   { number: VITALS.building, words: /build/i, name: "building" },
   { number: VITALS.awaitingAnswer, words: /answer/i, name: "waiting on an answer" },
-  { number: VITALS.queued, words: /queued|to do/i, name: "queued" },
+  { number: VITALS.queued, words: /waiting to start/i, name: "queued" },
   { number: VITALS.lessonsPendingEstate, words: /lesson/i, name: "lessons" },
   { number: VITALS.memoryPendingEstate, words: /memor/i, name: "memories" },
 ];

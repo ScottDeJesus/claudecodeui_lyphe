@@ -35,8 +35,11 @@ runCase(async (t) => {
   const house = await sittingHouse(t, "hunt-overdue");
   const { passId } = await addPass(house, "code", FILES);
   const L = (n) => `dispatch-hunter-case-overdue-${n}`;
-  const out = await addSitting(house, { hunt: "code", passId, launchId: L(1) });
-  const strange = await addSitting(house, { hunt: "code", passId, launchId: L(2) });
+  // The out sittings' limits passed long ago, grace and the soul's late start (child.pid written now) both counted:
+  // a limit still ahead is overdue's NOT YET and re-arm, never a stop (hunt_sitting.overdue).
+  const PAST_LIMIT = -24 * 60;
+  const out = await addSitting(house, { hunt: "code", passId, launchId: L(1), minutes: PAST_LIMIT });
+  const strange = await addSitting(house, { hunt: "code", passId, launchId: L(2), minutes: PAST_LIMIT });
   const ended = await addSitting(house, { hunt: "code", passId, launchId: L(3), state: "ended" });
   const procs = [standIn(house, L(1)), standIn(house, L(2), { identity: false }), standIn(house, L(3))];
   try {

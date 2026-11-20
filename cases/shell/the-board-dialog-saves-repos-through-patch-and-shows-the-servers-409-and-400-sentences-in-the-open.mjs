@@ -1,6 +1,6 @@
 // A board's repositories are written through `PATCH /api/kanban/boards/:boardId` (`repos`), and the server's two
 // refusals are said where the fix is, inside the board dialog, never in a toast that leaves:
-//   - the Autonomy switch pressed on a board that names no repository answers 409 KANBAN_BOARD_NEEDS_REPOS: the dialog
+//   - the Runs itself switch pressed on a board that names no repository answers 409 KANBAN_BOARD_NEEDS_REPOS: the dialog
 //     opens on Board repositories with the server's sentence in it;
 //   - a Save answered 400 KANBAN_BOARD_REPO_INVALID (a path not inside a git work tree) leaves the dialog open over the
 //     path that was typed, with the server's sentence in it;
@@ -65,14 +65,14 @@ runCase(async (t) => {
   await openKanban(page);
 
   // 409: the switch opens the repositories dialog with the server's sentence.
-  const autonomy = page.getByRole("switch", { name: "Autonomy" }).first();
+  const autonomy = page.getByRole("switch", { name: "Runs itself" }).first();
   await autonomy.waitFor({ timeout: WAIT_MS });
   await autonomy.click();
   const dialog = page.getByRole("dialog").filter({ hasText: "Board repositories" }).first();
   try {
     await dialog.waitFor({ timeout: WAIT_MS });
   } catch {
-    return broken(`the Autonomy switch answered 409 KANBAN_BOARD_NEEDS_REPOS and no "Board repositories" dialog opened (PATCHes sent: ${JSON.stringify(patches)})`);
+    return broken(`the Runs itself switch answered 409 KANBAN_BOARD_NEEDS_REPOS and no "Board repositories" dialog opened (PATCHes sent: ${JSON.stringify(patches)})`);
   }
   if (!(await dialog.innerText()).includes(NEEDS)) return broken(`the repositories dialog opened by the 409 does not say the server's sentence "${NEEDS}"`);
 

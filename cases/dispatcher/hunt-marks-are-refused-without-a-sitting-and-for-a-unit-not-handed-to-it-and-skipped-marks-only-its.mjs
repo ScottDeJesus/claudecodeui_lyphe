@@ -26,7 +26,11 @@ runCase(async (t) => {
   const other = await addSitting(house, { hunt: "code", passId: code.passId, launchId: null });
   await handTo(house, s, [code.ids["src/a.py"], code.ids["src/b.py"]]);
   await handTo(house, other, [code.ids["lib/c.py"]]);
-  await writeLog(house, L, [{ use: { name: "Read", input: { file_path: path.join(house.repo, "src/b.py") } } }]);
+  // A call counts as evidence only once its result is in the log (hunt_marks.opened), so the Read carries one.
+  await writeLog(house, L, [
+    { use: { name: "Read", input: { file_path: path.join(house.repo, "src/b.py") } } },
+    { result: "x = 1" },
+  ]);
   const wrong = [];
 
   const before = await unitsOf(house);
