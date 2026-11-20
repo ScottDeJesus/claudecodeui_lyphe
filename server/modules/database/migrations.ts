@@ -818,6 +818,18 @@ const addSessionPermissionModeColumn = (db: Database): void => {
 };
 
 /**
+ * Adds the `context_window` column: the context window, in tokens, the Claude SDK last reported for the model a session ran on (a
+ * turn's `result.modelUsage[model].contextWindow`). It was process memory alone, so after a restart every Claude chat's context was
+ * measured against the CONTEXT_WINDOW fallback until its next turn, and a 1M chat read as over full. Left NULL for pre-existing rows:
+ * until a turn reports one, the window the session's recorded model names stands in (`provider-token-usage.service.ts`).
+ */
+const addSessionContextWindowColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'context_window', 'INTEGER');
+};
+
+/**
  * Drops `session_drafts.last_claimed_queue_id`, a column nothing reads or writes. `SESSION_DRAFTS_TABLE_SCHEMA_SQL`
  * no longer declares it, so a fresh database never has it; this is the half that reaches a database already on disk.
  * SQLite refuses to drop a column that an index, trigger or view names (none does), and an unread column is no reason
@@ -920,6 +932,7 @@ export const runMigrations = (db: Database) => {
     addSessionEffortColumn(db);
     addSessionNameGivenColumn(db);
     addSessionPermissionModeColumn(db);
+    addSessionContextWindowColumn(db);
     addForkedFromSessionIdColumn(db);
     addSimpleListAtColumn(db);
     addSessionUserStateColumns(db);

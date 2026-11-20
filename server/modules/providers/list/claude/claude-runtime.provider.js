@@ -543,7 +543,7 @@ function buildTokenBudget(messageUsage, reportedContextWindow) {
   const cacheTokens = cacheCreationTokens + cacheReadTokens;
   const inputTokens = directInputTokens + cacheTokens;
   const outputTokens = readNumber(messageUsage.output_tokens ?? messageUsage.outputTokens);
-  const contextWindow = resolveContextWindow(reportedContextWindow);
+  const contextWindow = resolveContextWindow(reportedContextWindow, inputTokens + outputTokens);
 
   return {
     used: inputTokens + outputTokens,
@@ -639,7 +639,7 @@ function extractCumulativeTokenBudget(sdkMessage, reportedContextWindow) {
   const inputTokens = readNumber(modelData.cumulativeInputTokens ?? modelData.inputTokens);
   const outputTokens = readNumber(modelData.cumulativeOutputTokens ?? modelData.outputTokens);
   const totalUsed = inputTokens + outputTokens;
-  const contextWindow = resolveContextWindow(reportedContextWindow);
+  const contextWindow = resolveContextWindow(reportedContextWindow, totalUsed);
 
   return {
     used: totalUsed,

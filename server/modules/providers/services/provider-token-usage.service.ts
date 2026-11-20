@@ -115,8 +115,9 @@ const defaultDependencies: ProviderTokenUsageServiceDependencies = {
  * model id at most, and an id cannot tell a 200K from a 1M variant, nor what a
  * self-hosted model behind ANTHROPIC_BASE_URL allows. Remembering the reported
  * value lets the history-derived usage show the same window the live counter
- * did. It is process memory on purpose: after a restart the counter falls back
- * to CONTEXT_WINDOW until the session's next turn reports again.
+ * did. This map is the fast copy; each report is also kept on the session's row
+ * (`sessions.context_window`), so a restart does not drop every chat back to the
+ * CONTEXT_WINDOW fallback until its next turn.
  */
 const reportedClaudeContextWindows = new Map<string, number>();
 
@@ -124,16 +125,34 @@ const reportedClaudeContextWindows = new Map<string, number>();
 const MAX_REPORTED_CLAUDE_CONTEXT_WINDOWS = 1000;
 
 /**
- * Used by the Claude runtime provider to record the window the SDK reported for
- * a session's turn. Non-positive or non-numeric values are ignored so a build
- * that reports no window never overwrites one that did.
+ * A Claude model's two context windows: the standard one, and the long one a model alias or id with the 1M suffix runs with
+ * (`opus[1m]`, `claude-opus-5-5[1m]`), which the transcript's model id alone cannot say. A conversation holding more than the
+ * standard window can only be on the long one.
  */
-export function rememberClaudeContextWindow(providerSessionId: string, contextWindow: number): void {
-  if (!providerSessionId || !Number.isFinite(contextWindow) || contextWindow <= 0) {
-    return;
-  }
+const STANDARD_CONTEXT_WINDOW = 200_000;
+const ONE_MILLION_CONTEXT_WINDOW = 1_000_000;
+const ONE_MILLION_SUFFIX = /\[1m\]$/i;
 
-  // Re-insert so the most recently reported sessions are the last evicted.
+/** The window a budget falls back to when nothing says the session's window and CONTEXT_WINDOW is unset. */
+const DEFAULT_CONTEXT_WINDOW = 160_000;
+
+/**
+ * The window a Claude session is measured against when the SDK has reported none for it and its model names none: CONTEXT_WINDOW
+ * (`configured`, else 160,000) while the conversation fits in it. A conversation already holding more (`used`) cannot be on that
+ * window: it is measured against the smallest real window that holds it, the standard one, then the 1M one. Without this, a chat
+ * with no report (after a restart, or not sent on since) read as more than full.
+ *
+ * Used by this file's `summarizeClaudeTokenUsage` (a history read) and the Claude provider's `resolveContextWindow` (a live budget).
+ */
+export function fallbackClaudeContextWindow(used: number, configured: string | undefined = process.env.CONTEXT_WINDOW): number {
+  const parsed = Number.parseInt(configured ?? '', 10);
+  const fallback = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_CONTEXT_WINDOW;
+  if (used <= fallback) return fallback;
+  return used <= STANDARD_CONTEXT_WINDOW ? STANDARD_CONTEXT_WINDOW : Math.max(fallback, ONE_MILLION_CONTEXT_WINDOW);
+}
+
+/** Holds one report in the fast copy, the most recent last so it is the last evicted. */
+function holdReportedWindow(providerSessionId: string, contextWindow: number): void {
   reportedClaudeContextWindows.delete(providerSessionId);
   reportedClaudeContextWindows.set(providerSessionId, contextWindow);
   if (reportedClaudeContextWindows.size > MAX_REPORTED_CLAUDE_CONTEXT_WINDOWS) {
@@ -145,12 +164,58 @@ export function rememberClaudeContextWindow(providerSessionId: string, contextWi
 }
 
 /**
- * Used by the Claude runtime provider (a resumed run starts from the window its
- * session last reported), the Claude history reader, and this service's usage
- * lookup. Returns undefined when no run has reported a window for the session.
+ * Used by the Claude runtime provider to record the window the SDK reported for
+ * a session's turn. Non-positive or non-numeric values are ignored so a build
+ * that reports no window never overwrites one that did. A window the session did
+ * not hold already is written to its row too; a failed write is logged and the
+ * memory copy still serves this process.
+ */
+export function rememberClaudeContextWindow(providerSessionId: string, contextWindow: number): void {
+  if (!providerSessionId || !Number.isFinite(contextWindow) || contextWindow <= 0) {
+    return;
+  }
+
+  const held = reportedClaudeContextWindows.get(providerSessionId);
+  holdReportedWindow(providerSessionId, contextWindow);
+  if (held === contextWindow) {
+    return;
+  }
+  try {
+    sessionsDb.setContextWindow(providerSessionId, contextWindow);
+  } catch (error) {
+    console.warn(`[token-usage] the context window of ${providerSessionId} could not be kept on its row`, error);
+  }
+}
+
+/**
+ * The window a Claude session is measured against: the one the SDK last reported
+ * for it (this process's copy, else the one kept on its row), and before any
+ * report, the 1M window its recorded model names (`opus[1m]`). Undefined when
+ * neither says: the caller then falls back to CONTEXT_WINDOW.
+ *
+ * Used by the Claude runtime provider (a resumed run starts from it), the Claude
+ * history reader, and this service's usage lookup.
  */
 export function getReportedClaudeContextWindow(providerSessionId: string | null | undefined): number | undefined {
-  return providerSessionId ? reportedClaudeContextWindows.get(providerSessionId) : undefined;
+  if (!providerSessionId) {
+    return undefined;
+  }
+  const held = reportedClaudeContextWindows.get(providerSessionId);
+  if (held !== undefined) {
+    return held;
+  }
+  let kept: { contextWindow: number | null; model: string | null } | null = null;
+  try {
+    kept = sessionsDb.contextWindowOf(providerSessionId);
+  } catch (error) {
+    console.warn(`[token-usage] the context window of ${providerSessionId} could not be read from its row`, error);
+  }
+  if (kept?.contextWindow && kept.contextWindow > 0) {
+    holdReportedWindow(providerSessionId, kept.contextWindow);
+    return kept.contextWindow;
+  }
+  // Not held as a report: the model can change before the next turn reports, and the report is the truth.
+  return kept?.model && ONE_MILLION_SUFFIX.test(kept.model.trim()) ? ONE_MILLION_CONTEXT_WINDOW : undefined;
 }
 
 function readUsageNumber(value: unknown): number {
@@ -251,8 +316,10 @@ function emptyCodexTokenUsage(): TokenUsageResult {
  * window currently holds. Summing turns would count the same cached prefix
  * once per turn.
  *
- * The total is the window the SDK reported for the session (`reportedContextWindow`)
- * when there is one, and the CONTEXT_WINDOW setting otherwise.
+ * The total is the window the session is measured against (`reportedContextWindow`,
+ * `getReportedClaudeContextWindow`) when there is one, and the fallback otherwise
+ * (`fallbackClaudeContextWindow`: CONTEXT_WINDOW, or the 1M window for a conversation
+ * holding more than a standard one).
  */
 export function summarizeClaudeTokenUsage(
   entries: AnyRecord[],
@@ -305,11 +372,9 @@ export function summarizeClaudeTokenUsage(
     break;
   }
 
-  const parsedContextWindow = Number.parseInt(configuredContextWindow ?? '', 10);
-  const configuredOrDefaultContextWindow = Number.isFinite(parsedContextWindow) ? parsedContextWindow : 160_000;
   const contextWindow = reportedContextWindow && reportedContextWindow > 0
     ? reportedContextWindow
-    : configuredOrDefaultContextWindow;
+    : fallbackClaudeContextWindow(inputTokens + outputTokens, configuredContextWindow);
   const cacheTokens = cacheReadTokens + cacheCreationTokens;
 
   return {

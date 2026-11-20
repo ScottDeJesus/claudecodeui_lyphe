@@ -487,6 +487,39 @@ export const sessionsDb = {
   },
 
   /**
+   * Records the context window, in tokens, the Claude SDK reported for the model the session behind `providerSessionId` ran on, so
+   * its context is measured against the right window after a restart too. Written by the providers module's token usage service
+   * (`rememberClaudeContextWindow`) when a turn reports a window it did not hold already.
+   */
+  setContextWindow(providerSessionId: string, contextWindow: number): void {
+    const db = getConnection();
+    db.prepare(
+      `UPDATE sessions
+       SET context_window = ?
+       WHERE provider_session_id = ?`
+    ).run(contextWindow, providerSessionId);
+  },
+
+  /**
+   * What the window of the session behind `providerSessionId` can be read from: the window the SDK last reported for it (NULL before
+   * any) and the model the app last recorded for it (NULL before any), or null for a provider id no row carries. Read by the
+   * providers module's token usage service (`getReportedClaudeContextWindow`) when its own memory holds no report.
+   */
+  contextWindowOf(providerSessionId: string): { contextWindow: number | null; model: string | null } | null {
+    const db = getConnection();
+    const row = db
+      .prepare(
+        `SELECT context_window, model
+         FROM sessions
+         WHERE provider_session_id = ?
+         ORDER BY updated_at DESC
+         LIMIT 1`
+      )
+      .get(providerSessionId) as { context_window: number | null; model: string | null } | undefined;
+    return row === undefined ? null : { contextWindow: row.context_window, model: row.model };
+  },
+
+  /**
    * Records the reasoning effort one session runs with.
    *
    * `default` is stored as an explicit choice rather than NULL so reopening
