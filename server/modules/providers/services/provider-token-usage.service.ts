@@ -125,13 +125,17 @@ const reportedClaudeContextWindows = new Map<string, number>();
 const MAX_REPORTED_CLAUDE_CONTEXT_WINDOWS = 1000;
 
 /**
- * A Claude model's two context windows: the standard one, and the long one a model alias or id with the 1M suffix runs with
- * (`opus[1m]`, `claude-opus-5-5[1m]`), which the transcript's model id alone cannot say. A conversation holding more than the
- * standard window can only be on the long one.
+ * A Claude model's two context windows: the standard one, and the long one, which the transcript's model id alone cannot say. A
+ * conversation holding more than the standard window can only be on the long one.
  */
 const STANDARD_CONTEXT_WINDOW = 200_000;
 const ONE_MILLION_CONTEXT_WINDOW = 1_000_000;
-const ONE_MILLION_SUFFIX = /\[1m\]$/i;
+
+/**
+ * The models a chat records that run with the 1M window before any turn has reported it: an alias or id with the 1M suffix
+ * (`opus[1m]`, `sonnet[1m]`, `claude-opus-5-5[1m]`), and the Fable family, which is 1M without one (`fable`, `claude-fable-5-2`).
+ */
+const ONE_MILLION_MODEL = /\[1m\]$|(^|[^a-z])fable([^a-z]|$)/i;
 
 /** The window a budget falls back to when nothing says the session's window and CONTEXT_WINDOW is unset. */
 const DEFAULT_CONTEXT_WINDOW = 160_000;
@@ -190,7 +194,7 @@ export function rememberClaudeContextWindow(providerSessionId: string, contextWi
 /**
  * The window a Claude session is measured against: the one the SDK last reported
  * for it (this process's copy, else the one kept on its row), and before any
- * report, the 1M window its recorded model names (`opus[1m]`). Undefined when
+ * report, the 1M window its recorded model runs with (`opus[1m]`, `fable`). Undefined when
  * neither says: the caller then falls back to CONTEXT_WINDOW.
  *
  * Used by the Claude runtime provider (a resumed run starts from it), the Claude
@@ -215,7 +219,7 @@ export function getReportedClaudeContextWindow(providerSessionId: string | null 
     return kept.contextWindow;
   }
   // Not held as a report: the model can change before the next turn reports, and the report is the truth.
-  return kept?.model && ONE_MILLION_SUFFIX.test(kept.model.trim()) ? ONE_MILLION_CONTEXT_WINDOW : undefined;
+  return kept?.model && ONE_MILLION_MODEL.test(kept.model.trim()) ? ONE_MILLION_CONTEXT_WINDOW : undefined;
 }
 
 function readUsageNumber(value: unknown): number {
