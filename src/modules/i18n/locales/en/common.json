@@ -43,7 +43,23 @@
     "places": "Other screens"
   },
   "places": {
-    "menu": "Menu"
+    "menu": "Menu",
+    "wheel": "Places",
+    "lastChat": "last chat",
+    "here": "here",
+    "trail": {
+      "source": "Where you've been",
+      "label": "Where you have been",
+      "close": "Stay here",
+      "step": "{{index}} of {{count}}: {{place}}",
+      "stepHere": "{{index}} of {{count}}: {{place}}, here",
+      "hint": "Press a place to go back to it · Esc stays",
+      "kind": {
+        "page": "page",
+        "screen": "screen",
+        "chat": "chat"
+      }
+    }
   },
   "rail": {
     "label": "Views",

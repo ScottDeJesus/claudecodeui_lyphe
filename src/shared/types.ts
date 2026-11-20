@@ -2268,11 +2268,12 @@ export type WorkspaceView = {
   hiddenFromNav: boolean;
 };
 
-/** One row of the command palette's Navigate group: `key` is its React key, `label` the name after "Go to", `keywords` the words the search also matches, and `run` the act the row performs when chosen. ProjectCommandPalette builds the list; CommandPalette only draws it. */
+/** One row of the command palette's Places group: `key` is its React key, `label` the name after "Go to", `keywords` the words the search also matches, `icon` the glyph drawn before it (none for a plugin's view), and `run` the act the row performs when chosen. ProjectCommandPalette builds the list (the wheel's places first, then the other views); CommandPalette only draws it. */
 export type PaletteNavRow = {
   key: string;
   label: string;
   keywords: string;
+  icon?: ComponentType<{ className?: string }>;
   run: () => void;
 };
 
@@ -4506,3 +4507,43 @@ export type LocaleWords = { key: string; english: string };
  * `STATION_NEED_KINDS`, which gives each its glyph, its word, its tone and its one act.
  */
 export type StationNeedKind = Exclude<StationNeed['kind'], 'ask'> | StationAskKind;
+
+// ---------------------------
+
+//----------------- PLACES: the wheel of places, the trail and the palette's Places group ------------
+
+/**
+ * A place the app's navigation leads to, by the name the reader knows it by: the two pages over the workspace (`home`, `station`), the
+ * last chat (`chat`), the workspace's screens (`roadmap` is the `runner` view, `bugs` the `kanban` view, the others by their own ids)
+ * and Settings, a door. The wheel draws each at a fixed bearing, so a place keeps its angle whatever else is there.
+ */
+export type PlaceId = 'home' | 'station' | 'roadmap' | 'bugs' | 'chat' | 'cerberus' | 'inbox' | 'api' | 'universe' | 'schedules' | 'settings';
+
+/**
+ * One place as the navigation lists it, resolved for the page on screen: its name (the chat's own title for `chat`), its glyph (which
+ * is all the wheel draws of it, but for the last chat's title), the ring it stands on (the five visited most on the inner, the rest on
+ * the outer), whether it is where the reader is (`here`), the words the palette's search also matches, and `go`, the press that takes
+ * the reader there. Built by project-workspace's `PlacesProvider`; read by its wheel (`PlacesWheel`) and by its command palette's Places
+ * group.
+ */
+export type Place = {
+  id: PlaceId;
+  label: string;
+  icon: ComponentType<{ className?: string; strokeWidth?: string | number }>;
+  ring: 'inner' | 'outer';
+  here: boolean;
+  keywords: string;
+  go: () => void;
+};
+
+/**
+ * One step of the trail: a place the reader has stood on in this page's life, newest last. `key` tells two steps apart (`home`,
+ * `station`, `view:<tab>`, `chat:<session id>`), `label` is its name and `kind` the sort of place it is, said under the name. Recorded
+ * by project-workspace's `PlacesProvider`, which also takes the reader back to one; drawn by its `PlaceTrail`, the course a held back
+ * arrow opens.
+ */
+export type PlaceTrailStep = {
+  key: string;
+  label: string;
+  kind: 'page' | 'screen' | 'chat';
+};

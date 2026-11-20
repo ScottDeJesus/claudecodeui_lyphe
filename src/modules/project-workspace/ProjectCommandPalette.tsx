@@ -1,18 +1,20 @@
-import { AudioLines, LayoutDashboard } from 'lucide-react';
+import { AudioLines } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import { useSwitcherActions } from '@/modules/app-switcher';
 import { CommandPalette } from '@/modules/command-palette';
 import { useCompanion } from '@/modules/companion';
 import { selectGitRepository } from '@/modules/git-panel';
+import { usePlaces } from '@/modules/project-workspace/context/PlacesContext';
 import { useProjectCommandState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
-import { openHome, openStation } from '@/shared/cloudcliDoors';
 import { GIT_REPO_PATHS } from '@/shared/constants';
 import { useHomeShowing, useStationShowing } from '@/shared/context/StationLayerContext';
-import type { ChatDoor, PaletteGroup, PaletteNavRow } from '@/shared/types';
+import type { AppTab, ChatDoor, PaletteGroup, PaletteNavRow } from '@/shared/types';
+
+/** The views that are places of the wheel's, listed with the places: the rest of the views follow them. */
+const PLACE_VIEWS: ReadonlySet<AppTab> = new Set<AppTab>(['runner', 'kanban', 'cerberus', 'inbox', 'api', 'universe', 'schedules']);
 
 /**
  * Rendered by WorkspaceFrame to bind this module's project state, and the chat's door, to the
@@ -29,9 +31,9 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
     setActiveTab,
   } = useProjectCommandState();
   const { views } = useWorkspaceViews();
+  const { places } = usePlaces();
   const stationShowing = useStationShowing();
   const homeShowing = useHomeShowing();
-  const navigate = useNavigate();
 
   // The switcher's five acts, the list the radial draws too. They are the switcher's to define (which
   // pane is in front, what a Reload is), so this only forwards them to the palette's Applications group.
@@ -52,29 +54,26 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
     [selectedRepoPath, setActiveTab],
   );
 
-  // The Navigate rows come off the one list the rail reads, so the palette reaches every view by the names the
-  // rail gives them, and a view added to that list is reachable here with no second edit. Settings is the one
-  // row of ours: it is not a view but a door, so it comes last. Memoised because a fresh array on every
-  // render would defeat the memo().
+  // THE PLACES LEAD: the wheel's places in the wheel's order (Home, the station, the Roadmap, Bugs, the last chat, then the outer
+  // ring's, Settings last), each going where the wheel's own press goes; then every other view off the one list the rail reads, so a
+  // view added to that list is reachable here with no second edit. Memoised because a fresh array on every render would defeat the memo().
   const navRows = useMemo<PaletteNavRow[]>(
     () => [
-      // The sessions home: not a view of this page but the page over it, so it leads the list (`openHome`, the rail's Home button's own door).
-      { key: 'home', label: t('home.title'), keywords: t('home.keywords'), run: () => openHome(navigate) },
-      ...views.map((view) => ({
+      ...places.map((place) => ({ key: `place-${place.id}`, label: place.label, keywords: place.keywords, icon: place.icon, run: place.go })),
+      ...views.filter((view) => !PLACE_VIEWS.has(view.id)).map((view) => ({
         key: view.id,
         label: view.label,
         keywords: view.keywords,
+        icon: view.icon ?? undefined,
         run: () => setActiveTab(view.id),
       })),
-      { key: 'settings', label: t('rail.settings'), keywords: 'open settings preferences', run: () => openSettings() },
     ],
-    [views, t, setActiveTab, openSettings, navigate],
+    [places, views, setActiveTab],
   );
 
-  // Kaylee's group: a row that opens her panel and a row that opens her station. Her name is the one he gave her, so it is
-  // read off her picture, and the memo keeps the group's identity through the frames she sends (each sentence changes the
-  // picture, not her name). The station's door is `openStation`: the station comes forward over this page, in this tab, and the
-  // workspace stays as it is under it; the same door her panel's head carries.
+  // Kaylee's group: a row that opens her panel (her station is a place, so it is among the places). Her name is the one he gave her,
+  // so it is read off her picture, and the memo keeps the group's identity through the frames she sends (each sentence changes the
+  // picture, not her name).
   const { picture, setOpen: setCompanionOpen } = useCompanion();
   const companionName = picture?.settings.name ?? t('companion.defaultName');
   const companionGroup = useMemo<PaletteGroup>(
@@ -88,16 +87,9 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
           icon: AudioLines,
           run: () => setCompanionOpen(true),
         },
-        {
-          key: 'station',
-          label: t('companion.palette.station', { defaultValue: 'Open Kaylee Station' }),
-          keywords: t('companion.palette.stationKeywords', { defaultValue: 'kaylee station watch floor dashboard monitor' }),
-          icon: LayoutDashboard,
-          run: () => openStation(navigate),
-        },
       ],
     }),
-    [t, companionName, setCompanionOpen, navigate],
+    [t, companionName, setCompanionOpen],
   );
 
   // The station or the sessions home on screen covers this page, and Ctrl+K is heard on the whole document: with the palette drawn it would open on a page

@@ -15,7 +15,7 @@ import { StationPortraitWords } from '@/modules/station/StationPortrait';
 import { StationTalk } from '@/modules/station/StationTalk';
 import { useStation } from '@/modules/station/context/StationContext';
 import type { CompanionLogEntry, CompanionPicture } from '@/shared/companion-types';
-import { CORE_BODY_SHARE } from '@/shared/constants';
+import { CORE_BODY_SHARE, HOLDS_PLACES } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { CompanionEars, CompanionPresence, CompanionSentenceRef } from '@/shared/types';
 import { Button, buttonVariants, Menu, Sheet } from '@/shared/ui';
@@ -387,14 +387,15 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
           // Each ring a press of its own at a desk; on a phone and as the small mark the whole core is the way home.
           layered={!phone && form !== 'mark'}
           context={{ label: t('companion.log.label', { name }), onPress: openConversation }}
-          pressMarks={{ 'data-station-kaylee-core': '' }}
+          // Held, the core brings up the wheel of places: slide to one and let go.
+          pressMarks={{ 'data-station-kaylee-core': '', ...HOLDS_PLACES }}
           around={(outerRadius) => <StationDraftAlert ringRadius={outerRadius} still={form === 'mark'} />}
         />
       )}
       turnedTo={turnedTo}
       picture={picture}
       speaking={voice.speaking}
-      menu={<PlacesMenu here="station" triggerClassName={NAME_PRESS} />}
+      menu={<PlacesMenu triggerClassName={NAME_PRESS} />}
       controls={(
         <CompanionControls
           name={name}

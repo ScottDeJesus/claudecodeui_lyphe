@@ -1,0 +1,126 @@
+/*
+ * THE WHEEL OF PLACES AND THE TRAIL (PlacesWheel, PlaceTrail, PlacesProvider's holds).
+ *
+ * The wheel arrives from Kaylee's core on the lock spring, sector by sector, the inner ring first; a glyph arrives after its sector.
+ * Put away with nothing chosen, it settles off (accelerates away, never springs); a place chosen is on screen at once, with no wheel
+ * lingering over it. A place pointed at takes the accent: its
+ * sector the accent's soft fill and edge, its name the accent's ink. The place on screen is raised (the second surface, the strong edge).
+ *
+ * The ground is the dialog's own near-black, not a token, and for the dialog's reason (`feedback.css`): `--canvas` is near-white in day,
+ * and the wheel's sectors are `--surface`, so a token ground would erase them where they need it most.
+ */
+
+.places-wheel { position: fixed; inset: 0; z-index: 70; touch-action: none; user-select: none; -webkit-user-select: none; outline: none; }
+.places-wheel[data-leaving='true'] { pointer-events: none; }
+
+.places-wheel-ground {
+  position: absolute; inset: 0; background: rgba(16, 17, 22, 0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: places-fade var(--duration-fade) ease both;
+}
+/* At night the page under it is light on dark, and shows through more: the ground dims it further. */
+.dark .places-wheel-ground { background: rgba(16, 17, 22, 0.74); }
+
+.places-wheel-rings { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.places-wheel-hair { fill: none; stroke: rgba(255, 255, 255, 0.08); stroke-width: 1; animation: places-fade var(--duration-fade) ease both; }
+.places-wheel-leader { animation: places-fade var(--duration-fade) ease both; }
+.places-wheel-leader circle { fill: none; stroke: var(--accent); stroke-width: 1; }
+.places-wheel-leader line { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 5; }
+
+.places-wheel-rings path {
+  pointer-events: auto; cursor: pointer; fill: var(--surface); fill-opacity: 0.94; stroke: var(--hairline); stroke-width: 1;
+  transform-box: view-box; transition: fill var(--duration-fade) ease, stroke var(--duration-fade) ease, fill-opacity var(--duration-fade) ease;
+  animation: places-arrive var(--duration-lock) var(--ease-lock) both; animation-delay: calc(var(--i, 0) * 24ms);
+}
+.places-wheel-rings path[data-ring='outer'] { fill-opacity: 0.84; stroke: var(--border); }
+.places-wheel-rings path[data-here='true'] { fill: var(--surface2); fill-opacity: 1; stroke: var(--border-strong); }
+.places-wheel-rings path[data-over='true'] { fill: var(--accent-soft); fill-opacity: 1; stroke: var(--accent); }
+
+/* The menu lies over the whole window and takes no press: its items take their own. */
+.places-wheel-menu { position: absolute; inset: 0; pointer-events: none; }
+.places-wheel-menu .places-wheel-name { pointer-events: auto; }
+
+/* A place over its sector: its glyph alone, but the last chat, which keeps its title and, at a desk, what it is. */
+.places-wheel-name {
+  position: absolute; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 44px;
+  min-height: 44px; justify-content: center; margin: 0; padding: 4px 6px; border: 0; border-radius: var(--radius-control); background: none;
+  color: var(--ink); cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; transition: color var(--duration-fade) ease;
+  animation: places-arrive var(--duration-lock) var(--ease-lock) both; animation-delay: calc(80ms + var(--i, 0) * 24ms);
+}
+.places-wheel-name:focus-visible { box-shadow: 0 0 0 1px var(--focus); }
+.places-wheel-name[data-ring='outer'] { color: var(--ink-muted); }
+.places-wheel-name[data-over='true'] { color: var(--accent-ink); }
+.places-wheel-glyph { width: 28px; height: 28px; flex: none; }
+.places-wheel-name[data-ring='outer'] .places-wheel-glyph { width: 20px; height: 20px; }
+.places-wheel-word {
+  max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 11px;
+  line-height: 14px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.places-wheel-sub {
+  font-family: var(--font-mono); font-size: 9px; line-height: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-muted); white-space: nowrap;
+}
+
+/* On a phone the glyphs are the fan's, a size down; the last chat's title in a finger's width. */
+.places-wheel[data-fan='true'] .places-wheel-glyph { width: 22px; height: 22px; }
+.places-wheel[data-fan='true'] .places-wheel-name[data-ring='outer'] .places-wheel-glyph { width: 18px; height: 18px; }
+.places-wheel[data-fan='true'] .places-wheel-word { max-width: 60px; font-size: 9px; line-height: 11px; letter-spacing: 0.12em; }
+
+.places-wheel-core { position: absolute; pointer-events: none; animation: places-arrive var(--duration-lock) var(--ease-lock) both; }
+
+.places-wheel-plate {
+  position: absolute; left: 50%; translate: -50% 0; max-width: calc(100vw - 24px); margin: 0; padding: 4px 10px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; background: var(--surface); box-shadow: 0 0 0 1px var(--hairline);
+  border-radius: var(--radius-control); color: var(--accent-ink); font-family: var(--font-mono); font-size: 10px; line-height: 14px;
+  font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; animation: places-fade 160ms ease both;
+}
+.places-wheel-plate[data-here='true'] { color: var(--ink); }
+
+.places-wheel-acts {
+  position: absolute; left: 50%; translate: -50% 0; display: flex; gap: 8px; animation: places-fade var(--duration-fade) ease both;
+  animation-delay: 200ms;
+}
+
+/* Settling away: what stops being true accelerates off and never springs. */
+.places-wheel[data-leaving='true'] .places-wheel-ground,
+.places-wheel[data-leaving='true'] .places-wheel-hair,
+.places-wheel[data-leaving='true'] .places-wheel-leader,
+.places-wheel[data-leaving='true'] .places-wheel-plate,
+.places-wheel[data-leaving='true'] .places-wheel-acts { animation: places-fade-out 200ms var(--ease-settle) both; }
+.places-wheel[data-leaving='true'] .places-wheel-rings path,
+.places-wheel[data-leaving='true'] .places-wheel-name,
+.places-wheel[data-leaving='true'] .places-wheel-core { animation: places-settle 200ms var(--ease-settle) both; }
+
+@keyframes places-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes places-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes places-arrive { from { opacity: 0; scale: 0.84; } to { opacity: 1; scale: 1; } }
+@keyframes places-settle { from { opacity: 1; scale: 1; } to { opacity: 0; scale: 0.92; } }
+
+/* THE HOLDS: what holds the trail or the places keeps the platform's own long press off it, and draws the hold as it fills. */
+[data-holds-trail], [data-holds-places] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+[data-holds-trail][data-holding], [data-holds-places][data-holding] { animation: places-hold 450ms linear both; }
+@keyframes places-hold { from { box-shadow: 0 0 0 0 transparent; } to { box-shadow: 0 0 0 3px var(--accent); } }
+
+/* THE TRAIL: its plate hangs over every page from the arrow that was held. */
+.places-trail-room { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+.places-trail-room .ast-opening { z-index: auto; }
+.places-trail-names { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.places-trail-names[data-list='true'] { grid-template-columns: minmax(0, 1fr); }
+.places-trail-step {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 44px; margin: 0; padding: 4px 8px 4px 0;
+  border: 0; background: none; text-align: left; cursor: pointer; color: var(--ink-mid); outline: none;
+  transition: color var(--duration-fade) ease;
+}
+.places-trail-step:hover, .places-trail-step:focus-visible { color: var(--accent-ink); }
+.places-trail-step:focus-visible { box-shadow: 0 0 0 1px var(--focus); }
+.places-trail-step[data-here='true'] { color: var(--ink); }
+.places-trail-name { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 13px; line-height: 17px; }
+.places-trail-kind, .places-trail-hint {
+  font-family: var(--font-mono); font-size: 9px; line-height: 12px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.places-trail-hint { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .places-wheel *, .places-wheel { animation-duration: 1ms !important; animation-delay: 0ms !important; transition: none !important; }
+  [data-holds-trail][data-holding], [data-holds-places][data-holding] { animation: none; box-shadow: 0 0 0 3px var(--accent); }
+}

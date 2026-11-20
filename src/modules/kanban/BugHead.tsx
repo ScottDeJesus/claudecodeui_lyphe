@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { KanbanBoard } from '@/shared/kanban-types';
 import { openHome, openStation } from '@/shared/cloudcliDoors';
+import { HOLDS_TRAIL } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import { Button, Select } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
@@ -22,7 +23,7 @@ const FINGER_CATCH = "relative finger:before:absolute finger:before:-inset-2 fin
 
 /**
  * THE HEAD OF THE BUGS VIEW, as the chat's head is drawn: the way back at the start (Kaylee Station when the screen was reached
- * from there, else the sessions home; Escape presses it, `WAY_BACK`), then what this is: BUGS, and the board's name, which is its
+ * from there, else the sessions home; Escape presses it, `WAY_BACK`; held, it opens the trail of places, `HOLDS_TRAIL`), then what this is: BUGS, and the board's name, which is its
  * picker (the old header's switcher, under the same name, with New board under its list). At the end the menu to every other
  * place. Nothing else: what the board is doing is its instrument's to say, and everything that sets the board up is behind its core.
  *
@@ -40,6 +41,7 @@ export function BugHead({ boards, currentBoardId, onSelectBoard, onNewBoard, men
       <Button
         data-bug-head-back=""
         {...WAY_BACK}
+        {...HOLDS_TRAIL}
         variant="outline"
         size="icon"
         className={`${FINGER_CATCH} size-9 shrink-0 finger:size-7`}

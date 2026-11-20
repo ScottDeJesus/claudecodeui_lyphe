@@ -823,3 +823,22 @@ export const CORE_BODY_SHARE = 0.35;
  * (`coreGaugeScale` in `shared/utils`); the instrument draws them there and the chat's core puts the outer one's press there.
  */
 export const CORE_GAUGE_GAPS: readonly [number, number] = [6, 13];
+
+// ---------------------------
+
+//----------------- PLACES ------------
+
+/**
+ * What a page's back arrow states when HOLDING IT opens the trail, the places the reader has been (project-workspace's
+ * `PlacesProvider` hears the long press; its `PlaceTrail` hangs from the arrow). Carried beside `WAY_BACK` by the chat's head
+ * (`ChatHead`) and the Bugs view's (`BugHead`). A plain press is still the way back.
+ */
+export const HOLDS_TRAIL = { 'data-holds-trail': '' } as const;
+
+/**
+ * What a core states when HOLDING IT opens the wheel of places, held: slide to a place and let go to go there. Carried by Kaylee's
+ * core on the sessions home (`WorkspaceHome`) and at the station (`StationKaylee`), through `CompanionCore`'s `pressMarks`. A plain
+ * press is still the core's own.
+ */
+export const HOLDS_PLACES = { 'data-holds-places': '' } as const;
+

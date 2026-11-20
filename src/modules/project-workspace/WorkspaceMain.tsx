@@ -513,7 +513,7 @@ function WorkspaceMain({
               <CoreDrawingProvider value={drawChatCore}>
                 <KanbanPanel
                   projectId={selectedProject?.projectId ?? null}
-                  menu={<PlacesMenu here="kanban" triggerClassName="relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']" />}
+                  menu={<PlacesMenu triggerClassName="relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']" />}
                 />
               </CoreDrawingProvider>
             </div>
