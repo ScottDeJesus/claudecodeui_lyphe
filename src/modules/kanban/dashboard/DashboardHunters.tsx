@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { DashboardHunterNights } from '@/modules/kanban/dashboard/DashboardHunterNights';
 import { DashboardHunterSkips } from '@/modules/kanban/dashboard/DashboardHunterSkips';
 import type { BugDashboardPart, HuntHunter, HuntProjectStanding, HuntSkippedUnit, HuntStatus, Tone } from '@/shared/types';
-import { Badge, Banner, Button, ConfirmDialog, EmptyState, Meter, SignalLoop } from '@/shared/ui';
+import { Badge, Banner, Button, ConfirmDialog, EmptyState, Rule, SignalLoop } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 
 /**
@@ -24,19 +24,19 @@ import { formatShortDate } from '@/shared/utils';
  * the press opens the kit's question, which says what stopping does: the hunter finishes what it has in hand, and
  * tonight is over.
  *
- * THEN ONE GROUP FOR EACH HUNTER, headed by its name and the soul that wears it, and ONE ROW FOR EACH PROJECT.
- * A project being hunted reads left to right as it is asked: which project and where it stands (a word), then the
- * pass as THREE measures (covered, skipped, not reached), each the kit's `Meter` with its figure, under the pass's
- * total and the unit's word; then what the hunt has cost and found: about how many nights are left, tickets and
- * proposals filed, and how its last night ended.
+ * THEN ONE GROUP FOR EACH HUNTER, under its Rule (its name, and the soul that wears it at the line's end), and ONE ROW
+ * FOR EACH PROJECT. A project being hunted reads left to right as it is asked: which project and where it stands (a
+ * word), then the pass as ONE ring with its three measures in words beside it (covered, skipped, not reached, each with
+ * the unit's word); then what the hunt has cost and found: about how many nights are left, tickets and proposals filed,
+ * and how its last night ended.
  *
- * THE THREE ARE DRAWN AS THREE, AND ONLY COVERED IS PROGRESS. Covered fills in the accent. Skipped and Not reached
- * fill in the neutral grey, never the accent: a bar of work nobody has done must not read as work done. A skip is
- * routine and lasting, so it wears no amber: its reasons are the table below, and amber in this section is kept for
- * the two things that ask to be looked at, a project that could not be mapped and a night given up.
+ * ONLY COVERED IS PROGRESS. Round the ring covered is the green (finished is green), skipped the neutral grey and not
+ * reached the bare track: work nobody has done must not read as work done. A skip is routine and lasting, so it wears no
+ * amber: its reasons are the table below, and amber in this section is kept for the two things that ask to be looked
+ * at, a project that could not be mapped and a night given up.
  *
- * A PROJECT THAT COULD NOT BE MAPPED SAYS WHY AND DRAWS NO BAR. One with nothing to hunt (not started, nothing of the
- * hunter's kind, no database named) is one quiet line: a bar at zero would claim a pass that does not exist.
+ * A PROJECT THAT COULD NOT BE MAPPED SAYS WHY AND DRAWS NO RING. One with nothing to hunt (not started, nothing of the
+ * hunter's kind, no database named) is one quiet line: a ring at zero would claim a pass that does not exist.
  *
  * A PART THAT DID NOT ANSWER BLANKS THE SECTION. When the house's `hunt status` refused, the section says its
  * sentence and draws nothing under it: no line, no bar, no table.
@@ -66,13 +66,53 @@ const STATE_TONES: Record<HuntProjectStanding['state'], Tone> = {
   'no database named': 'neutral',
 };
 
-/** A share of a pass as a percent, or `null` for a pass that holds nothing: unknown, never zero. */
-const shareOf = (count: number, total: number) => (total > 0 ? (count / total) * 100 : null);
 
 /** A soul's slug as its name: `argus` is Argus. */
 const soulName = (soul: string) => soul.charAt(0).toUpperCase() + soul.slice(1);
 
-/** One project's row in a hunter's group: its standing as a word, and its pass in three measures while it has one. */
+/** The ring's radius and its length, in its own 48-unit square. */
+const RING_R = 20;
+const RING_LENGTH = 2 * Math.PI * RING_R;
+
+/**
+ * ONE PROJECT'S PASS AS A RING: from twelve o'clock, what is covered in the green, then what was skipped in the grey, and the rest
+ * of the ring the track (not reached). Its figure is the share covered. It is a meter for assistive tech, which hears all three
+ * in words.
+ */
+function PassRing({ standing, unit }: { standing: HuntProjectStanding; unit: string }) {
+  const { t } = useTranslation();
+  const total = Math.max(0, standing.total);
+  const covered = total > 0 ? standing.covered / total : 0;
+  const skipped = total > 0 ? standing.skipped / total : 0;
+  const words = (['covered', 'skipped', 'open'] as const)
+    .map((key) => `${t(`kanban.dashboard.hunters.parts.${key}`)} ${standing[key].toLocaleString()}`)
+    .join(', ');
+  return (
+    <span
+      role="meter"
+      aria-label={t('kanban.dashboard.hunters.pass', { pass: standing.pass ?? 1, total: total.toLocaleString(), unit })}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(covered * 100)}
+      aria-valuetext={`${words} ${unit}`}
+      className="relative grid size-14 shrink-0 place-items-center"
+    >
+      <svg viewBox="0 0 48 48" className="absolute inset-0 size-full -rotate-90" aria-hidden="true">
+        <circle cx="24" cy="24" r={RING_R} fill="none" stroke="var(--track)" strokeWidth="3" />
+        {skipped > 0 && (
+          <circle cx="24" cy="24" r={RING_R} fill="none" stroke="var(--neutral-dot)" strokeWidth="3"
+            strokeDasharray={`${skipped * RING_LENGTH} ${RING_LENGTH}`} strokeDashoffset={-covered * RING_LENGTH} />
+        )}
+        {covered > 0 && (
+          <circle cx="24" cy="24" r={RING_R} fill="none" stroke="var(--pos-dot)" strokeWidth="3" strokeDasharray={`${covered * RING_LENGTH} ${RING_LENGTH}`} />
+        )}
+      </svg>
+      <span className="relative font-mono text-[11px] tabular-nums text-foreground">{total > 0 ? `${Math.round(covered * 100)}%` : '—'}</span>
+    </span>
+  );
+}
+
+/** One project's row in a hunter's group: its standing as a word, and its pass as a ring and three figures while it has one. */
 function ProjectStanding({ standing }: { standing: HuntProjectStanding }) {
   const { t } = useTranslation();
   const unit = t(`kanban.dashboard.hunters.units.${standing.unit_word}`);
@@ -106,19 +146,15 @@ function ProjectStanding({ standing }: { standing: HuntProjectStanding }) {
     );
   }
 
-  /** One of the three measures: its word, its figure, and its share of the pass as the bar. */
-  const part = (key: 'covered' | 'skipped' | 'open') => {
-    const label = t(`kanban.dashboard.hunters.parts.${key}`);
-    const count = standing[key];
-    return (
-      <Meter
-        label={label}
-        ariaLabel={t('kanban.dashboard.hunters.partsLabel', { project: standing.name, part: label, figure: count.toLocaleString(), total: standing.total.toLocaleString(), unit })}
-        value={count.toLocaleString()}
-        percent={shareOf(count, standing.total)}
-      />
-    );
-  };
+  /** One of the three measures, in words: its name and its figure, in the unit the pass counts. */
+  const part = (key: 'covered' | 'skipped' | 'open') => (
+    <div className="flex items-baseline gap-2" data-hunter-part={key}>
+      <dt className="w-24 shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{t(`kanban.dashboard.hunters.parts.${key}`)}</dt>
+      <dd className="font-mono text-sm tabular-nums text-foreground">
+        {standing[key].toLocaleString()} <span className="text-xs text-muted-foreground">{unit}</span>
+      </dd>
+    </div>
+  );
 
   return (
     <li
@@ -133,11 +169,15 @@ function ProjectStanding({ standing }: { standing: HuntProjectStanding }) {
         </span>
       </div>
 
-      <div className="grid gap-x-5 gap-y-2.5 sm:grid-cols-3" data-hunter-parts>
-        {part('covered')}
-        {/* The kit's fill reads `--accent`; these two are handed the neutral dot, so what nobody has hunted is grey and never the colour of progress. */}
-        <div className="[--accent:var(--neutral-dot)]">{part('skipped')}</div>
-        <div className="[--accent:var(--neutral-dot)]">{part('open')}</div>
+      {/* The pass as one object: a ring covered in the green (finished is green), skipped in the grey, the rest not reached, and
+          its three figures in words beside it. */}
+      <div className="flex items-center gap-4" data-hunter-parts>
+        <PassRing standing={standing} unit={unit} />
+        <dl className="flex flex-col gap-1">
+          {part('covered')}
+          {part('skipped')}
+          {part('open')}
+        </dl>
       </div>
 
       <div className="flex min-w-0 flex-col gap-0.5 text-xs text-muted-foreground">
@@ -171,17 +211,22 @@ function HunterGroup({ hunter }: { hunter: HuntHunter }) {
   const headingId = useId();
   return (
     <div className="flex flex-col" role="group" aria-labelledby={headingId} data-hunter={hunter.hunt}>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border pb-2">
-        <h4 id={headingId} className="text-sm font-semibold text-foreground">
-          {t(`kanban.dashboard.hunters.name.${hunter.hunt}`, { defaultValue: hunter.hunt })}
-        </h4>
-        <span className="text-xs text-muted-foreground">{t('kanban.dashboard.hunters.soul', { soul: soulName(hunter.soul) })}</span>
-        {!hunter.runs && <Badge as="span" tone="neutral" className="vv-badge--compact">{t('kanban.dashboard.hunters.notRunning')}</Badge>}
-      </div>
+      <Rule
+        id={headingId}
+        level={4}
+        end={
+          <>
+            <span className="normal-case tracking-normal">{t('kanban.dashboard.hunters.soul', { soul: soulName(hunter.soul) })}</span>
+            {!hunter.runs && <Badge as="span" tone="neutral" className="vv-badge--compact">{t('kanban.dashboard.hunters.notRunning')}</Badge>}
+          </>
+        }
+      >
+        {t(`kanban.dashboard.hunters.name.${hunter.hunt}`, { defaultValue: hunter.hunt })}
+      </Rule>
       {hunter.projects.length === 0 ? (
         <p className="py-3 text-sm text-muted-foreground">{t('kanban.dashboard.hunters.noProjects')}</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-border">
+        <ul className="flex flex-col divide-y divide-[var(--hairline)]">
           {hunter.projects.map((standing) => <ProjectStanding key={standing.project} standing={standing} />)}
         </ul>
       )}
@@ -197,7 +242,7 @@ export function DashboardHunters({ hunts, night, reopen, onRunNight, onStopNight
   // The night the question before stopping was asked of, by its date, or `null`: a stopped night cannot be opened again
   // tonight. A date and not a yes: a question left standing when its night closes is never asked of the next night.
   const [stopAsked, setStopAsked] = useState<string | null>(null);
-  const heading = <h3 id={headingId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.hunters.title')}</h3>;
+  const heading = <Rule id={headingId}>{t('kanban.dashboard.hunters.title')}</Rule>;
 
   if (!hunts.ok) {
     return (

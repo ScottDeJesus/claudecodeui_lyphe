@@ -111,8 +111,8 @@ runCase(async (t) => {
     return broken(`the route answered and the face reads data-bug-dashboard=${state}, not ready`);
   }
 
-  await page.locator('[data-bug-dashboard] .vv-select__trigger').first().click({ timeout: WAIT_MS });
-  await page.locator('[role="option"]', { hasText: /Last 7 days/ }).first().click({ timeout: WAIT_MS });
+  // How far back is the kit's segmented control since the board's redraw to the design system (2026-11-20).
+  await page.locator('[data-bug-dashboard] [role="radio"]', { hasText: /^\s*7 days\s*$/ }).first().click({ timeout: WAIT_MS });
   if ((await readsAfter(opened + 1)) !== opened + 1 || reads[opened].scope !== BOARD.id || reads[opened].days !== 7) {
     return broken(`picking Last 7 days left the reads at ${said()}, not one more for ${BOARD.id}/7`);
   }

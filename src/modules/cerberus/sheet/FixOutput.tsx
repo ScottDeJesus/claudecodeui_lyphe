@@ -61,7 +61,7 @@ const OutputLine = memo(function OutputLine({ line }: { line: CerberusRunLine })
 });
 
 /** The card's frame and its head's eyebrow, shared by the run and its placeholder. */
-const FRAME = 'overflow-hidden rounded-xl border border-border bg-card';
+const FRAME = 'overflow-hidden border-y border-border';
 const EYEBROW = 'm-0 text-xs font-normal uppercase tracking-[0.14em] text-muted-foreground';
 /** The output pane: a well on the canvas, mono; past its height it scrolls. */
 const PANE = 'flex max-h-[min(26rem,60vh)] min-h-[112px] flex-col overflow-y-auto bg-background px-3.5 py-3 font-mono text-xs leading-[1.75] text-secondary-foreground';
@@ -74,7 +74,7 @@ function ReadingRun({ eyebrowId }: { eyebrowId: string }) {
   const { t } = useTranslation();
   return (
     <section aria-labelledby={eyebrowId} aria-busy="true" className={FRAME}>
-      <div className="flex items-start gap-2.5 border-b border-border px-3.5 py-3">
+      <div className="flex items-start gap-2.5 border-b border-border py-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <h4 id={eyebrowId} className={EYEBROW}>{t('cerberus.fix.output.title')}</h4>
           <div className="vv-skeleton h-[18px] w-3/5" />
@@ -100,7 +100,7 @@ function UnreadRun({ eyebrowId, onRetry }: { eyebrowId: string; onRetry: () => v
   const { t } = useTranslation();
   return (
     <section aria-labelledby={eyebrowId} className={FRAME}>
-      <div className="flex flex-col gap-2.5 px-3.5 py-3">
+      <div className="flex flex-col gap-2.5 py-3">
         <h4 id={eyebrowId} className={EYEBROW}>{t('cerberus.fix.output.title')}</h4>
         <UnreachableBanner onRetry={onRetry} />
       </div>
@@ -167,7 +167,7 @@ export function FixOutput({ runId }: { runId: string }) {
 
   return (
     <section aria-labelledby={eyebrowId} className={cn(FRAME, 'motion-safe:animate-[vv-pop_.5s_theme(transitionTimingFunction.enter)_both]')}>
-      <div className="flex items-start gap-2.5 border-b border-border px-3.5 py-3">
+      <div className="flex items-start gap-2.5 border-b border-border py-3">
         <div className="min-w-0 flex-1">
           <h4 id={eyebrowId} className={EYEBROW}>{t('cerberus.fix.output.title')}</h4>
           <p id={nameId} className="text-[14.5px] font-medium [overflow-wrap:anywhere]">{run.name}</p>

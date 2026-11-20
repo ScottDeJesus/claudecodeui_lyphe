@@ -1,36 +1,24 @@
 import { Folder } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import MobileMenuButton from '@/modules/project-workspace/MobileMenuButton';
-
 type WorkspaceStateViewProps = {
   mode: 'loading' | 'empty';
-  isMobile: boolean;
-  onMenuClick: () => void;
-  /** Draw the phone's menu row above the body. Off for a pane that sits under WorkspaceMain's own header. */
-  showHeader?: boolean;
 };
 
 /**
  * Rendered by WorkspaceMain in two places:
- * - as the whole screen (`mode="loading"`, header on) while projects load, when no workspace header exists yet;
- * - as the choose-a-project body (`mode="empty"`, `showHeader={false}`) inside a pane that reads the open
- *   project — Chat, Files, Shell, Git, Tasks and a plugin's — when none is selected. Those panes sit under
- *   WorkspaceMain's own header, so a second menu row here would stack two of them on a phone.
+ * - as the whole screen (`mode="loading"`) while projects load;
+ * - as the choose-a-project body (`mode="empty"`) inside a pane that reads the open project — Chat, Shell, Tasks and a plugin's —
+ *   when none is selected, under the pane's own head. A project is chosen by opening one of its chats from the sessions home, and a
+ *   folder is made a project from the menu's New project (the old sidebar that did both is no longer drawn).
  */
-export default function WorkspaceStateView({ mode, isMobile, onMenuClick, showHeader = true }: WorkspaceStateViewProps) {
+export default function WorkspaceStateView({ mode }: WorkspaceStateViewProps) {
   const { t } = useTranslation();
 
   const isLoading = mode === 'loading';
 
   return (
     <div className="flex h-full flex-col">
-      {showHeader && isMobile && (
-        <div className="pwa-header-safe flex-shrink-0 border-b border-border/50 bg-background/80 p-2 backdrop-blur-sm sm:p-3">
-          <MobileMenuButton onMenuClick={onMenuClick} compact />
-        </div>
-      )}
-
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center text-muted-foreground">
@@ -60,7 +48,7 @@ export default function WorkspaceStateView({ mode, isMobile, onMenuClick, showHe
               {/* A green WORD takes the readable ink: `text-primary` is the accent FILL and
                   measures 2.5:1 on this wash. The pair is explained at tailwind.config.js:69. */}
               <p className="text-sm text-accent-ink">
-                <strong>{t('mainContent.tip')}:</strong> {isMobile ? t('mainContent.createProjectMobile') : t('mainContent.createProjectDesktop')}
+                <strong>{t('mainContent.tip')}:</strong> {t('mainContent.newProjectTip')}
               </p>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
 import { SessionFollowupsSwitch, SessionPanelSwitch } from '@/modules/session-panel';
 import { openHome, openStation } from '@/shared/cloudcliDoors';
+import { HOLDS_TRAIL } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { Project, ProjectSession } from '@/shared/types';
 import { Button } from '@/shared/ui';
@@ -22,7 +23,8 @@ type ChatHeadProps = {
 /**
  * THE HEAD OF A CHAT: the way back and what this is. A back arrow at the start goes back to the page the chat was reached from: Kaylee
  * Station when it was opened there, else the sessions home, where every chat is. ESCAPE PRESSES IT (`WAY_BACK`): the key is the way back out
- * of a chat, and no longer stops its turn, which the core's own Stop does. Beside it, the word Chat with the project's name, and
+ * of a chat, and no longer stops its turn, which the core's own Stop does. HELD, it opens the trail (`HOLDS_TRAIL`): every place the
+ * reader has been, any of them one press away. Beside it, the word Chat with the project's name, and
  * the chat's own title under them. At the end, where the chat has them: the toggle for its next
  * steps (`SessionFollowupsSwitch`) and the switch to its panel (`SessionPanelSwitch`); and always, last, the menu to every other
  * place (`PlacesMenu`). Nothing else: what the chat is doing is its core's to say (`ChatCore`), and everything that sets the chat up
@@ -55,6 +57,7 @@ export default function ChatHead({ selectedProject, selectedSession, newSessionL
       <Button
         data-chat-head-back=""
         {...WAY_BACK}
+        {...HOLDS_TRAIL}
         variant="outline"
         size="icon"
         className="relative size-9 shrink-0 finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']"
@@ -76,7 +79,7 @@ export default function ChatHead({ selectedProject, selectedSession, newSessionL
       {/* The chat's panel is a place switched to from here; with no panel this draws nothing. */}
       <SessionPanelSwitch />
       {/* The way to every other place, last in the head: the same menu the home and the station carry. */}
-      <PlacesMenu here="chat" triggerClassName="relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']" />
+      <PlacesMenu triggerClassName="relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']" />
       </div>
     </header>
   );

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
   FileText,
+  FolderPlus,
   GitCommit,
   GitMerge,
   MessageSquare,
@@ -56,15 +57,18 @@ type CommandPaletteProps = {
    */
   onShowRepoInGitTab: (() => void) | null;
   /**
-   * The Navigate group's rows, in order — the workspace's views by the names the rail gives them, then Settings.
-   * The palette lists them and runs the one chosen; which views exist is the workspace's to say.
+   * The Places group's rows, in order, the palette's first group: the wheel's places (the pages, the screens, the last chat,
+   * Settings), then the workspace's other views by the names the rail gives them. The palette lists them and runs the one
+   * chosen; which places and views exist is the workspace's to say.
    */
   navRows: PaletteNavRow[];
   /**
-   * Kaylee's group ("Talk to Kaylee"), drawn between the Applications and Navigate groups. The palette lists its rows and
+   * Kaylee's group ("Talk to Kaylee"), drawn after the Applications group. The palette lists its rows and
    * runs the one chosen; what opening her means is the workspace's to say.
    */
   companionGroup: PaletteGroup;
+  /** Opens the new-project wizard, which makes a folder a project; drawn as the Actions group's New project row. */
+  onNewProject?: () => void;
   /**
    * The application switcher's five acts, from the switcher's own list (the one the radial draws), drawn
    * as the Applications group. The palette knows nothing of what an act does; it lists them and runs the
@@ -82,6 +86,7 @@ function CommandPalette({
   onShowRepoInGitTab,
   navRows,
   companionGroup,
+  onNewProject,
   switcherActions,
 }: CommandPaletteProps) {
   const [open, setOpen] = React.useState(false);
@@ -217,11 +222,27 @@ function CommandPalette({
             value={search}
             onValueChange={setSearch}
           />
-          {/* Tall enough for the Actions and Applications groups to stand whole on open (about 330px), so all
-              five acts are on screen and the list's fold falls inside the Kaylee group; on a short window
-              it keeps to what the window can hold, as the kit's 300px did. */}
+          {/* Tall enough for the Places group's inner ring and most of its outer to stand whole on open (about
+              330px), the places being what the palette is opened for most; the acts are under them. On a short
+              window it keeps to what the window can hold, as the kit's 300px did. */}
           <CommandList className="max-h-[min(360px,calc(100dvh-6rem))]">
             <CommandEmpty>No results.</CommandEmpty>
+
+            {/* The places lead the list: where the reader goes most, by the names and in the order the wheel of places gives them. */}
+            {showActions && (
+              <CommandGroup heading="Places">
+                {navRows.map(({ key, label, keywords, icon: Icon, run: runRow }) => (
+                  <CommandItem
+                    key={key}
+                    value={`Go to ${label} ${keywords}`}
+                    onSelect={() => run(runRow)}
+                  >
+                    {Icon ? <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden /> : <span className="h-4 w-4 shrink-0" aria-hidden />}
+                    <span className="flex-1 truncate">{`Go to ${label}`}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
 
             {showActions && (
               <CommandGroup heading="Actions">
@@ -239,6 +260,12 @@ function CommandPalette({
                     <span className="text-xs text-muted-foreground">Select a project first</span>
                   )}
                 </CommandItem>
+                {onNewProject && (
+                  <CommandItem value="New project add folder create project" onSelect={() => run(onNewProject)}>
+                    <FolderPlus className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="flex-1">New project</span>
+                  </CommandItem>
+                )}
                 <CommandItem value="Toggle theme dark light mode" onSelect={() => run(toggleDarkMode)}>
                   <SunMoon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span className="flex-1">Toggle theme</span>
@@ -254,20 +281,6 @@ function CommandPalette({
                   <CommandItem key={key} value={`${label} ${keywords}`} onSelect={() => run(runRow)}>
                     <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="flex-1">{label}</span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-
-            {showActions && (
-              <CommandGroup heading="Navigate">
-                {navRows.map((row) => (
-                  <CommandItem
-                    key={row.key}
-                    value={`Go to ${row.label} ${row.keywords}`}
-                    onSelect={() => run(row.run)}
-                  >
-                    <span className="flex-1">{`Go to ${row.label}`}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>

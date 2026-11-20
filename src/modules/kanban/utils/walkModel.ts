@@ -1,6 +1,16 @@
 import type { TFunction } from 'i18next';
 
-import type { CardPriority, KanbanCardLink, KanbanCardModel } from '@/shared/ui';
+import type { KanbanPriority } from '@/shared/kanban-types';
+
+/** One tie a card's tags name to another card, as the open bug's Links section lists it (`linksOf`). */
+type KanbanCardLink = {
+  /** The linked card's id: what the press opens. Never painted. `null` for a card that cannot be opened any more: its row is then words alone. */
+  id: string | null;
+  /** How this card is tied to that one, in the board's words: "Duplicate of", "Split from". */
+  word: string;
+  /** The linked card's title: what the reader is told. */
+  title: string;
+};
 
 /**
  * A CARD'S WALK AS THE BOARD READS IT, and the two things a walk writes into a card's TAGS: which
@@ -55,7 +65,7 @@ export type KanbanWalk = {
   cure: boolean;
   /** How a waiting card rides once ageing has moved it up: the whole days it has waited and the
    *  priority it is taken at. `null` for a card that rides at its own priority, or is not waiting. */
-  aged: { waitedDays: number; ridesAs: CardPriority } | null;
+  aged: { waitedDays: number; ridesAs: KanbanPriority } | null;
 };
 
 /** A soul's name as a name: the feed spells it lower case. */
@@ -109,16 +119,14 @@ export function flowOf(tags: string[]): { flow: KanbanFlow; tag: string; wordKey
   return tag ? { ...FLOW_TAGS[tag], tag } : null;
 }
 
-/** The word a card whose walk is the night's cure reads, and the tag the night's ticket put on it:
- *  the tag says the same thing, so it is not drawn beside the word. */
+/** The word a card whose walk is the night's cure reads. */
 const CURE_WORD_KEY = 'kanban.flow.cure';
-const CURE_TAG = 'regression';
 
 /**
  * The key of the word that says what kind of card this is, or `null` for a card no walk has sorted:
  * `Regression` while its walk is the night's cure, else its flow's word. THE ONE READER OF IT: the
- * face and the drawer's head both ask here, so a cure card is never a Regression on the board and
- * a Bug in its sheet.
+ * rings' plates and the open card's head both ask here, so a cure card is never a Regression on the
+ * board and a Bug in its Opening.
  */
 export function kindWordKey(tags: string[], walk: KanbanWalk | null): string | null {
   return walk?.cure ? CURE_WORD_KEY : (flowOf(tags)?.wordKey ?? null);
@@ -160,39 +168,18 @@ export function linksOf(tags: string[], { t, titleOf }: KanbanWalkWords): Kanban
 }
 
 /**
- * The walk's half of a card's face, laid over the model `toCardModel` made.
- *
- * THE KIND'S WORD LEADS THE TAGS, as a word ("Bug", "UI change", "Tweak", and "Regression" for a
- * card the night's cure is walking) and never a colour: it is the first thing that says what kind of
- * card this is. THE HOLD'S SENTENCE IS PRINTED, and only where the lane says so
- * (`KanbanLaneSpec.showsHold`): a card is held only while it waits in To Do. HOW AN AGED CARD RIDES
- * is printed in that same lane and line, after the hold: `waiting 4 days · rides as medium`, and
- * only when ageing has moved the card, because a card riding at its own priority has nothing to
- * add to the priority it already shows. THE LINKS leave the tag row, where they would read as
- * `duplicate-of:c-12`, and become rows.
+ * WHAT HOLDS A WAITING CARD, in words: the dispatcher's sentence for why it holds the card (`Held — …`), and how a card that ageing
+ * has moved up rides (`waiting 4 days · rides as high`), only when ageing has moved it, because a card riding at its own priority
+ * has nothing to add to the priority it already shows. Null when neither is so. A card is held only while it waits in To Do, so the
+ * caller asks only for a card in the lane that shows holds (`KanbanLaneSpec.showsHold`). Read by the open card (`KanbanCardDrawer`),
+ * under its course.
  */
-export function withWalkFace(
-  card: KanbanCardModel,
-  options: KanbanWalkWords & { walk: KanbanWalk | null; showsHold: boolean },
-): KanbanCardModel {
-  const { t, walk, showsHold } = options;
-  const kind = kindWordKey(card.tags, walk);
-  const links = linksOf(card.tags, options);
-  const hold = showsHold ? (walk?.hold ?? '').trim() : '';
-  const aged = showsHold ? (walk?.aged ?? null) : null;
-
-  if (kind === null && links.length === 0 && hold.length === 0 && aged === null) return card;
-
-  const names = plainTagsOf(card.tags).filter((tag) => !(walk?.cure && tag === CURE_TAG));
-  const waiting = [
+export function walkNoteOf(walk: KanbanWalk | null, t: TFunction): string | null {
+  const hold = (walk?.hold ?? '').trim();
+  const aged = walk?.aged ?? null;
+  const words = [
     ...(hold.length > 0 ? [t('kanban.card.held', { why: hold })] : []),
     ...(aged ? [t('kanban.card.aged', { count: aged.waitedDays, priority: t(`kanban.priority.${aged.ridesAs}`).toLocaleLowerCase() })] : []),
   ];
-
-  return {
-    ...card,
-    tags: [...(kind ? [t(kind)] : []), ...names],
-    note: waiting.length > 0 ? waiting.join(' · ') : undefined,
-    links: links.length > 0 ? links : undefined,
-  };
+  return words.length > 0 ? words.join(' · ') : null;
 }

@@ -10,14 +10,15 @@ import { useHostWindow } from '@/shared/context/HostWindowContext';
  * The tick runs on the window the reader is looking at (`useHostWindow()`): a hidden opener throttles
  * its timers to about one a minute, and a seconds clock would stutter in a floating window.
  *
- * Used by `CerberusHeader`, whose words move with the second, by `FixOutput`, which counts a running fix's
- * seconds, and by `CatalogView`, which only needs to know when an entry's hour as new is up.
+ * Used by the fleet's Opening (`FleetOpening`), whose words move with the second, by a machine's Opening
+ * (`NodeOpening`), whose mutes count down, by `FixOutput`, which counts a running fix's seconds, and by
+ * `CatalogView`, which only needs to know when an entry's hour as new is up.
  */
 export function useClock(tickMs = 1000): number {
   const hostWindow = useHostWindow();
 
-  // The clock's own reading. Essential and not derivable: nothing else re-renders the header when a
-  // second passes, and the pill's time and the age both change for no other reason.
+  // The clock's own reading. Essential and not derivable: nothing else re-renders an Opening when a
+  // second passes, and the live line's age and a mute's time left both change for no other reason.
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {

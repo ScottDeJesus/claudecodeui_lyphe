@@ -85,8 +85,8 @@ type MuteDialogProps = {
  * provider's toast. While the write is out the chips and the field hold still, and Cancel, the ✕,
  * Escape and the backdrop wait for its answer.
  *
- * For the cerberus module's `CerberusPanel`, which hosts one and opens it from a Needs-you card's Mute
- * and from the check sheet's.
+ * For the cerberus module's `CerberusPanel`, which hosts one and opens it from a need's Mute (in a
+ * machine's Opening) and from the check sheet's.
  */
 export function MuteDialog({ open, check, onClose }: MuteDialogProps) {
   if (!open || check === null) return null;

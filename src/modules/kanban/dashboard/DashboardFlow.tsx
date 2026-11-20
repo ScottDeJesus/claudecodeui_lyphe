@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { KanbanStatsDay } from '@/shared/kanban-types';
 import type { DataTableColumn } from '@/shared/types';
-import { Button, DataTable, DayBars, FoldChevron } from '@/shared/ui';
+import { Button, DataTable, DayBars, FoldChevron, Rule } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 
 /**
@@ -46,7 +46,7 @@ export function DashboardFlow({ byDay, days }: DashboardFlowProps) {
 
   return (
     <section className="flex flex-col gap-3" aria-labelledby={headingId} data-dashboard-flow>
-      <h3 id={headingId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.flow.title')}</h3>
+      <Rule id={headingId}>{t('kanban.dashboard.flow.title')}</Rule>
 
       <DayBars
         label={t('kanban.dashboard.flow.plot', { days, opened, fixed })}
@@ -69,7 +69,7 @@ export function DashboardFlow({ byDay, days }: DashboardFlowProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-3 self-start finger:h-11"
+            className="-ml-3 self-start text-muted-foreground finger:h-11"
             aria-expanded={tableOpen}
             aria-controls={tableId}
             onClick={() => setTableOpen((open) => !open)}

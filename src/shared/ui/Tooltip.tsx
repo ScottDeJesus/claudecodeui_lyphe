@@ -44,7 +44,7 @@ function getArrowClasses(position: TooltipPosition): string {
 /**
  * The name or the note of a control, for a pointer that hovers. Used by the accounts, app-switcher, chat-host, companion,
  * deepseek-spend, dispatcher, heal, jev, kanban, project-workspace, sidebar, station and task-master modules and by the shared
- * KanbanCard and PromptInput primitives.
+ * PromptInput primitive.
  *
  * A MOUSE OR A PEN opens it after `delay`, read off pointer events. A FINGER opens it by a long press alone: a tap also fires
  * the browser's compatibility `mouseenter` after its `touchend`, which, read as a hover, opens the bubble 350 ms after every tap

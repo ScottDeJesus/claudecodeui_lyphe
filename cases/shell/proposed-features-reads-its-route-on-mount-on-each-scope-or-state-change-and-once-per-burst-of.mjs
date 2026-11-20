@@ -4,17 +4,19 @@
 // dev server, whose React.StrictMode mounts every effect twice. Which proposals → All reads again with state=all, Which
 // boards → All boards again with board=all; a burst of three dispatcher_state frames on the app's socket is coalesced
 // into one or two more reads (with no timer the face cannot know a burst is over), never one per frame; with nothing
-// arriving nothing is read. The face draws the route's proposals and none of the stand-in it drew before it was wired.
+// arriving nothing is read. The face draws the route's proposals and none of the stand-in it drew before it was wired: since
+// the board's redraw to the design system (2026-11-20) each is a mark on its state's ring round the board's core, and the
+// ended one opens from its mark (lib/kanban_board.mjs's openProposal).
 //
 // The board is lib/kanban_board.mjs's made-up board; the proposals' answer is this case's, and the app's socket is
 // handed on with the server's board and dispatcher frames held back (lib/bug_hunt_faces.mjs). Nothing is written.
 //
-// protects: src/modules/kanban/proposed/useProposals.ts, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/KanbanPanel.tsx
+// protects: src/modules/kanban/proposed/useProposals.ts, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/utils/proposalRings.ts, src/modules/kanban/KanbanPanel.tsx
 // writes: none
 
 import { withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
-import { BOARD, openBoard } from "../lib/kanban_board.mjs";
+import { BOARD, openBoard, openProposal } from "../lib/kanban_board.mjs";
 import { PROPOSALS, QUIET_MS, WAIT_MS, answer, holdBus, json, proposal, standInIn, tab, until, watch } from "../lib/bug_hunt_faces.mjs";
 
 const OPEN = [proposal(1, "Case proposal: split the case store", { priority: "high" }), proposal(2, "Case proposal: one reader for the case night", { kind: "design", priority: "low" })];
@@ -54,14 +56,19 @@ runCase(async (t) => {
   if ((await readsAfter(afterTab + 1)) !== afterTab + 1 || gets()[afterTab].query.board !== BOARD.id || gets()[afterTab].query.state !== "all") {
     return broken(`Which proposals → All left the reads at ${said()}, not one more for ${BOARD.id}/all`);
   }
-  const ended = page.locator(`[data-proposal="${ENDED.id}"]`).filter({ hasText: ENDED.title }).first();
-  if (!(await ended.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) {
-    return broken(`the route answered three proposals for state=all and the face drew no row for "${ENDED.title}" (data-proposed-features=${await page.locator("[data-proposed-features]").first().getAttribute("data-proposed-features")})`);
+  // Each proposal is a mark on its state's ring: the open two on Open, the dismissed one on Dismissed.
+  const ringOf = (id) => page.locator(`[data-kanban-panel] [data-bug-instrument] [role="slider"][data-ring-items~="proposal:${id}"]`).first();
+  if (!(await ringOf(ENDED.id).waitFor({ state: "attached", timeout: WAIT_MS }).then(() => true, () => false))) {
+    return broken(`the route answered three proposals for state=all and the face drew no mark for "${ENDED.title}" (data-proposed-features=${await page.locator("[data-proposed-features]").first().getAttribute("data-proposed-features")})`);
   }
-  const face = page.locator("[data-proposed-features]").first();
   for (const p of [...OPEN, ENDED]) {
-    if (!((await face.textContent()) ?? "").includes(p.title)) return broken(`the face drew no "${p.title}" from the route's answer`);
+    const ring = await ringOf(p.id).getAttribute("data-ring", { timeout: 2000 }).catch(() => null);
+    if (ring !== p.state) return broken(`"${p.title}" is drawn on the ${ring ?? "no"} ring, not its state's (${p.state})`);
   }
+  const ended = await openProposal(page, ENDED.id).catch(() => null);
+  if (ended === null || !((await ended.textContent()) ?? "").includes(ENDED.title)) return broken(`the dismissed "${ENDED.title}" does not open from its mark`);
+  await page.keyboard.press("Escape");
+  const face = page.locator("[data-proposed-features]").first();
   const stale = await standInIn(face);
   if (stale.length > 0) return broken(`over the route's answer the face still draws its stand-in: ${stale.join(" | ")}`);
 
@@ -82,5 +89,5 @@ runCase(async (t) => {
   await page.waitForTimeout(QUIET_MS * 2);
   if (gets().length !== afterBurst) return broken(`with nothing arriving the face read the route again: ${said()}`);
 
-  return held(`reads ${said()}: ${mounted} on mount, ${afterTab - mounted} for the tab, once per change, ${afterBurst - beforeBurst} for three frames, none while quiet; the route's three rows drawn, no stand-in`);
+  return held(`reads ${said()}: ${mounted} on mount, ${afterTab - mounted} for the tab, once per change, ${afterBurst - beforeBurst} for three frames, none while quiet; the route's three proposals drawn on their rings, no stand-in`);
 });

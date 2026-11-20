@@ -3,7 +3,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { KanbanFixTime, KanbanStats } from '@/shared/kanban-types';
-import { Button, Readout } from '@/shared/ui';
+import { Readout, Rule } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 
 /**
@@ -115,16 +115,11 @@ export function DashboardNumbers({ stats, allBoards, onOpenCard }: DashboardNumb
                 unknownLabel={unknownLabel}
                 note={t('kanban.dashboard.numbers.openedOn', { date: formatShortDate(oldest.createdAt) ?? '—' })}
               />
-              <Button
-                variant="outline"
-                className="h-auto min-h-9 w-full justify-start gap-2 whitespace-normal px-3 py-2 text-left font-normal finger:min-h-11"
-                data-dashboard-card={oldest.cardId}
-                onClick={() => onOpenCard(oldest.cardId, oldest.boardId)}
-              >
-                <span className="min-w-0 flex-1 break-words text-sm leading-snug text-foreground">{oldest.title}</span>
+              <button type="button" className="dash-row" data-dashboard-card={oldest.cardId} onClick={() => onOpenCard(oldest.cardId, oldest.boardId)}>
+                <span className="min-w-0 flex-1 break-words">{oldest.title}</span>
                 {allBoards && <span className="shrink-0 text-xs text-muted-foreground">{oldest.boardName}</span>}
-                <ChevronRight className="shrink-0 text-muted-foreground" aria-hidden="true" />
-              </Button>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </button>
             </>
           )}
         </div>
@@ -132,7 +127,7 @@ export function DashboardNumbers({ stats, allBoards, onOpenCard }: DashboardNumb
 
       <div className="flex flex-col gap-3" role="group" aria-labelledby={fixHeadingId} data-dashboard-fix-time>
         <div className="flex flex-col gap-0.5">
-          <h4 id={fixHeadingId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.fix.title')}</h4>
+          <Rule id={fixHeadingId} level={4}>{t('kanban.dashboard.fix.title')}</Rule>
           <p className="text-xs text-muted-foreground">{t('kanban.dashboard.fix.about', { days: scope.days })}</p>
         </div>
         <div className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">

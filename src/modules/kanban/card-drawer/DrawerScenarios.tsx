@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 
 import type { KanbanWalk } from '@/modules/kanban/utils/walkModel';
 import type { Tone } from '@/shared/types';
-import { Badge } from '@/shared/ui';
+import { Rule } from '@/shared/ui';
 
 /**
  * THE SCENARIOS THE WALK LEFT: what now stands guard over this card's change, each with the word
  * its newest run reads.
  *
- * THE WORD IS THE WHOLE POINT, so it leads the row, with its glyph: a reader scanning this list is
+ * THE WORD IS THE WHOLE POINT, so its glyph leads the row and the word ends it: a reader scanning this list is
  * asking one thing, whether what was fixed is still fixed. Green is a scenario that holds. Red is
  * spent on the two words that mean the fix has come undone — broken and regressed — and on nothing
  * else in this section. A scenario the walk has only written is a draft and is drawn plain: it is
@@ -18,8 +18,8 @@ import { Badge } from '@/shared/ui';
  * THE NAME IS READ AS THE SENTENCE IT IS. A scenario is named for its promise, hyphenated; the
  * hyphens are the store's spelling, not the reader's.
  *
- * NO WALK, NO SECTION. A card the dispatcher never walked has no scenarios to list and no empty
- * place for them. A walk that has not written one yet says so in one line.
+ * NO SCENARIOS, NO SECTION. A card the dispatcher never walked, or whose walk has not written one
+ * yet, has no empty place for them.
  */
 
 type DrawerScenariosProps = {
@@ -50,38 +50,33 @@ export function DrawerScenarios({ walk }: DrawerScenariosProps) {
   const { t } = useTranslation();
   const headingId = useId();
 
-  return (
-    <section className="flex flex-col gap-3" aria-labelledby={headingId} data-drawer-scenarios>
-      <h3 id={headingId} className="text-sm font-semibold text-foreground">
-        {t('kanban.scenarios.title')}
-      </h3>
+  if (walk.cases.length === 0) return null;
 
-      {walk.cases.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('kanban.scenarios.none')}</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {walk.cases.map((scenario) => {
-            const word = WORDS[scenario.word];
-            const label = word ? t(`kanban.scenarios.words.${word.key}`) : scenario.word;
-            return (
-              <li key={`${scenario.suite}:${scenario.name}`} className="flex items-start gap-2" data-scenario-word={scenario.word}>
-                {word?.tone ? (
-                  <Badge tone={word.tone} className="vv-badge--compact mt-0.5 shrink-0">
-                    <span aria-hidden="true">{word.glyph}</span>
-                    <span className="ml-1">{label}</span>
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="vv-badge--compact mt-0.5 shrink-0">{label}</Badge>
-                )}
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="break-words text-sm leading-snug text-foreground">{sentenceOf(scenario.name)}</span>
-                  <span className="text-xs text-ink-faint">{scenario.suite}</span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+  return (
+    <section className="flex flex-col gap-2" aria-labelledby={headingId} data-drawer-scenarios>
+      <Rule id={headingId}>{t('kanban.scenarios.title')}</Rule>
+      <ul className="flex flex-col gap-2">
+        {walk.cases.map((scenario) => {
+          const word = WORDS[scenario.word];
+          const label = word ? t(`kanban.scenarios.words.${word.key}`) : scenario.word;
+          return (
+            <li key={`${scenario.suite}:${scenario.name}`} className="flex items-start gap-2" data-scenario-word={scenario.word}>
+              <span className="bug-glyph" data-tone={word?.tone ?? undefined} aria-hidden="true">
+                {word?.glyph ?? '·'}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="break-words text-[13px] leading-[18px] text-foreground">{sentenceOf(scenario.name)}</span>
+                <span className="bug-figure">
+                  {/* The word in the tone it speaks in, then the suite it runs in. */}
+                  <span className={word?.tone === 'positive' ? 'text-[var(--pos-ink)]' : word?.tone === 'danger' ? 'text-[var(--danger-ink)]' : word?.tone === 'warn' ? 'text-[var(--warn-ink)]' : undefined}>{label}</span>
+                  {' · '}
+                  {scenario.suite}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

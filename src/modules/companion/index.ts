@@ -24,6 +24,8 @@ export { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPres
 // her core as a chat's is drawn, the body with her conversation's context and the account's week as two rings round it, each with its
 // press: the sessions home's docked core and the station's core in its halo.
 export { CompanionCore } from '@/modules/companion/CompanionCore';
+// her body alone, bound to her picture: project-workspace's wheel of places draws it at its middle, reading toward the place pointed at.
+export { CompanionFace } from '@/modules/companion/CompanionFace';
 // her state in words with its dot: this module's panel header (CompanionHeader), and the station's head.
 export { CompanionStatus } from '@/modules/companion/CompanionStatus';
 // her controls (Stop, model, Live, Clear, this device's voice and ears): this module's panel header (CompanionHeader), and the station's head.

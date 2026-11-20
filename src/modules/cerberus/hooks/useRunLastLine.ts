@@ -4,7 +4,7 @@ import type { CerberusRunLine, CerberusRunView } from '@/shared/cerberus-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 
 /**
- * A run's newest output line for a Needs-you card's strip, kept live while the run goes.
+ * A run's newest output line for a need's strip, kept live while the run goes.
  *
  * The overview carries `run.lastLine` and its number `run.lastN`, but it is read again only when a hint says
  * something moved, at most once a second and not at all while a run is quiet between lines. Each

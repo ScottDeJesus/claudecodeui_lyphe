@@ -29,8 +29,7 @@ type EmptyStateProps = {
  *
  * Used across the app: the affected-areas, app-switcher, carrier-bulletins, cerberus, chat, chat-host, companion,
  * deepseek-spend, dispatcher, document-preview, file-manager, followups, git-panel, heal, jev, kanban, memory-intake, notes,
- * roadmap, runner-tab, schedules, shell, sidebar, standalone-shell, station, task-master and universe modules and the shared
- * KanbanLane — an empty folder, an empty board, a queue with nothing waiting, a History with nothing in it yet, and (at `sm`)
+ * roadmap, runner-tab, schedules, shell, sidebar, standalone-shell, station, task-master and universe modules — an empty folder, an empty board, a queue with nothing waiting, a History with nothing in it yet, and (at `sm`)
  * the station's draft dock while she holds no draft and the heal Rules list while no correction has come back. Each means
  * "there is nothing here yet", and a dashed frame around a serif line says that without any of them inventing a way to.
  *

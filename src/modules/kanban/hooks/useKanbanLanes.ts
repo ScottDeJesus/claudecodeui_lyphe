@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { KanbanBoardEvent, KanbanCardSummary, KanbanStatus } from '@/shared/kanban-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { KanbanCardModel } from '@/shared/ui';
 import { useKanbanLaneFeed } from '@/modules/kanban/hooks/useKanbanLaneFeed';
-import { sortSummaries, toCardModel, type KanbanViewSort } from '@/modules/kanban/utils/cardModel';
+import { sortSummaries, type KanbanViewSort } from '@/modules/kanban/utils/cardModel';
 import { EMPTY_LANE, sumOf } from '@/modules/kanban/utils/laneData';
 import type { KanbanLaneSpec } from '@/modules/kanban/utils/lanePolicy';
 
@@ -13,18 +12,15 @@ import type { KanbanLaneSpec } from '@/modules/kanban/utils/lanePolicy';
  * the drawer is open on, and THE ONE SUBSCRIPTION that keeps all of it true.
  *
  * THE WIRE IS `useKanbanLaneFeed`'s, which holds what each lane has and the write path into it. Two
- * things live here instead: the view over those summaries — mapped through the single wire-to-view
- * conversion — and the websocket listener, because a board's frames are the board's, not the data's.
+ * things live here instead: the reading of those summaries — each lane's count and paging, and its
+ * cards as this render holds them — and the websocket listener, because a board's frames are the
+ * board's, not the data's.
  *
- * Called ONCE, by the panel, with the lanes `kanbanLanes(autonomy)` composed. `autonomy` is here for
- * the one thing the lane data cannot answer: whether a card's face carries signals at all. It is
- * passed as a value rather than derived from the specs, because deriving it would be a second
- * reading of the lane policy.
+ * Called ONCE, by the panel, with the lanes `kanbanLanes(autonomy)` composed.
  */
 
-/** One lane as the rail hands it to the kit. */
+/** One lane's reading: its total and its paging (its cards are `laneSummaries`). */
 export type KanbanLaneView = {
-  cards: KanbanCardModel[];
   /** Server-side total across the lane's statuses; `null` until the counts land, never `0`. */
   count: number | null;
   loading: boolean;
@@ -33,7 +29,13 @@ export type KanbanLaneView = {
 };
 
 export type KanbanLanes = {
-  laneView: (spec: KanbanLaneSpec, sort?: KanbanViewSort) => KanbanLaneView;
+  laneView: (spec: KanbanLaneSpec) => KanbanLaneView;
+  /**
+   * The wire summaries one lane holds, in the server's order, read from THIS render's state: what the board's rings are drawn
+   * from (`utils/bugRings`). `cardIds` and `summaryOf` read the lanes through a ref brought up to date after a render, which a
+   * press or a drop may read but a render may not: the last lane to land would be a render behind.
+   */
+  laneSummaries: (spec: KanbanLaneSpec) => KanbanCardSummary[];
   /** The summed total of a set of statuses: how a lane's count is computed, exposed for the one
    *  other sum the board needs — the cards To Do is holding for an answer. */
   countOf: (statuses: KanbanStatus[]) => number;
@@ -68,7 +70,7 @@ export type KanbanLanes = {
   applyCardMove: (card: KanbanCardSummary, laneId: string, position: number) => void;
 };
 
-export function useKanbanLanes(boardId: string | null, specs: KanbanLaneSpec[], autonomy: boolean): KanbanLanes {
+export function useKanbanLanes(boardId: string | null, specs: KanbanLaneSpec[]): KanbanLanes {
   const { subscribe } = useWebSocket();
   const feed = useKanbanLaneFeed(boardId, specs);
   const { lanes, lanesRef, counts, applyCard, applyCounts } = feed;
@@ -115,24 +117,22 @@ export function useKanbanLanes(boardId: string | null, specs: KanbanLaneSpec[], 
 
   const countOf = useCallback((statuses: KanbanStatus[]): number => sumOf(counts, statuses), [counts]);
 
-  /**
-   * One lane, as painted. The count is the SUM of the lane's statuses and the cards are the single
-   * wire-to-view conversion applied to the summaries — nothing here decides what a card means.
-   */
+  /** One lane's reading. The count is the SUM of the lane's statuses: nothing here decides what a card means. */
   const laneView = useCallback(
-    (spec: KanbanLaneSpec, sort: KanbanViewSort = 'server'): KanbanLaneView => {
+    (spec: KanbanLaneSpec): KanbanLaneView => {
       const state = lanes[spec.id] ?? EMPTY_LANE;
 
       return {
-        cards: sortSummaries(state.summaries, sort).map((summary) => toCardModel(summary, { autonomy })),
         count: counts === null ? null : sumOf(counts, spec.statuses),
         loading: state.loading,
         hasMore: state.hasMore,
         loadingMore: state.loadingMore,
       };
     },
-    [lanes, counts, autonomy]
+    [lanes, counts]
   );
+
+  const laneSummaries = useCallback((spec: KanbanLaneSpec): KanbanCardSummary[] => (lanes[spec.id] ?? EMPTY_LANE).summaries, [lanes]);
 
   const cardIds = useCallback(
     (laneId: string, sort: KanbanViewSort = 'server'): string[] =>
@@ -163,6 +163,7 @@ export function useKanbanLanes(boardId: string | null, specs: KanbanLaneSpec[], 
 
   return {
     laneView,
+    laneSummaries,
     countOf,
     cardIds,
     summaryOf,

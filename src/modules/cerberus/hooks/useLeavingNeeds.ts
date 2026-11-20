@@ -42,7 +42,7 @@ function drawnCards(needs: CerberusNeed[], leavers: Leaver[]): DrawnCard[] {
  * A place counts in the list as it was DRAWN, cards still leaving included, so a second card that
  * leaves while the first is on its way out is kept where it stood and not one slot above.
  *
- * Used by the cerberus module's `NeedsYouCard`, the one list on the tab that has cards come and go.
+ * Used by a machine's Opening (`NodeOpening`), the one list on the tab that has needs come and go.
  */
 export function useLeavingNeeds(needs: CerberusNeed[]): DrawnCard[] {
   // The cards that have stopped needing you and are still on their way out. Essential: it is the one

@@ -9,8 +9,8 @@
  * Both pieces only READ the swap: a toned figure and a toned bar take `--tone-ink` and `--tone-dot` from their own
  * `data-tone`.
  *
- * Imported once, for side effect, from src/shared/ui/index.ts — after data.css and before board.css, which keeps the
- * last word. The place is free: nothing here shares a selector with a sibling sheet.
+ * Imported once, for side effect, from src/shared/ui/index.ts — after data.css. The place is free: nothing here shares a
+ * selector with a sibling sheet.
  */
 
 /* ---------------------------------------------------------------- Readout */

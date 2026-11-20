@@ -1,0 +1,207 @@
+/*
+ * The bug screen's own paint: the open bug's sections, set in the design system's voice inside the Opening they hang in. A
+ * section is headed by the kit's Rule; what is written on the bug reads as text and becomes a field only under the hand (a
+ * hairline at rest, the accent while it has the focus); every list is rows on the plate's own ground, with no boxes. Every
+ * selector is under `.bug-opening`, the card's own wrapper (`KanbanCardDrawer`).
+ */
+
+/* What is written, written in place: the title as the Opening's title, the lead line and the closing remarks as text. */
+.bug-opening .bug-field {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 3px 0 4px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 19px;
+  resize: none;
+  field-sizing: content;
+  transition: border-color var(--duration-fade) ease;
+}
+.bug-opening .bug-field::placeholder { color: var(--ink-faint); }
+.bug-opening .bug-field:hover { border-bottom-color: var(--hairline); }
+.bug-opening .bug-field:focus { outline: none; border-bottom-color: var(--accent); }
+.bug-opening .bug-field[data-quiet='true'] { color: var(--ink-mid); }
+.bug-opening textarea.bug-field { min-height: 42px; max-height: 240px; overflow-y: auto; }
+/* index.css pins every textarea's ink and its placeholder's with !important (and the fill colour, which the placeholder inherits);
+   a field here keeps the plate's own inks. */
+.ast-opening .bug-opening textarea.bug-field { color: var(--ink) !important; -webkit-text-fill-color: currentColor !important; caret-color: var(--ink) !important; }
+.ast-opening .bug-opening textarea.bug-field[data-quiet='true'] { color: var(--ink-mid) !important; }
+.ast-opening .bug-opening textarea.bug-field::placeholder { color: var(--ink-faint) !important; -webkit-text-fill-color: var(--ink-faint) !important; opacity: 1 !important; }
+.bug-opening .bug-title {
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+/* The bug's quiet facts, on the design system's label column: PRIORITY, TAGS. */
+.bug-opening .bug-facts { display: grid; grid-template-columns: 78px minmax(0, 1fr); align-items: center; column-gap: 12px; row-gap: 10px; margin: 0; }
+.bug-opening .bug-facts > dt {
+  margin: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+.bug-opening .bug-facts > dd { margin: 0; min-width: 0; }
+/* A high bug's chosen rung is the warn ink: urgent, never denied. */
+.bug-opening [data-priority='high'] .vv-segmented__option[aria-checked='true'] { color: var(--warn-ink); }
+
+/* A tag: a name on a hairline, its × beside it. Never a tone. */
+.bug-opening .bug-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 24px;
+  padding: 0 2px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  color: var(--ink-mid);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+/* One line that adds to its section: a field on a hairline and its press, by its mark alone. */
+.bug-opening .bug-add { display: flex; align-items: center; gap: 8px; }
+.bug-opening .bug-add > .bug-field { flex: 1; min-width: 0; font-size: 12px; line-height: 17px; }
+
+/* The long text, read as the design system's Prose: one size, headings by their weight, lists by a dash, code between two rules,
+   on the plate's own ground with no frame. */
+.bug-opening .bug-prose { color: var(--ink); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.bug-opening .bug-prose :is(h1, h2, h3, h4, h5, h6) { margin: 1.1em 0 0.35em; color: var(--ink); font-size: 1em; line-height: 1.45; font-weight: 600; }
+.bug-opening .bug-prose > div > :first-child, .bug-opening .bug-prose > :first-child { margin-top: 0; }
+.bug-opening .bug-prose ul { list-style-type: '– '; }
+.bug-opening .bug-prose ul > li::marker { color: var(--ink-muted); }
+/* The markdown preview's highlighter sets its frame inline, so the rules here are !important to take it off. */
+.ast-opening .bug-opening .bug-prose pre { margin: 0.8em 0 !important; padding: 8px 0 !important; border-block: 1px solid var(--hairline); border-radius: 0 !important; background: transparent !important; font-size: 12px !important; }
+.ast-opening .bug-opening .bug-prose pre code { background: transparent !important; }
+
+/* A row that opens something (a linked bug): the row itself is the press, a chevron at its end. */
+.bug-opening .bug-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fade) ease;
+}
+.bug-opening .bug-row:hover { background: var(--surface2); }
+.bug-opening .bug-row:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+/* The word for a tie ("Duplicate of"), said before the other bug's title in the quiet ink. */
+.bug-opening .bug-word { flex: none; color: var(--ink-muted); font-size: 12px; line-height: 18px; }
+
+/* A line of a list the run keeps (a sitting, a scenario, an issue): its glyph, its words, its figure. */
+.bug-opening .bug-glyph { flex: none; width: 14px; font-family: var(--font-mono); font-size: 12px; line-height: 18px; text-align: center; color: var(--ink-muted); }
+.bug-opening .bug-glyph[data-tone='positive'] { color: var(--pos-dot); }
+.bug-opening .bug-glyph[data-tone='danger'] { color: var(--danger-dot); }
+.bug-opening .bug-glyph[data-tone='warn'] { color: var(--warn-dot); }
+.bug-opening .bug-figure { color: var(--ink-muted); font-family: var(--font-mono); font-size: 10px; line-height: 14px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+@media (pointer: coarse), (max-width: 767.98px) {
+  .bug-opening .bug-row { min-height: 44px; }
+  .bug-opening .bug-tag { min-height: 32px; }
+}
+
+/* A file held over the open bug: the plate is where it lands. */
+.ast-opening-plate:has(.bug-opening[data-drop='true']) { box-shadow: var(--shadow-overlay), inset 0 0 0 1px var(--accent); }
+/* A fenced block that names its language: the name as a caption over the code, on the code's own left edge. */
+.ast-opening .bug-opening .bug-prose .group:has(> .absolute.left-3) pre { padding-top: 28px !important; }
+.ast-opening .bug-opening .bug-prose .group > .absolute.left-3 { left: 0; top: 10px; font-family: var(--font-mono); font-size: 10px; font-weight: 400; letter-spacing: 0.24em; }
+
+/*
+ * The board's numbers (`BugDashboard`), read as one instrument's readout: tables as rules between rows with no frame and no
+ * filled head (their heads the mono captions), the days as thin ticks off one rule, a card as a row that opens it, and the fold
+ * line in the quiet ink. Every selector is under `.bug-dashboard`, the dashboard's own root.
+ */
+.bug-dashboard .vv-datatable { border: 0; border-block: 1px solid var(--hairline); border-radius: 0; background: transparent; }
+.bug-dashboard .vv-datatable__head,
+.bug-dashboard .vv-datatable__head:first-child {
+  background: var(--canvas);
+  box-shadow: none;
+  border-bottom-color: var(--hairline);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+}
+.bug-dashboard .vv-datatable__cell { padding-block: 10px; border-bottom-color: var(--hairline); font-size: 13px; }
+.bug-dashboard .vv-datatable__cell:first-child { background: var(--canvas); box-shadow: none; }
+@media (hover: hover) {
+  .bug-dashboard .vv-datatable__row--pressable:hover,
+  .bug-dashboard .vv-datatable__row--pressable:hover > .vv-datatable__cell:first-child { background: var(--surface2); }
+}
+
+/* Opened above the rule and fixed below it, a tick a day. */
+.bug-dashboard .vv-daybars__side { justify-content: center; }
+.bug-dashboard .vv-daybars__bar,
+.bug-dashboard .vv-daybars__side[data-side='down'] .vv-daybars__bar { width: 3px; border-radius: 0; }
+.bug-dashboard .vv-daybars__zero { background: var(--hairline); }
+
+/* A card, as a row that opens it: the row itself is the press, a chevron at its end. */
+.bug-dashboard .dash-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-block: 1px solid var(--hairline);
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fade) ease;
+}
+.bug-dashboard .dash-row:hover { background: var(--surface2); }
+.bug-dashboard .dash-row:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+/* The card a changelog line came from: quiet words that open it. */
+.bug-dashboard .dash-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 17px;
+  text-align: left;
+  cursor: pointer;
+}
+.bug-dashboard .dash-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.bug-dashboard .dash-link:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+/* The Trace's beads sit on the page here, not on a plate. */
+.bug-dashboard .ast-trace-bead { background: var(--canvas); }
+@media (pointer: coarse), (max-width: 767.98px) {
+  .bug-dashboard .dash-row, .bug-dashboard .dash-link { min-height: 44px; }
+}

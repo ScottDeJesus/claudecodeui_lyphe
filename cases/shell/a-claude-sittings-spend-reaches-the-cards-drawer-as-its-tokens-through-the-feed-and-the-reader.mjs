@@ -18,7 +18,7 @@ import path from "node:path";
 
 import { withPage } from "../lib/app.mjs";
 import { broken, cannotRun, held, runCase } from "../lib/case.mjs";
-import { CARDS, faceOf, openBoard } from "../lib/kanban_board.mjs";
+import { CARDS, openBoard, openDrawer } from "../lib/kanban_board.mjs";
 import { feedCards, stage, walk } from "../lib/kanban_feed.mjs";
 
 const PHONE = { width: 390, height: 844 };
@@ -86,8 +86,8 @@ runCase(async (t) => {
     stages: [{ ...stage("builder", "hephaestus", "case-launch-builder-0001", "done"), ...TOKENS }],
   })]);
   await openBoard(page);
-  await faceOf(page, CARD.id).getByText(CARD.title).first().click({ timeout: WAIT_MS });
-  const drawer = page.getByRole("dialog").first();
+  // The card is a mark on its ring since the board's redraw to the design system (2026-11-20): it opens from the keyboard.
+  const drawer = await openDrawer(page, CARD.id);
   await drawer.waitFor({ timeout: WAIT_MS });
   const row = drawer.locator('[data-stage="builder"]').first();
   if (!(await row.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) {

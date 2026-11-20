@@ -64,8 +64,8 @@ type EnrollDialogProps = {
  * whose token is out. Closing at any step is safe: a token already issued still works until it expires,
  * and the node turns up in Fleet when its warden speaks.
  *
- * For the cerberus module's `CerberusPanel`, which hosts one and opens it from the header's "Enroll a
- * node".
+ * For the cerberus module's `CerberusPanel`, which hosts one and opens it from the plus at the fleet's foot
+ * (`CerberusFoot`) and from the fleet's Opening (`FleetOpening`): "Enroll a node".
  */
 export function EnrollDialog({ open, onClose }: EnrollDialogProps) {
   if (!open) return null;

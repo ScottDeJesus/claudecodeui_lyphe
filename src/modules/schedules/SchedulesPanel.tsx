@@ -43,15 +43,11 @@ export function SchedulesPanel() {
 
   return (
     <section aria-label="Schedules" className="flex h-full min-h-0 flex-col">
+      {/* The screen's own head names it (`ScreenHead`); this row is what the registry's sync says and its Refresh. */}
       <header className="flex flex-none flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b border-border px-4 py-3">
-        <span className="grid size-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
-          <Clock className="size-4" aria-hidden="true" />
-        </span>
-        <h2 className="text-sm font-medium">Schedules</h2>
-        {/* The sync's age and its counts travel together. On a phone they take the line under the
-            title, so Refresh keeps its place on the first line however long the age reads. */}
+        {/* The sync's age and its counts travel together, and wrap under themselves before they push Refresh off its line. */}
         {freshness && (
-          <div className="order-last flex basis-full flex-wrap items-center gap-x-2.5 gap-y-1 sm:order-none sm:basis-auto">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1">
             <Badge as="span" tone={freshness.tone} title={lastSync ? `${lastSync.ranAt} · took ${lastSync.ms} ms` : undefined}>
               {freshness.label}
             </Badge>

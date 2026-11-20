@@ -11,7 +11,7 @@
 
 import { withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
-import { CARDS, detailOf, faceOf, openBoard } from "../lib/kanban_board.mjs";
+import { CARDS, detailOf, openBoard, openDrawer } from "../lib/kanban_board.mjs";
 
 const PHONE = { width: 390, height: 844 };
 const WAIT_MS = 15000;
@@ -41,14 +41,15 @@ runCase(async (t) => {
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ card }) });
   });
 
-  await faceOf(page, CARD.id).getByText(CARD.title).first().click({ timeout: WAIT_MS });
-  const drawer = page.getByRole("dialog").first();
+  // The card is a mark on its ring since the board's redraw to the design system (2026-11-20): it opens from the keyboard.
+  const drawer = await openDrawer(page, CARD.id);
   await drawer.waitFor({ timeout: WAIT_MS });
   const group = drawer.locator("[data-drawer-decisions]");
   await group.first().waitFor({ timeout: WAIT_MS }).catch(() => {});
   if ((await group.count()) === 0) return broken(`the drawer of "${CARD.title}" lists none of the three decisions its detail carries`);
+  // Its words as written: the heading is set in capitals by its type (the design system's caption), which `innerText` reports.
   const text = await group.first().innerText();
-  if (!/Decided for you · 3\b/.test(text)) return broken(`the decisions' heading does not count 3: ${JSON.stringify(text.split("\n")[0])}`);
+  if (!/Decided for you · 3\b/i.test(text)) return broken(`the decisions' heading does not count 3: ${JSON.stringify(text.split("\n")[0])}`);
   if (text.includes(ANSWERED.question)) return broken(`the decisions list repeats the answered question "${ANSWERED.question}", whose answer stands in its own row`);
   const at = NEWEST_FIRST.map((question) => text.indexOf(question));
   if (at.some((index) => index < 0)) return broken(`the decisions list misses a noted decision: ${JSON.stringify(text)}`);

@@ -9,7 +9,7 @@ import { RecordedResults } from '@/modules/cerberus/sheet/RecordedResults';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import { isWholeDate, isWholeTime, stampOf, stretchKey } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCell, CerberusCheckDetail, CerberusCheckIndexEntry } from '@/shared/cerberus-types';
-import { Card, Field, Input, Select } from '@/shared/ui';
+import { Field, Input, Rule, Select } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /** Verve's card eyebrow, worn by the card's heading and by each section's under it. */
@@ -32,8 +32,8 @@ const WAIT_THEN_FADE = 'animate-[vv-fade_200ms_ease_150ms_both]';
 /** Where the check index stands: being read, unread, read and empty, or read. */
 type IndexState = 'reading' | 'failed' | 'empty' | 'ready';
 
-/** The answer well's frame: canvas ground inside the card, so the one thing the card is for stands apart. */
-const WELL_FRAME = 'rounded-xl border border-border bg-background px-4 py-3.5';
+/** The answer's frame: between two rules, so the one thing the lookup is for stands apart. */
+const WELL_FRAME = 'border-y border-border py-3.5';
 
 type LookupCardProps = {
   /** Every active check (`GET /api/cerberus/checks`), `null` until the index answers. */
@@ -181,8 +181,8 @@ export function LookupCard({ checks, checksFailed, chosen, date, time, detail, f
   const answeredAt = answer === null ? null : stampOf(answer.lookup.at, now);
 
   return (
-    <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-4 px-[18px] py-4">
-      <h2 id={headingId} className={EYEBROW}>{t('cerberus.history.eyebrow')}</h2>
+    <section role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-4">
+      <Rule id={headingId}>{t('cerberus.history.eyebrow')}</Rule>
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-[2_1_260px]">
           <Field label={t('cerberus.history.check')}>
@@ -268,6 +268,6 @@ export function LookupCard({ checks, checksFailed, chosen, date, time, detail, f
           </div>
         </>
       ) : waiting ? <WaitingSections /> : null}
-    </Card>
+    </section>
   );
 }

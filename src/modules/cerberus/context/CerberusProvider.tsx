@@ -146,7 +146,7 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   const [unreachable, setUnreachable] = useState(false);
 
   // True once a read fails while the overview held was answered over STALE_AFTER_MS before. Essential:
-  // it is what stops the header's pill saying Live and puts the "last answer" banner over a fleet that
+  // it is what stops the fleet's Opening saying Live and puts the "last answer" banner over a fleet that
   // may no longer be true. Set only by a failed read and cleared only by a good answer, so it never
   // needs a timer of its own.
   const [stale, setStale] = useState(false);

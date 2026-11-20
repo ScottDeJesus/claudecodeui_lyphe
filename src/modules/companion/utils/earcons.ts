@@ -1,36 +1,19 @@
-/** How long one note sounds, in seconds; the second note starts as the first ends. */
-const NOTE_SECONDS = 0.11;
-/** The rise at a note's start and the fall at its end, in seconds, so a note never clicks. */
-const NOTE_RAMP_SECONDS = 0.01;
-/** A note's peak gain: a quiet cue, not an alert. */
-const NOTE_GAIN = 0.12;
+import { playSound, preloadSounds } from '@/shared/sounds';
 
-/** The two notes of each cue, in Hz: her name opened a recording (A4, then E5, rising) and a recording closed (E5, then A4, falling). */
-const NOTES = { opened: [440, 659], closed: [659, 440] } as const;
+/** Each cue's sound in the app's set: Kaylee's name opened a recording, and a recording closed. */
+const CUES = { opened: 'listenOpen', closed: 'listenClose' } as const;
 
 /**
- * Used by `useEars`: the tone that tells him her name opened a recording (`opened`, rising) and that one closed, however it
- * closed (`closed`, falling). Two sine notes on the ears' own AudioContext, straight to its destination: they never pass
- * through her player, whose analyser moves her mouth, and her voice switch does not silence them (they are the page's cue,
- * not her speech).
+ * Used by `useEars`: the cue that tells him Kaylee's name opened a recording (`opened`: a quick breath in and a low voice rising from A
+ * to E flat) and that one closed, however it closed (`closed`: the voice falling back, a breath out, a soft knock). Both are the app's
+ * sound set's (`shared/sounds`), played on the ears' own AudioContext straight to its destination: they never pass through Kaylee's
+ * player, whose analyser moves the face, and the voice switch does not silence them (they are the page's cue, not speech).
  */
 export function playEarcon(context: AudioContext, kind: 'opened' | 'closed'): void {
-  const startsAt = context.currentTime;
-  NOTES[kind].forEach((frequency, index) => {
-    const noteStart = startsAt + index * NOTE_SECONDS;
-    const noteEnd = noteStart + NOTE_SECONDS;
-    const oscillator = context.createOscillator();
-    const envelope = context.createGain();
-    oscillator.type = 'sine';
-    // `value`, not `setValueAtTime`: the note's pitch is its own from the moment it is made.
-    oscillator.frequency.value = frequency;
-    envelope.gain.setValueAtTime(0, noteStart);
-    envelope.gain.linearRampToValueAtTime(NOTE_GAIN, noteStart + NOTE_RAMP_SECONDS);
-    envelope.gain.setValueAtTime(NOTE_GAIN, noteEnd - NOTE_RAMP_SECONDS);
-    envelope.gain.linearRampToValueAtTime(0, noteEnd);
-    oscillator.connect(envelope);
-    envelope.connect(context.destination);
-    oscillator.start(noteStart);
-    oscillator.stop(noteEnd);
-  });
+  void playSound(context, CUES[kind]);
+}
+
+/** Used by `useEars` as the ears take their AudioContext: both cues fetched and decoded ahead, so the first one sounds at once. */
+export function readyEarcons(context: BaseAudioContext): void {
+  preloadSounds(context, CUES.opened, CUES.closed);
 }

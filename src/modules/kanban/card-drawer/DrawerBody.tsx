@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { Pencil, Plus, X } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,37 +6,32 @@ import { MarkdownPreview } from '@/modules/markdown-preview';
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
 import { plainTagsOf } from '@/modules/kanban/utils/walkModel';
 import type { KanbanCardDetail, KanbanPriority } from '@/shared/kanban-types';
-import { Badge, Button, Chip, Field, Input } from '@/shared/ui';
+import { Button, Rule, SegmentedControl } from '@/shared/ui';
 
 /**
- * THE CARD EVERY BOARD HAS: what this card is called, how urgent it is, what it is filed under,
- * what it is for, and the long text behind it.
+ * THE CARD EVERY BOARD HAS: what this card is called and what it is for (`DrawerTitle`, first in the open card whatever else
+ * leads), how urgent it is, what it is filed under, and the long text behind it (`DrawerBody`).
  *
- * IT IS THE HALF THAT IS ALWAYS VISIBLE. Nothing here is gated on autonomy, because none of it
- * belongs to an autonomous run — a board a human drives alone still has titles, priorities, tags
- * and a description. The run's own ledger is the three sections after this one.
+ * IT IS THE HALF THAT IS ALWAYS VISIBLE. Nothing here is gated on autonomy, because none of it belongs to an autonomous run — a
+ * board a human drives alone still has titles, priorities, tags and a description. The run's own ledger is the sections after
+ * this one.
  *
- * THE FACE FIRST. Title, priority and tags open the sheet in that order because they are exactly
- * what the reader was looking at on the card they just pressed: the drawer continues the card
- * rather than presenting a form they have to re-orient inside. The two long fields follow, in the
- * order they are written — what this is for, then what was written about it.
+ * WRITTEN IN PLACE, READ AS TEXT. The title is the Opening's title and the description the line under it, each a field only
+ * under the hand: a hairline while pointed at, the accent while it has the focus, and no box at rest. How urgent it is and what
+ * it is filed under are two quiet facts on the design system's label column; the long text is read as Prose under its Rule,
+ * whose pencil is the way to write it.
  *
- * EVERY FIELD HOLDS A DRAFT AND SAVES DELIBERATELY. A keystroke is not a write: the board is
- * shared, every write broadcasts, and a card whose title is saved per character floods four other
- * screens with frames. The draft is seeded once per card (the shell keys this component on the
- * card id), so a re-read that arrives while the reader is typing repaints everything EXCEPT what
- * is under their hands.
+ * EVERY FIELD HOLDS A DRAFT AND SAVES DELIBERATELY. A keystroke is not a write: the board is shared, every write broadcasts,
+ * and a card whose title is saved per character floods four other screens with frames. The draft is seeded once per card (the
+ * shell keys this component on the card id), so a re-read that arrives while the reader is typing repaints everything EXCEPT
+ * what is under their hands.
  *
- * EVERY WRITE BELOW IS A VERB ON `useKanbanMutations`, which the shell hands down. That hook is
- * where a write becomes a toast and where a refusal carries the server's own sentence, so this
- * file calls nothing itself: a second write path here would be a write the reader never hears the
- * outcome of.
+ * EVERY WRITE BELOW IS A VERB ON `useKanbanMutations`, which the shell hands down. That hook is where a write becomes a toast
+ * and where a refusal carries the server's own sentence, so this file calls nothing itself: a second write path here would be
+ * a write the reader never hears the outcome of.
  *
- * PRIORITY IS THE CARD'S OWN LADDER, SPELLED. `high` is amber and never red — an urgent card is
- * not a denied one — `medium` carries no tone at all, and `low` is the quiet end. The card face
- * prints nothing for `medium` because it is what nearly every card is; here all three are
- * present, because this is where the reader CHOOSES, and a ladder with a missing rung cannot be
- * chosen from.
+ * PRIORITY IS THE CARD'S OWN LADDER, SPELLED. All three rungs are offered at once (the kit's segmented control), low to high;
+ * a chosen `high` is the warn ink and never red — an urgent card is not a denied one.
  */
 
 type DrawerBodyProps = {
@@ -53,60 +48,96 @@ const PRIORITIES = [
   { value: 'high', labelKey: 'kanban.priority.high' },
 ] satisfies { value: KanbanPriority; labelKey: string }[];
 
-/** Rendered by KanbanCardDrawer, always. Nothing else mounts it. */
-export function DrawerBody({ detail, writes }: DrawerBodyProps) {
-  const { t } = useTranslation();
-  const titleId = useId();
-  const descriptionId = useId();
-  const bodyLabelId = useId();
-  const priorityLabelId = useId();
-  const tagId = useId();
+/** The three text fields save the same way: write, and put the DRAFT back the way the card still is when the write is refused. */
+async function saveField(writes: KanbanMutations, cardId: string, patch: Parameters<KanbanMutations['updateCard']>[1], revert: () => void) {
+  const landed = await writes.updateCard(cardId, patch);
+  if (!landed) revert();
+  return landed;
+}
 
+/**
+ * The open card's name and the line under it, written in place: the title as the Opening's title, the description as its quiet
+ * lead. The title is the first field of the open card, which is what a new card's naming finds (`KanbanCardDrawer`).
+ *
+ * Rendered by KanbanCardDrawer, first, always. Nothing else mounts it.
+ */
+export function DrawerTitle({ detail, writes }: DrawerBodyProps) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(detail.title);
   const [description, setDescription] = useState(detail.description);
-  const [body, setBody] = useState(detail.body);
-  const [editingBody, setEditingBody] = useState(false);
-  const [tag, setTag] = useState('');
-
-  // The tags that are only names. The flow's tag is the word in the sheet's header and each link
-  // is a row under this body (`DrawerLinks`), by the other card's title: neither is a chip here,
-  // where a link would read as `duplicate-of:` and an id.
-  const tagNames = plainTagsOf(detail.tags);
-
-  /** The three text fields save the same way: skip a no-op, write, and put the DRAFT back the way
-   *  the card still is when the write is refused. */
-  const saveField = async (patch: Parameters<KanbanMutations['updateCard']>[1], revert: () => void) => {
-    const landed = await writes.updateCard(detail.id, patch);
-    if (!landed) revert();
-    return landed;
-  };
 
   const saveTitle = () => {
     const next = title.trim();
-    // An empty title is refused HERE, before the round trip: the card keeps the name it had rather
-    // than becoming the blank row a reader would have to hunt for on the board.
+    // An empty title is refused HERE, before the round trip: the card keeps the name it had rather than becoming the blank row
+    // a reader would have to hunt for on the board.
     if (next.length === 0) {
       setTitle(detail.title);
       return;
     }
     if (next === detail.title) return;
-    void saveField({ title: next }, () => setTitle(detail.title));
+    void saveField(writes, detail.id, { title: next }, () => setTitle(detail.title));
   };
 
   const saveDescription = () => {
     if (description === detail.description) return;
-    void saveField({ description }, () => setDescription(detail.description));
+    void saveField(writes, detail.id, { description }, () => setDescription(detail.description));
   };
 
+  return (
+    <div className="flex flex-col gap-1">
+      <input
+        data-bug-title=""
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
+        onBlur={saveTitle}
+        onKeyDown={(event) => {
+          // Enter LEAVES the field and the blur is what saves. Calling the saver here as well would PATCH twice on
+          // Enter-then-click-away and broadcast two frames to every other screen watching this board.
+          if (event.key === 'Enter') event.currentTarget.blur();
+        }}
+        placeholder={t('kanban.drawer.titlePlaceholder')}
+        aria-label={t('kanban.drawer.title')}
+        className="bug-field bug-title"
+      />
+      <textarea
+        rows={2}
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+        onBlur={saveDescription}
+        placeholder={t('kanban.drawer.descriptionPlaceholder')}
+        aria-label={t('kanban.drawer.description')}
+        data-quiet="true"
+        className="bug-field"
+      />
+    </div>
+  );
+}
+
+/** Rendered by KanbanCardDrawer, always, after the questions when a card leads with them. Nothing else mounts it. */
+export function DrawerBody({ detail, writes }: DrawerBodyProps) {
+  const { t } = useTranslation();
+  const bodyLabelId = useId();
+  const priorityLabelId = useId();
+  const tagsLabelId = useId();
+  const tagId = useId();
+
+  const [body, setBody] = useState(detail.body);
+  const [editingBody, setEditingBody] = useState(false);
+  const [tag, setTag] = useState('');
+
+  // The tags that are only names. The flow's tag is the word in the Opening's head and each link is a row under this body
+  // (`DrawerLinks`), by the other card's title: neither is a tag here, where a link would read as `duplicate-of:` and an id.
+  const tagNames = plainTagsOf(detail.tags);
+
   const saveBody = async () => {
-    // The editor is left only once the write has landed: a failed save keeps the reader's text in
-    // front of them rather than folding it away into a body the server never received.
-    if (await saveField({ body }, () => setBody(detail.body))) setEditingBody(false);
+    // The editor is left only once the write has landed: a failed save keeps the reader's text in front of them rather than
+    // folding it away into a body the server never received.
+    if (await saveField(writes, detail.id, { body }, () => setBody(detail.body))) setEditingBody(false);
   };
 
   const setPriority = (next: KanbanPriority) => {
-    // It writes on the press. There is no draft to lose and no second control to confirm at, and
-    // the pressed chip follows `detail.priority`, so a refusal simply leaves the old one lit.
+    // It writes on the press. There is no draft to lose and no second control to confirm at, and the chosen rung follows
+    // `detail.priority`, so a refusal simply leaves the old one chosen.
     if (next === detail.priority) return;
     void writes.updateCard(detail.id, { priority: next });
   };
@@ -121,124 +152,84 @@ export function DrawerBody({ detail, writes }: DrawerBodyProps) {
     void writes.removeTag(detail.id, name);
   };
 
+  const bodyPress = editingBody ? t('kanban.drawer.bodyCancel') : t('kanban.drawer.bodyEdit');
+
   return (
-    <section className="flex flex-col gap-5">
-      <Field label={t('kanban.drawer.title')} htmlFor={titleId}>
-        <Input
-          id={titleId}
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          onBlur={saveTitle}
-          onKeyDown={(event) => {
-            // Enter LEAVES the field and the blur is what saves. Calling the saver here as well
-            // would PATCH twice on Enter-then-click-away and broadcast two frames to every other
-            // screen watching this board.
-            if (event.key === 'Enter') event.currentTarget.blur();
-          }}
-          placeholder={t('kanban.drawer.titlePlaceholder')}
-          className="h-10 text-base font-medium"
-        />
-      </Field>
+    <section className="flex flex-col gap-4">
+      <dl className="bug-facts">
+        <dt id={priorityLabelId}>{t('kanban.drawer.priority')}</dt>
+        <dd data-priority={detail.priority}>
+          <SegmentedControl
+            label={t('kanban.drawer.priority')}
+            options={PRIORITIES.map((step) => ({ value: step.value, label: t(step.labelKey) }))}
+            value={detail.priority}
+            onChange={setPriority}
+          />
+        </dd>
 
-      {/* A pressed group rather than a select: three options, all of them worth seeing at once,
-          and the chosen one readable without opening anything. Not a `Field` — its `<label>` would
-          name a single control, and what needs naming here is the GROUP of three, so the label is
-          a span carrying the same ink and `role="group"` points at it. A `<label for>` with
-          nothing to bind to is markup that reads as a mistake to anything walking the tree. */}
-      <div className="flex flex-col gap-1.5">
-        <span className="vv-field__label" id={priorityLabelId}>{t('kanban.drawer.priority')}</span>
-        <div className="flex flex-wrap gap-2" role="group" aria-labelledby={priorityLabelId}>
-          {PRIORITIES.map((step) => (
-            <Chip
-              key={step.value}
-              size="sm"
-              selected={detail.priority === step.value}
-              tone={step.value === 'high' ? 'warn' : undefined}
-              onClick={() => setPriority(step.value)}
-            >
-              {t(step.labelKey)}
-            </Chip>
-          ))}
-        </div>
-      </div>
-
-      <Field label={t('kanban.drawer.tags')} htmlFor={tagId}>
-        <div className="flex flex-col gap-2">
-          {tagNames.length > 0 && (
-            <ul className="flex flex-wrap gap-1.5">
-              {tagNames.map((name) => (
-                <li key={name}>
-                  {/* A tag is a name, never a verdict: outline, never a tone. The only coloured
-                      thing a tag may carry is nothing at all. */}
-                  <Badge variant="outline" className="vv-badge--compact gap-1">
-                    {name}
-                    <button
-                      type="button"
-                      className="text-ink-faint hover:text-foreground"
-                      aria-label={t('kanban.drawer.removeTag', { tag: name })}
-                      onClick={() => removeTag(name)}
-                    >
-                      <X className="h-3 w-3" aria-hidden="true" />
-                    </button>
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="flex gap-2">
-            <Input
-              id={tagId}
-              value={tag}
-              onChange={(event) => setTag(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') addTag();
-              }}
-              placeholder={t('kanban.drawer.tagPlaceholder')}
-              className="h-8"
-            />
-            <Button variant="tonal" size="sm" className="h-8 shrink-0" onClick={addTag}>
-              {t('kanban.drawer.addTag')}
-            </Button>
+        <dt id={tagsLabelId}>{t('kanban.drawer.tags')}</dt>
+        <dd>
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-labelledby={tagsLabelId}>
+            {tagNames.map((name) => (
+              // A tag is a name, never a verdict: a hairline, never a tone.
+              <span key={name} className="bug-tag">
+                {name}
+                <button type="button" className="ast-file-x" aria-label={t('kanban.drawer.removeTag', { tag: name })} title={t('kanban.drawer.removeTag', { tag: name })} onClick={() => removeTag(name)}>
+                  <X className="size-3" aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+            <span className="bug-add flex-1 basis-28">
+              <input
+                id={tagId}
+                value={tag}
+                onChange={(event) => setTag(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void addTag();
+                }}
+                placeholder={t('kanban.drawer.tagPlaceholder')}
+                aria-label={t('kanban.drawer.tagPlaceholder')}
+                className="bug-field"
+              />
+              {/* The press arrives with what it adds: a tag being typed. Enter adds it too. */}
+              {tag.trim().length > 0 && (
+                <Button variant="outline" size="icon" className="size-7 shrink-0 finger:size-11" aria-label={t('kanban.drawer.tagPlaceholder')} title={t('kanban.drawer.tagPlaceholder')} onClick={() => void addTag()}>
+                  <Plus aria-hidden="true" />
+                </Button>
+              )}
+            </span>
           </div>
-        </div>
-      </Field>
+        </dd>
+      </dl>
 
-      <Field label={t('kanban.drawer.description')} htmlFor={descriptionId}>
-        <textarea
-          id={descriptionId}
-          rows={3}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          onBlur={saveDescription}
-          placeholder={t('kanban.drawer.descriptionPlaceholder')}
-          className="vv-input w-full resize-y px-3 py-2 text-sm"
-        />
-      </Field>
-
-      {/* The long text is READ by default and written on purpose. It is the field most likely to
-          hold something a machine wrote and a human is consulting, so the resting state RENDERS
-          it — headings, lists, tables and fenced code as the writer meant them — and the editor
-          holds the source. A reader consulting a plan should not be parsing hashes and pipes.
-          `MarkdownPreview` comes through the markdown-preview barrel, the same door and the same
-          `prose` wrapper the PRD editor already uses for exactly this. */}
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
-          <span className="vv-field__label" id={bodyLabelId}>{t('kanban.drawer.body')}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-auto h-7 px-2"
-            onClick={() => {
-              // Cancel DISCARDS. Leaving the draft behind would re-open the abandoned text on the
-              // next Edit press, over a body the server may have changed since.
-              if (editingBody) setBody(detail.body);
-              setEditingBody((editing) => !editing);
-            }}
-          >
-            {editingBody ? t('kanban.drawer.bodyCancel') : t('kanban.drawer.bodyEdit')}
-          </Button>
-        </div>
+      {/* The long text is READ by default and written on purpose. It is the field most likely to hold something a machine wrote
+          and a human is consulting, so the resting state RENDERS it — headings, lists, tables and fenced code as the writer meant
+          them — and the editor holds the source. `MarkdownPreview` comes through the markdown-preview barrel, the same door the
+          PRD editor uses. With nothing written, the Rule and its pencil are all there is. */}
+      <section className="flex flex-col gap-2" aria-labelledby={bodyLabelId}>
+        <Rule
+          id={bodyLabelId}
+          end={
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-7 finger:size-11"
+              aria-label={bodyPress}
+              title={bodyPress}
+              aria-pressed={editingBody}
+              onClick={() => {
+                // Cancel DISCARDS. Leaving the draft behind would re-open the abandoned text on the next press, over a body the
+                // server may have changed since.
+                if (editingBody) setBody(detail.body);
+                setEditingBody((editing) => !editing);
+              }}
+            >
+              {editingBody ? <X aria-hidden="true" /> : <Pencil aria-hidden="true" />}
+            </Button>
+          }
+        >
+          {t('kanban.drawer.body')}
+        </Rule>
 
         {editingBody ? (
           <div className="flex flex-col gap-2">
@@ -250,21 +241,18 @@ export function DrawerBody({ detail, writes }: DrawerBodyProps) {
               placeholder={t('kanban.drawer.bodyPlaceholder')}
               className="vv-input w-full resize-y px-3 py-2 font-mono text-xs leading-relaxed"
             />
-            <Button variant="default" size="sm" className="self-end" onClick={saveBody}>
+            <Button variant="default" size="sm" className="self-end" onClick={() => void saveBody()}>
               {t('kanban.drawer.bodySave')}
             </Button>
           </div>
-        ) : detail.body.trim().length > 0 ? (
-          <section
-            aria-labelledby={bodyLabelId}
-            className="vv-card prose prose-sm max-w-none break-words p-3 dark:prose-invert"
-          >
-            <MarkdownPreview content={detail.body} />
-          </section>
         ) : (
-          <p className="text-sm text-muted-foreground">{t('kanban.drawer.bodyEmpty')}</p>
+          detail.body.trim().length > 0 && (
+            <div className="bug-prose prose prose-sm max-w-none dark:prose-invert">
+              <MarkdownPreview content={detail.body} />
+            </div>
+          )
         )}
-      </div>
+      </section>
     </section>
   );
 }

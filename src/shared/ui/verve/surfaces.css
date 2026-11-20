@@ -3,21 +3,19 @@
  * classes a drag of any one sets for its length.
  *
  * The fourth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
- * feedback.css is at it, and board.css belongs to the board. README rule 6: the next file opens
- * the same way again.
+ * and feedback.css is at it. README rule 6: the next file opens the same way again.
  *
  * Same contract as its three siblings. A library class string carries `vv-<name>` plus layout
  * utilities and nothing else; colour comes from tokens.css and nowhere else; no rule declares a
- * `--tone-*` property. Nothing here shares a selector with controls.css, feedback.css or
- * board.css, so where it loads between them decides nothing.
+ * `--tone-*` property. Nothing here shares a selector with controls.css or feedback.css, so
+ * where it loads between them decides nothing.
  *
  * ONE departure from "the className carries size": the FAB's size is a custom property,
  * `--vv-fab-size`, because three things read it — the box, the inline `clamp()` that keeps a
  * stored point on screen (DockableFab.tsx), and the switcher's radial discs (`.vv-fab-disc`).
  * Spelt as a Tailwind class it would be several spellings of one number, and they would drift.
  *
- * Imported once, for side effect, from src/shared/ui/index.ts — after feedback.css and before
- * board.css, which keeps the last word.
+ * Imported once, for side effect, from src/shared/ui/index.ts — after feedback.css.
  */
 
 /* ---------------------------------------------------------------- DockableFab */
@@ -287,8 +285,8 @@ body.vv-dragging iframe { pointer-events: none; }
   [data-hold-lift] :is(a, img) { -webkit-user-drag: none; }
 }
 /* The item in a hand (sortable/carried.ts marks it `data-carried`, and writes its place, ground and corners
- * inline) is lifted OFF its list: `--shadow-lift`, the elevation Verve gives a lane card in the hand
- * (board.css `--lifted`), and the hairline a Verve card is edged with (`--border-strong`) — the shadow alone is
+ * inline) is lifted OFF its list: `--shadow-lift`, the elevation Verve gives a card in the hand,
+ * and the hairline a Verve card is edged with (`--border-strong`) — the shadow alone is
  * warm black at 13%, which a dark ground does not show, and the lift must read the moment it takes, before the
  * finger has moved. That, and the item leaving its slot to follow the pointer, is the whole of the cue on a
  * phone that cannot buzz. */

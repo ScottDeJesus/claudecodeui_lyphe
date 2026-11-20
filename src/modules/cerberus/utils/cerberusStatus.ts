@@ -63,9 +63,9 @@ export const STATUS_TABLE: Record<CerberusStatus, StatusLook> = {
  * check never draw one state two ways. A refusal is the run's outcome, never a check's status, so it is
  * not a row of the status table above.
  *
- * Read by the Needs-you card's run strip (`NeedFix`), the sheet's Fix output (`FixOutput`) and the diagnosis
- * panel (`DiagnosisPanel`: its Failed pill and its one-off's ran line), so a run reads the same on the card
- * and in the sheet.
+ * Read by a need's run strip (`NeedFix`), the sheet's Fix output (`FixOutput`) and the diagnosis panel
+ * (`DiagnosisPanel`: its Failed pill and its one-off's ran line), so a run reads the same on a need and in
+ * the sheet.
  */
 export const RUN_LOOK: Record<'going' | 'ok' | 'failed' | 'timed_out' | 'refused', { tone: Tone; icon: LucideIcon }> = {
   going: { tone: 'info', icon: Wrench },
@@ -78,13 +78,11 @@ export const RUN_LOOK: Record<'going' | 'ok' | 'failed' | 'timed_out' | 'refused
 /**
  * How the fleet draws a node or a service with a fix running (`fixing`; `design/cerberus/cerberus-fleet.js`
  * :10 and :18): a running fix's tone and wrench (`RUN_LOOK.going`), on the `solid` cell, so every paint map
- * keyed by cell shape draws it as the prototype does — a node's tile edged 1.5px in the info dot
- * (`TILE_EDGE`), its ring dot and a service's square filled with it (`DOT_PAINT`, `StatusSquare`), a
- * service's pill in the info tone. Its mark pulses (`glyphMotion`, `vv-pulse` 1.4 s) where a failing
- * one rings: a fix is already on it. Its words go by who started the run: "Fix running on its own" /
- * "Fix running" (`cerberus.fix.fleet.runningAuto` / `.running`); the rings' key says "Fix running or
- * updating" (`cerberus.fix.fleet.legend`). `wordKey` is the bare "Fix running", the name a mark carries
- * to assistive tech when no sentence names it.
+ * keyed by cell shape draws it as the prototype does — a service's minute filled in the info dot, its pill
+ * in the info tone, a machine's Opening worded in it. Its mark pulses (`glyphMotion`, `vv-pulse` 1.4 s)
+ * where a failing one rings: a fix is already on it. Its words go by who started the run: "Fix running on
+ * its own" / "Fix running" (`cerberus.fix.fleet.runningAuto` / `.running`). `wordKey` is the bare "Fix
+ * running", the name a mark carries to assistive tech when no sentence names it.
  *
  * Fed from `overview.running` (`fleetModel`): a node and a service with a run going on one of its checks.
  * Read through `markLook`, with every status.
@@ -103,7 +101,7 @@ type MarkLook = { tone: Tone; icon: LucideIcon; cell: CerberusCellShape; wordKey
 /**
  * The look a mark is painted from: `STATUS_TABLE`'s row for a status, `FLEET_FIXING_LOOK` for `fixing`.
  * Every mark of a node or a service reads it, so a fix running is the same info look — its wrench wherever
- * a mark has room for an icon — in a card, a square, a pill, a ring's dot and the key.
+ * a mark has room for an icon — in a need, a minute, a pill and a machine's Opening.
  */
 export function markLook(mark: CerberusMark): MarkLook {
   return mark === 'fixing' ? FLEET_FIXING_LOOK : STATUS_TABLE[mark];
@@ -112,13 +110,12 @@ export function markLook(mark: CerberusMark): MarkLook {
 /**
  * The mark a NODE's word draws with, or `null` for a word with no mark. `empty` has none: nothing is on
  * the node to read. `fixing` is a fix running on the node: the info wrench, which pulses where a failing
- * node rings. `updating` is a warden update queued or running on it, and draws that same info wrench —
- * the rings' key says "Fix running or updating" of the one look — while `paused`, its warden mid-restart,
- * keeps the dashed neutral of its checks. `enrolling` is a held place, fed by nothing yet; whatever
- * feeds it gives its word a mark.
+ * node rings. `updating` is a warden update queued or running on it, and draws that same info wrench,
+ * while `paused`, its warden mid-restart, keeps the dashed neutral of its checks. `enrolling` is a held
+ * place, fed by nothing yet; whatever feeds it gives its word a mark.
  *
- * Read by Fleet's node card (its round glyph and its tile's edge) and by the rings (each node's dot, its
- * label's icon, and the hub), so a node is drawn the same in every layout.
+ * Read by the instrument's rings (`utils/fleetRings`: a machine's word), by a machine's Opening (its
+ * status word's tone, and the ink of its line), so a machine reads the same wherever it is named.
  */
 export function nodeMark(status: FleetStatus): CerberusMark | null {
   if (status === 'empty' || status === 'enrolling') return null;

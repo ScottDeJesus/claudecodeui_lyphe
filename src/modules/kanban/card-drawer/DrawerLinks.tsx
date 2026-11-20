@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { linksOf, type KanbanLinkedTitle } from '@/modules/kanban/utils/walkModel';
 import type { KanbanCardDetail } from '@/shared/kanban-types';
-import { Button } from '@/shared/ui';
+import { Rule } from '@/shared/ui';
 
 /**
  * THE CARDS THIS ONE IS TIED TO: a duplicate, the card it was split from, a related one, the
@@ -14,8 +14,8 @@ import { Button } from '@/shared/ui';
  * card IS: a card that is a duplicate of another is read differently from its first line down.
  *
  * THE TITLE, WHOLE, AND NEVER THE ID. Each row is the word for the tie and the other card's title,
- * unclipped — the face cuts it to a line, and this is where it stands in full. The row is the
- * press: it opens that card in this same sheet. 44 px under a finger.
+ * unclipped. The row is the press, an object that opens and so no button's frame: it opens that
+ * card in this same Opening. 44 px under a finger.
  *
  * A CARD THAT IS GONE IS SAID, NOT OFFERED. Its row is the same word and "a card that is no longer
  * on this board", in the calm ink, with no press: opening it could only show that it cannot be
@@ -43,32 +43,26 @@ export function DrawerLinks({ detail, titleOf, onOpenCard }: DrawerLinksProps) {
 
   return (
     <section className="flex flex-col gap-2" aria-labelledby={headingId} data-drawer-links>
-      <h3 id={headingId} className="text-sm font-semibold text-foreground">
-        {t('kanban.links.title')}
-      </h3>
-      <ul className="flex flex-col gap-2">
+      <Rule id={headingId}>{t('kanban.links.title')}</Rule>
+      <ul className="-mx-2 flex flex-col">
         {links.map((link, index) => {
           const { id } = link;
           if (id === null) {
             return (
-              <li key={`${link.word}-gone-${index}`} className="flex min-w-0 items-baseline gap-2 px-3 py-2" data-linked-card-gone>
-                <span className="shrink-0 text-xs text-muted-foreground">{link.word}</span>
-                <span className="min-w-0 flex-1 break-words text-sm leading-snug text-muted-foreground">{link.title}</span>
+              <li key={`${link.word}-gone-${index}`} className="flex min-w-0 items-baseline gap-2.5 px-2 py-1.5" data-linked-card-gone>
+                <span className="bug-word">{link.word}</span>
+                <span className="min-w-0 flex-1 break-words text-[13px] leading-[18px] text-muted-foreground">{link.title}</span>
               </li>
             );
           }
           return (
             <li key={`${link.word}-${id}`}>
-              <Button
-                variant="outline"
-                className="h-auto min-h-9 w-full justify-start gap-2 whitespace-normal px-3 py-2 text-left font-normal finger:min-h-11"
-                data-linked-card={id}
-                onClick={() => onOpenCard(id)}
-              >
-                <span className="shrink-0 text-xs text-muted-foreground">{link.word}</span>
-                <span className="min-w-0 flex-1 break-words text-sm leading-snug text-foreground">{link.title}</span>
-                <ChevronRight className="shrink-0 text-muted-foreground" aria-hidden="true" />
-              </Button>
+              {/* The row is the press: an object that opens, so no frame of a button round it. */}
+              <button type="button" className="bug-row" data-linked-card={id} onClick={() => onOpenCard(id)}>
+                <span className="bug-word">{link.word}</span>
+                <span className="min-w-0 flex-1 break-words text-[13px] leading-[18px]">{link.title}</span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </button>
             </li>
           );
         })}
