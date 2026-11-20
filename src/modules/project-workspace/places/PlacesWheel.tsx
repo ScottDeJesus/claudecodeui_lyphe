@@ -1,11 +1,12 @@
 import '@/modules/project-workspace/places/places.css';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import type { ComponentType, CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionFace } from '@/modules/companion';
+import { PlaceMarkDot } from '@/modules/project-workspace/places/PlaceMarkDot';
 import { OUT_OF_REACH } from '@/shared/constants';
 import type { Place, PlaceId } from '@/shared/types';
 import { Button } from '@/shared/ui';
@@ -112,13 +113,15 @@ type PlacesWheelProps = {
  * the outer, each at the same bearing every time, so the hand learns where a place is. EACH PLACE IS ITS GLYPH ALONE, but the last chat,
  * which keeps its title (a speech bubble alone does not say which chat). The place pointed at is named on the plate under the wheel,
  * and only while it is pointed at; the core reads toward it (her reading form, turned to its bearing). The place on screen is drawn
- * raised. Under the plate, away from the station, the applications' acts, glyphs too.
+ * raised. What waits at a place is marked on its glyph (`PlaceMarkDot`: the accent's bead for a word owed, the green tick for work
+ * finished unseen) and said after its name on the plate. Under the plate, away from the station, the applications' acts, glyphs too.
  *
  * Pressed, a place is gone to. Held (the press that brought it up still down), letting go over a place goes there, and anywhere else
  * leaves the wheel up. Keys: 1 to 5 the inner ring's places, the arrows round the places, Enter on one, Escape (or the backtick again)
  * puts it away, as does a press on the ground. On a phone it is a fan from the foot with the same places at the same sides.
  *
- * The places are a menu of items (a reader of the screen hears each one's name, and the place on screen as the current page); arrows
+ * The places are a menu of items (a reader of the screen hears each one's name, its mark's words as its description, and the place on
+ * screen as the current page); arrows
  * move round it. Drawn by this module's `PlacesProvider` while it is up, into the body, over every page; it states it owns Escape
  * (`OWNS_ESCAPE`).
  */
@@ -128,6 +131,7 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
   const height = useSyncExternalStore(subscribeToResize, readHeight);
   const dial = dialFor(width, height, acts.length > 0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const markIds = useId();
   const [over, setOver] = useState<PlaceId | null>(null);
   const [holding, setHolding] = useState(held !== null);
   // Whether a place has been chosen: a release and the click after it are one choice, never two goes.
@@ -299,13 +303,17 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
               data-over={over === place.id ? 'true' : 'false'}
               data-here={place.here ? 'true' : 'false'}
               aria-current={place.here ? 'page' : undefined}
+              aria-describedby={place.mark === null ? undefined : `${markIds}-${place.id}`}
               aria-keyshortcuts={inner && !fan ? String(SLOT[place.id] + 1) : undefined}
               className="places-wheel-name"
               style={{ left: x, top: y, '--i': index } as CSSProperties}
               onFocus={() => setOver(place.id)}
               onClick={() => choose(place)}
             >
-              <Icon className="places-wheel-glyph" strokeWidth={inner ? 1.4 : 1.5} aria-hidden="true" />
+              <span className="places-wheel-glyph-box">
+                <Icon className="places-wheel-glyph" strokeWidth={inner ? 1.4 : 1.5} aria-hidden="true" />
+                {place.mark !== null && <PlaceMarkDot kind={place.mark.kind} />}
+              </span>
               {place.id === 'chat' ? (
                 <>
                   <span className="places-wheel-word">{place.label}</span>
@@ -317,6 +325,10 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
             </button>
           );
         })}
+        {/* The marks' words, each the description of its place's item: outside the items, so an item's name stays its own. */}
+        {places.map((place) => place.mark !== null && (
+          <span key={place.id} id={`${markIds}-${place.id}`} hidden>{place.mark.words}</span>
+        ))}
       </div>
 
       <div className="places-wheel-core" style={{ left: cx - dial.core / 2, top: cy - dial.core / 2, width: dial.core, height: dial.core }}>
@@ -328,10 +340,11 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
         />
       </div>
 
-      {/* The name of the place pointed at, while it is pointed at: empty, the plate is absent. */}
+      {/* The name of the place pointed at, while it is pointed at, and what waits there: empty, the plate is absent. */}
       {pointed !== null && (
         <p key={pointed.id} className="places-wheel-plate" data-here={pointed.here ? 'true' : 'false'} style={{ top: dial.plateY }}>
           {pointed.label}
+          {pointed.mark !== null && <span className="places-wheel-plate-words" data-mark={pointed.mark.kind}>{` · ${pointed.mark.words}`}</span>}
         </p>
       )}
 

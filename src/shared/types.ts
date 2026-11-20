@@ -4522,9 +4522,9 @@ export type PlaceId = 'home' | 'station' | 'roadmap' | 'bugs' | 'chat' | 'cerber
 /**
  * One place as the navigation lists it, resolved for the page on screen: its name (the chat's own title for `chat`), its glyph (which
  * is all the wheel draws of it, but for the last chat's title), the ring it stands on (the five visited most on the inner, the rest on
- * the outer), whether it is where the reader is (`here`), the words the palette's search also matches, and `go`, the press that takes
- * the reader there. Built by project-workspace's `PlacesProvider`; read by its wheel (`PlacesWheel`) and by its command palette's Places
- * group.
+ * the outer), whether it is where the reader is (`here`), the words the palette's search also matches, what waits there (`mark`, or null
+ * while nothing does), and `go`, the press that takes the reader there (to the part that answers the mark, when one stands). Built by
+ * project-workspace's `PlacesProvider`; read by its wheel (`PlacesWheel`) and by its command palette's Places group.
  */
 export type Place = {
   id: PlaceId;
@@ -4533,7 +4533,19 @@ export type Place = {
   ring: 'inner' | 'outer';
   here: boolean;
   keywords: string;
+  mark: PlaceMark | null;
   go: () => void;
+};
+
+/**
+ * What waits at a place, drawn on its glyph in the wheel and, gathered, on the menu that brings the wheel up: `owed`, a word of the
+ * reader's is owed there (the accent, breathing); `done`, work finished there that has not been looked at yet (the green tick). `words`
+ * say what, after the place's name: on the wheel's plate, and to a reader of the screen. Built by project-workspace's `PlacesProvider`
+ * from the figures each place's own screen already reads; drawn by its `PlacesWheel` and `PlacesMenu`.
+ */
+export type PlaceMark = {
+  kind: 'owed' | 'done';
+  words: string;
 };
 
 /**

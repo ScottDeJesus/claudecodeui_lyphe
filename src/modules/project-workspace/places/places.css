@@ -74,6 +74,30 @@
   font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; animation: places-fade 160ms ease both;
 }
 .places-wheel-plate[data-here='true'] { color: var(--ink); }
+/* The plate's second half, what waits at the place pointed at, in its mark's ink. */
+.places-wheel-plate-words[data-mark='owed'] { color: var(--accent-ink); }
+.places-wheel-plate-words[data-mark='done'] { color: var(--pos-ink); }
+
+/*
+ * WHAT WAITS (PlaceMarkDot), at the top right corner of a place's glyph and of the menu: the accent's bead for a word owed, breathing as
+ * the station's draft bead does; the green tick for finished work not yet seen, still. Each pops in as it comes; in the wheel, after its
+ * place has arrived.
+ */
+.places-wheel-glyph-box { position: relative; display: grid; place-items: center; }
+.places-mark {
+  position: absolute; top: -3px; right: -3px; display: grid; place-items: center; width: 8px; height: 8px; border-radius: 50%;
+  pointer-events: none; animation: places-mark-in var(--duration-lock) var(--ease-lock) both;
+}
+.places-mark[data-mark='owed'] {
+  background: var(--accent); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: places-mark-in var(--duration-lock) var(--ease-lock) both, places-mark-breathe 2.6s ease-in-out 600ms infinite;
+}
+.places-mark[data-mark='done'] { top: -5px; right: -5px; width: 12px; height: 12px; background: var(--pos-dot); color: var(--surface); }
+.places-mark[data-mark='done'] svg { width: 8px; height: 8px; }
+.places-wheel .places-mark { animation-delay: calc(220ms + var(--i, 0) * 24ms); }
+.places-wheel .places-mark[data-mark='owed'] { animation-delay: calc(220ms + var(--i, 0) * 24ms), calc(820ms + var(--i, 0) * 24ms); }
+@keyframes places-mark-in { from { opacity: 0; scale: 0.2; } to { opacity: 1; scale: 1; } }
+@keyframes places-mark-breathe { 50% { scale: 1.25; box-shadow: 0 0 14px 3px color-mix(in srgb, var(--accent) 70%, transparent); } }
 
 .places-wheel-acts {
   position: absolute; left: 50%; translate: -50% 0; display: flex; gap: 8px; animation: places-fade var(--duration-fade) ease both;
@@ -122,5 +146,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .places-wheel *, .places-wheel { animation-duration: 1ms !important; animation-delay: 0ms !important; transition: none !important; }
+  /* A mark stands still: shown at once, the bead lit without breathing. */
+  .places-mark { animation: none !important; }
   [data-holds-trail][data-holding], [data-holds-places][data-holding] { animation: none; box-shadow: 0 0 0 3px var(--accent); }
 }

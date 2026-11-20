@@ -5,7 +5,13 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { useBackToWorkspace, useCurrentApplication, useSwitcherActions } from '@/modules/app-switcher';
+import { useCerberusNeeds } from '@/modules/cerberus';
+import { useChatHost } from '@/modules/chat-host';
+import { useClaudeUpdateLine } from '@/modules/claude-updates';
 import { usePaletteOps } from '@/modules/command-palette';
+import { useCompanion } from '@/modules/companion';
+import { useDispatcherPlans } from '@/modules/dispatcher';
+import { useInboxWaiting } from '@/modules/inbox';
 import { ProjectCreationWizard } from '@/modules/project-creation-wizard';
 import { useProjectEffectsState, useProjectMainState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
@@ -13,9 +19,11 @@ import { PlaceTrail } from '@/modules/project-workspace/places/PlaceTrail';
 import { PlacesWheel } from '@/modules/project-workspace/places/PlacesWheel';
 import { StationGlyph } from '@/modules/project-workspace/places/StationGlyph';
 import { openHome, openStation } from '@/shared/cloudcliDoors';
+import { useAwaitingInputSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { createStableContext } from '@/shared/context/stableContext';
 import { useHomeShowing, useStationDoors, useStationShowing } from '@/shared/context/StationLayerContext';
-import type { AppTab, ChatDoor, Place, PlaceId, PlaceTrailStep } from '@/shared/types';
+import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
+import type { AppTab, ChatDoor, Place, PlaceId, PlaceMark, PlaceTrailStep, SettingsMainTab } from '@/shared/types';
 import { getSessionTitle } from '@/shared/utils';
 
 /** The workspace's screens the wheel stands on its rings, by the names the wheel gives them, in its order. */
@@ -82,6 +90,12 @@ function wheelFrom(opener: HTMLElement | null, held: number | null): WheelState 
 type PlacesValue = {
   /** Every place the navigation leads to, in the wheel's order: the inner ring's five, then the outer's six. */
   places: Place[];
+  /**
+   * What waits elsewhere, gathered for the menu that brings the wheel up: `owed` while any place away from here owes a word, else
+   * `done` while one has finished work unseen, its words naming each such place; null while nothing waits. The app's own newer release
+   * stays on Settings in the wheel: it is news to read there, not a word owed on every page.
+   */
+  menuMark: PlaceMark | null;
   /** Brings the wheel up out of `opener`; with `heldPointer`, the pointer still down from that press, which a release over a place spends. */
   openWheel: (opener: HTMLElement | null, heldPointer: number | null) => void;
   /** Opens the new-project wizard, which makes a folder a project: the door the old sidebar's plus was. */
@@ -120,6 +134,12 @@ export function usePlaces(): PlacesValue {
  * EVERY GO IS A DOOR THE APP ALREADY HAS: a page is `openHome` or `openStation`; a screen is the workspace's view brought forward at
  * the address it held (an application over the workspace stepped back first, as Kaylee's own opens do); a chat is the station's
  * "Open the chat" door (`openChatInWorkspace`), the one her orders use; Settings is the workspace's dialog.
+ *
+ * WHAT WAITS AT A PLACE IS MARKED ON IT (`Place.mark`), each figure the one its own screen already reads, so a mark and the screen it
+ * leads to never tell two stories: other chats waiting on an answer (the home), Kaylee's draft (the station), the roadmap's asks or its
+ * whole lane finished, the last chat's question or its reply landed unseen, the checks that need a person (Cerberus), the Inbox's count,
+ * and Settings while the server must be restarted or an update is on offer (pressed then, it opens on the tab that says so). Gathered,
+ * the marks of the places away from here mark the menu (`menuMark`).
  *
  * IT ALSO HOLDS THE NEW-PROJECT WIZARD (`newProject`): the old sidebar's plus was its only door, and no screen draws that sidebar
  * now. The wheel offers it under its places and the palette among its acts.
@@ -169,6 +189,59 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
   const lastChatId = lastChat?.id ?? null;
   const lastChatTitle = lastChat?.title ?? null;
 
+  // WHAT WAITS AT THE PLACES, read where each place's own screen reads it. Each comes down to words, or a count, before the places are
+  // built, so a frame that moves nothing a mark says builds nothing new.
+  const cerberusNeeds = useCerberusNeeds();
+  const { total: inboxWaiting } = useInboxWaiting();
+  const { waiting: roadmapWaiting, tone: roadmapTone } = useDispatcherPlans();
+  const { unread: chatUnread } = useChatHost();
+  const awaitingInput = useAwaitingInputSessionIdSet();
+  const { picture } = useCompanion();
+  const claudeUpdate = useClaudeUpdateLine();
+  const appVersion = useVersionCheck('siteboon', 'claudecodeui');
+
+  const chatAsking = lastChatId !== null && awaitingInput.has(lastChatId);
+  // The chat's unread reply is the open conversation's; the last chat is that one when it is the one the workspace has open.
+  const chatReplied = chatUnread && lastChatId !== null && lastChatId === sessionId;
+  // Every other chat with a question waiting: the sessions home is where they are listed.
+  let othersAsking = 0;
+  for (const id of awaitingInput) if (id !== lastChatId) othersAsking += 1;
+  const draft = picture?.draft ?? null;
+  const draftWords = draft === null ? null : t('station.draft.bead', {
+    name: picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' }),
+    target: draft.target.kind === 'session' ? draft.target.session.name : draft.target.projectName,
+    defaultValue: '{{name}}’s draft for {{target}}',
+  });
+  // Settings, the first that stands: the server running another version than this page (restart it), Claude's update on offer (not
+  // while it is being installed), the app's newer release. Each opens the tab that says it.
+  let settingsNotice: { words: string; tab: SettingsMainTab; quiet: boolean } | null = null;
+  if (appVersion.restartRequired) {
+    settingsNotice = { words: t('version.restartRequired', { ns: 'sidebar' }), tab: 'about', quiet: false };
+  } else if (claudeUpdate !== null && !claudeUpdate.working) {
+    settingsNotice = { words: `${claudeUpdate.title} · ${claudeUpdate.detail}`, tab: 'updates', quiet: false };
+  } else if (appVersion.updateAvailable) {
+    const release = appVersion.releaseInfo?.title || `v${appVersion.latestVersion}`;
+    settingsNotice = { words: `${release} · ${t('version.updateAvailable', { ns: 'sidebar' })}`, tab: 'about', quiet: true };
+  }
+  const settingsWords = settingsNotice?.words ?? null;
+  const settingsTab = settingsNotice?.tab ?? null;
+  const settingsQuiet = settingsNotice?.quiet ?? false;
+
+  const marks = useMemo(() => {
+    const at: Partial<Record<PlaceId, PlaceMark>> = {};
+    if (othersAsking > 0) at.home = { kind: 'owed', words: t('rail.badge.inbox', { count: othersAsking }) };
+    if (draftWords !== null) at.station = { kind: 'owed', words: draftWords };
+    // The lane's own reading: an ask owed outranks the green, and the green is every drawn plan complete (`tone`), never a lane at work.
+    if (roadmapWaiting > 0) at.roadmap = { kind: 'owed', words: t('rail.badge.inbox', { count: roadmapWaiting }) };
+    else if (roadmapTone === 'positive') at.roadmap = { kind: 'done', words: t('places.mark.finished', { defaultValue: 'All finished' }) };
+    if (chatAsking) at.chat = { kind: 'owed', words: t('places.mark.asking', { defaultValue: 'Waiting on your answer' }) };
+    else if (chatReplied) at.chat = { kind: 'done', words: t('rail.badge.chat') };
+    if (cerberusNeeds > 0) at.cerberus = { kind: 'owed', words: t('rail.badge.cerberus', { count: cerberusNeeds }) };
+    if (inboxWaiting > 0) at.inbox = { kind: 'owed', words: t('rail.badge.inbox', { count: inboxWaiting }) };
+    if (settingsWords !== null) at.settings = { kind: 'owed', words: settingsWords };
+    return at;
+  }, [othersAsking, draftWords, roadmapWaiting, roadmapTone, chatAsking, chatReplied, cerberusNeeds, inboxWaiting, settingsWords, t]);
+
   const goHome = useCallback(() => openHome(doors.navigate), [doors]);
   const goStation = useCallback(() => {
     // From the home the roadmap goes with the reader: the station's stack arrives from the home's circle.
@@ -191,13 +264,18 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     const screens = new Map(SCREEN_PLACES.flatMap(({ id, tab, ring }) => {
       const view = views.find((each) => each.id === tab && !each.hiddenFromNav);
       if (view === undefined || view.icon === null) return [];
-      const place: Place = { id, label: view.label, icon: view.icon, ring, here: where === id, keywords: view.keywords, go: () => goScreen(tab) };
+      const place: Place = {
+        id, label: view.label, icon: view.icon, ring, here: where === id, keywords: view.keywords, mark: marks[id] ?? null, go: () => goScreen(tab),
+      };
       return [[id, place] as const];
     }));
     const pick = (id: PlaceId) => (screens.has(id) ? [screens.get(id) as Place] : []);
     return [
-      { id: 'home', label: homeName, icon: House, ring: 'inner', here: where === 'home', keywords: t('home.keywords'), go: goHome },
-      { id: 'station', label: stationName, icon: StationGlyph, ring: 'inner', here: where === 'station', keywords: 'kaylee station companion watch floor', go: goStation },
+      { id: 'home', label: homeName, icon: House, ring: 'inner', here: where === 'home', keywords: t('home.keywords'), mark: marks.home ?? null, go: goHome },
+      {
+        id: 'station', label: stationName, icon: StationGlyph, ring: 'inner', here: where === 'station', keywords: 'kaylee station companion watch floor',
+        mark: marks.station ?? null, go: goStation,
+      },
       ...pick('roadmap'),
       ...pick('bugs'),
       ...(lastChatId === null || lastChatTitle === null ? [] : [{
@@ -207,6 +285,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         ring: 'inner' as const,
         here: where === 'chat',
         keywords: 'last chat conversation session',
+        mark: marks.chat ?? null,
         go: () => goChat(lastChatId),
       }]),
       ...pick('cerberus'),
@@ -214,9 +293,21 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       ...pick('api'),
       ...pick('universe'),
       ...pick('schedules'),
-      { id: 'settings', label: t('rail.settings'), icon: Settings, ring: 'outer', here: false, keywords: 'open settings preferences', go: () => openSettings() },
+      {
+        id: 'settings', label: t('rail.settings'), icon: Settings, ring: 'outer', here: false, keywords: 'open settings preferences',
+        mark: marks.settings ?? null, go: () => openSettings(settingsTab ?? undefined),
+      },
     ];
-  }, [stationShowing, homeShowing, activeTab, lastChatId, lastChatTitle, sessionId, views, homeName, stationName, t, goHome, goStation, goScreen, goChat, openSettings]);
+  }, [stationShowing, homeShowing, activeTab, lastChatId, lastChatTitle, sessionId, views, homeName, stationName, marks, settingsTab, t, goHome, goStation, goScreen, goChat, openSettings]);
+
+  const menuMark = useMemo<PlaceMark | null>(() => {
+    const waiting = places.filter((place) => place.mark !== null && !place.here && !(place.id === 'settings' && settingsQuiet));
+    if (waiting.length === 0) return null;
+    return {
+      kind: waiting.some((place) => place.mark?.kind === 'owed') ? 'owed' : 'done',
+      words: waiting.map((place) => `${place.label}: ${place.mark?.words}`).join('. '),
+    };
+  }, [places, settingsQuiet]);
 
   // THE NEW-PROJECT WIZARD, the one door to making a folder a project now that no screen draws the old sidebar whose plus it was.
   // A made project is read into the lists as the sidebar's own did.
@@ -369,7 +460,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     setTrailFrom(null);
   }, [trailFrom]);
 
-  const value = useMemo<PlacesValue>(() => ({ places, openWheel, newProject }), [places, openWheel, newProject]);
+  const value = useMemo<PlacesValue>(() => ({ places, menuMark, openWheel, newProject }), [places, menuMark, openWheel, newProject]);
 
   return (
     <PlacesContext.Provider value={value}>

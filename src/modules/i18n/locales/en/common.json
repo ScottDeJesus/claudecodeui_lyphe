@@ -47,6 +47,10 @@
     "lastChat": "last chat",
     "here": "here",
     "newProject": "New project",
+    "mark": {
+      "asking": "Waiting on your answer",
+      "finished": "All finished"
+    },
     "trail": {
       "source": "Where you've been",
       "label": "Where you have been",

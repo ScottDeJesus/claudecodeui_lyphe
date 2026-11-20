@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { CLOUDCLI_WORDMARK_FONT_FAMILY } from '@/shared/constants';
 import { IS_PLATFORM, cn } from '@/shared/utils';
-import { AppLogo, buttonVariants } from '@/shared/ui';
+import { AppLogo, Banner, buttonVariants } from '@/shared/ui';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import PremiumFeatureCard from '@/modules/settings/PremiumFeatureCard';
 
@@ -28,10 +28,13 @@ function DiscordIcon({ className }: { className?: string }) {
   );
 }
 
-/** Rendered by Settings for the "about" tab, showing version, links and premium upsell cards. */
+/**
+ * Rendered by Settings for the "about" tab, showing version, links and premium upsell cards. While the server runs another version than
+ * this page was built from, it says to restart it: the wheel of places marks Settings for that, and opens it here.
+ */
 export default function AboutTab() {
   const { t } = useTranslation('settings');
-  const { updateAvailable, latestVersion, currentVersion, releaseInfo } = useVersionCheck('siteboon', 'claudecodeui');
+  const { updateAvailable, latestVersion, currentVersion, releaseInfo, restartRequired } = useVersionCheck('siteboon', 'claudecodeui');
   const releasesUrl = releaseInfo?.htmlUrl || `${GITHUB_REPO_URL}/releases`;
 
   return (
@@ -72,6 +75,13 @@ export default function AboutTab() {
           </p>
         </div>
       </div>
+
+      {/* Updated on disk, not yet running: a Banner, so the ▲ carries the state as well as the fill. */}
+      {restartRequired && (
+        <Banner tone="warn">
+          <span className="text-xs font-medium">{t('version.restartRequired', { ns: 'sidebar' })}</span>
+        </Banner>
+      )}
 
       {/* Star on GitHub button */}
       <a
