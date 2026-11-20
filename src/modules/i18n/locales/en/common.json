@@ -529,6 +529,13 @@
       "notRead": "The launch table could not be read again:"
     }
   },
+  "codeMode": {
+    "title": "Code Mode",
+    "switchName": "Code Mode: {{label}}",
+    "waiting": "Waiting: {{why}}. Agents work as before until it can.",
+    "readinessUnread": "Whether this box can run Code Mode could not be read.",
+    "unreadable": "The switches could not be read from the server, so their positions are unknown. This is not the same as off. It is retried whenever this window regains focus."
+  },
   "usage": {
     "pace": {
       "ceiling": "ceiling {{percent}}%",

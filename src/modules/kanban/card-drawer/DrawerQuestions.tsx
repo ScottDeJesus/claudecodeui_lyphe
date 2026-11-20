@@ -94,8 +94,7 @@ function QuestionRow({
   // reader's own words and no other way: its field stands open, and there is no "Something else"
   // to press, because there is nothing for it to be other than.
   const freeOnly = question.otherOn && question.options.length === 0;
-  // Otherwise seeded from the question's own text rather than from `otherOn`: `otherOn` says the
-  // asker ALLOWED a free answer, this says the reader is giving one.
+  // Otherwise seeded from the question's own text: this says the reader is giving a free answer.
   const [usingOther, setUsingOther] = useState(freeOnly || question.other.trim().length > 0);
   const [changing, setChanging] = useState(false);
 
@@ -155,9 +154,9 @@ function QuestionRow({
               </Chip>
             ))}
 
-            {/* Offered only when the asker allowed it. A free-text answer nobody asked for is a
-                decision recorded in a vocabulary the run cannot read. */}
-            {question.otherOn && !freeOnly && (
+            {/* Always offered beside the options: when none of them is what the reader wants, their
+                own words are the answer, and the run is handed them as "In his words". */}
+            {!freeOnly && (
               <Chip
                 size="sm"
                 selected={usingOther}
