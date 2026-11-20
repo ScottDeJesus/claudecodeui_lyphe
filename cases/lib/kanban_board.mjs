@@ -162,6 +162,26 @@ export async function openDrawer(page, id) {
 }
 
 /**
+ * Open one proposed feature as the Proposed features face does since the board's redraw to the design system (2026-11-20): the
+ * proposals are marks on rings round the board's core, one ring for each state, and a mark opens from the keyboard (its ring's
+ * slider, Home, the arrow to its place, Enter). Answers the proposal's Opening, `[data-proposal="<id>"]`, which holds its title,
+ * its findings, its stopgaps, what became of it and, while it is open, the three presses of your call.
+ */
+export async function openProposal(page, id) {
+  const mark = `proposal:${id}`;
+  const ring = page.locator(`${RING_SLIDERS}[data-ring-items~="${mark}"]`).first();
+  await ring.waitFor({ state: "attached", timeout: WAIT_MS });
+  const at = ((await ring.getAttribute("data-ring-items")) ?? "").split(" ").indexOf(mark);
+  await ring.focus();
+  await page.keyboard.press("Home");
+  for (let step = 0; step < at; step += 1) await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+  const opening = page.locator(`[data-proposal="${id}"]`).first();
+  await opening.waitFor({ timeout: WAIT_MS });
+  return opening;
+}
+
+/**
  * Open the board itself, as its core's press does: the core's own button for assistive tech ("Open the board"), pressed from the
  * keyboard (it is drawn under the rings' canvas, so a pointer reaches the core through the canvas). Waits for the board's Opening
  * and answers it: whether it runs itself, its counts, its repositories and its acts.

@@ -23,9 +23,10 @@ import { useLinkedTitles } from '@/modules/kanban/hooks/useLinkedTitles';
 import { ProposedFeatures } from '@/modules/kanban/proposed/ProposedFeatures';
 import { useProposals } from '@/modules/kanban/proposed/useProposals';
 import { bugRings, bugStatusOf, moreId, ringOfMore } from '@/modules/kanban/utils/bugRings';
+import { proposalIdOf, proposalItemId, proposalMoreId, proposalRings } from '@/modules/kanban/utils/proposalRings';
 import { DONE_LANE_ID, kanbanLanes, kanbanRings, laneOfStatus, newCardLane } from '@/modules/kanban/utils/lanePolicy';
 import { stageRunning } from '@/modules/kanban/utils/walkModel';
-import type { AstrolabePoint, AstrolabeRingGauge, AstrolabeRingsHandle, BugDashboardView, ProposalsView } from '@/shared/types';
+import type { AstrolabePoint, AstrolabeRing, AstrolabeRingGauge, AstrolabeRingItem, AstrolabeRingsHandle, BugDashboardView, ProposalsView } from '@/shared/types';
 import { Button, EmptyState, Opening, Spinner } from '@/shared/ui';
 
 /**
@@ -34,8 +35,9 @@ import { Button, EmptyState, Opening, Spinner } from '@/shared/ui';
  * where it is, what it is doing, how far it has got and how much it matters, with no word on screen until you touch it
  * (`BugInstrument`, `utils/bugRings`). A press on a mark opens that card, hung from it (`KanbanCardDrawer`, in the kit's
  * Opening); a press on the core opens the board (`BugBoardOpening`); a press on its measure opens the board's numbers. Its foot
- * holds what is present: the switch between the three faces and the plus that makes a bug (`BugFoot`). The Dashboard and the
- * Proposed features are the work when chosen: they take the middle, and the instrument docks at the foot, still live.
+ * holds what is present: the switch between the three faces and the plus that makes a bug (`BugFoot`). The Proposed features are
+ * the instrument's second set: the same core, and round it the proposals (`ProposedFeatures`, `utils/proposalRings`). The
+ * Dashboard is the work when chosen: it takes the middle, and the instrument docks at the foot, still live.
  *
  * IT COMPOSES, IT DOES NOT BUILD. The rings are the kit's; the hooks below are the board's data; the two decisions the kit may
  * never know — which statuses compose which lane and which lanes compose which ring — live in `utils/lanePolicy`. What is left
@@ -43,7 +45,8 @@ import { Button, EmptyState, Opening, Spinner } from '@/shared/ui';
  *
  * IT IS THE ONE OWNER OF BOARD STATE: the board hook is called HERE once, so this screen has a single `currentBoardId` — and it
  * is GLOBAL, never scoped to the open project. ONE LIVE REGION, owned by the board rather than a ring, because only the board sees
- * both the lane a card left and the one it landed in. ONE OPENING AT A TIME: a card's, the board's, or a ring's further cards.
+ * both the lane a card left and the one it landed in. ONE OPENING AT A TIME: a card's, a proposal's, the board's, or a ring's
+ * further marks.
  *
  * THE FACE AND WHAT THE DASHBOARD AND THE PROPOSALS ARE ASKED are the panel's own, because they are per-SCREEN and not per-board:
  * all survive a board switch. None is remembered across visits.
@@ -105,6 +108,8 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
   const [dashboardView, setDashboardView] = useState<BugDashboardView>({ scope: 'board', days: 30 });
   // Which boards and which proposals the Proposed features face is asked for, kept here for the same reason.
   const [proposalsView, setProposalsView] = useState<ProposalsView>({ scope: 'board', state: 'open' });
+  // The open proposal, by id: the instrument keeps its mark facing and its Opening hangs from it.
+  const [openProposalId, setOpenProposalId] = useState<number | null>(null);
 
   // The proposals' ONE read, here and not in the face: the tab's count and the face's rows are then the same answer.
   const proposals = useProposals(proposalsView.scope === 'all' ? 'all' : currentBoardId, proposalsView.state);
@@ -230,6 +235,21 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
   // The instrument's box: an Opening stands clear of it where the room allows, so the rings stay whole beside it.
   const instrumentBox = useCallback(() => sceneRef.current?.querySelector('[data-bug-instrument]')?.getBoundingClientRect() ?? null, []);
 
+  // THE PROPOSALS AS RINGS, the instrument's second set, worked out again on every render from the panel's one read.
+  const proposalSet = proposalRings(proposals.reading.status === 'ready' ? proposals.reading.proposals : [], openProposalId, proposalsView.scope === 'all', t);
+  const proposalPlacesRef = useRef({ proposalSet, openProposalId });
+  useEffect(() => {
+    proposalPlacesRef.current = { proposalSet, openProposalId };
+  });
+  const proposalAnchor = useCallback((): AstrolabePoint | null => {
+    const { proposalSet: held, openProposalId: id } = proposalPlacesRef.current;
+    if (id === null) return null;
+    const ringId = held.ringOf(id);
+    if (ringId === null) return null;
+    const onMark = held.rings.find((ring) => ring.id === ringId)?.items.some((item) => item.id === proposalItemId(id)) ?? false;
+    return ringsRef.current?.pointOf(ringId, onMark ? proposalItemId(id) : proposalMoreId(ringId)) ?? null;
+  }, []);
+
   // The scene's room, for the instrument's square at home: as large as the room allows, up to the design system's home size.
   const [room, setRoom] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -249,8 +269,13 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
     setFreshId(made ? cardId : null);
     board.openCard(cardId);
   };
+  const openProposal = (id: number | null) => {
+    setOther(null);
+    setOpenProposalId(id);
+  };
   const openOther = (next: OtherOpening) => {
     board.openCard(null);
+    setOpenProposalId(null);
     setOther(next);
   };
 
@@ -262,15 +287,21 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
     if (card) openCard(card.id, true);
   };
 
-  const instrument = (docked: boolean) => (
+  /** The instrument: the board's lanes, or a second set the face hands it (the proposals), round the same core and measure. */
+  const instrument = (docked: boolean, set?: { rings: AstrolabeRing[]; label: string; hold: boolean; onOpen: (item: AstrolabeRingItem) => void }) => (
     <BugInstrument
       ringsRef={ringsRef}
-      rings={rings}
-      building={building}
+      rings={set?.rings ?? rings.rings}
+      label={set?.label}
+      building={set === undefined ? building : null}
       gauge={gauge}
       docked={docked}
-      hold={openId !== null || other !== null}
+      hold={(set?.hold ?? openId !== null) || other !== null}
       onOpen={(item) => {
+        if (set !== undefined) {
+          set.onOpen(item);
+          return;
+        }
         const ringId = ringOfMore(item.id);
         if (ringId !== null) openOther({ kind: 'more', ringId });
         else openCard(item.id);
@@ -330,9 +361,33 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
     }
     if (face === 'proposed') {
       return (
-        <div className="scrollbar-thin h-full overflow-y-auto">
-          <ProposedFeatures view={proposalsView} onView={setProposalsView} reading={proposals.reading} onRetry={proposals.retry} onOpenCard={openDashboardCard} />
-        </div>
+        <ProposedFeatures
+          view={proposalsView}
+          onView={setProposalsView}
+          reading={proposals.reading}
+          onRetry={proposals.retry}
+          onOpenCard={openDashboardCard}
+          openId={openProposalId}
+          onOpen={openProposal}
+          anchor={proposalAnchor}
+          avoid={instrumentBox}
+          home={
+            // At home under the face's two controls, as large as the room under them allows (its box is a size container).
+            <div data-ast-keeps-opening="" data-bug-instrument="" style={{ width: 'min(100cqw, 100cqh, 720px)', height: 'min(100cqw, 100cqh, 720px)' }}>
+              {instrument(false, {
+                rings: proposalSet.rings,
+                label: t('kanban.proposed.listLabel'),
+                hold: openProposalId !== null,
+                onOpen: (item) => {
+                  const ringId = ringOfMore(item.id);
+                  const id = proposalIdOf(item.id);
+                  if (ringId !== null) openOther({ kind: 'more', ringId });
+                  else if (id !== null) openProposal(id);
+                },
+              })}
+            </div>
+          }
+        />
       );
     }
 
@@ -346,8 +401,11 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
     );
   };
 
-  const moreRing = other?.kind === 'more' ? rings.rings.find((ring) => ring.id === other.ringId) ?? null : null;
-  const moreCards = other?.kind === 'more' ? (rings.cardsOf[other.ringId] ?? []).filter((cardId) => !moreRing?.items.some((item) => item.id === cardId)) : [];
+  const moreRing = other?.kind === 'more' ? (face === 'proposed' ? proposalSet.rings : rings.rings).find((ring) => ring.id === other.ringId) ?? null : null;
+  const moreCards = other?.kind === 'more' && face === 'board' ? (rings.cardsOf[other.ringId] ?? []).filter((cardId) => !moreRing?.items.some((item) => item.id === cardId)) : [];
+  const moreProposals = other?.kind === 'more' && face === 'proposed'
+    ? (proposalSet.proposalsOf[other.ringId] ?? []).filter((proposal) => !moreRing?.items.some((item) => item.id === proposalItemId(proposal.id)))
+    : [];
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground" data-kanban-panel data-kanban-face={face} data-project-id={projectId ?? undefined}>
@@ -397,8 +455,8 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
           />
         )}
 
-        {/* The board itself, hung from its core. */}
-        {face === 'board' && currentBoard !== undefined && (
+        {/* The board itself, hung from its core, whichever set turns round it. */}
+        {face !== 'dashboard' && currentBoard !== undefined && (
           <Opening
             open={other?.kind === 'board'}
             anchor={coreAnchor}
@@ -426,8 +484,8 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
           </Opening>
         )}
 
-        {/* A ring's further cards, hung from its "more" mark: each a press that opens it, and the lane's next page while there is one. */}
-        {face === 'board' && moreRing !== null && other?.kind === 'more' && (
+        {/* A ring's further marks, hung from its "more" mark: each a press that opens it, and the lane's next page while there is one. */}
+        {face !== 'dashboard' && moreRing !== null && other?.kind === 'more' && (
           <Opening
             open
             anchor={moreAnchor(other.ringId)}
@@ -435,7 +493,7 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
             onClose={() => setOther(null)}
             backLabel={t('kanban.drawer.close')}
             source={moreRing.label}
-            title={t('kanban.ring.further', { count: moreCards.length, defaultValue: '{{count}} more' })}
+            title={t('kanban.ring.further', { count: face === 'proposed' ? moreProposals.length : moreCards.length, defaultValue: '{{count}} more' })}
             marks={{ 'data-bug-more-opening': other.ringId }}
           >
             <ul className="-mx-2 flex flex-col">
@@ -450,8 +508,19 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
                   </button>
                 </li>
               ))}
+              {moreProposals.map((proposal) => (
+                <li key={proposal.id}>
+                  <button
+                    type="button"
+                    className="w-full truncate rounded-[2px] px-2 py-1.5 text-left text-sm text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--focus)]"
+                    onClick={() => openProposal(proposal.id)}
+                  >
+                    {proposal.title}
+                  </button>
+                </li>
+              ))}
             </ul>
-            {rings.unread[other.ringId] && (
+            {face === 'board' && rings.unread[other.ringId] && (
               <Button
                 variant="outline"
                 size="sm"
@@ -472,6 +541,7 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
         face={face}
         onFace={(next) => {
           setOther(null);
+          setOpenProposalId(null);
           if (next !== 'board') board.openCard(null);
           setFace(next);
         }}
@@ -479,7 +549,7 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
         openProposals={openProposals?.length}
         openHighProposals={openHighProposals}
         onNewBug={currentBoardId === null ? undefined : () => { void newBug(); }}
-        docked={face !== 'board' && currentBoardId !== null ? instrument(true) : null}
+        docked={face === 'dashboard' && currentBoardId !== null ? instrument(true) : null}
       />
 
       <KanbanBoardDialog

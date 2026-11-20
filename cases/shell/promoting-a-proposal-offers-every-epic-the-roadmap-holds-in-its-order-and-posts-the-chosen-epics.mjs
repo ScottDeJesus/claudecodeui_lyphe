@@ -13,7 +13,7 @@
 
 import { withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
-import { openBoard } from "../lib/kanban_board.mjs";
+import { openBoard, openProposal } from "../lib/kanban_board.mjs";
 import { PROPOSALS, PROPOSAL_ACT, QUIET_MS, ROADMAP, WAIT_MS, answer, json, proposal, standInIn, tab, until, watch } from "../lib/bug_hunt_faces.mjs";
 
 const PROPOSAL = proposal(7, "Case proposal: promote me");
@@ -56,9 +56,9 @@ runCase(async (t) => {
   await tab(page, "Proposed features").click({ timeout: WAIT_MS });
   // A dispatcher frame or a change re-reads the face; one more read, should the mount's have gone before this route, is asked by All.
   await page.locator('[data-proposed-features] [role="radio"]').filter({ hasText: /^\s*All\s*$/ }).first().click({ timeout: WAIT_MS });
-  const row = page.locator(`[data-proposal="${PROPOSAL.id}"]`).filter({ hasText: PROPOSAL.title }).first();
-  if (!(await row.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) return broken(`the face drew no row for the route's "${PROPOSAL.title}"`);
-  await row.locator("button[aria-controls]").first().click({ timeout: WAIT_MS });
+  // A proposal is a mark on a ring since the board's redraw to the design system (2026-11-20): it opens from the keyboard.
+  const row = await openProposal(page, PROPOSAL.id).catch(() => null);
+  if (row === null) return broken(`the face drew no mark that opens the route's "${PROPOSAL.title}"`);
   await row.locator('[data-proposal-press="promote"]').click({ timeout: WAIT_MS });
   const dialog = page.locator('[data-proposal-dialog="promote"]').first();
   if (!(await dialog.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) return broken("Promote to the roadmap opened no promote dialog");

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { BugRings } from '@/modules/kanban/utils/bugRings';
 import { useCoreDrawing } from '@/shared/context/CoreDrawingContext';
 import type { AstrolabePoint, AstrolabeRing, AstrolabeRingGauge, AstrolabeRingItem, AstrolabeRingsHandle } from '@/shared/types';
 import { Rings } from '@/shared/ui';
@@ -20,8 +19,10 @@ const CORE_SHARE = 0.69;
 type BugInstrumentProps = {
   /** The rings' handle, for an Opening to hang from a mark and for the core to find the card it builds. */
   ringsRef: RefObject<AstrolabeRingsHandle>;
-  /** The board's rings (`utils/bugRings`). */
-  rings: BugRings;
+  /** The set it turns through: the board's lanes (`utils/bugRings`) or its proposals (`utils/proposalRings`). */
+  rings: AstrolabeRing[];
+  /** What the set is, for assistive tech: "The board", "Proposed features". */
+  label?: string;
   /** The card the dispatcher is building now, by id, if one is: the core writes toward its mark. */
   building: string | null;
   /** The measure the core wears: how much of the board is fixed. Absent while the board holds nothing. */
@@ -40,7 +41,8 @@ type BugInstrumentProps = {
 
 /**
  * THE BUG BOARD'S INSTRUMENT: the board's lanes as rings round the board's core (the kit's `Rings`), every card a mark that says
- * where it is, what it is doing, how far it has got and how much it matters (`utils/bugRings`). Its core is the board running
+ * where it is, what it is doing, how far it has got and how much it matters (`utils/bugRings`). Its second set is the board's
+ * proposed features, a ring for each thing a proposal can be (`utils/proposalRings`): the face chosen at the foot is the set. Its core is the board running
  * itself: at rest a tide, and while the dispatcher builds a card it takes the writing form, its tendril at that card's mark, so
  * what the board is doing is the core's shape and never a word beside it. Round the core, one measure: how much of the board is
  * fixed, quiet, and a press on it opens the board's numbers.
@@ -50,12 +52,12 @@ type BugInstrumentProps = {
  *
  * Drawn by the panel (`KanbanPanel`), at home in the scene's middle and docked at its foot.
  */
-export function BugInstrument({ ringsRef, rings, building, gauge, docked = false, hold, onOpen, onCore, onGauge }: BugInstrumentProps) {
+export function BugInstrument({ ringsRef, rings, label, building, gauge, docked = false, hold, onOpen, onCore, onGauge }: BugInstrumentProps) {
   const { t } = useTranslation();
   const draw = useCoreDrawing();
   // Where the card being built lies from the core, in degrees, re-read while it is built: the tendril follows the drifting mark.
   const [bearing, setBearing] = useState(90);
-  const innermost = rings.rings[0]?.id ?? null;
+  const innermost = rings[0]?.id ?? null;
 
   useEffect(() => {
     if (building === null || innermost === null) return undefined;
@@ -71,8 +73,8 @@ export function BugInstrument({ ringsRef, rings, building, gauge, docked = false
   return (
     <Rings
       ref={ringsRef}
-      rings={rings.rings}
-      label={t('kanban.ring.instrument', { defaultValue: 'The board' })}
+      rings={rings}
+      label={label ?? t('kanban.ring.instrument', { defaultValue: 'The board' })}
       hold={hold}
       decorative={docked}
       gauge={docked || gauge === null ? undefined : [gauge]}

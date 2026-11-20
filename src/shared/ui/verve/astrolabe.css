@@ -68,7 +68,7 @@
 .ast-opening-title { margin: 0; min-width: 0; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 400; }
 .ast-opening-body { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .ast-opening-body > p { margin: 0; }
-@media (pointer: coarse) { .ast-opening-close { min-width: 44px; min-height: 44px; } }
+@media (pointer: coarse), (max-width: 767.98px) { .ast-opening-close { min-width: 44px; min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .ast-opening[data-ready="true"] .ast-opening-plate { animation: ast-fade-in var(--duration-fade) ease both; } }
 
 /* ---------------- KeyValueList ---------------- */
@@ -138,6 +138,7 @@ button.ast-step-mark:hover .ast-step-ring { border-color: var(--ink); }
 .ast-choice-opt:hover { border-color: var(--border-strong); }
 .ast-choice-opt:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
 .ast-choice-opt[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-ink); }
+.ast-choice-opt:disabled { opacity: 0.5; cursor: default; }
 .ast-choice-opt-mark { flex: none; width: 9px; height: 9px; box-sizing: border-box; border: 1px solid currentColor; border-radius: 50%; opacity: 0.7; }
 .ast-choice[data-multi="true"] .ast-choice-opt-mark { border-radius: 1px; }
 .ast-choice-opt[aria-pressed="true"] .ast-choice-opt-mark { background: currentColor; opacity: 1; animation: ast-pop var(--duration-lobe) var(--ease-lobe) both; }
@@ -160,7 +161,7 @@ button.ast-file-name:hover { text-decoration: underline; text-underline-offset: 
 .ast-file-x:hover { color: var(--ink); }
 .ast-file-name:focus-visible, .ast-file-x:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
 .ast-file-said { flex-basis: 100%; margin: 0; color: var(--danger-ink); font-size: 12px; line-height: 17px; overflow-wrap: anywhere; }
-@media (pointer: coarse), (max-width: 767.98px) { .ast-file-chip { min-height: 44px; } .ast-file-x { width: 36px; height: 36px; } }
+@media (pointer: coarse), (max-width: 767.98px) { .ast-file-chip { min-height: 44px; } .ast-file-x { width: 44px; height: 44px; } }
 
 @media (prefers-reduced-motion: reduce) {
   .ast-hrule-line, .ast-step-glyph, .ast-trace-item, .ast-trace-bead, .ast-choice-opt-mark { animation: ast-fade-in var(--duration-fade) ease both !important; }

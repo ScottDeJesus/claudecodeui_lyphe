@@ -1,8 +1,10 @@
 // The Bugs view gains a third face, Proposed features, after Board and Dashboard (bug-hunters, seam 11, scaffolded in
-// phase 14). Pressed, it draws the proposals and neither the lanes nor the dashboard. Each row says its priority as a
-// word (High, Medium, Low) and its kind in words (Too big for a ticket, The design is wrong), never a colour alone; a
-// collapsed row opens in place on its press; under a finger every press is 44 px and the face stacks inside 390 px
-// (INV-10275). Switching faces and opening a row write nothing.
+// phase 14). Pressed, it draws the proposals and neither the lanes nor the dashboard. Since the board's redraw to the design
+// system (2026-11-20) the proposals are the instrument's second set: marks on rings round the board's core, each opening from
+// its mark (lib/kanban_board.mjs's openProposal) into its Opening, which says its priority as a word (High, Medium, Low) and
+// its kind in words (Too big for a ticket, The design is wrong), never a colour alone. Under a finger every press is 44 px and
+// the face stacks inside 390 px (INV-10275); a press only a screen reader reaches (1 px, the core's) is not a finger's.
+// Switching faces and opening a proposal write nothing.
 //
 // The data is not this case's to judge: the rows come from the proposals route, which this case answers with two open
 // proposals of the route's shape. The panel reads that route once at its mount, inside openBoard and before this
@@ -10,12 +12,12 @@
 // case then presses the face's own Try again, a read, to draw its rows. The board is lib/kanban_board.mjs's made-up
 // board, every board request answered by the page; nothing reaches the server.
 //
-// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/proposed/ProposalRow.tsx, src/modules/kanban/proposed/useProposals.ts, src/modules/i18n/locales/en/common.json
+// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/proposed/ProposalOpening.tsx, src/modules/kanban/utils/proposalRings.ts, src/modules/kanban/proposed/useProposals.ts, src/modules/i18n/locales/en/common.json
 // writes: none
 
 import { withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
-import { BOARD, CARDS, faceOf, openBoard } from "../lib/kanban_board.mjs";
+import { BOARD, CARDS, faceOf, openBoard, openProposal } from "../lib/kanban_board.mjs";
 
 const DESK = { width: 1440, height: 900 };
 const PHONE = { width: 390, height: 844 };
@@ -38,13 +40,13 @@ const ANSWER = { proposals: [proposal(1, "Split the store's writer", "too-big", 
 const tab = (page, name) => page.locator(`[data-kanban-panel] [role="tab"][aria-label="${name}"]`).first();
 const settle = (page) => page.waitForTimeout(500);
 
-/** The face below the tabs, read in the page: its text, its presses' heights, what runs off the screen, its collapsed rows. */
+/** The face below the tabs, read in the page: its text, its presses' heights, what runs off the screen. */
 const readFace = (page) => page.evaluate(() => {
   const panel = document.querySelector("[data-kanban-panel]");
   const header = panel.querySelector("header");
   const strip = panel.querySelector('[role="tablist"]');
   const outside = (el) => (header && header.contains(el)) || (strip && strip.contains(el));
-  const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden"; };
+  const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && getComputedStyle(el).visibility !== "hidden"; };
   const scrolls = (el) => { for (let a = el.parentElement; a && a !== panel; a = a.parentElement) { const o = getComputedStyle(a).overflowX; if (o === "auto" || o === "scroll") return true; } return false; };
   const all = [...panel.querySelectorAll("*")].filter((el) => !outside(el) && shown(el));
   const presses = all.filter((el) => el.matches('button, [role="button"], [role="radio"], [role="combobox"], a[href]'));
@@ -53,8 +55,7 @@ const readFace = (page) => page.evaluate(() => {
   const off = all.filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1 && !scrolls(el))
     .map((el) => `${el.tagName.toLowerCase()} "${(el.textContent || "").trim().slice(0, 30)}" ends at ${Math.round(el.getBoundingClientRect().right)}`);
   const text = all.map((el) => [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(" ")).join(" ").replace(/\s+/g, " ");
-  const folded = presses.filter((el) => el.getAttribute("aria-expanded") === "false" && !el.hasAttribute("aria-haspopup") && el.getAttribute("role") !== "combobox").length;
-  return { text, short, off: off.slice(0, 5), folded, dashboard: !!panel.querySelector("[data-bug-dashboard]") };
+  return { text, short, off: off.slice(0, 5), dashboard: !!panel.querySelector("[data-bug-dashboard]") };
 });
 
 runCase(async (t) => {
@@ -84,29 +85,26 @@ runCase(async (t) => {
   if (await faceOf(page, CARDS.bug.id).isVisible().catch(() => false)) return broken("on the Proposed features face the lanes are still drawn");
 
   await page.setViewportSize(PHONE);
-  await page.waitForFunction(() => /High|Medium|Low/.test(document.querySelector("[data-kanban-panel]")?.innerText ?? ""), null, { timeout: WAIT_MS }).catch(() => {});
+  await page.locator('[data-kanban-panel] [data-bug-instrument] [role="slider"][data-ring-items~="proposal:1"]').first()
+    .waitFor({ state: "attached", timeout: WAIT_MS }).catch(() => {});
   await settle(page);
   const face = await readFace(page);
   if (face.dashboard) return broken("on the Proposed features face the dashboard is drawn");
-  if (!/\b(High|Medium|Low)\b/.test(face.text)) return broken("no row on the Proposed features face says a priority as the word High, Medium or Low");
-  if (!/Too big for a ticket|The design is wrong/.test(face.text)) return broken("no row says its kind as Too big for a ticket or The design is wrong");
   if (face.short.length > 0) return broken(`at 390 wide these presses on the face are under a finger's 44 px: ${face.short.slice(0, 6).join("; ")}`);
   if (face.off.length > 0) return broken(`at 390 wide the face runs off the screen: ${face.off.join("; ")}`);
-  if (face.folded === 0) return broken("no row on the face is a collapsed press that opens in place (no aria-expanded=false press)");
 
-  const row = page.locator('[data-kanban-panel] [aria-expanded="false"]:not([aria-haspopup]):not([role="combobox"])')
-    .filter({ hasNot: page.locator('[role="tab"]') });
-  // The element itself is held, not the locator: the locator picks by `aria-expanded="false"`, so once the row opens
-  // it would read the next collapsed row and report the pressed one as still shut.
-  const first = await row.first().elementHandle();
-  await first.click();
+  // A proposal opens from its mark, into its Opening.
+  const opening = await openProposal(page, ANSWER.proposals[0].id).catch(() => null);
+  if (opening === null) return broken("no mark on the face opens the route's first proposal");
   await settle(page);
-  if ((await first.getAttribute("aria-expanded").catch(() => null)) !== "true") return broken("pressing a collapsed row does not open it in place (aria-expanded stays false)");
+  if (!((await opening.textContent()) ?? "").includes(ANSWER.proposals[0].title)) return broken(`the proposal's Opening does not name "${ANSWER.proposals[0].title}"`);
   const opened = await readFace(page);
+  if (!/\b(High|Medium|Low)\b/.test(opened.text)) return broken("the opened proposal does not say its priority as the word High, Medium or Low");
+  if (!/Too big for a ticket|The design is wrong/.test(opened.text)) return broken("the opened proposal does not say its kind as Too big for a ticket or The design is wrong");
   if (opened.short.length > 0) return broken(`opened at 390 wide, these presses are under 44 px: ${opened.short.slice(0, 6).join("; ")}`);
-  if (opened.off.length > 0) return broken(`opened at 390 wide, the row runs off the screen: ${opened.off.join("; ")}`);
+  if (opened.off.length > 0) return broken(`opened at 390 wide, the proposal runs off the screen: ${opened.off.join("; ")}`);
 
   const writes = requests.filter((r) => r.method !== "GET");
   if (writes.length > 0) return broken(`switching to the face and opening a row wrote ${writes.map((w) => `${w.method} ${w.path}`).join(", ")}`);
-  return held("Board, Dashboard, Proposed features; the face draws no lanes and no dashboard; priority and kind are words; a row opens in place; every press 44 px and nothing off the screen at 390; nothing written");
+  return held("Board, Dashboard, Proposed features; the face draws no lanes and no dashboard; a proposal opens from its mark and says its priority and kind in words; every press 44 px and nothing off the screen at 390; nothing written");
 });
