@@ -124,27 +124,38 @@ const reportedClaudeContextWindows = new Map<string, number>();
 /** One number per session; the cap only bounds a long-lived server's memory. */
 const MAX_REPORTED_CLAUDE_CONTEXT_WINDOWS = 1000;
 
-/**
- * A Claude model's two context windows: the standard one, and the long one, which the transcript's model id alone cannot say. A
- * conversation holding more than the standard window can only be on the long one.
- */
-const STANDARD_CONTEXT_WINDOW = 200_000;
-const ONE_MILLION_CONTEXT_WINDOW = 1_000_000;
-
-/**
- * The models a chat records that run with the 1M window before any turn has reported it: an alias or id with the 1M suffix
- * (`opus[1m]`, `sonnet[1m]`, `claude-opus-5-5[1m]`), and the Fable family, which is 1M without one (`fable`, `claude-fable-5-2`).
- */
-const ONE_MILLION_MODEL = /\[1m\]$|(^|[^a-z])fable([^a-z]|$)/i;
-
 /** The window a budget falls back to when nothing says the session's window and CONTEXT_WINDOW is unset. */
 const DEFAULT_CONTEXT_WINDOW = 160_000;
 
 /**
- * The window a Claude session is measured against when the SDK has reported none for it and its model names none: CONTEXT_WINDOW
- * (`configured`, else 160,000) while the conversation fits in it. A conversation already holding more (`used`) cannot be on that
- * window: it is measured against the smallest real window that holds it, the standard one, then the 1M one. Without this, a chat
- * with no report (after a restart, or not sent on since) read as more than full.
+ * The windows a conversation too large for the fallback is measured against before any chat has reported one: the two a Claude model
+ * runs with. Once one has, the windows the person's own chats reported are used instead.
+ */
+const FIRST_KNOWN_WINDOWS: readonly number[] = [200_000, 1_000_000];
+
+/**
+ * The window a Claude model is measured against, learned from the person's own chats: the one the SDK most recently reported for a
+ * chat recorded on that very model value (`sonnet[1m]`, `fable`). Undefined while no chat on it has reported one. Nothing about a
+ * model's window is written down here: what a turn reports is the truth, and it changes when the model does.
+ *
+ * Used by this file's `getReportedClaudeContextWindow` (a chat with no report of its own) and the Claude runtime (a new chat's first budget).
+ */
+export function claudeModelContextWindow(model: string | null | undefined): number | undefined {
+  const wanted = model?.trim();
+  if (!wanted) return undefined;
+  try {
+    return sessionsDb.latestContextWindowForModel(wanted) ?? undefined;
+  } catch (error) {
+    console.warn(`[token-usage] the context window of model ${wanted} could not be read`, error);
+    return undefined;
+  }
+}
+
+/**
+ * The window a Claude session is measured against when nothing says its window (no report of its own, and none from a chat on its
+ * model): CONTEXT_WINDOW (`configured`, else 160,000) while the conversation fits in it. A conversation already holding more (`used`)
+ * cannot be on that window: it is measured against the smallest window any chat has reported that holds it (200,000 or 1,000,000
+ * before any has). Without this, such a chat read as more than full.
  *
  * Used by this file's `summarizeClaudeTokenUsage` (a history read) and the Claude provider's `resolveContextWindow` (a live budget).
  */
@@ -152,7 +163,14 @@ export function fallbackClaudeContextWindow(used: number, configured: string | u
   const parsed = Number.parseInt(configured ?? '', 10);
   const fallback = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_CONTEXT_WINDOW;
   if (used <= fallback) return fallback;
-  return used <= STANDARD_CONTEXT_WINDOW ? STANDARD_CONTEXT_WINDOW : Math.max(fallback, ONE_MILLION_CONTEXT_WINDOW);
+  let reported: number[] = [];
+  try {
+    reported = sessionsDb.reportedContextWindows();
+  } catch {
+    // A failed read leaves the first known windows.
+  }
+  const candidates = [...new Set(reported.length > 0 ? reported : FIRST_KNOWN_WINDOWS)].sort((a, b) => a - b);
+  return candidates.find((window) => window >= used) ?? Math.max(used, ...candidates);
 }
 
 /** Holds one report in the fast copy, the most recent last so it is the last evicted. */
@@ -194,8 +212,8 @@ export function rememberClaudeContextWindow(providerSessionId: string, contextWi
 /**
  * The window a Claude session is measured against: the one the SDK last reported
  * for it (this process's copy, else the one kept on its row), and before any
- * report, the 1M window its recorded model runs with (`opus[1m]`, `fable`). Undefined when
- * neither says: the caller then falls back to CONTEXT_WINDOW.
+ * report, the window the newest report from a chat on its recorded model gives
+ * (`claudeModelContextWindow`). Undefined when neither says: the caller then falls back.
  *
  * Used by the Claude runtime provider (a resumed run starts from it), the Claude
  * history reader, and this service's usage lookup.
@@ -219,7 +237,7 @@ export function getReportedClaudeContextWindow(providerSessionId: string | null 
     return kept.contextWindow;
   }
   // Not held as a report: the model can change before the next turn reports, and the report is the truth.
-  return kept?.model && ONE_MILLION_MODEL.test(kept.model.trim()) ? ONE_MILLION_CONTEXT_WINDOW : undefined;
+  return claudeModelContextWindow(kept?.model);
 }
 
 function readUsageNumber(value: unknown): number {

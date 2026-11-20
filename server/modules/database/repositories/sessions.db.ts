@@ -475,15 +475,19 @@ export const sessionsDb = {
    *
    * Called both when the user picks a model for the session and on every send,
    * so the row always reflects what the session last ran with and reopening it
-   * restores that model instead of a catalog default.
+   * restores that model instead of a catalog default. A different model than the
+   * one recorded lets go of the window reported for the old one (`context_window`):
+   * that window was the old model's, and the next turn reports the new one's.
    */
   setSessionModel(sessionId: string, model: string): void {
     const db = getConnection();
+    // SET reads the row as it was, so `model IS ?` compares the recorded model with the new one.
     db.prepare(
       `UPDATE sessions
-       SET model = ?
+       SET context_window = CASE WHEN model IS ? THEN context_window ELSE NULL END,
+           model = ?
        WHERE session_id = ?`
-    ).run(model, sessionId);
+    ).run(model, model, sessionId);
   },
 
   /**
@@ -517,6 +521,38 @@ export const sessionsDb = {
       )
       .get(providerSessionId) as { context_window: number | null; model: string | null } | undefined;
     return row === undefined ? null : { contextWindow: row.context_window, model: row.model };
+  },
+
+  /**
+   * The window the Claude SDK most recently reported for any session recorded on `model` (the value a chat stores: `sonnet[1m]`,
+   * `fable`), or null when no session on it has reported one. Read by the providers module's token usage service
+   * (`claudeModelContextWindow`) for a chat whose own turns have reported none yet: the model's window is learned from the person's
+   * own chats, never written down.
+   */
+  latestContextWindowForModel(model: string): number | null {
+    const db = getConnection();
+    const row = db
+      .prepare(
+        `SELECT context_window
+         FROM sessions
+         WHERE model = ? AND context_window > 0
+         ORDER BY updated_at DESC
+         LIMIT 1`
+      )
+      .get(model) as { context_window: number } | undefined;
+    return row?.context_window ?? null;
+  },
+
+  /**
+   * Every distinct window the Claude SDK has reported for any session, smallest first. Read by the providers module's token usage
+   * service (`fallbackClaudeContextWindow`) to measure a conversation that outgrows the fallback against a window that is real.
+   */
+  reportedContextWindows(): number[] {
+    const db = getConnection();
+    const rows = db
+      .prepare('SELECT DISTINCT context_window FROM sessions WHERE context_window > 0 ORDER BY context_window')
+      .all() as Array<{ context_window: number }>;
+    return rows.map((row) => row.context_window);
   },
 
   /**

@@ -42,6 +42,7 @@ import {
 } from '@/modules/notifications/index.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
 import {
+  claudeModelContextWindow,
   getReportedClaudeContextWindow,
   rememberClaudeContextWindow
 } from '@/modules/providers/services/provider-token-usage.service.js';
@@ -1086,7 +1087,8 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
   // The window the SDK reported for this session's model (a resumed session starts from the one
   // its last run reported), and the budget last published: re-sent with the right total when the
   // turn's `result` is the first to state the window.
-  let reportedContextWindow = getReportedClaudeContextWindow(providerSessionId) ?? null;
+  // A new chat has no session to have reported one: the window the newest report from a chat on its model gives stands in.
+  let reportedContextWindow = getReportedClaudeContextWindow(providerSessionId) ?? claudeModelContextWindow(options.model || CLAUDE_DEFAULT_MODEL) ?? null;
   let lastSentTokenBudget = null;
   // The reconciliation window. On resume the CLI first closes out any
   // background task its previous process took down with it — what retiring a
