@@ -13,7 +13,7 @@ import { formatRelativeTime } from '@/shared/utils';
  * the reader; a decision is a choice that was not worth their time. Read together they are every
  * fork this card met, and the one place to look when a card came out other than expected.
  *
- * A RECORD, SO IT IS QUIET. No tone, no press: the choice in ink, the question it answered above
+ * A RECORD, SO IT IS QUIET. No tone, and no press on a row: the choice in ink, the question it answered above
  * it in the calm ink, and when. It is drawn only when there is one — a card on which nothing was
  * decided has no empty place saying so.
  *
