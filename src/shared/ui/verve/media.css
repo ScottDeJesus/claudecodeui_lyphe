@@ -26,8 +26,8 @@
  * and 3.55:1 over a pure-white one (a white wall or ceiling, the commonest ground in a restoration photo set),
  * under the 4.5:1 AA line for small text. A darker scrim is the operator's call, not this sheet's.
  *
- * Imported once, for side effect, from src/shared/ui/index.ts — after panels.css and before board.css,
- * which keeps the last word. The place is free: nothing here shares a selector with a sibling sheet, and
+ * Imported once, for side effect, from src/shared/ui/index.ts — after panels.css. The place is free:
+ * nothing here shares a selector with a sibling sheet, and
  * every rule reads tokens that tokens.css declares, so no rule here depends on landing before or after one.
  */
 

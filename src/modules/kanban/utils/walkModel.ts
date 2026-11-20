@@ -1,6 +1,16 @@
 import type { TFunction } from 'i18next';
 
-import type { CardPriority, KanbanCardLink } from '@/shared/ui';
+import type { KanbanPriority } from '@/shared/kanban-types';
+
+/** One tie a card's tags name to another card, as the open bug's Links section lists it (`linksOf`). */
+type KanbanCardLink = {
+  /** The linked card's id: what the press opens. Never painted. `null` for a card that cannot be opened any more: its row is then words alone. */
+  id: string | null;
+  /** How this card is tied to that one, in the board's words: "Duplicate of", "Split from". */
+  word: string;
+  /** The linked card's title: what the reader is told. */
+  title: string;
+};
 
 /**
  * A CARD'S WALK AS THE BOARD READS IT, and the two things a walk writes into a card's TAGS: which
@@ -55,7 +65,7 @@ export type KanbanWalk = {
   cure: boolean;
   /** How a waiting card rides once ageing has moved it up: the whole days it has waited and the
    *  priority it is taken at. `null` for a card that rides at its own priority, or is not waiting. */
-  aged: { waitedDays: number; ridesAs: CardPriority } | null;
+  aged: { waitedDays: number; ridesAs: KanbanPriority } | null;
 };
 
 /** A soul's name as a name: the feed spells it lower case. */

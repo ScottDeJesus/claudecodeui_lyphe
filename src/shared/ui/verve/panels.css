@@ -3,8 +3,8 @@
  * Update wardens dialog ticks nodes with, and the DialogFrame all four of its dialogs sit in.
  *
  * The fifth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
- * feedback.css is at it, surfaces.css belongs to the three kit pieces that are mechanism, and
- * board.css to the board. README rule 6: the next file opens the same way again.
+ * feedback.css is at it, and surfaces.css belongs to the three kit pieces that are mechanism. README rule 6:
+ * the next file opens the same way again.
  *
  * Same contract as its siblings. A library class string carries `vv-<name>` plus layout utilities
  * and nothing else; colour comes from tokens.css and nowhere else; no rule declares a `--tone-*`
@@ -21,8 +21,8 @@
  *    Cerberus tab draws the same way cannot drift, and the name has a consumer that makes Tailwind
  *    emit it. The rule here is its geometry.
  *
- * Imported once, for side effect, from src/shared/ui/index.ts — after surfaces.css and before
- * board.css, which keeps the last word. Nothing here depends on its place against controls.css or
+ * Imported once, for side effect, from src/shared/ui/index.ts — after surfaces.css. Nothing here
+ * depends on its place against controls.css or
  * against src/index.css, which lands after this sheet: whatever has to beat `.vv-input`, a utility
  * in the class string or one of index.css's pins does so on specificity. The Sheet, Timeline, Steps,
  * Checkbox and DialogFrame rules share no selector with any sibling, so for them the order decides nothing.

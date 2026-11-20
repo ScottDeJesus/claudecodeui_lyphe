@@ -1,5 +1,4 @@
-import type { KanbanCardSummary } from '@/shared/kanban-types';
-import type { CardPriority } from '@/shared/ui';
+import type { KanbanCardSummary, KanbanPriority } from '@/shared/kanban-types';
 
 /**
  * THE ORDER A LANE'S LOADED CARDS ARE READ IN. The board's rings draw every lane in the server's own order (`server`, the keyset
@@ -9,7 +8,7 @@ import type { CardPriority } from '@/shared/ui';
 export type KanbanViewSort = 'server' | 'priority' | 'newest';
 
 /** Higher wins: the ladder a card's priority reads as, as a number, for the priority sort. */
-const PRIORITY_RANK: Record<CardPriority, number> = { high: 0, medium: 1, low: 2 };
+const PRIORITY_RANK: Record<KanbanPriority, number> = { high: 0, medium: 1, low: 2 };
 
 /**
  * The lane's loaded cards in the order a requested view reads them — a VIEW over the pages

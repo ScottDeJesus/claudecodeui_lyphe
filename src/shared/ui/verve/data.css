@@ -16,8 +16,8 @@
  * and open row 4.44:1. The dark theme clears all three (4.74, 6.51, 5.32). A darker ink for them is the operator's
  * call, as the gallery tag's 3.55:1 is (media.css).
  *
- * Imported once, for side effect, from src/shared/ui/index.ts — after media.css and before board.css, which keeps
- * the last word. The place is free: nothing here shares a selector with a sibling sheet.
+ * Imported once, for side effect, from src/shared/ui/index.ts — after media.css. The place is free: nothing here shares a
+ * selector with a sibling sheet.
  */
 
 /* ---------------------------------------------------------------- SegmentedControl */

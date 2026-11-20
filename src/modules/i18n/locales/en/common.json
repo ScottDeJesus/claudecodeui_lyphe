@@ -39,8 +39,7 @@
   "home": {
     "title": "Home",
     "keywords": "home sessions chats folders pinned",
-    "station": "Open {{name}}'s station",
-    "places": "Other screens"
+    "station": "Open {{name}}'s station"
   },
   "places": {
     "menu": "Menu",
@@ -2077,8 +2076,6 @@
     "chooseProject": "Choose Your Project",
     "selectProjectDescription": "Open a chat from Home, or start a new one there, to work in its project. Each project holds its chats and file history.",
     "tip": "Tip",
-    "createProjectMobile": "Tap the menu button above to access projects",
-    "createProjectDesktop": "Create a new project by clicking the folder icon in the sidebar",
     "newProjectTip": "To make a folder a project, open the menu and press New project",
     "newSession": "New Session",
     "untitledSession": "Untitled Session",
