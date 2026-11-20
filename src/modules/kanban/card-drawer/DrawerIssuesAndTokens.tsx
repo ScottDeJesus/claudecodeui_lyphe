@@ -1,10 +1,11 @@
+import { Check, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
 import type { KanbanCardDetail } from '@/shared/kanban-types';
-import { Badge, Button, Field, Input } from '@/shared/ui';
-import { cn, formatRelativeTime } from '@/shared/utils';
+import { Button, KeyValueList, Rule } from '@/shared/ui';
+import { formatRelativeTime } from '@/shared/utils';
 
 /**
  * THE RUN'S LEDGER: what went wrong, what it cost, and what it had to say at the end.
@@ -21,8 +22,12 @@ import { cn, formatRelativeTime } from '@/shared/utils';
  * NOTHING HERE LETS A RUN PROCEED OR HOLDS IT BACK. A card on a self-running board is walked the
  * moment it is in To Do; what stops a walk is a question, and that is answered in its own section.
  *
- * SPEND IS NEVER A JUDGEMENT. Four counters and their sum, no bar, no colour, no threshold: this
- * board has no budget to be over, and painting a number amber invents one.
+ * SPEND IS NEVER A JUDGEMENT. Four counters on the design system's label column and their sum at
+ * the end of its Rule, no bar, no colour, no threshold: this board has no budget to be over, and
+ * painting a number amber invents one. A card that has spent nothing has no spend section.
+ *
+ * EACH BLOCK UNDER ITS RULE, NOTHING BOXED. An open issue is a red ✕, a resolved one a green ✓
+ * (finished is green) with who closed it; the closing remarks are text written in place.
  *
  * EVERY WRITE BELOW IS A VERB ON `useKanbanMutations`, handed down by the shell: that hook is where
  * a write becomes a toast and where a refusal carries the server's own sentence, so this file
@@ -81,39 +86,20 @@ export function DrawerIssuesAndTokens({ detail, writes }: DrawerIssuesAndTokensP
 
   return (
     <section className="flex flex-col gap-5">
-      <section className="flex flex-col gap-3" aria-labelledby={issuesHeadingId}>
-        <div className="flex items-center gap-2">
-          <h3 id={issuesHeadingId} className="text-sm font-semibold text-foreground">
-            {t('kanban.issues.title')}
-          </h3>
-          {open > 0 && (
-            <Badge tone="danger" className="vv-badge--compact">
-              {t('kanban.issues.open', { count: open })}
-            </Badge>
-          )}
-        </div>
+      <section className="flex flex-col gap-2" aria-labelledby={issuesHeadingId} data-drawer-issues="">
+        <Rule id={issuesHeadingId} end={open > 0 ? t('kanban.issues.open', { count: open }) : undefined} endTone="danger">
+          {t('kanban.issues.title')}
+        </Rule>
 
-        {detail.issues.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('kanban.issues.none')}</p>
-        ) : (
+        {detail.issues.length > 0 && (
           <ul className="flex flex-col gap-2">
             {detail.issues.map((row) => (
               <li key={row.id} className="flex items-start gap-2">
-                <span
-                  aria-hidden="true"
-                  className={cn('mt-0.5 shrink-0 text-xs', row.resolved ? 'text-ink-faint' : 'text-destructive')}
-                >
+                <span className="bug-glyph" data-tone={row.resolved ? 'positive' : 'danger'} aria-hidden="true">
                   {row.resolved ? '✓' : '✕'}
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span
-                    className={cn(
-                      'text-sm leading-snug',
-                      row.resolved ? 'text-muted-foreground' : 'text-foreground'
-                    )}
-                  >
-                    {row.text}
-                  </span>
+                  <span className={row.resolved ? 'text-[13px] leading-[18px] text-muted-foreground' : 'text-[13px] leading-[18px] text-foreground'}>{row.text}</span>
                   {row.resolved && (
                     // Who closed it and when, because a resolved issue is a claim someone made.
                     <span className="text-xs text-ink-faint">
@@ -125,13 +111,9 @@ export function DrawerIssuesAndTokens({ detail, writes }: DrawerIssuesAndTokensP
                   )}
                 </div>
                 {!row.resolved && (
-                  <Button
-                    variant="tonal"
-                    size="sm"
-                    className="h-7 shrink-0 px-2"
-                    onClick={() => resolveIssue(row.id)}
-                  >
-                    {t('kanban.issues.resolve')}
+                  <Button variant="outline" size="sm" className="h-7 shrink-0 gap-1 px-2 finger:size-11 finger:px-0" aria-label={t('kanban.issues.resolve')} title={t('kanban.issues.resolve')} onClick={() => resolveIssue(row.id)}>
+                    <Check aria-hidden="true" />
+                    <span className="finger:sr-only">{t('kanban.issues.resolve')}</span>
                   </Button>
                 )}
               </li>
@@ -139,58 +121,55 @@ export function DrawerIssuesAndTokens({ detail, writes }: DrawerIssuesAndTokensP
           </ul>
         )}
 
-        <div className="flex gap-2">
-          <Input
+        <div className="bug-add">
+          <input
             id={issueId}
             value={issue}
             onChange={(event) => setIssue(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') fileIssue();
+              if (event.key === 'Enter') void fileIssue();
             }}
             placeholder={t('kanban.issues.filePlaceholder')}
             aria-label={t('kanban.issues.file')}
-            className="h-8"
+            className="bug-field"
           />
-          <Button variant="tonal" size="sm" className="h-8 shrink-0" onClick={fileIssue}>
-            {t('kanban.issues.file')}
-          </Button>
+          {issue.trim().length > 0 && (
+            <Button variant="outline" size="icon" className="size-7 shrink-0 finger:size-11" aria-label={t('kanban.issues.file')} title={t('kanban.issues.file')} onClick={() => void fileIssue()}>
+              <Plus aria-hidden="true" />
+            </Button>
+          )}
         </div>
       </section>
 
+      {detail.buildTokens > 0 && (
+        <section className="flex flex-col gap-2" aria-labelledby={spendHeadingId} data-drawer-spend="">
+          <Rule id={spendHeadingId} end={t('kanban.tokens.total', { total: detail.buildTokens.toLocaleString() })}>
+            {t('kanban.tokens.title')}
+          </Rule>
+          <KeyValueList items={spend.map((counter) => [t(counter.labelKey), counter.value.toLocaleString()] as const)} />
+        </section>
+      )}
 
-      <section className="flex flex-col gap-2" aria-labelledby={spendHeadingId}>
-        <h3 id={spendHeadingId} className="text-sm font-semibold text-foreground">
-          {t('kanban.tokens.title')}
-        </h3>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-          {spend.map((counter) => (
-            <div key={counter.key} className="flex flex-col">
-              <dt className="text-xs text-muted-foreground">{t(counter.labelKey)}</dt>
-              <dd className="vv-tabular text-sm text-foreground">{counter.value.toLocaleString()}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="vv-tabular text-xs text-ink-faint">
-          {t('kanban.tokens.total', { total: detail.buildTokens.toLocaleString() })}
-        </p>
-      </section>
-
-      <Field label={t('kanban.closing.title')} htmlFor={remarksId}>
+      <section className="flex flex-col gap-1" aria-labelledby={`${remarksId}-rule`}>
+        <Rule id={`${remarksId}-rule`}>{t('kanban.closing.title')}</Rule>
         <textarea
           id={remarksId}
-          rows={3}
+          rows={2}
           value={remarks}
           onChange={(event) => setRemarks(event.target.value)}
           onBlur={saveRemarks}
           placeholder={t('kanban.closing.placeholder')}
-          className="vv-input w-full resize-y px-3 py-2 text-sm"
+          aria-labelledby={`${remarksId}-rule`}
+          className="bug-field"
         />
-      </Field>
+      </section>
 
       {changelog.length > 0 && (
-        <Field label={t('kanban.changelog.title')} helper={t('kanban.changelog.helper')}>
-          <p className="text-sm leading-snug text-foreground" data-drawer-changelog>{changelog}</p>
-        </Field>
+        <section className="flex flex-col gap-1" aria-labelledby={`${remarksId}-changelog`}>
+          <Rule id={`${remarksId}-changelog`}>{t('kanban.changelog.title')}</Rule>
+          {/* Read here and not typed: the walk writes it. What it is for is its title. */}
+          <p className="text-[13px] leading-[18px] text-foreground" title={t('kanban.changelog.helper')} data-drawer-changelog>{changelog}</p>
+        </section>
       )}
     </section>
   );

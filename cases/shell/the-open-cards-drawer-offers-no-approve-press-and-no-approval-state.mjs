@@ -1,6 +1,7 @@
 // The open card's drawer offers no Approve and no Withdraw approval press, and says nothing of approval: the Approve
 // gate is gone from the board (kanban-bug-dispatcher, the board's screens). What the run's ledger still draws stands:
-// the checklist, the spend and the closing remarks.
+// the checklist, the issues and the closing remarks. (Since the open card's redraw to the design system, 2026-11-20, its
+// spend is drawn only once the card has spent something, and this card has not.)
 //
 // The card is lib/kanban_board.mjs's: not approved, with a plan and no question open, so the drawer as it stood before
 // this change drew an enabled Approve press and "Needs approval". Opened at 1440x900 on a board with autonomy on. Every
@@ -15,7 +16,7 @@ import { CARDS, openBoard, openDrawer } from "../lib/kanban_board.mjs";
 
 const DESKTOP = { width: 1440, height: 900 };
 const APPROVAL = /approv/i;
-const STILL_DRAWN = [/checklist|steps/i, /spend|tokens/i, /closing/i];
+const STILL_DRAWN = [/checklist|steps/i, /issues/i, /closing/i];
 
 runCase(async (t) => {
   const page = await withPage(t, { viewport: DESKTOP });

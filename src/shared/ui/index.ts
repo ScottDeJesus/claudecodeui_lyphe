@@ -85,8 +85,9 @@ import '@/shared/ui/verve/data.css';
 // are its own and every rule reads only tokens. It was opened beside data.css rather than squeezed into it (data.css stood
 // at 220 lines; MANUAL rule 6). The one constraint is still that board.css stays last, below.
 import '@/shared/ui/verve/readings.css';
-// astrolabe.css holds the paint of the design system's own objects, Rings, Track and Opening (`.ast-*`, every selector its own, every
-// rule reading only tokens), so its place is as free as readings.css's. The one constraint is still that board.css stays last, below.
+// astrolabe.css holds the paint of the design system's own objects, Rings, Track, Opening and Rule, and of Steps, Trace, Choice and
+// Files (`.ast-*`, every selector its own, every rule reading only tokens), so its place is as free as readings.css's. The one
+// constraint is still that board.css stays last, below.
 import '@/shared/ui/verve/astrolabe.css';
 // The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
 // `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
@@ -186,6 +187,9 @@ export { QuestionOptionRow } from '@/shared/ui/QuestionOptionRow';
 // for a reading nobody has. Admitted because Astrolabe draws it; the kanban module's bug dashboard reads its numbers with it.
 export { Readout } from '@/shared/ui/Readout';
 export { Rings } from '@/shared/ui/Rings';
+// The design system's Rule: a section's heading with its hairline drawn out of the words, and its figure or its one press at the
+// line's end. The kanban module's open bug and dashboard head their sections with it.
+export { Rule } from '@/shared/ui/Rule';
 // A photo with its regions drawn over it: one SVG in the image's own 0..1 space (outline weight constant at any size
 // and zoom), a numbered badge at each region's corner, a press on either selecting it. The affected-areas module draws
 // a view's regions with it; the photo-match viewer is next. It also takes a box dragged on the photo (`drawing`) and

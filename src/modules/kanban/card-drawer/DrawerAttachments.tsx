@@ -1,14 +1,13 @@
-import { AlertCircle, File as FileIcon, FileImage, FileText, Trash2, UploadCloud, X } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { File as FileIcon, FileImage, FileText, Plus, X } from 'lucide-react';
+import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
 import { api, readApiJson } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
 import type { KanbanAttachment, KanbanCardDetail } from '@/shared/kanban-types';
-import { Badge, Button, Spinner } from '@/shared/ui';
-import { cn, downloadBlobAsFile, formatBytes } from '@/shared/utils';
+import { Button, Rule, Spinner } from '@/shared/ui';
+import { downloadBlobAsFile, formatBytes } from '@/shared/utils';
 
 /**
  * WHAT IS PINNED TO THE CARD: the files a person or a build left on it, and the one place to add
@@ -19,12 +18,14 @@ import { cn, downloadBlobAsFile, formatBytes } from '@/shared/utils';
  * sections autonomy hides are the RUN's ledger; this one is the card's, so the shell mounts it
  * beside the body and never inside the gated block.
  *
- * ONE ROW SHAPE, THREE STATES. A stored file, a file on its way up and a file the server refused
- * all sit in the same list with the same three columns — a slot, a name with its figures, a
- * control — so the eye reads down one column of names rather than three different widgets. What
- * changes between them is the slot and the tone: a stored image shows its own pixels, a file in
- * flight shows the house ring, a refusal shows the danger glyph and the server's sentence in red.
- * Red is spent on the refusal alone, because it is the only thing here that asks to be acted on.
+ * ONE CHIP, THREE STATES (the design system's Files). A stored file, a file on its way up and a file the server refused are
+ * each a chip on one hairline: a slot, the name, its size, and the × that takes it off. What changes between them is the slot
+ * and the tone: a stored picture shows its own pixels, a file in flight shows the house ring, a refusal shows the danger
+ * glyph and says so under its name. Red is spent on the refusal alone, because it is the only thing here that asks to be
+ * acted on.
+ *
+ * ONE PRESS IN, AND THE WHOLE CARD TO DROP ON. The plus at the end of the section's Rule picks files (its title says what the
+ * server takes); a file dropped anywhere on the open card lands here too, through `add` (the shell's drop, `KanbanCardDrawer`).
  *
  * THE PREVIEW IS NEVER `<img src={route}>`. The bytes sit behind a bearer token a bare image tag
  * cannot carry; the slot takes an object URL the fill phase makes from a fetched blob, exactly as
@@ -41,6 +42,9 @@ type DrawerAttachmentsProps = {
   /** The board's verbs, from the shell. This section reaches the network through none of its own. */
   writes: KanbanMutations;
 };
+
+/** What the shell can ask of this section: take these files, as a pick or a drop would. */
+export type DrawerAttachmentsHandle = { add: (files: File[]) => void };
 
 /**
  * A file on its way to the card, or one that did not make it. Local to this section: the server
@@ -63,13 +67,12 @@ function kindOf(mime: string): { icon: typeof FileIcon; label: string; image: bo
   return { icon: FileIcon, label: 'File', image: false };
 }
 
-/** Rendered by KanbanCardDrawer on every card, beside DrawerBody. Nothing else mounts it. */
-export function DrawerAttachments({ detail, writes }: DrawerAttachmentsProps) {
+/** Rendered by KanbanCardDrawer on every card, beside DrawerBody; the shell holds its handle for a drop. Nothing else mounts it. */
+export const DrawerAttachments = forwardRef<DrawerAttachmentsHandle, DrawerAttachmentsProps>(function DrawerAttachments({ detail, writes }, ref) {
   const { t } = useTranslation();
   const toast = useToast();
   const headingId = useId();
   const pickerRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
 
   const stored = detail.attachments.length;
 
@@ -119,9 +122,13 @@ export function DrawerAttachments({ detail, writes }: DrawerAttachmentsProps) {
     [writes, detail.id, t]
   );
 
-  const onSelectFiles = (files: File[]): void => {
-    for (const file of files) void uploadOne(file);
-  };
+  const onSelectFiles = useCallback(
+    (files: File[]): void => {
+      for (const file of files) void uploadOne(file);
+    },
+    [uploadOne]
+  );
+  useImperativeHandle(ref, () => ({ add: onSelectFiles }), [onSelectFiles]);
 
   // The removal is the whole of it. The write lands, the server broadcasts the card, and the
   // drawer's own re-read repaints this list without the row — so nothing is taken off the screen
@@ -162,88 +169,56 @@ export function DrawerAttachments({ detail, writes }: DrawerAttachmentsProps) {
     setUploads((held) => held.filter((row) => row.key !== key));
   };
 
-  return (
-    <section className="flex flex-col gap-3" aria-labelledby={headingId}>
-      <div className="flex items-center gap-2">
-        <h3 id={headingId} className="text-sm font-semibold text-foreground">
-          {t('kanban.attachments.title', { defaultValue: 'Attachments' })}
-        </h3>
-        {stored > 0 && (
-          <Badge tone="neutral" className="vv-badge--compact">
-            {stored}
-          </Badge>
-        )}
-      </div>
+  const choose = t('kanban.attachments.choose', { defaultValue: 'Choose a file' });
+  const limits = t('kanban.attachments.limits', { defaultValue: 'PNG, JPEG, GIF, WebP or PDF, up to 8 MB each' });
 
-      {stored === 0 && uploads.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {t('kanban.attachments.none', { defaultValue: 'Nothing attached yet.' })}
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2">
+  return (
+    <section className="flex flex-col gap-2" aria-labelledby={headingId} data-drawer-attachments="">
+      <Rule
+        id={headingId}
+        end={
+          <>
+            {stored > 0 && <span aria-hidden="true">{stored}</span>}
+            <Button variant="outline" size="icon" className="size-7 finger:size-11" aria-label={choose} title={`${choose} · ${limits}`} onClick={() => pickerRef.current?.click()}>
+              <Plus aria-hidden="true" />
+            </Button>
+          </>
+        }
+      >
+        {t('kanban.attachments.title', { defaultValue: 'Attachments' })}
+      </Rule>
+      <input
+        ref={pickerRef}
+        type="file"
+        multiple
+        accept={ACCEPT}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(event) => {
+          // Copied out before the value is cleared: clearing empties the live FileList, and the clear is what lets the same
+          // file be picked twice in a row.
+          onSelectFiles(Array.from(event.target.files ?? []));
+          event.target.value = '';
+        }}
+      />
+
+      {(stored > 0 || uploads.length > 0) && (
+        <ul className="ast-files">
           {detail.attachments.map((row) => (
-            <AttachmentRow key={row.id} row={row} onOpen={onOpen} onRemove={onRemove} />
+            <AttachmentChip key={row.id} row={row} onOpen={onOpen} onRemove={onRemove} />
           ))}
           {uploads.map((row) => (
-            <UploadRowView key={row.key} row={row} onDismiss={onDismiss} />
+            <UploadChip key={row.key} row={row} onDismiss={onDismiss} />
           ))}
         </ul>
       )}
-
-      {/* The one way in. A dashed frame is the house's word for "drop here" (the file manager
-          uses the same one); the button beside it is the same door for a phone, where nothing is
-          ever dragged, so the drop words step aside under 640px and the button stays. */}
-      <div
-        className={cn(
-          'flex flex-wrap items-center gap-2 rounded-md border border-dashed border-input px-3 py-2.5 text-sm text-muted-foreground',
-          dragOver && 'border-primary bg-muted'
-        )}
-        onDragOver={(event) => {
-          event.preventDefault();
-          if (!dragOver) setDragOver(true);
-        }}
-        onDragLeave={(event) => {
-          // `dragleave` fires on this frame every time the held file crosses into one of its own
-          // children, so the highlight clears only when the pointer has actually left the frame.
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOver(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragOver(false);
-          onSelectFiles(Array.from(event.dataTransfer.files));
-        }}
-      >
-        <UploadCloud className="h-4 w-4 shrink-0 text-ink-faint" aria-hidden="true" />
-        <span className="hidden sm:inline">
-          {t('kanban.attachments.drop', { defaultValue: 'Drop a file here, or' })}
-        </span>
-        <Button variant="tonal" size="sm" className="h-7" onClick={() => pickerRef.current?.click()}>
-          {t('kanban.attachments.choose', { defaultValue: 'Choose a file' })}
-        </Button>
-        <input
-          ref={pickerRef}
-          type="file"
-          multiple
-          accept={ACCEPT}
-          className="sr-only"
-          aria-label={t('kanban.attachments.choose', { defaultValue: 'Choose a file' })}
-          onChange={(event) => {
-            // Copied out before the value is cleared: clearing empties the live FileList, and the
-            // clear is what lets the same file be picked twice in a row.
-            onSelectFiles(Array.from(event.target.files ?? []));
-            event.target.value = '';
-          }}
-        />
-        <span className="w-full text-xs text-ink-faint">
-          {t('kanban.attachments.limits', { defaultValue: 'PNG, JPEG, GIF, WebP or PDF, up to 8 MB each' })}
-        </span>
-      </div>
     </section>
   );
-}
+});
 
-/** A stored file: its pixels or its glyph, its name and figures, and the press that removes it. */
-function AttachmentRow({
+/** A stored file: its pixels or its glyph, its name (the press that opens it), its size, and the × that takes it off. */
+function AttachmentChip({
   row,
   onOpen,
   onRemove,
@@ -287,107 +262,46 @@ function AttachmentRow({
     };
   }, [row.cardId, row.id, kind.image]);
 
+  const remove = t('kanban.attachments.remove', { defaultValue: 'Remove {{name}}', name: row.filename });
   return (
-    <RowFrame
-      slot={
-        kind.image && previewSrc !== null ? (
-          <img src={previewSrc} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <Icon className="h-5 w-5 text-ink-faint" aria-hidden="true" />
-        )
-      }
-      name={
-        // The name is the press that opens the file: a list of names nobody can open is a list.
-        <button
-          type="button"
-          className="truncate text-left text-sm text-foreground hover:underline"
-          onClick={() => onOpen(row.id)}
-        >
-          {row.filename}
-        </button>
-      }
-      meta={`${formatBytes(row.size)} · ${kind.label}`}
-      control={
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-          aria-label={t('kanban.attachments.remove', { defaultValue: 'Remove {{name}}', name: row.filename })}
-          onClick={() => onRemove(row.id)}
-        >
-          <Trash2 className="h-4 w-4" aria-hidden="true" />
-        </Button>
-      }
-    />
+    <li className="ast-file-chip" data-attachment={row.id}>
+      <span className="ast-file-thumb">
+        {kind.image && previewSrc !== null ? <img src={previewSrc} alt="" /> : <Icon className="size-4" aria-hidden="true" />}
+      </span>
+      {/* The name is the press that opens the file: a list of names nobody can open is a list. */}
+      <button type="button" className="ast-file-name" title={`${row.filename} · ${kind.label}`} onClick={() => onOpen(row.id)}>
+        {row.filename}
+      </button>
+      <span className="ast-file-size">{formatBytes(row.size)}</span>
+      <button type="button" className="ast-file-x" aria-label={remove} title={remove} onClick={() => onRemove(row.id)}>
+        <X className="size-3.5" aria-hidden="true" />
+      </button>
+    </li>
   );
 }
 
-/** A file in flight or refused. The refusal is the only red on this screen. */
-function UploadRowView({ row, onDismiss }: { row: UploadRow; onDismiss: (key: string) => void }) {
+/** A file in flight or refused. The refusal is the only red on this card, and it says so under the file's name. */
+function UploadChip({ row, onDismiss }: { row: UploadRow; onDismiss: (key: string) => void }) {
   const { t } = useTranslation();
   const failed = row.state === 'failed';
+  const dismiss = t('kanban.attachments.dismiss', { defaultValue: 'Dismiss {{name}}', name: row.filename });
 
   return (
-    <RowFrame
-      slot={
-        failed ? (
-          <AlertCircle className="h-5 w-5 text-destructive" aria-hidden="true" />
-        ) : (
-          <Spinner size={18} />
-        )
-      }
-      name={<span className={cn('truncate text-sm', failed ? 'text-foreground' : 'text-muted-foreground')}>{row.filename}</span>}
-      meta={
-        row.state === 'failed'
-          ? row.reason
-          : `${t('kanban.attachments.uploading', { defaultValue: 'Uploading…' })} · ${formatBytes(row.size)}`
-      }
-      // The refusal WRAPS where every other meta line truncates: on a phone it is the one sentence
-      // the reader has to act on, and an ellipsis would cut off the part that says what to do.
-      metaClassName={failed ? 'whitespace-normal break-words text-destructive' : undefined}
-      control={
-        failed ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 shrink-0 text-muted-foreground"
-            aria-label={t('kanban.attachments.dismiss', { defaultValue: 'Dismiss {{name}}', name: row.filename })}
-            onClick={() => onDismiss(row.key)}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        ) : null
-      }
-    />
-  );
-}
-
-/** The three columns every row shares: a 40px slot, a name over its figures, and a control. The
- *  figures are not set in tabular figures on purpose: this font's `tnum` widens the decimal point
- *  too, and "61 . 4 KB" is not a number a reader trusts. */
-function RowFrame({
-  slot,
-  name,
-  meta,
-  metaClassName,
-  control,
-}: {
-  slot: ReactNode;
-  name: ReactNode;
-  meta: string;
-  metaClassName?: string;
-  control: ReactNode;
-}) {
-  return (
-    <li className="flex items-center gap-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
-        {slot}
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        {name}
-        <span className={cn('text-xs text-muted-foreground', metaClassName ?? 'truncate')}>{meta}</span>
-      </div>
-      {control}
+    <li className="ast-file-chip" data-state={row.state}>
+      <span className="ast-file-thumb">
+        {failed ? <span className="bug-glyph" data-tone="danger" aria-hidden="true">✕</span> : <Spinner size={14} />}
+      </span>
+      <span className="ast-file-name">{row.filename}</span>
+      <span className="ast-file-size">
+        {failed ? null : `${t('kanban.attachments.uploading', { defaultValue: 'Uploading…' })} · ${formatBytes(row.size)}`}
+      </span>
+      {failed && (
+        <button type="button" className="ast-file-x" aria-label={dismiss} title={dismiss} onClick={() => onDismiss(row.key)}>
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      )}
+      {/* The refusal wraps where a name truncates: it is the one sentence the reader has to act on. */}
+      {row.state === 'failed' && <p className="ast-file-said">{row.reason}</p>}
     </li>
   );
 }

@@ -1,9 +1,9 @@
 import { Archive, ArrowDown, ArrowUp, CloudOff } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { DrawerAttachments } from '@/modules/kanban/card-drawer/DrawerAttachments';
-import { DrawerBody } from '@/modules/kanban/card-drawer/DrawerBody';
+import { DrawerAttachments, type DrawerAttachmentsHandle } from '@/modules/kanban/card-drawer/DrawerAttachments';
+import { DrawerBody, DrawerTitle } from '@/modules/kanban/card-drawer/DrawerBody';
 import { DrawerChecklist } from '@/modules/kanban/card-drawer/DrawerChecklist';
 import { DrawerIssuesAndTokens } from '@/modules/kanban/card-drawer/DrawerIssuesAndTokens';
 import { DrawerLinks } from '@/modules/kanban/card-drawer/DrawerLinks';
@@ -28,10 +28,10 @@ import { cn } from '@/shared/utils';
  * IT IS A SHELL AND NOTHING ELSE. No field lives in this file. It owns the frame, its head (where the card stands and what it is,
  * as a caption, and its state as a word), the card's course through the lanes, the states a card can be in before it is readable,
  * and the ONE decision the sections below it cannot make for themselves: which of them the board's autonomy setting lets the
- * reader see at all. `DrawerBody` is the card every board has — a title, what it is for, its tags and how urgent it is —
- * `DrawerLinks` is the cards it is tied to, and `DrawerAttachments` is what a person or a walk pinned to it (a walk's screenshots
- * are attachments like any other), on every board for the same reason. The other four are the autonomous run's own ledger, and
- * with autonomy off they are not hidden detail, they are not this board's vocabulary.
+ * reader see at all. `DrawerTitle` and `DrawerBody` are the card every board has — a title, what it is for, its tags and how
+ * urgent it is — `DrawerLinks` is the cards it is tied to, and `DrawerAttachments` is what a person or a walk pinned to it (a
+ * walk's screenshots are attachments like any other), on every board for the same reason. The other four are the autonomous
+ * run's own ledger, and with autonomy off they are not hidden detail, they are not this board's vocabulary.
  *
  * ITS COURSE IS A TRACK (the kit's): the board's lanes in their order, lit to the lane the card is in, that lane named; a press on
  * another lane moves the card there (`onMove`), which is what the card menu's Move rows and a drag between lanes did on the old
@@ -41,6 +41,9 @@ import { cn } from '@/shared/utils';
  * pressing it swaps the card's sections for `SubagentTranscriptView`, whose own Back swaps them in again (and so does the
  * Opening's back arrow, and Escape). The sections stay MOUNTED underneath, hidden, so a half-typed title or answer is still there
  * on the way back.
+ *
+ * A FILE DROPPED ANYWHERE ON IT IS ATTACHED. The whole open card is the place to drop on (its plate takes the accent's edge while
+ * a file is held over it); the drop goes to the attachments section, which uploads it as a pick would.
  *
  * IT IS THE ONLY FETCHER. One read when the card opens, handed down whole; a section that fetched the slice it needed would cost
  * six requests per open and let the checklist disagree with the count on the card's face. The same read answers a write made
@@ -217,6 +220,10 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
   // placeholder name selected, so typing replaces it. Once per card.
   const sectionsRef = useRef<HTMLDivElement>(null);
   const namedRef = useRef<string | null>(null);
+  const attachmentsRef = useRef<DrawerAttachmentsHandle>(null);
+  // A file held over the open card: the plate shows where it will land.
+  const [dropping, setDropping] = useState(false);
+  const holdsFiles = (event: DragEvent) => event.dataTransfer.types.includes('Files');
   useEffect(() => {
     if (!fresh || detail === null || namedRef.current === detail.id) return undefined;
     namedRef.current = detail.id;
@@ -228,9 +235,9 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
     return () => window.clearTimeout(timer);
   }, [fresh, detail]);
 
-  // A card that waits on an answer opens ON its question. It is the one thing the sheet was opened
-  // to get done, and under a title, a priority, tags and three empty fields it starts below the
-  // fold of a phone.
+  // A card that waits on an answer opens with its question right under its name. It is the one thing
+  // the card was opened to get done, and under a priority, tags, a body and attachments it starts
+  // below the fold of a phone.
   // The latch, set in the render the first read arrives in — the same adjust-on-change the clear
   // above is, and for the same reason: an effect would paint one frame in the other order first.
   if (detail !== null && leadsWithQuestion === null) {
@@ -246,16 +253,17 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
    * head of the list and back without being remounted: React moves a keyed sibling, it does not
    * rebuild it.
    *
-   * The card every board has comes first; the autonomous run's ledger after it. With autonomy off
-   * the ledger is not collapsed or dimmed — it is absent, because a board that is not running
-   * itself has no questions to answer, no steps being walked, no scenarios and no spend.
+   * The card's name comes first, always (`DrawerTitle`); then the card every board has; the
+   * autonomous run's ledger after it. With autonomy off the ledger is not collapsed or dimmed — it
+   * is absent, because a board that is not running itself has no questions to answer, no steps
+   * being walked, no scenarios and no spend.
    */
   const sections: ReactNode[] = [];
   if (detail !== null) {
     const card = [
       <DrawerBody key={`body-${detail.id}`} detail={detail} writes={writes} />,
       <DrawerLinks key={`links-${detail.id}`} detail={detail} titleOf={titleOf} onOpenCard={onOpenCard} />,
-      <DrawerAttachments key={`attachments-${detail.id}`} detail={detail} writes={writes} />,
+      <DrawerAttachments key={`attachments-${detail.id}`} ref={attachmentsRef} detail={detail} writes={writes} />,
     ];
     const questions = <DrawerQuestions key={`questions-${detail.id}`} detail={detail} writes={writes} />;
     const ledger = [
@@ -263,9 +271,10 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
       walk !== null && <DrawerScenarios key={`scenarios-${detail.id}`} walk={walk} />,
       <DrawerIssuesAndTokens key={`ledger-${detail.id}`} detail={detail} writes={writes} />,
     ];
-    if (!autonomy) sections.push(...card);
-    else if (asking) sections.push(questions, ...card, ...ledger);
-    else sections.push(...card, questions, ...ledger);
+    const name = <DrawerTitle key={`title-${detail.id}`} detail={detail} writes={writes} />;
+    if (!autonomy) sections.push(name, ...card);
+    else if (asking) sections.push(name, questions, ...card, ...ledger);
+    else sections.push(name, ...card, questions, ...ledger);
   }
 
   // The card's course: the lanes in their order, done behind the one it is in. Where it is now waits on an answer, is worked, or
@@ -295,8 +304,8 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
       }}
       backLabel={reading !== null ? t('kanban.ring.backToCard', { defaultValue: 'Back to the card' }) : t('kanban.drawer.close')}
       source={source}
-      // Its name is the card's own title, as the old sheet's was: its title field is the first thing in it, so the name is set
-      // only for a screen reader, never twice on screen.
+      // Its name is the card's own title: its title field is the first thing in it, so the name is set only for a screen reader,
+      // never twice on screen.
       name={detail?.title ?? t('kanban.drawer.untitled')}
       status={status ?? undefined}
       width={360}
@@ -337,7 +346,27 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
       )}
 
       {detail !== null && (
-        <div ref={sectionsRef} className={cn('bug-opening flex flex-col gap-5', reading !== null && 'hidden')}>
+        <div
+          ref={sectionsRef}
+          className={cn('bug-opening flex flex-col gap-5', reading !== null && 'hidden')}
+          data-drop={dropping ? 'true' : undefined}
+          onDragOver={(event) => {
+            if (!holdsFiles(event)) return;
+            event.preventDefault();
+            if (!dropping) setDropping(true);
+          }}
+          onDragLeave={(event) => {
+            // `dragleave` fires every time the held file crosses into one of the card's own children, so the edge clears only when
+            // the pointer has actually left the card.
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false);
+          }}
+          onDrop={(event) => {
+            if (!holdsFiles(event)) return;
+            event.preventDefault();
+            setDropping(false);
+            attachmentsRef.current?.add(Array.from(event.dataTransfer.files));
+          }}
+        >
           {/* Its course: where it is, and a press away from anywhere else on the board. */}
           <Track
             steps={course}
@@ -353,7 +382,7 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
           {sections}
           {/* Its place in its lane, a step earlier or later (the order the board takes its cards in, as the old lanes' keys
               moved it), and Archive: each by its mark alone, its words its title and its name. Archiving deletes nothing. */}
-          <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--hairline)] pt-3">
             {lane !== null && (
               <>
                 <Button variant="outline" size="icon" data-bug-earlier="" aria-label={t('kanban.ring.earlier', { lane, defaultValue: 'Earlier in {{lane}}' })} title={t('kanban.ring.earlier', { lane, defaultValue: 'Earlier in {{lane}}' })} onClick={() => onShift(-1)} className="size-9 finger:size-11">
