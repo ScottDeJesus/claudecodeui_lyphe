@@ -965,6 +965,11 @@
         "sent-back": "Sent back as a ticket",
         "dismissed": "Dismissed"
       },
+      "facts": {
+        "board": "Board",
+        "by": "By",
+        "when": "Proposed"
+      },
       "folder": "Folder",
       "findingsTitle": "Findings",
       "noFindings": "No finding is on it yet.",
@@ -1055,7 +1060,8 @@
       },
       "window": {
         "label": "How far back",
-        "days": "Last {{days}} days"
+        "days": "Last {{days}} days",
+        "short": "{{days}} days"
       },
       "units": {
         "min": "min",

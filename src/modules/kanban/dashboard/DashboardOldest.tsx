@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { KanbanAgedOpenCard, KanbanStatus } from '@/shared/kanban-types';
 import type { DataTableColumn } from '@/shared/types';
-import { Badge, Button, DataTable, EmptyState } from '@/shared/ui';
+import { Badge, Button, DataTable, EmptyState, Rule } from '@/shared/ui';
 
 /**
  * THE TEN OLDEST OPEN CARDS: what has waited longest, oldest first, in the order the server read them.
@@ -83,7 +83,7 @@ export function DashboardOldest({ cards, allBoards, onOpenCard }: DashboardOldes
 
   return (
     <section className="flex flex-col gap-3" aria-labelledby={headingId} data-dashboard-oldest>
-      <h3 id={headingId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.oldest.title')}</h3>
+      <Rule id={headingId}>{t('kanban.dashboard.oldest.title')}</Rule>
       {cards.length === 0 ? (
         <EmptyState size="sm" title={t('kanban.dashboard.oldest.empty')} />
       ) : (

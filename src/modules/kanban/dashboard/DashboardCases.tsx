@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { DashboardCaseSentence } from '@/modules/kanban/dashboard/DashboardCaseSentence';
 import type { BugDashboardPart, CasesOpenRegression, CasesRegressionTicket, CasesStats, CasesSuiteStats, DataTableColumn, Tone } from '@/shared/types';
-import { Badge, Banner, Button, DataTable, EmptyState } from '@/shared/ui';
+import { Badge, Banner, DataTable, EmptyState, Rule } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 
 /**
@@ -72,7 +72,7 @@ export function DashboardCases({ cases, days, onOpenCard }: DashboardCasesProps)
   const openId = useId();
   const theirsId = useId();
 
-  const heading = <h3 id={headingId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.cases.title')}</h3>;
+  const heading = <Rule id={headingId}>{t('kanban.dashboard.cases.title')}</Rule>;
 
   if (!cases.ok) {
     return (
@@ -133,15 +133,10 @@ export function DashboardCases({ cases, days, onOpenCard }: DashboardCasesProps)
     if (!ticket || ticket.board === null || ticket.card === null) return null;
     const { board, card } = ticket;
     return (
-      <Button
-        variant="outline"
-        className="h-auto min-h-9 w-full justify-start gap-2 whitespace-normal px-3 py-2 text-left font-normal finger:min-h-11"
-        data-dashboard-card={card}
-        onClick={() => onOpenCard(card, board)}
-      >
-        <span className="min-w-0 flex-1 break-words text-sm leading-snug text-foreground">{ticket.title}</span>
-        <ChevronRight className="shrink-0 text-muted-foreground" aria-hidden="true" />
-      </Button>
+      <button type="button" className="dash-row" data-dashboard-card={card} onClick={() => onOpenCard(card, board)}>
+        <span className="min-w-0 flex-1 break-words">{ticket.title}</span>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </button>
     );
   };
 
@@ -152,15 +147,13 @@ export function DashboardCases({ cases, days, onOpenCard }: DashboardCasesProps)
       {theirs.length > 0 && (
         <div className="flex flex-col gap-3" role="group" aria-labelledby={theirsId} data-dashboard-theirs>
           <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-2">
-              <h4 id={theirsId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.cases.theirs.title')}</h4>
-              <Badge tone="warn" className="vv-badge--compact">{theirs.length.toLocaleString()}</Badge>
-            </div>
+            <Rule id={theirsId} level={4} end={theirs.length.toLocaleString()} endTone="warn">{t('kanban.dashboard.cases.theirs.title')}</Rule>
             <p className="text-xs text-muted-foreground">{t('kanban.dashboard.cases.theirs.about')}</p>
           </div>
-          <ul className="flex flex-col gap-4">
+          <ul className="ast-trace">
             {theirs.map((mine) => (
-              <li key={caseKey(mine)} className="flex flex-col gap-1.5 border-l-2 border-border pl-3" data-dashboard-case={mine.name}>
+              <li key={caseKey(mine)} className="ast-trace-item" data-dashboard-case={mine.name}>
+                <span className="ast-trace-bead" aria-hidden="true" />
                 <DashboardCaseSentence sentence={mine.sentence} />
                 <span className="text-xs text-muted-foreground">
                   {t('kanban.dashboard.cases.broke', { date: formatShortDate(mine.broke_at) ?? '—', suite: mine.suite })}
@@ -180,9 +173,9 @@ export function DashboardCases({ cases, days, onOpenCard }: DashboardCasesProps)
 
       <div className="flex flex-col gap-3" role="group" aria-labelledby={openId} data-dashboard-regressions>
         <div className="flex flex-col gap-0.5">
-          <h4 id={openId} className="text-sm font-semibold text-foreground">
+          <Rule id={openId} level={4}>
             {theirs.length > 0 ? t('kanban.dashboard.cases.open.titleOthers') : t('kanban.dashboard.cases.open.title')}
-          </h4>
+          </Rule>
           <p className="text-xs text-muted-foreground">
             {regressions.ruled === 0
               ? t('kanban.dashboard.cases.open.summaryNone', { days })
@@ -194,9 +187,10 @@ export function DashboardCases({ cases, days, onOpenCard }: DashboardCasesProps)
             {theirs.length > 0 ? t('kanban.dashboard.cases.open.noneOthers') : t('kanban.dashboard.cases.open.none')}
           </p>
         ) : (
-          <ul className="flex flex-col gap-4">
+          <ul className="ast-trace">
             {others.map((regression) => (
-              <li key={caseKey(regression)} className="flex flex-col gap-1.5 border-l-2 border-border pl-3" data-dashboard-case={regression.name}>
+              <li key={caseKey(regression)} className="ast-trace-item" data-dashboard-case={regression.name}>
+                <span className="ast-trace-bead" aria-hidden="true" />
                 <DashboardCaseSentence sentence={regression.sentence} />
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                   {t('kanban.dashboard.cases.broke', { date: formatShortDate(regression.broke_at) ?? '—', suite: regression.suite })}

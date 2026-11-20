@@ -2,7 +2,7 @@ import { Fragment, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { DataTableColumn, HuntSkippedUnit } from '@/shared/types';
-import { Badge, Button, DataTable, EmptyState } from '@/shared/ui';
+import { Badge, Button, DataTable, EmptyState, Rule } from '@/shared/ui';
 import { formatRelativeTime } from '@/shared/utils';
 
 /**
@@ -106,7 +106,7 @@ export function DashboardHunterSkips({ skipped, hunterWord, nameOf, reopen, onHu
     <div className="flex flex-col gap-3" role="group" aria-labelledby={headingId} data-hunter-skips={skipped.length}>
       <div className="flex flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <h4 id={headingId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.hunters.skips.title')}</h4>
+          <Rule id={headingId} level={4}>{t('kanban.dashboard.hunters.skips.title')}</Rule>
           {skipped.length > 0 && <Badge as="span" tone="neutral" className="vv-badge--compact" data-hunter-skips-count>{skipped.length.toLocaleString()}</Badge>}
         </div>
         <p className="text-xs text-muted-foreground">{t('kanban.dashboard.hunters.skips.about')}</p>

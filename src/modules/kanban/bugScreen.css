@@ -126,3 +126,82 @@
 /* A fenced block that names its language: the name as a caption over the code, on the code's own left edge. */
 .ast-opening .bug-opening .bug-prose .group:has(> .absolute.left-3) pre { padding-top: 28px !important; }
 .ast-opening .bug-opening .bug-prose .group > .absolute.left-3 { left: 0; top: 10px; font-family: var(--font-mono); font-size: 10px; font-weight: 400; letter-spacing: 0.24em; }
+
+/*
+ * The board's numbers (`BugDashboard`), read as one instrument's readout: tables as rules between rows with no frame and no
+ * filled head (their heads the mono captions), the days as thin ticks off one rule, a card as a row that opens it, and the fold
+ * line in the quiet ink. Every selector is under `.bug-dashboard`, the dashboard's own root.
+ */
+.bug-dashboard .vv-datatable { border: 0; border-block: 1px solid var(--hairline); border-radius: 0; background: transparent; }
+.bug-dashboard .vv-datatable__head,
+.bug-dashboard .vv-datatable__head:first-child {
+  background: var(--canvas);
+  box-shadow: none;
+  border-bottom-color: var(--hairline);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+}
+.bug-dashboard .vv-datatable__cell { padding-block: 10px; border-bottom-color: var(--hairline); font-size: 13px; }
+.bug-dashboard .vv-datatable__cell:first-child { background: var(--canvas); box-shadow: none; }
+@media (hover: hover) {
+  .bug-dashboard .vv-datatable__row--pressable:hover,
+  .bug-dashboard .vv-datatable__row--pressable:hover > .vv-datatable__cell:first-child { background: var(--surface2); }
+}
+
+/* Opened above the rule and fixed below it, a tick a day. */
+.bug-dashboard .vv-daybars__side { justify-content: center; }
+.bug-dashboard .vv-daybars__bar,
+.bug-dashboard .vv-daybars__side[data-side='down'] .vv-daybars__bar { width: 3px; border-radius: 0; }
+.bug-dashboard .vv-daybars__zero { background: var(--hairline); }
+
+/* A card, as a row that opens it: the row itself is the press, a chevron at its end. */
+.bug-dashboard .dash-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-block: 1px solid var(--hairline);
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fade) ease;
+}
+.bug-dashboard .dash-row:hover { background: var(--surface2); }
+.bug-dashboard .dash-row:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+/* The card a changelog line came from: quiet words that open it. */
+.bug-dashboard .dash-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 17px;
+  text-align: left;
+  cursor: pointer;
+}
+.bug-dashboard .dash-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.bug-dashboard .dash-link:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+/* The Trace's beads sit on the page here, not on a plate. */
+.bug-dashboard .ast-trace-bead { background: var(--canvas); }
+@media (pointer: coarse), (max-width: 767.98px) {
+  .bug-dashboard .dash-row, .bug-dashboard .dash-link { min-height: 44px; }
+}
