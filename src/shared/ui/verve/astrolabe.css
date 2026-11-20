@@ -1,0 +1,80 @@
+/*
+ * The paint of the design system's own objects in the kit: Rings, Track and Opening (src/shared/ui). Each rule is the design
+ * system's (design-system/astrolabe/components/bundle.css), read through the app's names for its tokens: the ground is
+ * `--canvas`, a panel `--surface`, the quiet ink `--ink-mid`, the floating shadow `--shadow-overlay`, a panel's corner
+ * `--radius-card`. Every selector here is `.ast-*` and its own; nothing leans on a sibling sheet.
+ */
+
+/* What assistive tech reads and the eye does not: a ring's slider, a gauge's meter, the core's press. */
+.ast-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------------- Rings ---------------- */
+.ast-rings { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.ast-rings-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
+.ast-rings-core { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; pointer-events: none; }
+.ast-rings-core > * { width: 100%; height: 100%; }
+.ast-rings-slider:focus { outline: none; }
+
+/* ---------------- Track ---------------- */
+.ast-track { position: relative; height: 44px; min-width: 120px; }
+.ast-track::after { content: ''; position: absolute; right: 0; top: calc(50% - 4px); width: 1px; height: 8px; background: var(--ink-faint); pointer-events: none; }
+.ast-track-line { position: absolute; left: 0; right: 0; top: calc(50% - 0.5px); height: 1px; background: var(--hairline); }
+.ast-track-lit { position: absolute; left: 0; top: -0.5px; height: 2px; background: var(--ink-mid); transition: width var(--duration-lock) var(--ease-lock); }
+.ast-track-crawl { position: absolute; top: -0.5px; height: 2px; background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 10px); animation: ast-track-crawl 0.9s linear infinite; }
+@keyframes ast-track-crawl { from { background-position: 0 0; } to { background-position: 10px 0; } }
+.ast-track-fail { position: absolute; top: -0.5px; height: 2px; background: var(--danger-dot); }
+.ast-track-head { position: absolute; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: var(--accent); transition: left var(--duration-lock) var(--ease-lock); pointer-events: none; }
+.ast-track-head[data-state="failed"] { background: var(--danger-dot); }
+.ast-track-head[data-state="waiting"] { width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; background: var(--canvas); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.ast-track-step { position: absolute; top: 0; bottom: 0; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ast-track-step::before { content: ''; position: absolute; left: 0; top: calc(50% - 4px); width: 1px; height: 8px; background: var(--ink-faint); transition: height var(--duration-fade) ease, top var(--duration-fade) ease; }
+.ast-track-step[data-state="done"]::before { background: var(--ink-mid); }
+.ast-track-step[data-state="live"]::before, .ast-track-step[data-state="waiting"]::before { top: calc(50% - 6px); height: 12px; background: var(--accent); }
+.ast-track-step[data-state="failed"]::before { background: var(--danger-dot); }
+.ast-track-step[data-on="true"]::before { top: calc(50% - 8px); height: 16px; background: var(--ink); }
+.ast-track-step:focus-visible { outline: 1px solid var(--focus); outline-offset: -3px; }
+.ast-track-plate { position: absolute; bottom: calc(50% + 12px); transform: translateX(-50%); padding: 0 6px; background: color-mix(in srgb, var(--canvas) 80%, transparent); color: var(--ink); white-space: nowrap; pointer-events: none; font-family: var(--font-mono); font-size: 10px; line-height: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+.ast-track-plate[data-edge="start"] { transform: translateX(-12px); }
+.ast-track-plate[data-edge="end"] { transform: translateX(calc(-100% + 12px)); }
+.ast-track-num { color: var(--ink-muted); }
+@media (prefers-reduced-motion: reduce) { .ast-track-crawl { animation-duration: 2.6s; } .ast-track-lit, .ast-track-head { transition: none; } }
+
+/* ---------------- Opening ---------------- */
+.ast-opening { position: absolute; inset: 0; z-index: 40; pointer-events: none; }
+.ast-opening[data-ready="false"] { visibility: hidden; }
+.ast-opening-leader { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ast-opening-leader line { stroke: var(--accent); stroke-width: 1px; }
+.ast-opening-leader circle { fill: none; stroke: var(--accent); stroke-width: 1.25px; }
+.ast-opening-plate {
+  position: absolute; box-sizing: border-box; width: 320px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); overflow: auto;
+  display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; background: var(--surface); color: var(--ink);
+  border-radius: var(--radius-card); box-shadow: var(--shadow-overlay); pointer-events: auto; outline: none; transform-origin: 0 20%;
+  overscroll-behavior: contain;
+}
+.ast-opening[data-side="left"] .ast-opening-plate { transform-origin: 100% 20%; }
+.ast-opening[data-side="below"] .ast-opening-plate { transform-origin: 50% 0; }
+.ast-opening[data-side="above"] .ast-opening-plate { transform-origin: 50% 100%; }
+.ast-opening[data-side="sheet"] .ast-opening-plate { left: 12px; right: 12px; bottom: 12px; width: auto; max-width: none; max-height: 78%; transform-origin: 50% 100%; }
+.ast-opening[data-ready="true"] .ast-opening-plate { animation: ast-open var(--duration-lock) var(--ease-lock) both; }
+.ast-opening[data-ready="true"] .ast-opening-leader { animation: ast-fade-in var(--duration-fade) ease both; }
+@keyframes ast-open { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes ast-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.ast-opening-head { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.ast-opening-source { flex: 1; min-width: 0; color: var(--ink-muted); font-family: var(--font-mono); font-size: 10px; line-height: 14px; letter-spacing: 0.24em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ast-opening-close { flex: none; min-width: 28px; min-height: 28px; display: grid; place-items: center start; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; color: var(--ink-muted); transition: color var(--duration-fade) ease; }
+.ast-opening-close:hover { color: var(--ink); }
+.ast-opening-close:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+.ast-opening-title { margin: 0; min-width: 0; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 400; }
+.ast-opening-body { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ast-opening-body > p { margin: 0; }
+@media (pointer: coarse) { .ast-opening-close { min-width: 44px; min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .ast-opening[data-ready="true"] .ast-opening-plate { animation: ast-fade-in var(--duration-fade) ease both; } }
+
+/* ---------------- KeyValueList ---------------- */
+.ast-kv { display: grid; grid-template-columns: 78px minmax(0, 1fr); column-gap: 12px; row-gap: 3px; margin: 0; text-align: left; color: var(--ink-muted); font-family: var(--font-mono); font-size: 10.5px; line-height: 1.55; letter-spacing: 0.05em; }
+.ast-kv dt { margin: 0; text-transform: uppercase; }
+.ast-kv dd { margin: 0; min-width: 0; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The plate takes the focus as a container when it opens; the key's ring is for what is inside it. Two classes, so it outranks
+   tokens.css's `[tabindex]:focus-visible`, which lands later in the cascade. */
+.ast-opening .ast-opening-plate:focus-visible { outline: none; }

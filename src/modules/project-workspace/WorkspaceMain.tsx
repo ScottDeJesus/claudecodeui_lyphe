@@ -22,7 +22,7 @@ import { NotesPanel } from '@/modules/notes';
 import type { AppTab, CompanionPresence, FileOpenRequest, FilesRoot, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
-import { absolutePathIn } from '@/shared/utils';
+import { absolutePathIn, viewStandsAlone } from '@/shared/utils';
 import { useChatDeskSide } from '@/modules/project-workspace/hooks/useChatDeskSide';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
 import { useHiddenNavFallback } from '@/modules/project-workspace/hooks/useHiddenNavFallback';
@@ -33,6 +33,7 @@ import { CoreDrawingProvider } from '@/shared/context/CoreDrawingContext';
 import type { CoreDrawingInput } from '@/shared/context/CoreDrawingContext';
 import { ChatDesk } from '@/modules/project-workspace/ChatDesk';
 import ChatHead from '@/modules/project-workspace/ChatHead';
+import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
@@ -356,9 +357,10 @@ function WorkspaceMain({
     <SessionPanelProvider sessionId={activeTab === 'chat' && !floating ? (selectedSession?.id ?? null) : null} followupsApart={chatSide > 0}>
     <div className="flex h-full flex-col">
       {/* The Chat view has a head of its own, at every width: the way back to the sessions home, and the chat's name. It is the first
-          line of the chat's own pane (`ChatDesk` below), so at a desk it stands over the chat and not over the column beside it. Every
-          other view keeps the phone's strip (the drawer's button and the view's name), as does the Chat view while its chat floats. */}
-      {(activeTab !== 'chat' || floating) && (
+          line of the chat's own pane (`ChatDesk` below), so at a desk it stands over the chat and not over the column beside it. A view
+          that stands alone as the chat does (`viewStandsAlone`: the Bugs view) draws its own head too. Every other view keeps the
+          phone's strip (the drawer's button and the view's name), as does the Chat view while its chat floats. */}
+      {(activeTab === 'chat' ? floating : !viewStandsAlone(activeTab)) && (
         <WorkspaceHeader
           selectedProject={selectedProject}
           selectedSession={selectedSession}
@@ -506,7 +508,14 @@ function WorkspaceMain({
               with no project open there is simply no hint. */}
           {activeTab === 'kanban' && (
             <div className="h-full overflow-hidden">
-              <KanbanPanel projectId={selectedProject?.projectId ?? null} />
+              {/* The Bugs view stands alone as the chat does: its own head carries the way back and this menu, and its board's
+                  core is drawn by the same instrument a chat's is. */}
+              <CoreDrawingProvider value={drawChatCore}>
+                <KanbanPanel
+                  projectId={selectedProject?.projectId ?? null}
+                  menu={<PlacesMenu here="kanban" triggerClassName="relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']" />}
+                />
+              </CoreDrawingProvider>
             </div>
           )}
 

@@ -1,0 +1,16 @@
+/*
+ * The bug screen's own paint: the open card's sections, set in the design system's voice inside the Opening they hang in. Every
+ * label is a caption (mono, in capitals, tracked, the muted ink) and every section heading the same caption, so the card reads as
+ * one instrument's readout and not as a form. Every selector is under `.bug-opening`, the card's own wrapper (`KanbanCardDrawer`).
+ */
+.bug-opening .vv-field__label,
+.bug-opening h3,
+.bug-opening h4 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 400;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}

@@ -85,6 +85,9 @@ import '@/shared/ui/verve/data.css';
 // are its own and every rule reads only tokens. It was opened beside data.css rather than squeezed into it (data.css stood
 // at 220 lines; MANUAL rule 6). The one constraint is still that board.css stays last, below.
 import '@/shared/ui/verve/readings.css';
+// astrolabe.css holds the paint of the design system's own objects, Rings, Track and Opening (`.ast-*`, every selector its own, every
+// rule reading only tokens), so its place is as free as readings.css's. The one constraint is still that board.css stays last, below.
+import '@/shared/ui/verve/astrolabe.css';
 // The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
 // `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
 // `.vv-card` won every one of those at equal specificity and a selected card lost its wash.
@@ -153,7 +156,12 @@ export { KanbanLane } from '@/shared/ui/KanbanLane';
 export { Lightbox } from '@/shared/ui/Lightbox';
 export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';
 export { Menu } from '@/shared/ui/Menu';
+export { KeyValueList } from '@/shared/ui/KeyValueList';
 export { Meter } from '@/shared/ui/Meter';
+// The design system's Opening (Astrolabe's "what a deliberate click opened, hung from the mark it came out of"), Rings ("sets of
+// things you turn through") and Track ("one thing's course"), ported from its bundle: the kanban module's bug board is the first
+// screen built on them, and every screen redrawn to the design system after it is meant to reach for them before anything else.
+export { Opening } from '@/shared/ui/Opening';
 export { PillBar, Pill } from '@/shared/ui/PillBar';
 export {
   PromptInput,
@@ -177,6 +185,7 @@ export { QuestionOptionRow } from '@/shared/ui/QuestionOptionRow';
 // Astrolabe's Readout and ReadoutRow as one piece: a figure, its name, an optional unit, tone and comparison, and an em-dash
 // for a reading nobody has. Admitted because Astrolabe draws it; the kanban module's bug dashboard reads its numbers with it.
 export { Readout } from '@/shared/ui/Readout';
+export { Rings } from '@/shared/ui/Rings';
 // A photo with its regions drawn over it: one SVG in the image's own 0..1 space (outline weight constant at any size
 // and zoom), a numbered badge at each region's corner, a press on either selecting it. The affected-areas module draws
 // a view's regions with it; the photo-match viewer is next. It also takes a box dragged on the photo (`drawing`) and
@@ -213,6 +222,7 @@ export { Stepper } from '@/shared/ui/Stepper';
 export { Steps } from '@/shared/ui/Steps';
 export { Switch } from '@/shared/ui/Switch';
 export { Tabs } from '@/shared/ui/Tabs';
+export { Track } from '@/shared/ui/Track';
 // A status sentence with each hyphenated word (a model id, a version) held whole: the Custom compaction
 // row and the Dactyls field in Edit Agent Chains draw their Waiting line's reason through it.
 export { WholeWords } from '@/shared/ui/WholeWords';

@@ -684,6 +684,38 @@
     }
   },
   "kanban": {
+    "ring": {
+      "eyebrow": "Bugs",
+      "instrument": "The board",
+      "board": "Open the board",
+      "boardSource": "Board",
+      "needsYou": "Needs you",
+      "held": "Held",
+      "inHand": "In hand",
+      "failed": "Failed",
+      "more": "{{count}} more",
+      "further": "{{count}} more",
+      "loadMore": "Load more",
+      "fixed": "Fixed",
+      "fixedOf": "{{fixed}} of {{total}}",
+      "newBug": "New bug",
+      "course": "Course",
+      "courseStep": "Lane {{index}} of {{count}}: {{lane}}",
+      "backToCard": "Back to the card",
+      "earlier": "Earlier in {{lane}}",
+      "later": "Later in {{lane}}",
+      "issues_one": "{{count}} issue",
+      "issues_other": "{{count}} issues",
+      "noRepos": "None yet — name one to let the board run itself.",
+      "vitals": {
+        "building": "Building",
+        "asking": "Asking",
+        "queued": "Queued",
+        "lessons": "Lessons",
+        "memories": "Memories",
+        "everyBoard": "{{count}} · every board"
+      }
+    },
     "loading": "Reading the board…",
     "notAnswered": "The server did not answer, so nothing changed. Try again.",
     "unreachable": {

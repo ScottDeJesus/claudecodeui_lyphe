@@ -1,13 +1,14 @@
-// The board header's counts are five: building, awaitingAnswer, queued (the board's live To Do cards),
+// The board's counts are five: building, awaitingAnswer, queued (the board's live To Do cards),
 // lessonsPendingEstate and memoryPendingEstate. vitalsCounts reads exactly those keys off a board this
 // case fills, and the wire type on both sides (src/shared and server/shared kanban-types.ts) and the
-// strip's register list (KanbanVitalsStrip.tsx's REGISTERS) name exactly those five, so the strip draws
-// a number for every count the server sends and asks for no key it does not.
+// list of counts the board's Opening draws (BugBoardOpening.tsx's REGISTERS, since the board's redraw to
+// the design system on 2026-11-20; the header's strip before it) name exactly those five, so the board
+// draws a number for every count the server sends and asks for no key it does not.
 //
 // The counts are read off a database this case creates in its own scratch folder; the three source files
 // are parsed with the TypeScript compiler, never run in a browser.
 //
-// protects: server/modules/kanban/kanban-vitals.service.ts, server/shared/kanban-types.ts, src/shared/kanban-types.ts, src/modules/kanban/KanbanVitalsStrip.tsx
+// protects: server/modules/kanban/kanban-vitals.service.ts, server/shared/kanban-types.ts, src/shared/kanban-types.ts, src/modules/kanban/BugBoardOpening.tsx
 // writes: none
 
 import { readFile } from "node:fs/promises";
@@ -87,7 +88,7 @@ runCase(async (t: { defer: (cleanup: () => unknown) => void }) => {
 
   const client = vitalsTypeKeys(await parse("src/shared/kanban-types.ts"));
   const server = vitalsTypeKeys(await parse("server/shared/kanban-types.ts"));
-  const strip = stripKeys(await parse("src/modules/kanban/KanbanVitalsStrip.tsx"));
+  const strip = stripKeys(await parse("src/modules/kanban/BugBoardOpening.tsx"));
   if (!same(client)) wrong.push(`src/shared KanbanVitals names [${(client ?? ["no type literal"]).join(", ")}]`);
   if (!same(server)) wrong.push(`server/shared KanbanVitals names [${(server ?? ["no type literal"]).join(", ")}]`);
   if (!same(strip)) wrong.push(`the strip's REGISTERS name [${(strip ?? ["no array"]).join(", ")}]`);

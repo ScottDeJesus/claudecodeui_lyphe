@@ -25,8 +25,8 @@ const MENU_VIEWS: readonly AppTab[] = ['runner', 'cerberus', 'inbox', 'api', 'ka
 const NO_CHAT_DOOR: ChatDoor = { floating: false, unread: false, toggle: () => {}, collapse: () => {} };
 
 type PlacesMenuProps = {
-  /** The page the menu stands on: that page is left out of its own list. */
-  here: 'home' | 'chat' | 'station';
+  /** The page the menu stands on: that page is left out of its own list (a screen's own name too: the Bugs view's, `kanban`). */
+  here: 'home' | 'chat' | 'station' | 'kanban';
   /** Classes for the trigger, whose size is its page's to say (the home's corner, the chat's head, the row by the companion's name). */
   triggerClassName?: string;
 };
@@ -40,8 +40,9 @@ type PlacesMenuProps = {
  * Every press is one the workspace already has: a screen is the workspace's own view brought forward at the address it held,
  * Settings is the workspace's dialog (a portal over every page), and the two pages are their doors (`openHome`, `openStation`).
  *
- * Used by `home/WorkspaceHome` (its head's end, where the cog stood), `ChatHead` (the end of the chat's head) and, through this
- * module's barrel, the station module's `StationKaylee` (the last press in the row by the companion's name).
+ * Used by `home/WorkspaceHome` (its head's end, where the cog stood), `ChatHead` (the end of the chat's head), `WorkspaceMain` (handed
+ * to the Bugs view, the end of its head) and, through this module's barrel, the station module's `StationKaylee` (the last press in
+ * the row by the companion's name).
  */
 export function PlacesMenu({ here, triggerClassName }: PlacesMenuProps) {
   const { t } = useTranslation();
@@ -52,7 +53,7 @@ export function PlacesMenu({ here, triggerClassName }: PlacesMenuProps) {
   const switcherActs = useSwitcherActions(NO_CHAT_DOOR);
 
   const items = useMemo<ActionMenuItem[]>(() => {
-    const screens: ActionMenuItem[] = MENU_VIEWS.flatMap((id) => {
+    const screens: ActionMenuItem[] = MENU_VIEWS.filter((id) => id !== here).flatMap((id) => {
       const view = views.find((item) => item.id === id && !item.hiddenFromNav);
       if (view === undefined) return [];
       return [{

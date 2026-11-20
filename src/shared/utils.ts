@@ -3,7 +3,7 @@ import { extendTailwindMerge, validators } from 'tailwind-merge';
 
 import { CORE_GAUGE_GAPS } from '@/shared/constants';
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
-import type { AffectedAreasTrouble, ChatAttachment, DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
+import type { AffectedAreasTrouble, AppTab, ChatAttachment, DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -862,4 +862,18 @@ export function coreGaugeRadius(bodyRadius: number, index: 0 | 1): number {
  */
 export function coreContextTone(filled: number): 'quiet' | 'warn' | 'danger' {
   return filled >= 0.95 ? 'danger' : filled >= 0.8 ? 'warn' : 'quiet';
+}
+
+// ---------------------------
+
+//----------------- A WORKSPACE VIEW THAT STANDS ALONE ------------
+
+/**
+ * Whether a workspace view stands alone, as the redesigned screens do: its own head carries the way back and the menu to every
+ * other place, so the old sidebar, its rail and the phone's strip are not drawn round it. The chat first; the Bugs view since its
+ * redraw to the design system. Read by project-workspace's `ProjectSidebarRegion` (the sidebar and rail) and `WorkspaceMain` (the
+ * phone's strip); a view redrawn later joins here.
+ */
+export function viewStandsAlone(tab: AppTab): boolean {
+  return tab === 'chat' || tab === 'kanban';
 }

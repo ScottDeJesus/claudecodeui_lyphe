@@ -1,7 +1,8 @@
 // A board's repositories are written through `PATCH /api/kanban/boards/:boardId` (`repos`), and the server's two
 // refusals are said where the fix is, inside the board dialog, never in a toast that leaves:
-//   - the Runs itself switch pressed on a board that names no repository answers 409 KANBAN_BOARD_NEEDS_REPOS: the dialog
-//     opens on Board repositories with the server's sentence in it;
+//   - the board's on/off switch ("Turn this board on or off") pressed on a board that names no repository answers 409 KANBAN_BOARD_NEEDS_REPOS: the dialog
+//     opens on Board repositories with the server's sentence in it (the switch stands in what the board's core opens since
+//     the board's redraw to the design system, 2026-11-20);
 //   - a Save answered 400 KANBAN_BOARD_REPO_INVALID (a path not inside a git work tree) leaves the dialog open over the
 //     path that was typed, with the server's sentence in it;
 //   - each Save sends `repos` equal to the list on screen, and a 200 closes the dialog.
@@ -11,12 +12,12 @@
 // ({ success: false, error: { code, message } }) and the two sentences the server writes
 // (kanban-boards.service.ts, kanban-board-repos.ts). Nothing reaches the server's board. Read at 1440x900.
 //
-// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/KanbanBoardDialog.tsx, src/modules/kanban/KanbanBoardRepos.tsx, src/modules/kanban/hooks/useKanbanBoards.ts, src/modules/kanban/KanbanBoardHeader.tsx
+// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/KanbanBoardDialog.tsx, src/modules/kanban/KanbanBoardRepos.tsx, src/modules/kanban/hooks/useKanbanBoards.ts, src/modules/kanban/BugBoardOpening.tsx
 // writes: none
 
 import { withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
-import { BOARD, CARDS, faceOf, openBoard } from "../lib/kanban_board.mjs";
+import { BOARD, CARDS, faceOf, openBoard, openBoardItself } from "../lib/kanban_board.mjs";
 
 const WAIT_MS = 15000;
 // The view is named Bugs since a4e2af52 (2026-11-19); both names are found.
@@ -64,15 +65,15 @@ runCase(async (t) => {
   await page.reload({ waitUntil: "domcontentloaded" });
   await openKanban(page);
 
-  // 409: the switch opens the repositories dialog with the server's sentence.
-  const autonomy = page.getByRole("switch", { name: "Runs itself" }).first();
+  // 409: the switch opens the repositories dialog with the server's sentence. The switch is the board's, in what its core opens.
+  const autonomy = (await openBoardItself(page)).getByRole("switch", { name: "Turn this board on or off" }).first();
   await autonomy.waitFor({ timeout: WAIT_MS });
   await autonomy.click();
   const dialog = page.getByRole("dialog").filter({ hasText: "Board repositories" }).first();
   try {
     await dialog.waitFor({ timeout: WAIT_MS });
   } catch {
-    return broken(`the Runs itself switch answered 409 KANBAN_BOARD_NEEDS_REPOS and no "Board repositories" dialog opened (PATCHes sent: ${JSON.stringify(patches)})`);
+    return broken(`the board's on/off switch answered 409 KANBAN_BOARD_NEEDS_REPOS and no "Board repositories" dialog opened (PATCHes sent: ${JSON.stringify(patches)})`);
   }
   if (!(await dialog.innerText()).includes(NEEDS)) return broken(`the repositories dialog opened by the 409 does not say the server's sentence "${NEEDS}"`);
 
