@@ -1,11 +1,12 @@
 import type { TFunction } from 'i18next';
+import { ChevronsDown } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { capitalized, listWords, spoken } from '@/modules/affected-areas/utils/tourModel';
 import type { ContextSummary } from '@/shared/affected-areas-types';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { Button, Rule } from '@/shared/ui';
+import { Button, IconWord, Rule } from '@/shared/ui';
 import { cn, formatShortDate, resizeObserverIn } from '@/shared/utils';
 
 type ContextCardProps = {
@@ -106,8 +107,15 @@ export function ContextCard({ context, linked }: ContextCardProps) {
             {context.lossAccount}
           </blockquote>
           {long && !whole && (
-            <Button variant="link" size="sm" className="ml-1.5 h-7 px-1.5 max-md:h-11" onClick={onShowAll}>
-              {t('affectedAreas.context.showAll')}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-1.5 finger:size-11 finger:px-0"
+              aria-label={t('affectedAreas.context.showAll')}
+              title={t('affectedAreas.context.showAll')}
+              onClick={onShowAll}
+            >
+              <IconWord icon={ChevronsDown} word={t('affectedAreas.context.showAll')} />
             </Button>
           )}
         </div>
