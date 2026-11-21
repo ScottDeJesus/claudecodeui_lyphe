@@ -1,4 +1,4 @@
-import { CalendarSearchIcon } from 'lucide-react';
+import { CalendarSearchIcon, RotateCwIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,7 +14,7 @@ import { UploadsHead } from '@/modules/upload-runs/UploadsHead';
 import { UploadsPills } from '@/modules/upload-runs/UploadsPills';
 import type { LiveStatus, UploadsFilters, UploadsPillKey, UploadsTally, UploadsWindow } from '@/modules/upload-runs/utils/uploadsModel';
 import { agoWord } from '@/modules/upload-runs/utils/uploadsWords';
-import { Banner, Button, EmptyState } from '@/shared/ui';
+import { Banner, Button, IconWord } from '@/shared/ui';
 
 type UploadsViewProps = {
   /** Whether the Cerberus tab is showing this view. The tab keeps it mounted while hidden: hidden, it reads nothing and raises no sheet. */
@@ -119,7 +119,6 @@ export function UploadsView({ shown }: UploadsViewProps) {
   if (overview === null) {
     return (
       <div className="flex min-w-0 max-w-[1180px] flex-col gap-5 px-[clamp(16px,4cqi,32px)] pb-7 pt-5" data-uploads-view={read.phase}>
-        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{t('cerberus.uploads.head.eyebrow')}</p>
         {read.phase === 'trouble' ? (
           // STATE: THE FIRST READ FAILED. There is no answer to show, so the view is its own banner: the lane's sentence and
           // Try again. Warn, not danger: nothing was refused, the engine did not answer, and the next read may.
@@ -188,15 +187,24 @@ export function UploadsView({ shown }: UploadsViewProps) {
           // under it: the list that carries that chip is not drawn here, and a window whose only runs are dry ones
           // (a new account's first) would otherwise hold runs no press could show. What it says of test runs is of the answer
           // in hand, not of the chip just pressed: until the read for the press lands, the answer is the one without them.
-          <div className="flex min-w-0 flex-col gap-3">
-            <EmptyState
-              icon={CalendarSearchIcon}
-              title={t('cerberus.uploads.empty.title', { days })}
-              message={t(overview.filters.tests ? 'cerberus.uploads.empty.messageTests' : 'cerberus.uploads.empty.message')}
-              actionLabel={wider === undefined ? undefined : t('cerberus.uploads.empty.wider', { days: wider })}
-              onAction={wider === undefined ? undefined : () => onWindow(wider)}
-            />
-            <div className="flex min-w-0 flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+          <div className="flex min-w-0 flex-col items-start gap-3 border-t border-border pt-4" data-uploads-empty>
+            <p className="m-0 max-w-xl text-[13.5px] text-muted-foreground">
+              <span className="block text-foreground">{t('cerberus.uploads.empty.title', { days })}</span>
+              {t(overview.filters.tests ? 'cerberus.uploads.empty.messageTests' : 'cerberus.uploads.empty.message')}
+            </p>
+            {wider !== undefined && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 finger:size-11 finger:px-0 max-md:h-11"
+                aria-label={t('cerberus.uploads.empty.wider', { days: wider })}
+                title={t('cerberus.uploads.empty.wider', { days: wider })}
+                onClick={() => onWindow(wider)}
+              >
+                <IconWord icon={CalendarSearchIcon} word={t('cerberus.uploads.empty.wider', { days: wider })} />
+              </Button>
+            )}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
               <TestRunsChip selected={filters.tests} onToggle={() => onFilter({ ...filters, tests: !filters.tests })} />
               <span>{t('cerberus.uploads.runs.testsTitle')}</span>
             </div>
@@ -231,7 +239,11 @@ function TroubleBanner({ title, detail, retry, onRetry }: { title: string; detai
   return (
     <Banner
       tone="warn"
-      action={<Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>{retry}</Button>}
+      action={(
+        <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0 max-md:h-11" aria-label={retry} title={retry} onClick={onRetry}>
+          <IconWord icon={RotateCwIcon} word={retry} />
+        </Button>
+      )}
     >
       <p className="text-sm font-medium">{title}</p>
       {detail !== null && <p className="mt-0.5 text-xs">{detail}</p>}

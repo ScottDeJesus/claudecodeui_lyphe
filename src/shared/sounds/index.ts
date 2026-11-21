@@ -1,8 +1,3 @@
-import askingUrl from '@/shared/sounds/asking.mp3';
-import finishedUrl from '@/shared/sounds/finished.mp3';
-import listenCloseUrl from '@/shared/sounds/listen-close.mp3';
-import listenOpenUrl from '@/shared/sounds/listen-open.mp3';
-import planAsksUrl from '@/shared/sounds/plan-asks.mp3';
 import type { SoundName } from '@/shared/types';
 
 /**
@@ -14,6 +9,10 @@ import type { SoundName } from '@/shared/types';
  *   - `listenOpen` / `listenClose`: Kaylee's name opened a recording / the recording closed. A breath and a low voice gliding up
  *     from A to E flat, then back down with a knock; short and dry, so they are over before he speaks.
  *
+ * Each is named by `new URL('./<file>', import.meta.url)`, not imported: the bundler still hashes the file and hands back its URL, while
+ * code run outside the bundler (a case under node, which loads `shared/utils` and so this file) is handed a file URL and never asked
+ * to load an MP3 as a module.
+ *
  * They are made by `scripts/sounds/make-sounds.py` (its recipes, then `python3 scripts/sounds/make-sounds.py src/shared/sounds`), which
  * prints the gains below; the same run gives the same files.
  *
@@ -22,11 +21,11 @@ import type { SoundName } from '@/shared/types';
  * 3 dB over the old chime, a finished turn 1 dB over it, Kaylee's cues level with the old ones. Turning one up or down is that one number.
  */
 const SOUNDS: Record<SoundName, { url: string; gainDb: number }> = {
-  asking: { url: askingUrl, gainDb: -23.1 },
-  planAsks: { url: planAsksUrl, gainDb: -20.2 },
-  finished: { url: finishedUrl, gainDb: -26.3 },
-  listenOpen: { url: listenOpenUrl, gainDb: -12.8 },
-  listenClose: { url: listenCloseUrl, gainDb: -11.5 },
+  asking: { url: new URL('./asking.mp3', import.meta.url).href, gainDb: -23.1 },
+  planAsks: { url: new URL('./plan-asks.mp3', import.meta.url).href, gainDb: -20.2 },
+  finished: { url: new URL('./finished.mp3', import.meta.url).href, gainDb: -26.3 },
+  listenOpen: { url: new URL('./listen-open.mp3', import.meta.url).href, gainDb: -12.8 },
+  listenClose: { url: new URL('./listen-close.mp3', import.meta.url).href, gainDb: -11.5 },
 };
 
 /** Each sound's samples, fetched and decoded once for every context that plays it: a decoded buffer belongs to no one context. */

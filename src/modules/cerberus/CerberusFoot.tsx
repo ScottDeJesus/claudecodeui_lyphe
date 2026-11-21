@@ -5,16 +5,16 @@ import { useTranslation } from 'react-i18next';
 import type { CerberusView } from '@/shared/types';
 import { Button, Tabs } from '@/shared/ui';
 
-/** The faces in the strip's old order, each with its name and its mark. */
+/** The faces in the strip's old order, each with its name, its mark and what it holds (its hover title, after its name). */
 const FACES = [
-  { id: 'fleet', labelKey: 'cerberus.fleet.tabs.fleet', icon: Radar },
-  { id: 'catalog', labelKey: 'cerberus.catalog.tab', icon: BookOpen },
-  { id: 'history', labelKey: 'cerberus.fleet.tabs.history', icon: History },
-  { id: 'tours', labelKey: 'cerberus.tours.tab', icon: MapIcon },
-  { id: 'bulletins', labelKey: 'cerberus.bulletins.tab', icon: Newspaper },
-  { id: 'uploads', labelKey: 'cerberus.uploads.tab', icon: CloudUpload },
-  { id: 'scheduling', labelKey: 'cerberus.scheduling.tab', icon: CalendarClock },
-] as const satisfies ReadonlyArray<{ id: CerberusView; labelKey: string; icon: unknown }>;
+  { id: 'fleet', labelKey: 'cerberus.fleet.tabs.fleet', hintKey: 'cerberus.fleet.tabs.fleetHint', icon: Radar },
+  { id: 'catalog', labelKey: 'cerberus.catalog.tab', hintKey: 'cerberus.catalog.tabHint', icon: BookOpen },
+  { id: 'history', labelKey: 'cerberus.fleet.tabs.history', hintKey: 'cerberus.fleet.tabs.historyHint', icon: History },
+  { id: 'tours', labelKey: 'cerberus.tours.tab', hintKey: 'cerberus.tours.tabHint', icon: MapIcon },
+  { id: 'bulletins', labelKey: 'cerberus.bulletins.tab', hintKey: 'cerberus.bulletins.tabHint', icon: Newspaper },
+  { id: 'uploads', labelKey: 'cerberus.uploads.tab', hintKey: 'cerberus.uploads.tabHint', icon: CloudUpload },
+  { id: 'scheduling', labelKey: 'cerberus.scheduling.tab', hintKey: 'cerberus.scheduling.tabHint', icon: CalendarClock },
+] as const satisfies ReadonlyArray<{ id: CerberusView; labelKey: string; hintKey: string; icon: unknown }>;
 
 type CerberusFootProps = {
   face: CerberusView;
@@ -33,7 +33,7 @@ type CerberusFootProps = {
  * names, in its order) with, on the fleet, the plus that enrolls a node (its mark alone: the word is its title and its name).
  *
  * Each face is its mark and its word at a desk and its mark alone below the large breakpoint, where seven words do not fit; the word
- * stays its name, so a face is still found by it. The Fleet face counts the checks that need a person, in the warn tone, while
+ * stays its name, so a face is still found by it, and its hover title says what it holds. The Fleet face counts the checks that need a person, in the warn tone, while
  * another face is shown. The docked instrument steps aside on a phone, where the Fleet face is the way back. Drawn by the panel
  * (`CerberusPanel`).
  */
@@ -72,6 +72,7 @@ export function CerberusFoot({ face, onFace, needs, onEnroll, docked }: Cerberus
             tabs={FACES.map((entry) => ({
               id: entry.id,
               label: t(entry.labelKey),
+              hint: t(entry.hintKey),
               icon: entry.icon,
               ...(entry.id === 'fleet' && face !== 'fleet' && needs > 0
                 ? { count: needs, attention: t('cerberus.fleet.bar.needs', { count: needs }) }

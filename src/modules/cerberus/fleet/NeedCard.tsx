@@ -3,13 +3,12 @@ import { useTranslation } from 'react-i18next';
 
 import { DiagnoseButton } from '@/modules/cerberus/DiagnoseButton';
 import { NeedFix } from '@/modules/cerberus/fleet/NeedFix';
-import { IconWord } from '@/modules/cerberus/IconWord';
 import { StatusGlyph } from '@/modules/cerberus/StatusMarks';
 import { STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCheckView, CerberusNeed } from '@/shared/cerberus-types';
 import type { CerberusSheetTarget } from '@/shared/types';
-import { Button } from '@/shared/ui';
+import { Button, IconWord } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type NeedCardProps = {

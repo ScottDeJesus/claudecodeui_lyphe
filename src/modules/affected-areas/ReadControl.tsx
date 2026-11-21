@@ -1,10 +1,11 @@
+import { CircleStop, ListChecks, RefreshCw, ScanSearch } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import { FACES, listWords, needsRead } from '@/modules/affected-areas/utils/tourModel';
 import type { Budget, ReadResult, ViewEntry } from '@/shared/affected-areas-types';
 import type { PanoPress, TourReaderProgress } from '@/shared/types';
-import { Banner, Button, Meter } from '@/shared/ui';
+import { Banner, Button, IconWord, Meter } from '@/shared/ui';
 
 type ReadControlProps = {
   /** The open pano's press and what it stands on; null on the tour screen, where only Read the rest is offered. */
@@ -163,18 +164,42 @@ export function ReadControl({ pano, walk, unreadPanos, unreadViews, onReadRest, 
 
       <div className="flex flex-wrap gap-2">
         {pano !== null && left && (
-          <Button size="sm" variant={loud} className={PRESS} busy={pano.press.pressing !== null} onClick={pano.onRead}>
-            {pano.press.pressing === 'read' ? t('affectedAreas.read.readingPano') : t('affectedAreas.read.readPano')}
+          <Button
+            size="sm"
+            variant={loud}
+            className={`${PRESS} finger:size-11 finger:px-0`}
+            busy={pano.press.pressing !== null}
+            aria-label={pano.press.pressing === 'read' ? t('affectedAreas.read.readingPano') : t('affectedAreas.read.readPano')}
+            title={pano.press.pressing === 'read' ? t('affectedAreas.read.readingPano') : t('affectedAreas.read.readPano')}
+            onClick={pano.onRead}
+          >
+            <IconWord icon={ScanSearch} word={pano.press.pressing === 'read' ? t('affectedAreas.read.readingPano') : t('affectedAreas.read.readPano')} />
           </Button>
         )}
         {pano !== null && again !== null && (
-          <Button size="sm" variant={left ? 'outline' : loud} className={PRESS} busy={pano.press.pressing !== null} onClick={pano.onReadAgain}>
-            {pano.press.pressing === 'again' ? t('affectedAreas.read.readingAgain') : t('affectedAreas.read.readAgain')}
+          <Button
+            size="sm"
+            variant={left ? 'outline' : loud}
+            className={`${PRESS} finger:size-11 finger:px-0`}
+            busy={pano.press.pressing !== null}
+            aria-label={pano.press.pressing === 'again' ? t('affectedAreas.read.readingAgain') : t('affectedAreas.read.readAgain')}
+            title={pano.press.pressing === 'again' ? t('affectedAreas.read.readingAgain') : t('affectedAreas.read.readAgain')}
+            onClick={pano.onReadAgain}
+          >
+            <IconWord icon={RefreshCw} word={pano.press.pressing === 'again' ? t('affectedAreas.read.readingAgain') : t('affectedAreas.read.readAgain')} />
           </Button>
         )}
         {(unreadPanos > 0 || walk.running) && (
-          <Button size="sm" variant={pano === null ? loud : 'outline'} className={PRESS} busy={walk.running} onClick={onReadRest}>
-            {walk.running ? t('affectedAreas.read.readingRest') : t('affectedAreas.read.readRest')}
+          <Button
+            size="sm"
+            variant={pano === null ? loud : 'outline'}
+            className={`${PRESS} finger:size-11 finger:px-0`}
+            busy={walk.running}
+            aria-label={walk.running ? t('affectedAreas.read.readingRest') : t('affectedAreas.read.readRest')}
+            title={walk.running ? t('affectedAreas.read.readingRest') : t('affectedAreas.read.readRest')}
+            onClick={onReadRest}
+          >
+            <IconWord icon={ListChecks} word={walk.running ? t('affectedAreas.read.readingRest') : t('affectedAreas.read.readRest')} />
           </Button>
         )}
       </div>
@@ -193,8 +218,8 @@ export function ReadControl({ pano, walk, unreadPanos, unreadViews, onReadRest, 
               value={t('affectedAreas.read.walkingShare', { percent: walk.total === 0 ? 0 : Math.round(((walk.index - 1) / walk.total) * 100) })}
             />
           </div>
-          <Button size="sm" variant="outline" className={`flex-none ${PRESS}`} onClick={onStopRest}>
-            {t('affectedAreas.read.stopRest')}
+          <Button size="sm" variant="outline" className={`flex-none ${PRESS} finger:size-11 finger:px-0`} aria-label={t('affectedAreas.read.stopRest')} title={t('affectedAreas.read.stopRest')} onClick={onStopRest}>
+            <IconWord icon={CircleStop} word={t('affectedAreas.read.stopRest')} />
           </Button>
         </div>
       )}

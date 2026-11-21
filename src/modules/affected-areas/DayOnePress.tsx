@@ -1,9 +1,10 @@
+import { CircleStop, DraftingCompass } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import type { Budget, LayoutReadResult } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, TourReaderProgress } from '@/shared/types';
-import { Banner, Button, Meter } from '@/shared/ui';
+import { Banner, Button, IconWord, Meter } from '@/shared/ui';
 
 type DayOnePressProps = {
   /**
@@ -143,12 +144,14 @@ export function DayOnePress({ lastAnswer, trouble, walk, unreadPanos, unreadView
           <Button
             size="sm"
             variant={quiet ? 'outline' : 'default'}
-            className={PRESS}
+            className={`${PRESS} finger:size-11 finger:px-0`}
             busy={walk.running}
+            aria-label={walk.running ? t('affectedAreas.dayOne.press.reading') : t('affectedAreas.dayOne.press.read')}
+            title={walk.running ? t('affectedAreas.dayOne.press.reading') : t('affectedAreas.dayOne.press.read')}
             data-day-one-press-read=""
             onClick={onRead}
           >
-            {walk.running ? t('affectedAreas.dayOne.press.reading') : t('affectedAreas.dayOne.press.read')}
+            <IconWord icon={DraftingCompass} word={walk.running ? t('affectedAreas.dayOne.press.reading') : t('affectedAreas.dayOne.press.read')} />
           </Button>
         </div>
       )}
@@ -162,8 +165,8 @@ export function DayOnePress({ lastAnswer, trouble, walk, unreadPanos, unreadView
               value={t('affectedAreas.read.walkingShare', { percent: walk.total === 0 ? 0 : Math.round(((walk.index - 1) / walk.total) * 100) })}
             />
           </div>
-          <Button size="sm" variant="outline" className={`flex-none ${PRESS}`} onClick={onStop}>
-            {t('affectedAreas.read.stopRest')}
+          <Button size="sm" variant="outline" className={`flex-none ${PRESS} finger:size-11 finger:px-0`} aria-label={t('affectedAreas.read.stopRest')} title={t('affectedAreas.read.stopRest')} onClick={onStop}>
+            <IconWord icon={CircleStop} word={t('affectedAreas.read.stopRest')} />
           </Button>
         </div>
       )}

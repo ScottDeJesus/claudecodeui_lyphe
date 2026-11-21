@@ -8,7 +8,7 @@ import { DayOnePress } from '@/modules/affected-areas/DayOnePress';
 import { DayOneRooms } from '@/modules/affected-areas/DayOneRooms';
 import type { Codebook, DayOneFloor, Face, LayoutReadResult, LayoutStatus } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, TourReaderProgress } from '@/shared/types';
-import { EmptyState, SegmentedControl } from '@/shared/ui';
+import { Rule, SegmentedControl } from '@/shared/ui';
 import { formatRelativeTime } from '@/shared/utils';
 
 type DayOneSketchProps = {
@@ -36,8 +36,6 @@ type DayOneSketchProps = {
   onStopLayout: () => void;
 };
 
-/** The house's section eyebrow (MAN-742): it names the section, and no state is said in it alone. */
-const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
 
 /**
  * The drawing beside the room list from 960 px of panel; under it, the list stands under the drawing. Wider than the pano
@@ -164,11 +162,15 @@ export function DayOneSketch({
     // The two states whose words invite the press say instead, while it is refused, that the warning above is why.
     const invites = empty === 'none' || empty === 'unknown';
     body = (
-      <EmptyState
-        icon={state === 'unavailable' ? Ruler : DraftingCompass}
-        title={t(`affectedAreas.dayOne.empty.${empty}Title`)}
-        message={t(`affectedAreas.dayOne.empty.${empty}${invites && refused ? 'Refused' : ''}Message`)}
-      />
+      <p className="m-0 flex max-w-[760px] items-start gap-2.5 text-[13.5px] text-muted-foreground">
+        {state === 'unavailable'
+          ? <Ruler aria-hidden="true" className="mt-0.5 size-4 flex-none" />
+          : <DraftingCompass aria-hidden="true" className="mt-0.5 size-4 flex-none" />}
+        <span>
+          <span className="block text-foreground">{t(`affectedAreas.dayOne.empty.${empty}Title`)}</span>
+          {t(`affectedAreas.dayOne.empty.${empty}${invites && refused ? 'Refused' : ''}Message`)}
+        </span>
+      </p>
     );
   }
 
@@ -176,7 +178,7 @@ export function DayOneSketch({
     <section aria-labelledby={headingId} data-day-one={state} className="flex min-w-0 flex-col gap-3">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1">
-          <h3 id={headingId} className={EYEBROW}>{t('affectedAreas.dayOne.title')}</h3>
+          <Rule id={headingId}>{t('affectedAreas.dayOne.title')}</Rule>
           {layout !== null && layout.status !== 'none' && (
             <p className="text-[13.5px] text-foreground">{statusWords(layout, state === 'plan', rebuilding, t)}</p>
           )}

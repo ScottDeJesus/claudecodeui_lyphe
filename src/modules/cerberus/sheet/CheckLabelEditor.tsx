@@ -2,9 +2,8 @@ import { Check, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { IconWord } from '@/modules/cerberus/IconWord';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { Button, Input } from '@/shared/ui';
+import { Button, IconWord, Input } from '@/shared/ui';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 
 type CheckLabelEditorProps = {

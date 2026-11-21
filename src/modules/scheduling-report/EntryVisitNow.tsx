@@ -32,12 +32,12 @@ export function EntryVisitNow({ visit, after }: EntryVisitNowProps) {
   const v = 'cerberus.scheduling.sheet.visit';
 
   if (visit === null) {
-    return <p className="m-0 rounded-lg border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground" data-scheduling-visit="none">{t(`${v}.none`)}</p>;
+    return <p className="m-0 text-[13px] text-muted-foreground" data-scheduling-visit="none">{t(`${v}.none`)}</p>;
   }
 
   return (
     <div className="flex min-w-0 flex-col gap-3" data-scheduling-visit={visit.status}>
-      <div className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border px-3.5 py-3 text-[13px] leading-snug">
+      <div className="flex min-w-0 flex-col gap-1.5 text-[13px] leading-snug">
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Badge as="span" tone="neutral" className="flex-none" title={t(`${v}.statusTitle`)}>{visit.status}</Badge>
           <span className="min-w-0 break-words font-medium text-foreground">{spanWord(t, visit.start_at, visit.end_at)}</span>
@@ -52,7 +52,7 @@ export function EntryVisitNow({ visit, after }: EntryVisitNowProps) {
       ) : (
         <div className="flex min-w-0 flex-col gap-2" data-scheduling-after={after.length}>
           <p className="m-0 text-xs text-muted-foreground">{t(`${v}.after`, { count: after.length })}</p>
-          <ol className="m-0 flex min-w-0 list-none flex-col divide-y divide-border rounded-lg border border-border p-0">
+          <ol className="m-0 flex min-w-0 list-none flex-col divide-y divide-border border-y border-border p-0">
             {after.map((act) => <ActLine key={act.id} act={act} foreign />)}
           </ol>
         </div>

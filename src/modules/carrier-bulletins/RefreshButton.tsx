@@ -1,7 +1,7 @@
 import { RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { Button } from '@/shared/ui';
+import { Button, IconWord } from '@/shared/ui';
 
 type RefreshButtonProps = {
   onRefresh: () => void;
@@ -16,9 +16,8 @@ type RefreshButtonProps = {
 export function RefreshButton({ onRefresh }: RefreshButtonProps) {
   const { t } = useTranslation();
   return (
-    <Button variant="outline" size="sm" className="h-8 flex-none max-md:h-11" onClick={onRefresh}>
-      <RefreshCw aria-hidden="true" />
-      {t('cerberus.bulletins.refresh')}
+    <Button variant="outline" size="sm" className="h-8 flex-none finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.bulletins.refresh')} title={t('cerberus.bulletins.refresh')} onClick={onRefresh}>
+      <IconWord icon={RefreshCw} word={t('cerberus.bulletins.refresh')} />
     </Button>
   );
 }

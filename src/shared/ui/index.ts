@@ -141,6 +141,9 @@ export { HeldPage } from '@/shared/ui/HeldPage';
 // How often: a window's items by day (stacked clean / hiccup / test columns) and by local hour, each with its sentence. The
 // Cerberus tab's Uploads view draws it, handing in its own words as a key prefix.
 export { HowOften } from '@/shared/ui/HowOften';
+// A worded button's face: its mark and its word at a desk, its mark alone under a finger, the word kept as its name. The cerberus
+// tab draws its worded buttons with it, in its own faces and in the four views it borrows.
+export { IconWord } from '@/shared/ui/IconWord';
 export { Input } from '@/shared/ui/Input';
 export { Lightbox } from '@/shared/ui/Lightbox';
 export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';

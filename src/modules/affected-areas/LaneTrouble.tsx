@@ -1,8 +1,9 @@
+import { RotateCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { AFFECTED_AREAS_LANE_FAULTS } from '@/shared/constants';
 import type { AffectedAreasTrouble } from '@/shared/types';
-import { Banner, Button } from '@/shared/ui';
+import { Banner, Button, IconWord } from '@/shared/ui';
 
 type LaneTroubleProps = {
   trouble: AffectedAreasTrouble;
@@ -32,8 +33,8 @@ export function LaneTrouble({ trouble, subject, onRetry }: LaneTroubleProps) {
       <Banner
         tone="warn"
         action={(
-          <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>
-            {t('affectedAreas.trouble.retry')}
+          <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.trouble.retry')} title={t('affectedAreas.trouble.retry')} onClick={onRetry}>
+            <IconWord icon={RotateCw} word={t('affectedAreas.trouble.retry')} />
           </Button>
         )}
       >

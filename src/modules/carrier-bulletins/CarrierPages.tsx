@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, FileSearch } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,7 +12,7 @@ import { carrierStanding, partGroups, STANDING_LOOK } from '@/modules/carrier-bu
 import { fileWords, pageSplitWords, pullCommand, standingWords } from '@/modules/carrier-bulletins/utils/bulletinWords';
 import type { BulletinPage, OverviewRow } from '@/shared/carrier-bulletins-types';
 import type { AffectedAreasTrouble } from '@/shared/types';
-import { Banner, Button, Card } from '@/shared/ui';
+import { Banner, Button, IconWord } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
 
 type CarrierPagesProps = {
@@ -47,16 +47,16 @@ function partRange(pages: BulletinPage[], t: TFunction): string {
   return parts.join(' · ');
 }
 
-/** Verve's waiting surface in the shape of a part: its heading and a card of page rows, while the pages are read. */
+/** Verve's waiting surface in the shape of a part: its heading and its page rows between hairlines, while the pages are read. */
 function ReadingPages() {
   const { t } = useTranslation();
   return (
     <div aria-busy="true" className="flex flex-col gap-2">
       <p role="status" className="sr-only">{t('cerberus.bulletins.carrier.reading')}</p>
       <div aria-hidden="true" className="vv-skeleton h-5 w-2/5" />
-      <Card aria-hidden="true" className="flex flex-col gap-3 px-4 py-3.5">
+      <div aria-hidden="true" className="flex flex-col gap-3 border-y border-border py-3.5">
         {[0, 1, 2, 3, 4, 5].map((row) => <div key={row} className="vv-skeleton h-4 w-full" />)}
-      </Card>
+      </div>
     </div>
   );
 }
@@ -96,9 +96,8 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button variant="ghost" size="sm" className="-ml-3 max-md:h-11" onClick={onBack} {...WAY_BACK}>
-            <ChevronLeft aria-hidden="true" />
-            {t('cerberus.bulletins.carrier.back')}
+          <Button variant="ghost" size="sm" className="-ml-3 finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.bulletins.carrier.back')} title={t('cerberus.bulletins.carrier.back')} onClick={onBack} {...WAY_BACK}>
+            <IconWord icon={ChevronLeft} word={t('cerberus.bulletins.carrier.back')} />
           </Button>
           {row === null ? (
             <div aria-hidden="true" className="flex w-full flex-col gap-2 pt-1">
@@ -127,8 +126,15 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
         <Banner
           tone="warn"
           action={(
-            <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={() => onOpenPage(waiting[0].page)}>
-              {t('cerberus.bulletins.carrier.openPage', { page: waiting[0].page })}
+            <Button
+              variant="tonal"
+              size="sm"
+              className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0 max-md:h-11"
+              aria-label={t('cerberus.bulletins.carrier.openPage', { page: waiting[0].page })}
+              title={t('cerberus.bulletins.carrier.openPage', { page: waiting[0].page })}
+              onClick={() => onOpenPage(waiting[0].page)}
+            >
+              <IconWord icon={FileSearch} word={t('cerberus.bulletins.carrier.openPage', { page: waiting[0].page })} />
             </Button>
           )}
         >
@@ -166,11 +172,9 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
             </h3>
             <p className="text-[12.5px] text-muted-foreground">{partRange(part.pages, t)}</p>
           </div>
-          <Card className="overflow-hidden">
-            <ul aria-labelledby={`${baseId}-${index}`} className="m-0 list-none divide-y divide-border p-0">
-              {part.pages.map((page) => <PageRow key={page.page} page={page} showState={!sameState(part.pages)} onOpen={onOpenPage} />)}
-            </ul>
-          </Card>
+          <ul aria-labelledby={`${baseId}-${index}`} className="m-0 list-none divide-y divide-border border-y border-border p-0">
+            {part.pages.map((page) => <PageRow key={page.page} page={page} showState={!sameState(part.pages)} onOpen={onOpenPage} />)}
+          </ul>
         </section>
       ))}
     </div>

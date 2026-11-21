@@ -59,7 +59,7 @@ export function UploadTypeList({ types, runs, regression, friction, frictionFail
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <ul className="flex min-w-0 flex-col gap-2" data-uploads-types>
+      <ul className="flex min-w-0 flex-col divide-y divide-border border-b border-border" data-uploads-types>
         {types.map((row) => {
           const name = typeWord(t, row.upload_type);
           const ofType = runs.filter((run) => run.upload_type === row.upload_type && !run.dry_run);
@@ -68,10 +68,10 @@ export function UploadTypeList({ types, runs, regression, friction, frictionFail
           const trend = trendMark(row.trend);
           const returned = regression[row.upload_type];
           return (
-            <li key={row.upload_type} className="min-w-0 rounded-lg border border-border" data-uploads-type={row.upload_type}>
+            <li key={row.upload_type} className="min-w-0" data-uploads-type={row.upload_type}>
               <Collapsible className="min-w-0">
                 <CollapsibleTrigger
-                  className="group flex min-h-11 w-full min-w-0 flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-muted"
+                  className="group flex min-h-11 w-full min-w-0 flex-wrap items-center gap-2 px-1 py-2 text-left hover:bg-muted"
                   aria-label={t(`${k}.toggle`, { type: name })}
                 >
                   <ChevronRightIcon className="h-4 w-4 flex-none text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" aria-hidden="true" />

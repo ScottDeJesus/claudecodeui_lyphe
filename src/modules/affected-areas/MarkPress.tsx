@@ -13,6 +13,8 @@ type JudgmentPressProps = Omit<ComponentProps<typeof Button>, 'variant' | 'size'
   tone: Tone;
   /** The press's mark (✓, ✕): it carries the state in greyscale, where the tone cannot. */
   glyph: ReactNode;
+  /** Its word ("Confirm", "Not a change"): drawn beside the mark at a desk, its name and title always, the mark alone under a finger. */
+  word: string;
   /** This press's own mark is out: its glyph turns into the waiting ring, and it refuses a second press. */
   out?: boolean;
 };
@@ -25,21 +27,26 @@ type JudgmentPressProps = Omit<ComponentProps<typeof Button>, 'variant' | 'size'
  * (`bg-tone-soft`, `text-tone-ink`, `ring-tone-dot`; MAN-739 rule 4): the button is drawn without a variant, because
  * every variant carries a colour of its own and an accent hover that would turn a grey press green under the pointer.
  * `busy` (any press of the bar out) dims it and refuses the press while keeping its focus; `out` is the one that went.
+ * Under a finger it is a 44 px square of its mark alone, its word kept as its name; what follows the word (a key cap) is
+ * its `children`.
  *
  * Used by the affected-areas module's `MarkPresses` (Confirm, Not a change), `FacePhoto` (Save) and
  * `UnderstandingVerdict` (Right, Wrong).
  */
-export function JudgmentPress({ tone, glyph, out = false, busy = false, className, children, ...rest }: JudgmentPressProps) {
+export function JudgmentPress({ tone, glyph, word, out = false, busy = false, className, children, ...rest }: JudgmentPressProps) {
   return (
     <Button
+      aria-label={word}
+      title={word}
       {...rest}
       variant={null}
       size="sm"
       data-tone={tone}
       busy={busy || out}
-      className={cn('bg-tone-soft text-tone-ink ring-1 ring-inset ring-tone-dot/45 hover:bg-tone-dot/20 max-md:h-11', className)}
+      className={cn('bg-tone-soft text-tone-ink ring-1 ring-inset ring-tone-dot/45 hover:bg-tone-dot/20 max-md:h-11 finger:size-11 finger:px-0', className)}
     >
       {out ? <Loader2 aria-hidden="true" className="motion-safe:animate-spin" /> : glyph}
+      <span className="finger:hidden">{word}</span>
       {children}
     </Button>
   );

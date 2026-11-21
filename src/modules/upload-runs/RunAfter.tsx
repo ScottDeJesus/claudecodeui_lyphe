@@ -34,18 +34,18 @@ export function RunAfter({ walks, after, presses }: RunAfterProps) {
 
   if (after.length === 0) {
     const armed = walks.some((walk) => walk.armed);
-    return <p className="m-0 rounded-lg border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground" data-uploads-after="0">{t(armed ? `${a}.notYet` : `${a}.nothing`)}</p>;
+    return <p className="m-0 text-[13px] text-muted-foreground" data-uploads-after="0">{t(armed ? `${a}.notYet` : `${a}.nothing`)}</p>;
   }
 
   const ordered = [...after].sort((x, y) => (x.confirmed_at ?? '').localeCompare(y.confirmed_at ?? ''));
   return (
-    <ul className="m-0 flex min-w-0 list-none flex-col divide-y divide-border rounded-lg border border-border p-0" data-uploads-after={after.length}>
+    <ul className="m-0 flex min-w-0 list-none flex-col divide-y divide-border border-y border-border p-0" data-uploads-after={after.length}>
       {ordered.map((entry) => {
         const walk = walks.find((candidate) => candidate.id === entry.walk_id);
         const press = entry.consumed_by_run_id === null ? undefined : presses.find((candidate) => candidate.id === entry.consumed_by_run_id);
         const state = entry.consumed_at !== null ? 'pressed' : entry.revoked_at !== null ? (entry.bookkeeping_revoke ? 'replaced' : 'revoked') : 'standing';
         return (
-          <li key={entry.grant_id} className="flex min-w-0 flex-col gap-1.5 px-3.5 py-3 text-[13px] leading-snug" data-upload-confirmation={state}>
+          <li key={entry.grant_id} className="flex min-w-0 flex-col gap-1.5 py-3 text-[13px] leading-snug" data-upload-confirmation={state}>
             <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <span className="min-w-0 break-words font-medium text-foreground">{t(`${a}.confirmedBy`, { who: whoWord(t, entry.confirmed_by) })}</span>
               <span className="font-mono text-xs tabular-nums text-muted-foreground">{entry.confirmed_at === null ? t(`${a}.noTime`) : dayClockWord(entry.confirmed_at)}</span>

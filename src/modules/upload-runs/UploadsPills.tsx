@@ -104,7 +104,8 @@ export function UploadsPills({ tally, truncated, live, healed, frictionFailed, n
   ];
 
   return (
-    <PillBar className="w-full flex-wrap" role="group" aria-label={t(`${p}.label`)} data-uploads-pills>
+    // No tray of its own: the pills stand between two hairlines on the view's ground.
+    <PillBar className="w-full flex-wrap rounded-none border-y border-border bg-transparent px-0 py-1" role="group" aria-label={t(`${p}.label`)} data-uploads-pills>
       {pills.map((pill) => (
         <Pill
           key={pill.key}

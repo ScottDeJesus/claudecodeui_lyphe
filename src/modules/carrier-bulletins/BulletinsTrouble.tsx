@@ -1,7 +1,8 @@
+import { RotateCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { AffectedAreasTrouble } from '@/shared/types';
-import { Banner, Button } from '@/shared/ui';
+import { Banner, Button, IconWord } from '@/shared/ui';
 
 type BulletinsTroubleProps = {
   /**
@@ -33,8 +34,8 @@ export function BulletinsTrouble({ trouble, subject, onRetry }: BulletinsTrouble
       <Banner
         tone="warn"
         action={(
-          <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>
-            {t('cerberus.bulletins.trouble.retry')}
+          <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.bulletins.trouble.retry')} title={t('cerberus.bulletins.trouble.retry')} onClick={onRetry}>
+            <IconWord icon={RotateCw} word={t('cerberus.bulletins.trouble.retry')} />
           </Button>
         )}
       >

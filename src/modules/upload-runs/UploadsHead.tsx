@@ -1,11 +1,11 @@
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, X } from 'lucide-react';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { LiveStatus, UploadsFilters, UploadsTally, UploadsWindow } from '@/modules/upload-runs/utils/uploadsModel';
 import { agoWord, whoWord } from '@/modules/upload-runs/utils/uploadsWords';
 import type { Tone } from '@/shared/types';
-import { Badge, Button, SegmentedControl } from '@/shared/ui';
+import { Badge, Button, IconWord, SegmentedControl } from '@/shared/ui';
 
 type UploadsHeadProps = {
   /** The window on screen. */
@@ -30,9 +30,9 @@ const WINDOWS: UploadsWindow[] = [7, 30, 90];
 /**
  * THE VIEW'S HEAD: the view's answer, ranked UNDER the tab's. The Cerberus tab has its own header above this one, with
  * the page's one big headline (34 px); this is a section's heading inside that page, so its serif is the size the tab's
- * inner pieces use (21 to 24 px) and its eyebrow names the view without saying "Cerberus" again.
+ * inner pieces use (21 to 24 px). It needs no eyebrow: the face at the tab's foot already names the view.
  *
- * On the left, top to bottom: the eyebrow; the headline, whose italic accent takes the state's tone and says it in words
+ * On the left, top to bottom: the headline, whose italic accent takes the state's tone and says it in words
  * ("An upload is *running*", "3 runs *hit a hiccup*", "All *clean*", "No upload *yet*"); the scope, only while the view is
  * narrowed; and the summary, which gives the headline its "compared to what": the runs in the window, how many ran clean,
  * how many hit a hiccup, and the last run's age and who pressed it.
@@ -91,7 +91,6 @@ export function UploadsHead({ days, tally, live, truncated, filters, now, onWind
   return (
     <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3" data-uploads-head>
       <div className="flex min-w-0 flex-col gap-1.5">
-        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{t(`${h}.eyebrow`)}</p>
         <h2 className="font-serif text-[length:clamp(21px,5.6cqi,24px)] font-normal leading-[1.15] text-foreground">
           {/* Keyed by its words, so a headline that changes rises in afresh, as the tab's own header does. */}
           <span key={`${headline.lead}|${headline.accent}`} className="inline-block motion-safe:animate-shape-rise">
@@ -101,8 +100,16 @@ export function UploadsHead({ days, tally, live, truncated, filters, now, onWind
         {scope !== null && (
           <p className="m-0 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5" data-uploads-scope={scope}>
             <Badge as="span" tone="info" className="min-w-0 whitespace-normal break-words">{t(`${h}.scope.${scope}`, { who, account })}</Badge>
-            <Button variant="outline" size="sm" className="h-7 flex-none px-2.5 text-xs finger:h-11" onClick={() => onFilter({ ...filters, by: null, account: null })} data-uploads-scope-clear>
-              {t(`${h}.scopeClear.${scope}`)}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 flex-none px-2.5 text-xs finger:size-11 finger:px-0"
+              aria-label={t(`${h}.scopeClear.${scope}`)}
+              title={t(`${h}.scopeClear.${scope}`)}
+              onClick={() => onFilter({ ...filters, by: null, account: null })}
+              data-uploads-scope-clear
+            >
+              <IconWord icon={X} word={t(`${h}.scopeClear.${scope}`)} />
             </Button>
           </p>
         )}
@@ -122,9 +129,8 @@ export function UploadsHead({ days, tally, live, truncated, filters, now, onWind
           value={String(days)}
           onChange={(value) => onWindow(Number(value) as UploadsWindow)}
         />
-        <Button variant="outline" size="sm" className="h-8 flex-none max-md:h-11" onClick={onRefresh}>
-          <RefreshCw aria-hidden="true" />
-          {t(`${h}.refresh`)}
+        <Button variant="outline" size="sm" className="h-8 flex-none finger:size-11 finger:px-0 max-md:h-11" aria-label={t(`${h}.refresh`)} title={t(`${h}.refresh`)} onClick={onRefresh}>
+          <IconWord icon={RefreshCw} word={t(`${h}.refresh`)} />
         </Button>
       </div>
     </header>

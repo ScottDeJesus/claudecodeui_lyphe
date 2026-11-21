@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { UnderstandingMark } from '@/modules/affected-areas/UnderstandingMark';
 import { capitalized, spoken } from '@/modules/affected-areas/utils/tourModel';
 import type { ReadState, Understanding } from '@/shared/affected-areas-types';
-import { Card } from '@/shared/ui';
+import { Rule } from '@/shared/ui';
 import { formatRelativeTime } from '@/shared/utils';
 
 type UnderstandingCardProps = {
@@ -47,8 +47,8 @@ export function UnderstandingCard({ understanding, read }: UnderstandingCardProp
   add('couldNotSee', understanding.couldNotSee);
 
   return (
-    <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3 px-[18px] py-4">
-      <h3 id={headingId} className="text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.understanding.title')}</h3>
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3">
+      <Rule id={headingId}>{t('affectedAreas.understanding.title')}</Rule>
       {understanding.summary !== null && <p className="text-[13.5px] leading-relaxed text-foreground">{understanding.summary}</p>}
       {terms.length > 0 && (
         <dl className="m-0 grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)] gap-x-4 gap-y-2 text-[13px]">
@@ -69,6 +69,6 @@ export function UnderstandingCard({ understanding, read }: UnderstandingCardProp
       )}
       {/* Keyed by the read: an answer, a refusal or a Wrong note typed for one face's account never rides to another face's. */}
       {read !== null && read.readId !== null && <UnderstandingMark key={read.readId} read={read} />}
-    </Card>
+    </section>
   );
 }

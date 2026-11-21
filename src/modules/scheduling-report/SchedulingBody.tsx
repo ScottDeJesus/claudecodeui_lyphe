@@ -6,7 +6,7 @@ import { SchedulingKindList } from '@/modules/scheduling-report/SchedulingKindLi
 import { SchedulingOpeners } from '@/modules/scheduling-report/SchedulingOpeners';
 import type { SchedulingFilters, SchedulingRead } from '@/modules/scheduling-report/utils/schedulingModel';
 import type { SchedulingOverview } from '@/shared/scheduling-report-types';
-import { Badge, HowOften } from '@/shared/ui';
+import { HowOften, Rule } from '@/shared/ui';
 
 type SchedulingBodyProps = {
   /** The window as the server answered it. */
@@ -28,8 +28,8 @@ type SchedulingBodyProps = {
  * everything is one column in the same order, kinds, how often, where it starts, sessions, which is the order a phone
  * reads them in. The columns flow in the tab's own scroll; nothing here scrolls inside itself.
  *
- * Each section is addressable by id, so a pill can carry the reader to it, and is headed by the tab's eyebrow with a
- * short hint of how to read it.
+ * Each section is addressable by id, so a pill can carry the reader to it, and is headed by its Rule, with what it counts
+ * at the line's end.
  *
  * THE SESSIONS BADGE IS THE LIST'S OWN NUMBER. Speed bumps only is applied here, once, and the same entries are counted
  * for the badge and handed to the list, so the badge never says 31 over ten rows. People's sessions are counted apart
@@ -53,32 +53,28 @@ export function SchedulingBody({ overview, read, filters, now, onFilter, onOpenE
       data-scheduling-body
     >
       <div className="flex min-w-0 flex-col gap-7" data-scheduling-column="left">
-        <SchedulingSection id="scheduling-kinds" title={t(`${s}.kinds`)} hint={t(`${s}.kindsHint`)}>
+        <SchedulingSection id="scheduling-kinds" title={t(`${s}.kinds`)}>
           <SchedulingKindList kinds={overview.kinds} entries={overview.entries} now={now} onOpenEntry={onOpenEntry} />
         </SchedulingSection>
-        <SchedulingSection id="scheduling-often" title={t(`${s}.often`)} hint={t(`${s}.oftenHint`)}>
+        <SchedulingSection id="scheduling-often" title={t(`${s}.often`)}>
           <HowOften days={read.days} hours={read.hours} words="cerberus.scheduling.often" />
         </SchedulingSection>
-        <SchedulingSection id="scheduling-starts" title={t(`${s}.starts`)} hint={t(`${s}.startsHint`)}>
+        <SchedulingSection id="scheduling-starts" title={t(`${s}.starts`)}>
           <SchedulingOpeners openers={overview.openers} entries={overview.entries} />
         </SchedulingSection>
       </div>
-      <SchedulingSection id="scheduling-sessions" title={t(`${s}.sessions`)} hint={t(`${s}.sessionsHint`)} badge={badge}>
+      <SchedulingSection id="scheduling-sessions" title={t(`${s}.sessions`)} badge={badge}>
         <EntryList overview={overview} entries={listed} filters={filters} onFilter={onFilter} onOpenEntry={onOpenEntry} />
       </SchedulingSection>
     </div>
   );
 }
 
-/** A titled block of the body, addressable by id so a pill can carry the reader to it. Its hint is set apart by space, with no dot of its own: when it wraps under the title, no stray mark leads its line. */
-function SchedulingSection({ id, title, hint, badge, children }: { id: string; title: string; hint: string; badge?: string; children: ReactNode }) {
+/** A titled block of the body, addressable by id so a pill can carry the reader to it: its Rule, with what it counts at the line's end. */
+function SchedulingSection({ id, title, badge, children }: { id: string; title: string; badge?: string; children: ReactNode }) {
   return (
     <section id={id} aria-labelledby={`${id}-title`} className="flex min-w-0 scroll-mt-4 flex-col gap-3" data-scheduling-section={id}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 id={`${id}-title`} className="text-xs font-normal uppercase tracking-[0.14em] text-muted-foreground">{title}</h3>
-        {badge !== undefined && <Badge as="span" tone="neutral">{badge}</Badge>}
-        <span className="text-xs text-muted-foreground">{hint}</span>
-      </div>
+      <Rule id={`${id}-title`} end={badge}>{title}</Rule>
       {children}
     </section>
   );

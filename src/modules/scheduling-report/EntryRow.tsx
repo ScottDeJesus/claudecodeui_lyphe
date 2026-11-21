@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { dayClockWord, durationWord, isUndoPress, jobWord, reasonWords, resultWord, surfaceWord, verdictLook, whoWord } from '@/modules/scheduling-report/utils/schedulingWords';
 import type { SchedulingEntry } from '@/shared/scheduling-report-types';
-import { Badge, Chip } from '@/shared/ui';
+import { Badge } from '@/shared/ui';
 
 type EntryRowProps = {
   entry: SchedulingEntry;
@@ -75,9 +75,17 @@ export function EntryRow({ entry, onOpenEntry }: EntryRowProps) {
         </span>
         {(reasons.length > 0 || stillOpen || entry.surface !== null) && (
           <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-            {reasons.slice(0, REASON_CHIPS).map((reason) => (machine || reason.tone === 'neutral'
-              ? <Badge key={reason.code} as="span" tone="neutral">{reasonWords(t, reason).chip}</Badge>
-              : <Chip key={reason.code} size="sm" tone={reason.tone}>{reasonWords(t, reason).chip}</Chip>
+            {/* Each reason a word in its tone's ink (a machine's, and a neutral one, in the quiet ink), parted by a dot: no box of its own inside the row. */}
+            {reasons.slice(0, REASON_CHIPS).map((reason, index) => (
+              <span
+                key={reason.code}
+                data-tone={machine || reason.tone === 'neutral' ? undefined : reason.tone}
+                className={machine || reason.tone === 'neutral' ? 'text-xs text-muted-foreground' : 'text-xs font-medium text-tone-ink'}
+                data-scheduling-reason-word={reason.code}
+              >
+                {index > 0 && <span aria-hidden="true" className="mr-1.5 text-muted-foreground">·</span>}
+                {reasonWords(t, reason).chip}
+              </span>
             ))}
             {more > 0 && <span className="text-xs text-muted-foreground">{t(`${r}.moreReasons`, { count: more })}</span>}
             {stillOpen && (

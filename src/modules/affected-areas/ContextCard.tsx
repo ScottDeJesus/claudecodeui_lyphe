@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { capitalized, listWords, spoken } from '@/modules/affected-areas/utils/tourModel';
 import type { ContextSummary } from '@/shared/affected-areas-types';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { Button, Card } from '@/shared/ui';
+import { Button, Rule } from '@/shared/ui';
 import { cn, formatShortDate, resizeObserverIn } from '@/shared/utils';
 
 type ContextCardProps = {
@@ -14,7 +14,6 @@ type ContextCardProps = {
   linked: boolean;
 };
 
-const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
 
 /**
  * Where the facts came from, in a person's words: the source tables shadow-connector names, folded into the four
@@ -90,8 +89,8 @@ export function ContextCard({ context, linked }: ContextCardProps) {
   if (context.carrier !== null) facts.push([t('affectedAreas.context.carrier'), context.carrier]);
 
   return (
-    <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3 px-[18px] py-4">
-      <h3 id={headingId} className={EYEBROW}>{t('affectedAreas.context.title')}</h3>
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3">
+      <Rule id={headingId}>{t('affectedAreas.context.title')}</Rule>
       {loss !== '' && <p className="text-[15px] font-medium text-foreground">{loss}</p>}
       {context.statedCause !== null && <p className="text-[13.5px]">{t('affectedAreas.context.cause', { cause: context.statedCause })}</p>}
       {context.lossAccount !== null ? (
@@ -129,6 +128,6 @@ export function ContextCard({ context, linked }: ContextCardProps) {
       )}
       {!linked && <p className="text-[13.5px] text-muted-foreground">{t('affectedAreas.context.docusketchOnly')}</p>}
       <p className="text-xs text-muted-foreground">{t('affectedAreas.context.from', { sources: sourceWords(context.sources, t) })}</p>
-    </Card>
+    </section>
   );
 }

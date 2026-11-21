@@ -1,7 +1,7 @@
 import { Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Lightbox } from '@/shared/ui';
+import { Button, IconWord, Lightbox } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 
 type PageImageProps = {
@@ -57,9 +57,16 @@ export function PageImage({ image, page, carrier, stored, enlarged, onEnlarge, o
         <span className="min-w-0 text-[12.5px] text-muted-foreground">
           {day === null ? t('cerberus.bulletins.page.captionPage', { page }) : t('cerberus.bulletins.page.caption', { page, stored: day })}
         </span>
-        <Button variant="ghost" size="sm" className="-ml-3 flex-none max-md:h-11 [@container(min-width:720px)]:ml-0" disabled={image === null} onClick={onEnlarge}>
-          <Maximize2 aria-hidden="true" />
-          {t('cerberus.bulletins.page.enlarge')}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-3 flex-none finger:size-11 finger:px-0 max-md:h-11 [@container(min-width:720px)]:ml-0"
+          aria-label={t('cerberus.bulletins.page.enlarge')}
+          title={t('cerberus.bulletins.page.enlarge')}
+          disabled={image === null}
+          onClick={onEnlarge}
+        >
+          <IconWord icon={Maximize2} word={t('cerberus.bulletins.page.enlarge')} />
         </Button>
       </figcaption>
       {/* Mounted only while open, as the Lightbox asks: it opens into the top layer and gives focus back on close. */}

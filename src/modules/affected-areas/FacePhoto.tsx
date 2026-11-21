@@ -1,4 +1,4 @@
-import { Check, ChevronDown, PenLine, SquareDashed } from 'lucide-react';
+import { Check, ChevronDown, PenLine, SquareDashed, X } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,7 +7,7 @@ import { REGION_LOOK } from '@/modules/affected-areas/utils/regionLook';
 import { kindName } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, ViewEntry } from '@/shared/affected-areas-types';
 import type { MissedStage, RegionShape } from '@/shared/types';
-import { Badge, Button, buttonVariants, Menu, RegionImage } from '@/shared/ui';
+import { Badge, Button, buttonVariants, IconWord, Menu, RegionImage } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type FacePhotoProps = {
@@ -115,17 +115,16 @@ export function FacePhoto({
               <SquareDashed aria-hidden="true" className="size-4 flex-none" />
               {t('affectedAreas.missed.hint')}
             </p>
-            <Button variant="ghost" size="sm" className="flex-none max-md:h-11" data-missed-press="cancel" onClick={onCancel}>
-              {t('buttons.cancel')}
+            <Button variant="ghost" size="sm" className="flex-none finger:size-11 finger:px-0 max-md:h-11" aria-label={t('buttons.cancel')} title={t('buttons.cancel')} data-missed-press="cancel" onClick={onCancel}>
+              <IconWord icon={X} word={t('buttons.cancel')} />
             </Button>
           </>
         ) : (
           <>
             <div className="min-w-0">{tools}</div>
             {idle && (
-              <Button variant="outline" size="sm" className="flex-none max-md:h-11" data-missed-press="start" onClick={onDraw}>
-                <SquareDashed aria-hidden="true" />
-                {t('affectedAreas.missed.missedOne')}
+              <Button variant="outline" size="sm" className="flex-none finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.missed.missedOne')} title={t('affectedAreas.missed.missedOne')} data-missed-press="start" onClick={onDraw}>
+                <IconWord icon={SquareDashed} word={t('affectedAreas.missed.missedOne')} />
               </Button>
             )}
           </>
@@ -183,9 +182,17 @@ export function FacePhoto({
                 width={248}
               />
             )}
-            <Button variant="ghost" size="sm" className="max-md:h-11" busy={saving} data-missed-press="note" onClick={onNote}>
-              <PenLine aria-hidden="true" />
-              {note === '' ? t('affectedAreas.mark.addNote') : t('affectedAreas.mark.editNote')}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="finger:size-11 finger:px-0 max-md:h-11"
+              busy={saving}
+              aria-label={note === '' ? t('affectedAreas.mark.addNote') : t('affectedAreas.mark.editNote')}
+              title={note === '' ? t('affectedAreas.mark.addNote') : t('affectedAreas.mark.editNote')}
+              data-missed-press="note"
+              onClick={onNote}
+            >
+              <IconWord icon={PenLine} word={note === '' ? t('affectedAreas.mark.addNote') : t('affectedAreas.mark.editNote')} />
             </Button>
             <JudgmentPress
               tone={human.tone}
@@ -194,11 +201,10 @@ export function FacePhoto({
               aria-disabled={held.kind === null || undefined}
               data-missed-press="save"
               onClick={onSave}
-            >
-              {t('buttons.save')}
-            </JudgmentPress>
-            <Button variant="ghost" size="sm" className="max-md:h-11" busy={saving} data-missed-press="cancel" onClick={onCancel}>
-              {t('buttons.cancel')}
+              word={t('buttons.save')}
+            />
+            <Button variant="ghost" size="sm" className="finger:size-11 finger:px-0 max-md:h-11" busy={saving} aria-label={t('buttons.cancel')} title={t('buttons.cancel')} data-missed-press="cancel" onClick={onCancel}>
+              <IconWord icon={X} word={t('buttons.cancel')} />
             </Button>
           </div>
           {note !== '' && (

@@ -2,10 +2,9 @@ import { ChevronsDown } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { IconWord } from '@/modules/cerberus/IconWord';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import type { CerberusFeedFoot, TimelineEvent } from '@/shared/types';
-import { Button, Rule, Timeline } from '@/shared/ui';
+import { Button, IconWord, Rule, Timeline } from '@/shared/ui';
 
 type EventsCardProps = {
   /** The feed's rows, newest first, `null` until the first page answers. */

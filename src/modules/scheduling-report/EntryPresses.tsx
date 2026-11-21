@@ -29,9 +29,9 @@ export function EntryPresses({ acts, unanswered }: EntryPressesProps) {
   return (
     <div className="flex min-w-0 flex-col gap-2.5" data-scheduling-presses={acts.length}>
       {acts.length === 0 ? (
-        <p className="m-0 rounded-lg border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">{t(`${p}.none`)}</p>
+        <p className="m-0 text-[13px] text-muted-foreground">{t(`${p}.none`)}</p>
       ) : (
-        <ol className="m-0 flex min-w-0 list-none flex-col divide-y divide-border rounded-lg border border-border p-0">
+        <ol className="m-0 flex min-w-0 list-none flex-col divide-y divide-border border-y border-border p-0">
           {acts.map((act) => <ActLine key={act.id} act={act} />)}
         </ol>
       )}

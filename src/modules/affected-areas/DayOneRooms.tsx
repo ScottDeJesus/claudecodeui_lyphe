@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { band, feet, numberedItems } from '@/modules/affected-areas/utils/dayOneModel';
 import { capitalized, listWords, roomWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, DayOneFloor, DayOneRoom, Face, RoomSide } from '@/shared/affected-areas-types';
-import { Badge, Card } from '@/shared/ui';
+import { Badge, Rule } from '@/shared/ui';
 
 type DayOneRoomsProps = {
   /** The floor shown: its rooms in the plan's order, and everything laid on them. */
@@ -95,15 +95,15 @@ export function DayOneRooms({ floor, codebook, onOpenPanoAt }: DayOneRoomsProps)
   const several = floor.rooms.length > 1;
 
   return (
-    <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col overflow-hidden" data-day-one-rooms="">
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2" data-day-one-rooms="">
       {/* A part of the "Day-one sketch" section (its `h3`), so one level under it. */}
-      <h4 id={headingId} className="px-4 pb-2 pt-4 text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.dayOne.rooms.title')}</h4>
-      <ul aria-labelledby={headingId} className="m-0 list-none divide-y divide-border border-t border-border p-0">
+      <Rule id={headingId} level={4}>{t('affectedAreas.dayOne.rooms.title')}</Rule>
+      <ul aria-labelledby={headingId} className="m-0 list-none divide-y divide-border border-b border-border p-0">
         {floor.rooms.map((room) => {
           const held = items.filter((item) => item.roomKey === room.roomKey);
           const open = room.sides.some((side) => side.source === 'open');
           return (
-            <li key={room.roomKey} data-day-one-room={room.roomKey} className="flex min-w-0 flex-col gap-1 px-4 py-3">
+            <li key={room.roomKey} data-day-one-room={room.roomKey} className="flex min-w-0 flex-col gap-1 py-3">
               <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                 <span className="text-sm font-semibold text-foreground [overflow-wrap:anywhere]">{roomWords(room.roomName, null, false, t)}</span>
                 <span className="text-[13px] text-foreground">{sizeWords(room, t)}</span>
@@ -168,6 +168,6 @@ export function DayOneRooms({ floor, codebook, onOpenPanoAt }: DayOneRoomsProps)
           );
         })}
       </ul>
-    </Card>
+    </section>
   );
 }

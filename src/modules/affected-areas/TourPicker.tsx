@@ -6,7 +6,7 @@ import { LaneTrouble } from '@/modules/affected-areas/LaneTrouble';
 import { addressBesideName, tourFacts, tourName, tourReadState } from '@/modules/affected-areas/utils/tourModel';
 import type { TourSummary } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, Tone } from '@/shared/types';
-import { Badge, Card, EmptyState, Input } from '@/shared/ui';
+import { Badge, Input, Rule } from '@/shared/ui';
 
 type TourPickerProps = {
   /** The search field's text, held by the view root so the list a person searched is the one Back returns to. */
@@ -34,7 +34,7 @@ function ReadingRows() {
     <ul aria-busy="true" className="m-0 list-none p-0">
       <li className="sr-only" role="status">{t('affectedAreas.picker.reading')}</li>
       {[0, 1, 2, 3].map((row) => (
-        <li key={row} aria-hidden="true" className="flex items-start gap-3 border-t border-border px-4 py-3.5 first:border-t-0">
+        <li key={row} aria-hidden="true" className="flex items-start gap-3 border-t border-border px-1 py-3.5 first:border-t-0">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <div className="vv-skeleton h-[18px] w-2/5" />
             <div className="vv-skeleton h-3.5 w-3/5" />
@@ -66,15 +66,18 @@ export function TourPicker({ query, tours, trouble, onQuery, onOpenTour, onRetry
   const searching = query.trim() !== '';
 
   let body;
-  if (trouble !== null) body = <div className="p-4"><LaneTrouble trouble={trouble} subject="tours" onRetry={onRetry} /></div>;
+  if (trouble !== null) body = <LaneTrouble trouble={trouble} subject="tours" onRetry={onRetry} />;
   else if (tours === null) body = <ReadingRows />;
   else if (tours.length === 0) {
-    body = searching
-      ? <EmptyState title={t('affectedAreas.picker.noMatch', { query: query.trim() })} message={t('affectedAreas.picker.noMatchMessage')} />
-      : <EmptyState title={t('affectedAreas.picker.empty')} message={t('affectedAreas.picker.emptyMessage')} />;
+    body = (
+      <p className="m-0 text-[13.5px] text-muted-foreground" data-tours-empty={searching ? 'search' : 'none'}>
+        <span className="block text-foreground">{searching ? t('affectedAreas.picker.noMatch', { query: query.trim() }) : t('affectedAreas.picker.empty')}</span>
+        {searching ? t('affectedAreas.picker.noMatchMessage') : t('affectedAreas.picker.emptyMessage')}
+      </p>
+    );
   } else {
     body = (
-      <ul aria-labelledby={headingId} className="m-0 list-none divide-y divide-border p-0">
+      <ul aria-labelledby={headingId} className="m-0 list-none divide-y divide-border border-b border-border p-0">
         {tours.map((tour, index) => {
           const state = tourReadState(tour);
           return (
@@ -83,7 +86,7 @@ export function TourPicker({ query, tours, trouble, onQuery, onOpenTour, onRetry
                 type="button"
                 onClick={() => onOpenTour(tour.tourId)}
                 style={{ animationDelay: `${Math.min(index, STAGGER_ROWS) * STAGGER_MS}ms` }}
-                className="flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-background focus-visible:[outline-offset:-2px] motion-safe:animate-[vv-rise_.4s_theme(transitionTimingFunction.enter)_both]"
+                className="flex w-full items-start gap-3 px-1 py-3.5 text-left hover:bg-muted focus-visible:[outline-offset:-2px] motion-safe:animate-[vv-rise_.4s_theme(transitionTimingFunction.enter)_both]"
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -117,11 +120,10 @@ export function TourPicker({ query, tours, trouble, onQuery, onOpenTour, onRetry
         />
       </div>
       <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2">
-        <h2 id={headingId} className="text-xs uppercase tracking-[0.14em] text-ink-faint">
+        <Rule id={headingId} level={2} end={tours !== null && tours.length > 0 ? String(tours.length) : undefined}>
           {searching ? t('affectedAreas.picker.matching', { query: query.trim() }) : t('affectedAreas.picker.recent')}
-        </h2>
-        {/* An empty answer stands alone: EmptyState draws its own frame, and a card around it would frame it twice. */}
-        {tours !== null && tours.length === 0 && trouble === null ? body : <Card className="overflow-hidden">{body}</Card>}
+        </Rule>
+        {body}
       </section>
     </div>
   );

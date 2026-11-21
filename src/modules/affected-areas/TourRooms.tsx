@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { roomWords } from '@/modules/affected-areas/utils/tourModel';
 import type { RoomEntry } from '@/shared/affected-areas-types';
-import { Card } from '@/shared/ui';
+import { Rule } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type TourRoomsProps = {
@@ -55,22 +55,20 @@ export function TourRooms({ rooms }: TourRoomsProps) {
   const headingId = useId();
 
   return (
-    <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col overflow-hidden">
-      <h3 id={headingId} className="px-4 pb-2 pt-4 text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.rooms.title')}</h3>
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-1">
+      <Rule id={headingId} end={rooms.length > 0 ? String(rooms.length) : undefined}>{t('affectedAreas.rooms.title')}</Rule>
       {rooms.length === 0 ? (
-        <p className="px-4 pb-4 text-[13.5px] text-muted-foreground">{t('affectedAreas.rooms.empty')}</p>
+        <p className="text-[13.5px] text-muted-foreground">{t('affectedAreas.rooms.empty')}</p>
       ) : (
-        // Each row draws its hairline under itself, so a row of tiles reads as one line across. The list runs a pixel
-        // past the card's clipped bottom edge, which hides the last row's hairline: a short last row leaves no line
-        // stopping part way, and the card's own edge closes the list.
-        <ul aria-labelledby={headingId} className="m-0 -mb-px grid list-none grid-cols-[repeat(auto-fill,minmax(260px,1fr))] border-t border-border p-0">
+        // Each row draws its hairline under itself, so a row of tiles reads as one line across, on the view's own ground.
+        <ul aria-labelledby={headingId} className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(260px,1fr))] p-0">
           {rooms.map((room) => {
             const words = authorityWords(room, t);
             return (
               <li
                 key={`${room.roomKey}:${room.floor ?? 'none'}`}
                 data-tone={words === null ? undefined : 'warn'}
-                className="flex min-w-0 items-start gap-2.5 border-b border-border px-4 py-2.5"
+                className="flex min-w-0 items-start gap-2.5 border-b border-border py-2.5 pr-4"
               >
                 {/* The dot's column is kept on every row, so the names stand in one line down the list. */}
                 <span aria-hidden="true" className={cn('mt-1.5 size-2 flex-none rounded-full', words !== null && 'bg-tone-dot')} />
@@ -89,6 +87,6 @@ export function TourRooms({ rooms }: TourRoomsProps) {
           })}
         </ul>
       )}
-    </Card>
+    </section>
   );
 }

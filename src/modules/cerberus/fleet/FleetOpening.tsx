@@ -11,9 +11,8 @@ import { agoPhrase, muteTimeLeft } from '@/modules/cerberus/utils/fleetWords';
 import { batchPlace, canTake } from '@/modules/cerberus/utils/wardenUpdates';
 import type { CerberusOverview, CerberusWardens } from '@/shared/cerberus-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import { Button, Rule } from '@/shared/ui';
+import { Button, IconWord, Rule } from '@/shared/ui';
 import { cn } from '@/shared/utils';
-import { IconWord } from '@/modules/cerberus/IconWord';
 
 type FleetOpeningProps = {
   /** The fleet as center last answered it. */

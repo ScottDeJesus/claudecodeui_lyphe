@@ -42,11 +42,11 @@ export function SchedulingOpeners({ openers, entries }: SchedulingOpenersProps) 
   return (
     <div className="flex min-w-0 flex-col gap-3" data-scheduling-openers>
       {ordered.length === 0 ? (
-        <p className="m-0 rounded-lg border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">{t(`${o}.none`)}</p>
+        <p className="m-0 text-[13px] text-muted-foreground">{t(`${o}.none`)}</p>
       ) : (
-        <ul className="m-0 flex min-w-0 list-none flex-col divide-y divide-border rounded-lg border border-border p-0">
+        <ul className="m-0 flex min-w-0 list-none flex-col divide-y divide-border border-b border-border p-0">
           {ordered.map((row) => (
-            <li key={row.opener} className="flex min-w-0 items-baseline justify-between gap-3 px-3 py-2 text-[13px]" data-scheduling-opener={row.opener}>
+            <li key={row.opener} className="flex min-w-0 items-baseline justify-between gap-3 px-1 py-2 text-[13px]" data-scheduling-opener={row.opener}>
               <span className="min-w-0 break-words text-foreground">{openerWord(t, row.opener)}</span>
               <span className="flex-none text-xs tabular-nums text-muted-foreground">{t(`${o}.share`, { count: row.entries, total })}</span>
             </li>
