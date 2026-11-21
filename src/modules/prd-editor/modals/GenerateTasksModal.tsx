@@ -1,4 +1,7 @@
-import { Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Sparkles } from 'lucide-react';
+
+import { HEAD_PRESS } from '@/shared/constants';
+import { Button } from '@/shared/ui';
 
 const PRD_DOCS_URL =
   'https://github.com/eyaltoledano/claude-task-master/blob/main/docs/examples.md';
@@ -22,7 +25,10 @@ export default function GenerateTasksModal({
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-lg border border-border bg-card shadow-xl">
-        <div className="flex items-center justify-between border-b border-border p-6">
+        <div className="flex items-center gap-3 border-b border-border p-6">
+          <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onClose} aria-label={"Close"} title={"Close"}>
+            <ArrowLeft aria-hidden="true" />
+          </Button>
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--info-soft)]">
               <Sparkles className="h-4 w-4 text-[var(--info-ink)]" />
@@ -31,12 +37,6 @@ export default function GenerateTasksModal({
               Generate Tasks from PRD
             </h3>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         <div className="space-y-4 p-6">

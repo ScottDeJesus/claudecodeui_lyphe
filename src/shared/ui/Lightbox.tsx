@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Maximize2, Minus, Plus, X } from 'lucide-react';
+import { ArrowLeft, Maximize2, Minus, Plus } from 'lucide-react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
@@ -171,14 +171,15 @@ export function Lightbox({ label, children, onClose }: LightboxProps) {
           onClose();
         }}
         aria-label={t('lightbox.close')}
-        // The inset rides the OFFSET, not the layer's padding: an absolutely positioned box is
-        // placed against its containing block's padding EDGE, which padding does not move — measured,
-        // the layer's padding went 0 -> 47px and this button stayed at y=16, inside the band. `1rem`
-        // is the `top-4 right-4` it replaces, kept as the breathing room inside the band edge, and it
-        // is 0 pixels of change wherever there is no inset (every desktop and every non-PWA window).
-        className="absolute right-[calc(1rem+var(--safe-area-inset-right))] top-[calc(1rem+var(--safe-area-inset-top))] rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+        title={t('lightbox.close')}
+        // The way out is the back arrow at the top's start, as on every page's head, never a cross at its end. The inset rides
+        // the OFFSET, not the layer's padding: an absolutely positioned box is placed against its containing block's padding
+        // EDGE, which padding does not move — measured, the layer's padding went 0 -> 47px and this button stayed at y=16,
+        // inside the band. `1rem` is the breathing room inside the band edge, and it is 0 pixels of change wherever there is
+        // no inset (every desktop and every non-PWA window).
+        className="absolute left-[calc(1rem+var(--safe-area-inset-left))] top-[calc(1rem+var(--safe-area-inset-top))] rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
       >
-        <X className="h-5 w-5" />
+        <ArrowLeft className="h-5 w-5" aria-hidden="true" />
       </button>
 
       <div

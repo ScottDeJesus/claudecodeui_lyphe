@@ -1,19 +1,10 @@
 import { useRef } from 'react';
 import type { ReactNode } from 'react';
-import {
-  Download,
-  Eye,
-  FileText,
-  Maximize2,
-  Minimize2,
-  Moon,
-  Save,
-  Sparkles,
-  Sun,
-  X,
-} from 'lucide-react';
+import { ArrowLeft, Download, Eye, FileText, Maximize2, Minimize2, Moon, Save, Sparkles, Sun } from 'lucide-react';
 
+import { HEAD_PRESS } from '@/shared/constants';
 import { cn } from '@/shared/utils';
+import { Button } from '@/shared/ui';
 
 type PrdEditorHeaderProps = {
   fileName: string;
@@ -86,6 +77,9 @@ export default function PrdEditorHeader({
   return (
     <div className="flex min-w-0 flex-shrink-0 items-center justify-between border-b border-border p-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
+        <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onClose} aria-label={"Close"} title={"Close"}>
+          <ArrowLeft aria-hidden="true" />
+        </Button>
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-primary">
           <FileText className="h-4 w-4 text-primary-foreground" />
         </div>
@@ -219,11 +213,6 @@ export default function PrdEditorHeader({
           {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
 
-        <HeaderIconButton
-          title="Close"
-          onClick={onClose}
-          icon={<X className="h-6 w-6 md:h-4 md:w-4" />}
-        />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { HEAD_PRESS } from '@/shared/constants';
 import { Button } from '@/shared/ui';
 
 type CreateTaskModalProps = {
@@ -21,11 +22,11 @@ export default function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProp
       <div className="vv-dialog__backdrop absolute inset-0" onClick={onClose} aria-hidden />
 
       <div className="vv-dialog__panel relative w-full max-w-md">
-        <div className="flex items-center justify-between border-b border-border p-5">
-          <h3 className="text-lg font-semibold text-foreground">{t('createTask.title')}</h3>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label={t('createTask.close')}>
-            <X />
+        <div className="flex items-center gap-3 border-b border-border p-5">
+          <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onClose} aria-label={t('createTask.close')} title={t('createTask.close')}>
+            <ArrowLeft aria-hidden="true" />
           </Button>
+          <h3 className="text-lg font-semibold text-foreground">{t('createTask.title')}</h3>
         </div>
 
         <div className="space-y-5 p-5">

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Copy, Edit, Save, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Copy, Edit, Save, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { HEAD_PRESS } from '@/shared/constants';
 import { cn, copyTextToClipboard } from '@/shared/utils';
 import { api } from '@/shared/api';
 import { Badge, Button, Field, Input, Select } from '@/shared/ui';
@@ -130,7 +131,10 @@ export default function TaskDetailModal({
           backdrop, a sibling `absolute inset-0` that layer padding would leave short of the edge.
           No `--pwa-notch-safe-pad`: the panel carries no padding utility to compose with. */}
       <div className="pwa-notch-safe vv-dialog__panel relative flex h-full w-full flex-col max-md:rounded-none md:h-[90vh] md:max-w-4xl">
-        <div className="flex items-start justify-between gap-3 border-b border-border p-4 md:p-6">
+        <div className="flex items-start gap-3 border-b border-border p-4 md:p-6">
+          <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onClose} aria-label={t('createTask.close')} title={t('createTask.close')}>
+            <ArrowLeft aria-hidden="true" />
+          </Button>
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-center gap-2">
               <button
@@ -199,9 +203,6 @@ export default function TaskDetailModal({
               </Button>
             )}
 
-            <Button variant="ghost" size="icon" onClick={onClose} title={t('createTask.close')} aria-label={t('createTask.close')}>
-              <X />
-            </Button>
           </div>
         </div>
 
