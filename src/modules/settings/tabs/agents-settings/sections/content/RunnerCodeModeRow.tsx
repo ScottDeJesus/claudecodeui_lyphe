@@ -2,8 +2,8 @@ import { RefreshCw, SquareCode } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import SettingsToggle from '@/modules/settings/SettingsToggle';
-import { Button, SettingRow } from '@/shared/ui';
 import { useCodeMode } from '@/shared/hooks/useCodeMode';
+import { Button, SettingRow } from '@/shared/ui';
 
 /**
  * CODE MODE: WHICH LAUNCHES WORK WITH TWO TOOLS, one search and one script, instead of their built-in ones. The

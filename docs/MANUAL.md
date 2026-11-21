@@ -14259,15 +14259,31 @@ Returns `{config, unreadable, saving, texts, refusals, setNightly, typeField, le
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/bugHuntersWire.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useBugHunters.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersSetting.tsx
 
-## MAN-10079 — Code Mode card — Settings → Agents: RunnerCodeModeRow scaffold, handles, strings
+## MAN-10079 — Code Mode card — Settings → Agents: RunnerCodeModeRow, useCodeMode, GET/PUT /api/settings/code-mode
 
 `RunnerCodeModeRow.tsx` (Settings → Agents, drawn by `RunnerModelContent.tsx` directly under `RunnerMainSessionDactylsRow`) is the operator's card for Code Mode's per-kind switches (the verb and flags: MAN-10072). Code Mode: a launch works with two tools, one search and one script.
 
 ## Status
-- 2026-11-20: SCAFFOLD, drawn live from `FAKE_READING` (one `builders` entry, off, box ready). The Builders switch does not move and writes nothing.
-- The fill replaces the block under `// FILL: state` (the two types and `FAKE_READING`) with `useCodeMode()`, and the lines `// FILL: onToggle`, `// FILL: onRetry`. Its only line outside a marker is its import.
-- Names the card reads: `kinds`, `unreadable`, `ready`, `why`; it calls `onToggle(kind, next)` and `onRetry()`.
-- `useCodeMode` forgets EVERY position together (`useMainSessionDactylsSwitch`'s `forgetPosition`): never one kind's `enabled` `null` beside a known one.
+- 2026-11-20: WIRED. The card reads `useCodeMode()` (`kinds`, `unreadable`, `ready`, `why`); a press is `setEnabled(kind, next)`, Retry is `refresh()`. Nothing on the card holds a kind, a label or a sentence: all of it is the verb's.
+
+## The wires
+`code-mode` (`~/.claude/scripts/code-mode`, MAN-10072) is the switches' one reader and writer; CloudCLI reads and writes no flag file.
+
+| layer | file | does |
+|---|---|---|
+| verb client | `server/modules/settings/code-mode.ts` | `getCodeModeState()` runs `code-mode --status` (execFile, absolute path, 15 s, `userFacingEnv()` whole, cwd home) and answers its last stdout line, every field type-checked (one mistyped field anywhere → the whole answer untrusted); any failure answers `{ready: null, why: null, kinds: null}`, logged, never cached. `setCodeModeState(kind, enabled)` runs `code-mode set --by app:card -- <kind> on|off` and answers the status the verb printed. |
+| service | `settings.service.ts` | `getCodeMode` / `setCodeMode`, delegating verbatim. |
+| routes | `settings.routes.ts` | `GET /api/settings/code-mode`; `PUT /api/settings/code-mode` body `{"kind": string, "enabled": boolean}`. |
+| client | `src/shared/api.ts` | `api.settings.codeMode()`, `api.settings.saveCodeMode({kind, enabled})`. |
+| hook | `src/shared/hooks/useCodeMode.ts` | the one reader and writer in `src/`, on `useMainSessionDactylsSwitch`'s rules: read on mount, re-ask on `focus` and `visibilitychange`, no timer; one read in flight for the tab, one retry after 1.2 s; a single writer for the tab (a second press during a write is dropped); optimistic flip of that one kind, corrected by the PUT's answer; a failed PUT is re-read, and when that fails too EVERY kind's `enabled` goes `null` together (names and sentences kept). A body whose `kinds` is not a typed list (an error body, `kinds: null`) is "could not read", never off. |
+
+PUT answers:
+- 200: the verb's status after the write (`enabled` read back off disk, never the input).
+- 400 `INVALID_CODE_MODE_STATE`: `kind` not a non-empty string, or `enabled` not a boolean, or a body that is not an object. Nothing runs.
+- 400 `UNKNOWN_CODE_MODE_KIND`: the verb's exit 2 (`code-mode: no kind 'chats' — the kinds are: builders`). The verb refuses before writing. The `--` before the kind makes a kind spelled like a flag (`--status`) an unknown kind, never an option.
+- 502 `CODE_MODE_VERB_FAILED`: a timeout, a spawn failure, the verb's exit 3 refusal, or output that is not a typed status.
+
+A probe server started with `CODE_MODE_FLAG_DIR` on a scratch folder flips the scratch flags: the verb inherits the server's environment.
 
 ## Composition
 Kit parts only: `SettingRow`, `SettingsToggle`, `Button`. Icon `SquareCode`. No component was added.
@@ -14291,6 +14307,7 @@ Kit parts only: `SettingRow`, `SettingsToggle`, `Button`. Icon `SquareCode`. No 
 - `says` and `report` are the verb's data, never keys. The fake `says` equals `switch.KINDS["builders"]["says"]`.
 
 ## Measured
-- 2026-11-20: 9 states × 3 widths (1440, 390, 320 at 1.07 text scale) × light/dark, 54 pictures: no overflow, switch targets ≥44px on phones. At 320 scaled the kind rows sit 8px left of the title's sentences so the switch stays beside its name. `node .verify/code-mode-card-scaffold-shots.mjs` re-runs it (git-ignored; swaps the fake reading in the browser's copy of the module; shots in `.verify/shots/code-mode-card/<state>--<width>--<light|dark>.png`; no empty-list state).
+- 2026-11-20, the wired card: probe server (MAN-492) on :7897 with `CODE_MODE_FLAG_DIR` on a scratch folder, a Vite on :5199 (`CI=true SERVER_PORT=7897`) in front of it. GET, PUT builders on (flag file reads `on`), GET again, PUT `chats` and PUT `--status` (400 `UNKNOWN_CODE_MODE_KIND`, folder unchanged), PUT `enabled: "yes"` and a list body (400 `INVALID_CODE_MODE_STATE`); the real `~/.claude/state/code_mode/` never created. In the browser at 1440 and 390: card `ready`, handle `builders:on`; a press on the switch sent one PUT, removed the scratch flag and drew `builders:off`; no page error.
+- 2026-11-20: 9 states × 3 widths (1440, 390, 320 at 1.07 text scale) × light/dark, 54 pictures: no overflow, switch targets ≥44px on phones. At 320 scaled the kind rows sit 8px left of the title's sentences so the switch stays beside its name. Taken by `.verify/code-mode-card-scaffold-shots.mjs` (git-ignored), which swapped `FAKE_READING` in the browser's copy of the module; the wired card has no fake, so that script no longer runs against it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerCodeModeRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/code-mode-card-scaffold-shots.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/code-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerCodeModeRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCodeMode.ts
