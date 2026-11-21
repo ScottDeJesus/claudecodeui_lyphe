@@ -37,4 +37,4 @@ Runs `code-mode config --chat <id> --servers` with the map on stdin; the verb re
 
 Import `code-mode.service.ts` directly through `cloudcli-tsx` with `DATABASE_PATH` on a scratch database and `CODE_MODE_FLAG_DIR` on a scratch folder holding `chats.flag`; never write `chats.flag` at its real place. The verb writes `~/.claude/state/code_mode/chats/<id>/` for each chat it answers on.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/code-mode/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/code-mode-types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/code-mode/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/code-mode-types.ts
