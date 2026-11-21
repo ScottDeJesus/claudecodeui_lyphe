@@ -881,6 +881,7 @@ async function resolveSdkOptions(options, context, providerSessionId = context.r
     onNode: Boolean(options.node),
     cwd: options.cwd,
     servers: { ...(launch.servers ?? {}), ...baseServers },
+    compactionSeed: options.compactionSeed === true,
   });
   applyCodeModeLaunch(sdkOptions, codeMode);
   if (codeMode.on) {

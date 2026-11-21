@@ -8,6 +8,8 @@
 //   const id = newChat(ground);                           // a new Claude chat row, code_mode NULL
 //   const context = await contextOf(ground);              // the context providerRuntimeService.run hands a runtime
 //   codeModeRow(ground, id)                               // the raw sessions.code_mode cell (null, 0 or 1)
+//   talkedChat(ground, 0)                                 // a chat that has talked, its code_mode the word given
+//   compactChat(ground, id)                               // the chat swapped onto a new session, as a compaction does
 //   chatConfigOf(t, launch, id)                           // an on launch's server.json; its chat folder removed at the end
 //
 // NOTHING REAL IS WRITTEN. DATABASE_PATH names a scratch file before any database module loads, and
@@ -89,6 +91,31 @@ export function newChat(ground) {
   const id = randomUUID();
   ground.database.sessionsDb.createAppSession(id, "claude", ground.repo, "code mode case");
   return id;
+}
+
+/** A Claude chat that has talked (the CLI's session id and transcript path on its row), its code_mode the given word. */
+export function talkedChat(ground, word) {
+  const id = newChat(ground);
+  const providerSession = randomUUID();
+  ground.database.getConnection()
+    .prepare("UPDATE sessions SET provider_session_id = ?, jsonl_path = ?, code_mode = ? WHERE session_id = ?")
+    .run(providerSession, path.join(ground.folder, `${providerSession}.jsonl`), word, id);
+  return id;
+}
+
+/** Moves a chat onto a new session through the one mover a custom compaction uses; returns the new provider id. */
+export function compactChat(ground, id) {
+  const row = ground.database.getConnection().prepare("SELECT provider_session_id, jsonl_path FROM sessions WHERE session_id = ?").get(id);
+  const next = randomUUID();
+  ground.database.sessionCompactionsDb.swapToCompactedSession({
+    sessionId: id,
+    oldProviderSessionId: row.provider_session_id,
+    oldJsonlPath: row.jsonl_path,
+    newProviderSessionId: next,
+    facts: { trigger: "manual", summarizerModel: "haiku", summarizerServed: null, summarizerEffort: "low", preTokens: null, summarizerTokensIn: 0, summarizerTokensOut: 0, chunks: 1 },
+    seed: ["a case's seed"],
+  });
+  return next;
 }
 
 /** The raw sessions.code_mode cell, read with SQL so the reading does not lean on getCodeMode. */

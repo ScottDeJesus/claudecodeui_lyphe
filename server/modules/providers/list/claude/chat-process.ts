@@ -22,7 +22,7 @@
  *   installed CLI version (a running process is the build it was started with) are launch
  *   arguments and are not. The version is the one launch argument that is ORDERED rather than
  *   compared: only a process behind the binary is replaced, never one ahead of a reading.
- *   Whether a process runs in Code Mode is recorded and never compared: a chat keeps the mode it was born in.
+ *   Whether a process runs in Code Mode is recorded and never compared: a chat keeps its mode until its next compaction.
  *
  * consumer: claude-runtime.provider.js, session-host/idle-version-sweep.ts (the version rule)
  */

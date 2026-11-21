@@ -1,7 +1,7 @@
 // protects: server/modules/providers/list/claude/chat-process.ts
 // writes: none
 //
-// A chat keeps the mode it was born in, so the launch profile records codeMode and planLiveChanges never replaces a
+// A chat keeps its mode until its next compaction, so the launch profile records codeMode and planLiveChanges never replaces a
 // process over it: a Code Mode process whose next message could not ask the house (and so resolved off, with the
 // chat's real MCP map and no mcp__cm__search) keeps running in Code Mode, and the reverse holds too. A chat that is
 // not in Code Mode plans exactly as today (INV-8471): a changed MCP map respawns, a tool-set difference is a live

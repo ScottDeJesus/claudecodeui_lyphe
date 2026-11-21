@@ -42,26 +42,33 @@ const SERVERS_UNSENT = 'could not hand its changed servers to the house';
 const off = (): ChatCodeModeLaunch => ({ on: false });
 
 /**
- * A chat keeps the mode it was started in: the stored word is passed as `--born` so the verb never
- * re-reads the switch for it, and only the switch's own answer is stored, and only for a chat
- * whose row held nothing. An off that carries the house's reason (not ready, no folder) is logged
- * once and stored nowhere, and its `prompt`, when the house sent one, rides the launch. Any
- * failure answers off and stores nothing; a chat the mode cannot serve launches as it does today.
- * A chat's mode is settled by its first message: once its row holds a conversation, an undecided
- * row reads born off.
+ * A chat keeps its mode between compactions: the stored word is passed as `--born` so the verb never
+ * re-reads the switch for it. A compaction's seed launch starts a new conversation, so it is asked with
+ * no `--born`, as a new chat's first launch is, and its answer is stored beside the word
+ * (`swapped_code_mode`) for the swap to move in: the old conversation keeps its word until the chat
+ * really stands on the new one, and a take-back finds it there. Only the switch's own answer is stored,
+ * and only for a chat whose row held nothing or for a seed launch. An off that carries the house's reason
+ * (not ready, no folder) is logged once and stored nowhere, and its `prompt`, when the house sent one,
+ * rides the launch. Any failure answers off and stores nothing; a chat the mode cannot serve launches as
+ * it does today. A chat's mode is settled by its first message: once its row holds a conversation, an
+ * undecided row reads born off.
  */
 async function launchFor(input: {
   appSessionId: string | null;
   onNode: boolean;
   cwd: string;
   servers: Record<string, unknown>;
+  compactionSeed: boolean;
 }): Promise<ChatCodeModeLaunch> {
   const id = input.appSessionId;
-  if (!id || input.onNode || isKayleeChat(input.cwd)) return off();
+  if (!id) return off();
+  // Cleared before any way out, so a seed launch that stores no answer leaves the swap nothing stale to move in.
+  if (input.compactionSeed && !clearSwappedMode(id)) return off();
+  if (input.onNode || isKayleeChat(input.cwd)) return off();
 
-  let born: ReturnType<typeof sessionUserStateDb.getCodeMode>;
+  let born: boolean | null;
   try {
-    born = sessionUserStateDb.getCodeMode(id);
+    born = input.compactionSeed ? null : sessionUserStateDb.getCodeMode(id);
   } catch (error) {
     logOnce(LAUNCH_OFF, `could not read the stored mode: ${error instanceof Error ? error.message : String(error)}`, id);
     return off();
@@ -91,14 +98,29 @@ async function launchFor(input: {
     return launch;
   }
 
-  if (born === null) {
-    try {
-      if (!sessionUserStateDb.setCodeMode(id, launch.on)) logOnce(LAUNCH_STORE, 'no session row has this id', id);
-    } catch (error) {
-      logOnce(LAUNCH_STORE, error instanceof Error ? error.message : String(error), id);
-    }
-  }
+  if (input.compactionSeed) storeWord(id, () => sessionUserStateDb.setSwappedCodeMode(id, launch.on));
+  else if (born === null) storeWord(id, () => sessionUserStateDb.setCodeMode(id, launch.on));
   return launch;
+}
+
+/** False, logged once, when the seed's previous answer could not be cleared: the launch then answers off. */
+function clearSwappedMode(id: string): boolean {
+  try {
+    sessionUserStateDb.setSwappedCodeMode(id, null);
+    return true;
+  } catch (error) {
+    logOnce(LAUNCH_OFF, `could not clear the seed's stored mode: ${error instanceof Error ? error.message : String(error)}`, id);
+    return false;
+  }
+}
+
+/** Runs one store of the switch's answer; a missing row or a failed write is logged once and never fails the launch. */
+function storeWord(id: string, store: () => boolean): void {
+  try {
+    if (!store()) logOnce(LAUNCH_STORE, 'no session row has this id', id);
+  } catch (error) {
+    logOnce(LAUNCH_STORE, error instanceof Error ? error.message : String(error), id);
+  }
 }
 
 /**

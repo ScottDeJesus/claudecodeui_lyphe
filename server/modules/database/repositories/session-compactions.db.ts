@@ -202,6 +202,11 @@ export const sessionCompactionsDb = {
    * `transcriptPathAfterSwap`): a row naming a file that is not there yet is pruned, with its
    * chat, by the next full sync. In that gap the history reads the old file under the new id.
    *
+   * The chat's Code Mode word moves in the same transaction: the new conversation takes the mode its
+   * seed launch was decided in (`swapped_code_mode`, written by the code-mode module), and the old
+   * conversation's word is kept there for a take-back. A seed launch that stored no answer leaves the
+   * chat's word as it was. A duplicate announcement trades nothing again.
+   *
    * The seed's blocks are stored in the same upsert, as a JSON array, so the record that a
    * compaction happened and the text the new session was given can never be seen apart; a start-over
    * of the chat appends that text again (`latestCompaction`).
@@ -288,6 +293,13 @@ export const sessionCompactionsDb = {
         JSON.stringify(input.seed),
       );
 
+      // SQLite reads every right-hand side from the row as it stood, so this trades the two words.
+      if (chat.provider_session_id === input.oldProviderSessionId) {
+        db.prepare(
+          'UPDATE sessions SET code_mode = COALESCE(swapped_code_mode, code_mode), swapped_code_mode = code_mode WHERE session_id = ?'
+        ).run(input.sessionId);
+      }
+
       sessionsDb.repointSessionToProviderSession(input.sessionId, {
         providerSessionId: input.newProviderSessionId,
         jsonlPath: transcriptPathAfterSwap(input.oldJsonlPath, input.newProviderSessionId),
@@ -303,7 +315,8 @@ export const sessionCompactionsDb = {
    * is recorded as `compaction-abandoned` (at the path the chat holds when the indexer has repointed
    * it to the seed's file, else beside the old transcript), so the indexer never offers an abandoned
    * seed back as a chat and the chat's delete removes the file with the rest. Then the chat is repointed at its
-   * old session, `provider_session_id` and `jsonl_path` together.
+   * old session, `provider_session_id` and `jsonl_path` together, and its Code Mode word is the old
+   * conversation's again (the one the swap kept in `swapped_code_mode`).
    *
    * `newProviderSessionId` is the id the seed append announced, the one the swap moved the chat to.
    * It acts only while the chat stands on that id, so a repeat is a no-op and a stale take-back
@@ -350,6 +363,9 @@ export const sessionCompactionsDb = {
           ? chat.jsonl_path
           : siblingTranscriptPath(input.oldJsonlPath, input.newProviderSessionId),
       );
+
+      db.prepare('UPDATE sessions SET code_mode = swapped_code_mode, swapped_code_mode = NULL WHERE session_id = ?')
+        .run(input.sessionId);
 
       sessionsDb.repointSessionToProviderSession(input.sessionId, {
         providerSessionId: input.oldProviderSessionId,

@@ -2,7 +2,7 @@
 
 ## MAN-10091 — code-mode
 
-Code Mode for chats, CloudCLI's side: the two hooks the Claude runtime asks through its context (`context.codeMode`, MAN-8487), each answered by the house's verb `~/.claude/scripts/code-mode config --chat` (MAN-10072). Whether a chat works with one search and one script is the house's answer, behind its `chats` switch; this module passes the chat's facts, stores the one fact a chat keeps (the mode it was born in), and mounts no route and draws nothing.
+Code Mode for chats, CloudCLI's side: the two hooks the Claude runtime asks through its context (`context.codeMode`, MAN-8487), each answered by the house's verb `~/.claude/scripts/code-mode config --chat` (MAN-10072). Whether a chat works with one search and one script is the house's answer, behind its `chats` switch; this module passes the chat's facts, stores the one fact a chat keeps until its next compaction (the mode its conversation was started in), and mounts no route and draws nothing.
 
 | file | owns |
 | --- | --- |
@@ -17,7 +17,7 @@ The shapes are `ChatCodeModeLaunch` and `ChatCodeModeHooks` in `server/shared/co
 2. Reads `sessionUserStateDb.getCodeMode(id)` — `sessions.code_mode`: 1 born on, 0 born off; NULL reads born off when the row already holds a conversation (`provider_session_id` or `jsonl_path` set), so a chat that existed before its mode was decided never changes mode halfway through, and undecided only for a chat's first launch.
 3. Runs `code-mode config --chat <id> --cwd <cwd>`, plus `--born on|off` when the row holds a word, with `servers` as JSON on stdin (a map can carry a token, and argv shows in `ps`): `execFile` on the verb's absolute path, 12 s, 1 MB of output, `userFacingEnv()`, cwd home.
 4. Parses the LAST non-empty stdout line and checks every field: `{on:false}` with its `why` kept beside the launch (never inside it) and a string `prompt` kept inside it (any other `prompt` dropped), or `{on:true}` with `tools` strings, `server.command` a non-empty string and `server.args` strings, `prompt` a string, `env` string values, and `agents` kept only when it is an absolute path (anything else dropped, the launch still accepted: the path becomes the CLI's `--agents` argument). The launch is rebuilt field by field, so nothing beyond the contract reaches the runtime.
-5. Only the switch's own answer (on, or off with an empty `why`), and only for a chat whose row held no word: `setCodeMode(id, launch.on)`. A chat keeps the mode it was started in; `--born` means the verb never reads the switch for it again.
+5. Only the switch's own answer (on, or off with an empty `why`), and only for a chat whose row held no word: `setCodeMode(id, launch.on)`. Between compactions a chat keeps its mode; `--born` means the verb never reads the switch for it again. A compaction's seed launch (manual `/compact` or the automatic one; `options.compactionSeed`, asked as `compactionSeed: true`) starts a new conversation: it clears `sessions.swapped_code_mode`, passes no `--born`, and stores the switch's own answer there, never in `code_mode`; `swapToCompactedSession` trades the two in its transaction and `unswapCompactedSession` puts the old word back. The next message joins the seed's process, launched in that mode. The CLI's own compaction (the hand-off when the summarizer is not ready) keeps the process and session, so it changes no mode.
 
 Any failure — the stored mode unreadable, the verb timed out, exited non-zero or printed more than the cap, a last line that is not a launch, or an off whose `why` names the house's reason (the box not ready, the chat's folder not a directory) — answers off and stores nothing, and the chat launches as it does today (INV-78); an off carrying the house's reason keeps the house's `prompt` when it sent one. A chat's mode is settled by its first message: once its row holds a conversation, an undecided row reads born off. A store that finds no row (`setCodeMode` false) still answers the launch.
 
@@ -32,6 +32,8 @@ Runs `code-mode config --chat <id> --servers` with the map on stdin; the verb re
 ## The column
 
 `sessions.code_mode INTEGER` (nullable), added by `addSessionCodeModeColumn` in `migrations.ts`, run from `runMigrations` at boot right after `sessions.toolsets`; nothing is backfilled (the held-conversation rule above is read at every launch, so it reaches the rows the live database already had) and nothing is left for the operator to apply. A fork (`sessionsDb.createForkedSession`) writes the new row's `code_mode` as the row named by `forkedFromSessionId` holds it, in the same INSERT (`(SELECT code_mode FROM sessions WHERE session_id = ?)`): the fork resumes the source's transcript, so it is born in the source's mode. Otherwise read and written only through `sessionUserStateDb.getCodeMode` / `setCodeMode`; a value other than 0 or 1 reads undecided with one warning.
+
+`sessions.swapped_code_mode INTEGER` (nullable), added in `migrations.ts` beside it; nothing is backfilled. Holds the mode a compaction's seed launch decided for the new session, until `swapToCompactedSession` trades it with `code_mode` (the old word then waits in it for `unswapCompactedSession`). Written only through `sessionUserStateDb.setSwappedCodeMode(id, on | null)`.
 
 ## Probing
 
