@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react';
+
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,7 +8,7 @@ import { RefreshButton } from '@/modules/carrier-bulletins/RefreshButton';
 import { carrierGroups, GROUP_TONE } from '@/modules/carrier-bulletins/utils/bulletinModel';
 import type { LeftOutCarrier, OverviewRow } from '@/shared/carrier-bulletins-types';
 import type { AffectedAreasTrouble } from '@/shared/types';
-import { Banner, Card, EmptyState } from '@/shared/ui';
+import { Banner, Rule } from '@/shared/ui';
 
 type OverviewScreenProps = {
   /** Every carrier with a current file, as the overview answered; null while the read is out or when it failed. */
@@ -24,21 +24,19 @@ type OverviewScreenProps = {
 function ReadingRows() {
   const { t } = useTranslation();
   return (
-    <Card className="overflow-hidden">
-      <ul aria-busy="true" className="m-0 list-none p-0">
-        <li className="sr-only" role="status">{t('cerberus.bulletins.overview.reading')}</li>
-        {[0, 1, 2, 3].map((row) => (
-          <li key={row} aria-hidden="true" className="flex flex-col gap-2 border-t border-border px-4 py-3.5 first:border-t-0">
-            <div className="flex items-center justify-between gap-3">
-              <div className="vv-skeleton h-[18px] w-2/5" />
-              <div className="vv-skeleton h-6 w-24 rounded-full" />
-            </div>
-            <div className="vv-skeleton h-3.5 w-3/5" />
-            <div className="vv-skeleton h-3.5 w-4/5" />
-          </li>
-        ))}
-      </ul>
-    </Card>
+    <ul aria-busy="true" className="m-0 list-none border-y border-border p-0">
+      <li className="sr-only" role="status">{t('cerberus.bulletins.overview.reading')}</li>
+      {[0, 1, 2, 3].map((row) => (
+        <li key={row} aria-hidden="true" className="flex flex-col gap-2 border-t border-border px-1 py-3.5 first:border-t-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="vv-skeleton h-[18px] w-2/5" />
+            <div className="vv-skeleton h-6 w-24 rounded-full" />
+          </div>
+          <div className="vv-skeleton h-3.5 w-3/5" />
+          <div className="vv-skeleton h-3.5 w-4/5" />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -75,18 +73,19 @@ export function OverviewScreen({ rows, leftOut, trouble, onOpenCarrier, onRefres
   else if (rows.length === 0) {
     // "No carrier has a bulletin on file" is false when every carrier is left out (each has one the engine could not plan):
     // the banner above says so, and nothing is drawn under it.
-    body = leftOut.length > 0 ? null : <EmptyState icon={FileText} title={t('cerberus.bulletins.overview.empty')} message={t('cerberus.bulletins.overview.emptyMessage')} />;
+    body = leftOut.length > 0 ? null : (
+      <p className="m-0 border-t border-border pt-4 text-[13.5px] text-muted-foreground" data-bulletins-empty>
+        <span className="block text-foreground">{t('cerberus.bulletins.overview.empty')}</span>
+        {t('cerberus.bulletins.overview.emptyMessage')}
+      </p>
+    );
   } else {
     body = groups.map(({ group, rows: listed }) => (
       <section key={group} aria-labelledby={`${baseId}-${group}`} className="flex min-w-0 flex-col gap-2">
-        <h3 id={`${baseId}-${group}`} className="text-xs uppercase tracking-[0.14em] text-ink-faint">
-          {t(`cerberus.bulletins.overview.groups.${group}`)} · {listed.length}
-        </h3>
-        <Card className="overflow-hidden">
-          <ul aria-labelledby={`${baseId}-${group}`} className="m-0 list-none divide-y divide-border p-0">
-            {listed.map((row, index) => <CarrierRow key={row.bulletin_id} row={row} index={index} onOpen={onOpenCarrier} />)}
-          </ul>
-        </Card>
+        <Rule id={`${baseId}-${group}`} end={String(listed.length)}>{t(`cerberus.bulletins.overview.groups.${group}`)}</Rule>
+        <ul aria-labelledby={`${baseId}-${group}`} className="m-0 list-none divide-y divide-border border-b border-border p-0">
+          {listed.map((row, index) => <CarrierRow key={row.bulletin_id} row={row} index={index} onOpen={onOpenCarrier} />)}
+        </ul>
       </section>
     ));
   }

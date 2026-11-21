@@ -46,7 +46,7 @@ export function SchedulingKindList({ kinds, entries, now, onOpenEntry }: Schedul
   const k = 'cerberus.scheduling.kinds';
 
   return (
-    <ul className="flex min-w-0 flex-col gap-2" data-scheduling-kinds>
+    <ul className="flex min-w-0 flex-col divide-y divide-border border-b border-border" data-scheduling-kinds>
       {kinds.map((row) => {
         const name = t(`cerberus.scheduling.kind.${row.kind}`);
         const ofKind = entries.filter((entry) => entry.kind === row.kind && entry.actor_kind === 'person');
@@ -54,10 +54,10 @@ export function SchedulingKindList({ kinds, entries, now, onOpenEntry }: Schedul
         const quiet = row.clean + row.hiccups === 0;
         const trend = trendMark(row.trend);
         return (
-          <li key={row.kind} className="min-w-0 rounded-lg border border-border" data-scheduling-kind={row.kind}>
+          <li key={row.kind} className="min-w-0" data-scheduling-kind={row.kind}>
             <Collapsible className="min-w-0">
               <CollapsibleTrigger
-                className="group flex min-h-11 w-full min-w-0 flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-muted"
+                className="group flex min-h-11 w-full min-w-0 flex-wrap items-center gap-2 px-1 py-2 text-left hover:bg-muted"
                 aria-label={t(`${k}.toggle`, { kind: name })}
               >
                 <ChevronRightIcon className="h-4 w-4 flex-none text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" aria-hidden="true" />

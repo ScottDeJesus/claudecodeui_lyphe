@@ -3016,10 +3016,13 @@ The seams tool sets cross, as types and one hook. The Claude runtime reaches the
 | `ProviderRuntimeContext.toolsets` (`ChatToolsetHooks`) | `server/shared/types.ts` | always present; one hook, `launchFor({ appSessionId, onNode })` → `ChatToolsetLaunch` |
 | `useChatToolsets(hooks)` | `provider-runtime.service.ts` | stores the hooks every context carries |
 | `INERT_TOOLSET_HOOKS` | same | default; `launchFor` answers `{ env: {}, servers: null, promptLine: null }`, a fresh object per call, so a launch is today's |
+| `ProviderRuntimeContext.codeMode` (`ChatCodeModeHooks`, `server/shared/code-mode-types.ts`) | `server/shared/types.ts` | the context's third hook, always present; `launchFor({ appSessionId, onNode, cwd, servers })` → `ChatCodeModeLaunch` (`{ on: false, prompt? }` or `{ on: true, tools, server, prompt, env, agents? }`; both optional fields absent is a launch applied exactly as before), `serversChanged({ appSessionId, servers })` → void. Neither shape crosses a wire, so `src/shared` has no mirror; the file is listed in `.oxlintrc.json` (INV-6548) |
+| `useChatCodeMode(hooks)` | `provider-runtime.service.ts` | stores the hooks; called by `server/modules/code-mode/` at boot (MAN-10091) |
+| `INERT_CODE_MODE_HOOKS` | same | default; `launchFor` answers `{ on: false }` (a fresh object per call), `serversChanged` does nothing, so a launch is today's |
 | `IProviderRuntime.syncToolsets?(appSessionId)` | `server/shared/interfaces.ts` | optional; only a runtime with a live process per chat has it; answers `ToolsetSyncOutcome` |
 | `syncToolsets(provider, appSessionId)` | `provider-runtime.service.ts` | asks the provider's runtime, calling the verb as a method (`this` holds); answers `{ live: false }` for a runtime without the verb, a sync that throws or rejects, or a provider that fails to resolve; the last three log `[provider-runtime] could not sync the tool sets of <provider> session <id>:` |
 
-- `context.toolsets` is one delegating object that reads the registered hooks at CALL time, so a context built before `useChatToolsets` sees the hooks afterwards. why: a Claude process keeps the context of the message that spawned it.
+- `context.toolsets` and `context.codeMode` are each one delegating object that reads the registered hooks at CALL time, so a context built before `useChatToolsets` / `useChatCodeMode` sees the hooks afterwards. why: a Claude process keeps the context of the message that spawned it. The runtime imports nothing from `server/modules/code-mode/` either.
 
 - `useChatToolsets` is called by `toolsets.module.ts` at boot (MAN-8499); `session_toolsets_changed` is emitted by `toolsets.service.ts` after a switch that changed the on-sets (MAN-8500). The Claude runtime reads `context.toolsets` at every launch and answers `syncToolsets` for a chat with a live process (its call-ins, the one `setMcpServers` mechanism and the base-name guard: MAN-8495); a chat without one answers `live: 'next-message'`.
 - A probe script imports the app through `modules/providers/index.ts`. Importing `provider-runtime.service.ts` first dies on `Cannot access 'providerRegistry' before initialization` (circular import).
@@ -3038,7 +3041,7 @@ The seams tool sets cross, as types and one hook. The Claude runtime reaches the
 
 - `export { JWT_SECRET }` from `auth.middleware.js`; the toolsets module derives each chat's credential from it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/toolset-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/toolset-types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/code-mode-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/toolset-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/toolset-types.ts
 
 ## MAN-8490 — Composer tool-set section — ComposerToolsetSection, useSessionToolsets, the pill's count, the busy and waiting rows
 
@@ -3349,7 +3352,7 @@ The Tours view: a DocuSketch tour's affected areas drawn on a view's photo, or o
 |---|---|
 | phase | live: the Cerberus tab's fourth view, reading the lane; run whole against the live engine 2026-10-17 (`.verify/affected-areas-view.mjs`, `.verify/affected-areas-walk.mjs`); its 360° screen run 2026-10-22 (`.verify/affected-areas-sphere.mjs`: MAN-8956) |
 | mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view), inside a `KeptView` (MAN-8918): mounted on the first show of the Tours tab, `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano, `shown` and the sphere's look are lost then). why: the tour, pano, `shown` and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so the panel's `useKeptViews` keeps Tours's offset (written as Tours is left, restored as it returns) |
-| words | `affectedAreas.*` and `cerberus.tours.{tab,tabHint}` in `src/modules/i18n/locales/en/common.json` |
+| words | `affectedAreas.*` and `cerberus.tours.tab` in `src/modules/i18n/locales/en/common.json` |
 | shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `PanoShown` (`'sphere'` or a `Face`), `TourReaderProgress`, `AffectedAreasTrouble`, `PanoRoom` (a pano's `roomKey` and `floor`, against which a region's placement says "Counted in {room}"), `DayOneSection` (what `DayOneSketch` is handed, MAN-9038) in `src/shared/types.ts`; the sphere's `CubeFaces`, `SphereShape`, `SphereLook`, `SphereTrouble`: MAN-8943; the marks' `ToursScreenKey`, `RegionLayer`, `MarkWalk`, `MissedStage`: MAN-8582 |
 | shared constants | `AFFECTED_AREAS_LANE_FAULTS` (`no_secret`, `unreachable`, `unreadable`: the faults of the lane whatever was asked, each said in `affectedAreas.trouble.<fault>`) in `src/shared/constants.ts`; read by `LaneTrouble`, `ThresholdControl`, `MarkRefusal`. `MARK_NOTE_MAX` (500) beside it: MAN-8582 |
 
@@ -4084,7 +4087,7 @@ The Bulletins view: what Claude read of each carrier's SERVPRO program bulletin 
 | phase | live, reading the lane. Run whole against the live engine 2026-10-22 with `.verify/bulletins-view.mjs` (no model call, no write): 53 of 53 verdicts on the code before three later changes (the empty-scope labels, the strip's own scroller at 390 px, the no-ids check). Those three were measured apart (the strip: panel scroller 445 px in a 390 px box before, 390 in 390 after) or only compiled (the scope labels, the no-ids check); the run that would show them whole timed out in the harness's own page load at box load ~50. Also unrun: the probe's own page pick, member verdict and pages-list scroll leg (syntax-checked), and the overview with every carrier left out (no empty-state sentence under the banner). Re-run it when `/proc/loadavg` is under 12: it opens State Farm's page 13, else 22, else the read page with the most to draw (it prints which), and exits 2 only when no State Farm page holds a reading that states a requirement, which is the walk's to produce; the scroll the view keeps is measured on the carrier's 51-row pages list, so it needs no tall page |
 | mounted | `CerberusPanel` draws `<KeptView id="bulletins">` around the lazy `BulletinsView` (this module's barrel) after Tours, once center's overview has answered: mounted on its first show, `hidden` after, so the open carrier, page and scroll survive a visit to Fleet. Leaving the Cerberus workspace tab for Chat unmounts the panel and the view with it |
 | reads | four hooks in `hooks/`, each used by the view root alone: `useOverview`, `useBulletinPages`, `usePageReading` (each is `useLaneRead`, MAN-8917, over one `api.carrierBulletins` verb) and `usePageImage` |
-| words | `cerberus.bulletins.*` in `src/modules/i18n/locales/en/common.json`, including `cerberus.bulletins.tab` and `.tabHint` (the strip's two words); the surround's failure words are `viewBoundary.*` (MAN-8917) |
+| words | `cerberus.bulletins.*` in `src/modules/i18n/locales/en/common.json`, including `cerberus.bulletins.tab` (the strip's word); the surround's failure words are `viewBoundary.*` (MAN-8917) |
 | shared types | wire: `src/shared/carrier-bulletins-types.ts` (MAN-8865). Lane fault: `AffectedAreasTrouble` from `src/shared/types.ts` (one forwarder, `server/shared/shadow-connector-lane.ts`, serves both lanes) |
 | proof | 2026-10-22, 1280 and 390 px wide: State Farm's page 22 (the page the walk had read; page 13 when it has) drew its image beside its one requirement, the count on screen the count `GET /api/carrier-bulletins/bulletins/{id}/pages/22` holds; each key of the three live answers is a member of the wire mirror's type and every required member is live (`OverviewRow`, `BulletinPage`, `PageReading` and every nested type that had a live instance); no request but a GET; no request while Bulletins was hidden or untouched; zero console errors |
 
@@ -17295,7 +17298,7 @@ The Uploads view of the Cerberus tab: what happens when a person uses Restorly's
 `src/modules/i18n/locales/en/common.json`, under `cerberus`, after `bulletins`. English only; a login, customer, flow, step name, reason detail or tool summary is data, never a key (MAN-7870).
 | group | n | holds |
 |---|---|---|
-| `tab`, `tabHint`, `loading` | 3 | the strip's name and hint (read by the `VIEWS` row), the spinner label |
+| `tab`, `loading` | 2 | the strip's name (read by the `VIEWS` row), the spinner label |
 | `head` | 42 | headline states with their accents (a live dry run leads as "A test run is", never "An upload is"), scope and its clear press, summary, window switch, Refresh |
 | `pills` | 23 | the five pills and their titles (Live now reads "test run · working" for a dry run) |
 | `live` | 14 | the Live now card |
@@ -17327,7 +17330,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/
 Where the Uploads view meets the Cerberus tab, and the choices of its behaviour that a plain reading would not guess. The module: MAN-9891. Rules: INV-11822. The tab: MAN-7868.
 
 ## In the Cerberus tab
-- `uploads` is named in four places: `CerberusView` (`src/shared/types.ts`), `KEPT_VIEWS` (`src/modules/cerberus/hooks/useKeptViews.ts`), `VIEWS` (a row naming `cerberus.uploads.tab` and `cerberus.uploads.tabHint`) and a `KeptView` mount handed `shown={view === 'uploads'}` (`CerberusPanel.tsx`).
+- `uploads` is named in four places: `CerberusView` (`src/shared/types.ts`), `KEPT_VIEWS` (`src/modules/cerberus/hooks/useKeptViews.ts`), `VIEWS` (a row naming `cerberus.uploads.tab`) and a `KeptView` mount handed `shown={view === 'uploads'}` (`CerberusPanel.tsx`).
 - Kept mounted once shown, as Tours and Bulletins are (MAN-8918): its window, filters, open run and the scroll left survive a visit to Fleet. Unlike them it is also told by its feed while shown (MAN-9911).
 - No `FILL:` comment stands in `src/modules/cerberus`; MAN-7867 and MAN-7868 say so.
 

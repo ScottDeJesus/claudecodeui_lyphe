@@ -8,12 +8,12 @@
 // face says it was not answered the case presses its own Try again, a read. The board is lib/kanban_board.mjs's
 // made-up board, every board request answered by the page; nothing reaches the server and nothing is written.
 //
-// protects: src/modules/kanban/proposed/ProposalDismissDialog.tsx, src/modules/kanban/proposed/ProposalRow.tsx, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/KanbanPanel.tsx
+// protects: src/modules/kanban/proposed/ProposalDismissDialog.tsx, src/modules/kanban/proposed/ProposalOpening.tsx, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/KanbanPanel.tsx
 // writes: none
 
 import { withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
-import { BOARD, openBoard } from "../lib/kanban_board.mjs";
+import { BOARD, openBoard, openProposal } from "../lib/kanban_board.mjs";
 
 const WAIT_MS = 15000;
 const PROPOSALS = /\/api\/kanban-dispatch\/proposals(\?|$)/;
@@ -49,8 +49,9 @@ runCase(async (t) => {
   const panel = page.locator("[data-kanban-panel]");
   const press = panel.getByRole("button", { name: /^\s*Dismiss\s*$/ }).first();
   if (!(await press.isVisible().catch(() => false))) {
-    // The presses may sit inside the row's Collapsible: open the first collapsed row and look again.
-    await panel.locator('[aria-expanded="false"]:not([aria-haspopup]):not([role="combobox"]):not([role="tab"])').first().click({ timeout: WAIT_MS }).catch(() => {});
+    // The presses are in the proposal's Opening, hung from its mark on the instrument since the board's redraw to the design
+    // system (2026-11-20): open it from its ring and look again.
+    await openProposal(page, ANSWER.proposals[0].id).catch(() => {});
     await settle(page);
   }
   if (!(await press.isVisible().catch(() => false))) return broken("no open proposal on the face offers a Dismiss press");

@@ -6,7 +6,7 @@ import { RequirementList } from '@/modules/carrier-bulletins/RequirementList';
 import { SetAside } from '@/modules/carrier-bulletins/SetAside';
 import { pullCommand } from '@/modules/carrier-bulletins/utils/bulletinWords';
 import type { PageReading, PageWaiting } from '@/shared/carrier-bulletins-types';
-import { Banner, Card } from '@/shared/ui';
+import { Banner } from '@/shared/ui';
 import { formatRelativeTime } from '@/shared/utils';
 
 type ReadingColumnProps = {
@@ -63,11 +63,11 @@ export function ReadingColumn({ value, carrier }: ReadingColumnProps) {
   if (value.waiting !== null) return <WaitingNotice waiting={value.waiting} carrier={carrier} />;
   if (value.reading === null) {
     return (
-      <Card className="flex flex-col gap-1.5 px-[18px] py-4">
+      <div className="flex flex-col gap-1.5 border-y border-border py-4">
         <p className="text-[15px] font-medium text-foreground">{t('cerberus.bulletins.page.unread')}</p>
         <p className="text-[13.5px] text-muted-foreground">{t('cerberus.bulletins.page.unreadMessage', { carrier })}</p>
         <div className="pt-1"><CommandLine command={pullCommand(carrier)} /></div>
-      </Card>
+      </div>
     );
   }
   return (

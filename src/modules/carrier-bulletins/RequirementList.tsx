@@ -5,7 +5,7 @@ import { CommandLine } from '@/modules/carrier-bulletins/CommandLine';
 import { PageQuote } from '@/modules/carrier-bulletins/QuotedWords';
 import { QUESTIONS_COMMAND, requirementFacts } from '@/modules/carrier-bulletins/utils/bulletinWords';
 import type { PageRequirement, SettledRule } from '@/shared/carrier-bulletins-types';
-import { Banner, Card, EmptyState } from '@/shared/ui';
+import { Banner, Rule } from '@/shared/ui';
 
 type RequirementListProps = {
   requirements: PageRequirement[];
@@ -55,22 +55,21 @@ export function RequirementList({ requirements, carrier }: RequirementListProps)
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2">
-      <h3 id={headingId} className="text-xs uppercase tracking-[0.14em] text-ink-faint">
-        {t('cerberus.bulletins.page.requirementsTitle')} · {requirements.length}
-      </h3>
+      <Rule id={headingId} end={String(requirements.length)}>{t('cerberus.bulletins.page.requirementsTitle')}</Rule>
       {requirements.length === 0 ? (
-        <EmptyState title={t('cerberus.bulletins.page.nothing')} message={t('cerberus.bulletins.page.nothingMessage')} />
+        <p className="m-0 text-[13.5px] text-muted-foreground">
+          <span className="block text-foreground">{t('cerberus.bulletins.page.nothing')}</span>
+          {t('cerberus.bulletins.page.nothingMessage')}
+        </p>
       ) : (
-        <ul aria-labelledby={headingId} className="m-0 flex list-none flex-col gap-2.5 p-0">
+        <ul aria-labelledby={headingId} className="m-0 flex list-none flex-col divide-y divide-border border-b border-border p-0">
           {requirements.map((requirement, index) => (
             // A requirement has no id on the wire; its place in the reading is its identity on this page.
-            <li key={index}>
-              <Card className="flex flex-col gap-2 px-[18px] py-3.5">
-                <p className="text-[14.5px] font-medium leading-snug text-foreground [overflow-wrap:anywhere]">{requirement.words}</p>
-                <p className="text-[12.5px] text-muted-foreground">{requirementFacts(requirement, t).join(' · ')}</p>
-                {requirement.quote !== null && <PageQuote words={requirement.quote} />}
-                <SettledInto rule={requirement.rule} carrier={carrier} />
-              </Card>
+            <li key={index} className="flex flex-col gap-2 py-3.5">
+              <p className="text-[14.5px] font-medium leading-snug text-foreground [overflow-wrap:anywhere]">{requirement.words}</p>
+              <p className="text-[12.5px] text-muted-foreground">{requirementFacts(requirement, t).join(' · ')}</p>
+              {requirement.quote !== null && <PageQuote words={requirement.quote} />}
+              <SettledInto rule={requirement.rule} carrier={carrier} />
             </li>
           ))}
         </ul>

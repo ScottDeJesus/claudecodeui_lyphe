@@ -1,4 +1,4 @@
-import { FilterXIcon } from 'lucide-react';
+import { ChevronsDownIcon, FilterXIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,7 +7,7 @@ import { MachineCallsChip } from '@/modules/scheduling-report/MachineCallsChip';
 import type { SchedulingFilters } from '@/modules/scheduling-report/utils/schedulingModel';
 import { whoWord } from '@/modules/scheduling-report/utils/schedulingWords';
 import type { SchedulingEntry, SchedulingOverview } from '@/shared/scheduling-report-types';
-import { Button, Chip, EmptyState } from '@/shared/ui';
+import { Button, Chip, IconWord } from '@/shared/ui';
 
 type EntryListProps = {
   /** The window as the server answered it: the people who scheduled, and whether it was cut short. */
@@ -80,15 +80,27 @@ export function EntryList({ overview, entries, filters, onFilter, onOpenEntry }:
 
       {entries.length === 0 ? (
         // The filters match nothing: the chips stay above, and the way back is the action.
-        <EmptyState size="sm" icon={FilterXIcon} title={t(`${r}.noMatch`)} actionLabel={t(`${r}.clear`)} onAction={() => onFilter(NO_FILTERS)} />
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3" data-scheduling-no-match>
+          <p className="m-0 text-[13px] text-muted-foreground">{t(`${r}.noMatch`)}</p>
+          <Button variant="outline" size="sm" className="h-8 finger:size-11 finger:px-0 max-md:h-11" aria-label={t(`${r}.clear`)} title={t(`${r}.clear`)} onClick={() => onFilter(NO_FILTERS)}>
+            <IconWord icon={FilterXIcon} word={t(`${r}.clear`)} />
+          </Button>
+        </div>
       ) : (
         <>
-          <ul className="flex min-w-0 flex-col divide-y divide-border overflow-hidden rounded-lg border border-border">
+          <ul className="flex min-w-0 flex-col divide-y divide-border border-y border-border">
             {shown.map((entry) => <EntryRow key={entry.id} entry={entry} onOpenEntry={onOpenEntry} />)}
           </ul>
           {rest > 0 && (
-            <Button variant="outline" size="sm" className="h-8 self-start max-md:h-11" onClick={() => setLimit((count) => count + PAGE)}>
-              {rest <= PAGE ? t(`${r}.more`, { count: rest }) : t(`${r}.moreOf`, { count: PAGE, rest })}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 self-start finger:size-11 finger:px-0 max-md:h-11"
+              aria-label={rest <= PAGE ? t(`${r}.more`, { count: rest }) : t(`${r}.moreOf`, { count: PAGE, rest })}
+              title={rest <= PAGE ? t(`${r}.more`, { count: rest }) : t(`${r}.moreOf`, { count: PAGE, rest })}
+              onClick={() => setLimit((count) => count + PAGE)}
+            >
+              <IconWord icon={ChevronsDownIcon} word={rest <= PAGE ? t(`${r}.more`, { count: rest }) : t(`${r}.moreOf`, { count: PAGE, rest })} />
             </Button>
           )}
         </>

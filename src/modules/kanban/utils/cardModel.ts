@@ -1,88 +1,17 @@
-import type { KanbanCardSummary } from '@/shared/kanban-types';
-import type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/ui';
+import type { KanbanCardSummary, KanbanPriority } from '@/shared/kanban-types';
 
 /**
- * THE ONE WIRE-TO-VIEW CONVERSION. A `KanbanCardSummary` becomes a `KanbanCardModel` here and
- * nowhere else — the panel, the lane rail and the drawer all call this, so two faces can never
- * disagree about what a signal means.
- *
- * WHAT IT DECIDES, AND WHAT IT REFUSES TO. It formats spend into the string the card PAINTS, so
- * the card never does token math. What a card's WALK adds to the face — the kind's word (a flow's,
- * or `Regression` for the night's cure), the hold, how an aged card rides
- * (`waiting 4 days · rides as medium`) and the links — is laid over this model by `withWalkFace`
- * (`utils/walkModel`), because each is read off the dispatcher's feed and not off the card. And it
- * drops every signal entirely when autonomy is off, which is the whole mechanism behind an
- * autonomy-off face being title, priority and tags — not a second render path in the component.
- */
-
-/** A thousand, a million: the two steps the spend chip is spelled in. */
-const THOUSAND = 1000;
-const MILLION = 1_000_000;
-
-/**
- * The order the two view sorts paint cards in. `server` is the lane's own order — the keyset
- * page the API returned — and is the default: a lane that has been sorted by hand stays sorted
- * by whatever asked for it, and a page appended under it is re-sorted rather than interleaved.
+ * THE ORDER A LANE'S LOADED CARDS ARE READ IN. The board's rings draw every lane in the server's own order (`server`, the keyset
+ * page the API returned), and a move resolves against that order; the two other sorts remain for a reader that asks a lane's ids
+ * in another order (`useKanbanLanes`' `cardIds`).
  */
 export type KanbanViewSort = 'server' | 'priority' | 'newest';
 
-/** Higher wins. The ladder the card's ink spells, as a number, because the panel sorts by it. */
-const PRIORITY_RANK: Record<CardPriority, number> = { high: 0, medium: 1, low: 2 };
+/** Higher wins: the ladder a card's priority reads as, as a number, for the priority sort. */
+const PRIORITY_RANK: Record<KanbanPriority, number> = { high: 0, medium: 1, low: 2 };
 
 /**
- * Spend, preformatted: `640`, `128k`, `1.4M`. Zero and nonsense return undefined — a card that
- * has moved no tokens shows no chip rather than a `0`, which would read as a measured amount.
- */
-function formatTokens(total: number): string | undefined {
-  if (!Number.isFinite(total) || total <= 0) return undefined;
-  if (total < THOUSAND) return String(total);
-
-  const thousands = Math.round(total / THOUSAND);
-  if (thousands < THOUSAND) return `${thousands}k`;
-
-  return `${(total / MILLION).toFixed(1)}M`;
-}
-
-/**
- * The counts a face may report, folded from the summary's four rollups.
- *
- * A zero count is ABSENT rather than zero: the card reads `signals.openIssues` as a flag and a
- * word, and `0 issues` is a badge saying there is nothing to say.
- */
-function signalsFor(summary: KanbanCardSummary): KanbanCardSignals {
-  const signals: KanbanCardSignals = {};
-
-  if (summary.openQuestions > 0) signals.openQuestions = summary.openQuestions;
-  if (summary.openIssues > 0) signals.openIssues = summary.openIssues;
-  if (summary.checklistTotal > 0) {
-    signals.checklist = { done: summary.checklistDone, total: summary.checklistTotal };
-  }
-
-  const tokens = formatTokens(summary.buildTokens);
-  if (tokens) signals.tokens = tokens;
-
-  return signals;
-}
-
-/**
- * One summary as the kit renders it.
- *
- * `autonomy` is the board's own setting and the only switch here: with it OFF the returned model
- * carries no `signals` field whatsoever, and the card's face is its title, its priority and its
- * tags. Nothing is hidden on the server by that — every verb stays reachable.
- */
-export function toCardModel(summary: KanbanCardSummary, options: { autonomy: boolean }): KanbanCardModel {
-  return {
-    id: summary.id,
-    title: summary.title,
-    priority: summary.priority,
-    tags: summary.tags ?? [],
-    signals: options.autonomy ? signalsFor(summary) : undefined,
-  };
-}
-
-/**
- * The lane's loaded cards in the order a requested view paints them — a VIEW over the pages
+ * The lane's loaded cards in the order a requested view reads them — a VIEW over the pages
  * already held, never a refetch, because the keyset cursor walks the SERVER's order and a fetch
  * per sort would page a lane in an order its cursor does not know.
  *

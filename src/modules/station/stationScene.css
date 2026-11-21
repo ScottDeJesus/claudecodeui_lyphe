@@ -24,7 +24,9 @@
   grid-template: 'road' minmax(0, 1fr) 'stage' auto 'kaylee' auto / minmax(0, 1fr);
 }
 [data-station-scene='staged'] > [data-station-scene-grid] {
-  grid-template: 'kaylee stage' minmax(0, 1fr) / var(--kaylee-col) minmax(0, 1fr);
+  grid-template: 'kaylee stage' minmax(0, 1fr) / var(--kaylee-col) minmax(0, var(--stage-max));
+  /* Once the panel has reached its most, the two columns stand as one block in the middle (the shell's `STAGE_TRACK_MAX`). */
+  justify-content: center;
 }
 [data-station-arrangement='compact'] [data-station-scene='staged'] > [data-station-scene-grid],
 [data-station-arrangement='phone'] [data-station-scene='staged'] > [data-station-scene-grid] {
@@ -68,8 +70,10 @@
 [data-station-scene='rest'] [data-station-stage-cell] { width: 100%; max-width: 720px; margin-inline: auto; }
 [data-station-scene='rest'] [data-station-stage-cell]:has(> [data-station-stage='empty']) [data-station-stage-empty-message] { display: none; }
 [data-station-scene='rest'] [data-station-stage-cell]:has(> [data-station-stage='empty']):not(:has([data-station-shelf])) { display: none; }
+/* In two columns the panel's top stands under the menu's corner (`PlacesCorner`, every head's 60 px row), so the menu never sits on the
+ * panel's own head and its presses. In one column the companion's row is at the head, with the menu at its end. */
 [data-station-scene='staged'] [data-station-stage-cell] {
-  margin: 16px 16px 12px 0;
+  margin: 60px 16px 12px 0;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
@@ -169,4 +173,86 @@
   [data-station-scene='staged'] [data-station-stage-cell] { animation: ast-fade-in var(--duration-fade) ease both; }
   .station-mark__corner { animation: none; }
   [data-station-held], [data-station-held]:has([data-arrival='arriving'], [data-arrival='live']) { transition: none; }
+}
+
+/* ---------- the draft held for your Send: a bead on the companion's core, and the card it opens ----------
+ * The bead orbits just outside the core's rings (`--orbit-r`, `StationDraftAlert`'s) at the instrument's idle drift, and holds still
+ * under a pointer, with the focus on it, while its card is open, and under reduced motion. It is drawn out of the core as it arrives
+ * (the lobe spring), breathes, and a ring opens from it now and then: what waits, waits for you. Its press is 22 px, 44 under a
+ * finger. The card grows out of the core on the lobe spring, from the point the view hands it (`transform-origin`); as a sheet at
+ * the foot it rises from below. */
+.station-draft-orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: 0;
+  height: 0;
+  animation: station-draft-orbit 40s linear infinite;
+}
+.station-draft-orbit:hover,
+.station-draft-orbit:focus-within,
+.station-draft-orbit[data-open] { animation-play-state: paused; }
+/* Round the small mark at a column's head there is no room for an orbit: it holds still on the ring at the core's lower corner. */
+.station-draft-orbit[data-still] { transform: rotate(45deg); animation: none; }
+.station-draft-bead {
+  position: absolute;
+  top: -11px;
+  left: calc(var(--orbit-r) - 11px);
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  cursor: pointer;
+  animation: station-draft-out var(--duration-lobe) var(--ease-lobe) both;
+}
+.station-draft-bead::before {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--accent) 60%, transparent);
+  content: '';
+  animation: station-draft-breathe 2.6s ease-in-out infinite;
+}
+.station-draft-bead::after {
+  position: absolute;
+  inset: 6px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  opacity: 0;
+  content: '';
+  animation: station-draft-ring 4s ease-out 1s infinite;
+}
+@media (hover: none) and (pointer: coarse) {
+  .station-draft-bead { top: -22px; left: calc(var(--orbit-r) - 22px); width: 44px; height: 44px; }
+  .station-draft-bead::after { inset: 17px; }
+}
+@keyframes station-draft-orbit { from { transform: rotate(-50deg); } to { transform: rotate(310deg); } }
+@keyframes station-draft-out { from { opacity: 0; transform: translateX(calc(-1 * var(--orbit-r))) scale(0.2); } }
+@keyframes station-draft-breathe {
+  50% { box-shadow: 0 0 16px 3px color-mix(in srgb, var(--accent) 70%, transparent); transform: scale(1.18); }
+}
+@keyframes station-draft-ring {
+  0% { opacity: 0.85; transform: scale(0.5); }
+  70%, 100% { opacity: 0; transform: scale(2.4); }
+}
+.station-draft-pop[data-station-draft-pop='beside'] {
+  max-height: min(78dvh, 720px);
+  animation: station-draft-pop var(--duration-lobe) var(--ease-lobe) both;
+}
+.station-draft-pop[data-station-draft-pop='sheet'] {
+  --ast-from: translateY(24px);
+  max-height: calc((100dvh - var(--keyboard-height, 0px)) * 0.75);
+  animation: ast-arrive var(--duration-lock) var(--ease-lock) both;
+}
+@keyframes station-draft-pop { from { opacity: 0; transform: scale(0.72); } }
+@media (prefers-reduced-motion: reduce) {
+  .station-draft-orbit,
+  .station-draft-bead,
+  .station-draft-bead::before,
+  .station-draft-bead::after { animation: none; }
+  .station-draft-orbit { transform: rotate(-50deg); }
+  .station-draft-pop[data-station-draft-pop] { animation: ast-fade-in var(--duration-fade) ease both; }
 }

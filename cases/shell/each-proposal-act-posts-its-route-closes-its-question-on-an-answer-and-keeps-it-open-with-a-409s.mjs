@@ -1,21 +1,23 @@
 // Each answer to a proposed feature calls its own route and says what the dispatcher refused where it was asked
 // (bug-hunters, seams 10 and 11, wired in phase 16). Promote posts /proposals/<id>/promote { arc }, Send back as a ticket
-// posts /proposals/<id>/send-back, Dismiss posts /proposals/<id>/dismiss { reason }, and the row's Priority posts
+// posts /proposals/<id>/send-back, Dismiss posts /proposals/<id>/dismiss { reason }, and the proposal's Priority posts
 // /proposals/<id>/priority { priority }. A 409 is the dispatcher's refusal: its question stays open and says the
 // sentence the route carried (`{ error }`; its `REFUSED <verb>:` lead may be dropped, as the board's
 // dispatcherAnswer.plainSentence drops it, so the reason's own words are what is looked for), and a priority, which
-// asks no question, says it on its row. A 200 closes
-// the question. Each question is answered twice here: first refused, then answered.
+// asks no question, says it in the proposal's Opening. A 200 closes
+// the question. Each question is answered twice here: first refused, then answered. Since the board's redraw to the design
+// system (2026-11-20) a proposal is a mark on a ring and opens from it (lib/kanban_board.mjs's openProposal); its priority is
+// the kit's segmented control.
 //
 // The board is lib/kanban_board.mjs's made-up board; the proposals, the roadmap and every act are answered by this
 // case. Nothing reaches the dispatcher and nothing is written.
 //
-// protects: src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/proposed/ProposalRow.tsx, src/modules/kanban/proposed/ProposalPromoteDialog.tsx, src/modules/kanban/proposed/ProposalDismissDialog.tsx
+// protects: src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/proposed/ProposalOpening.tsx, src/modules/kanban/proposed/ProposalPromoteDialog.tsx, src/modules/kanban/proposed/ProposalDismissDialog.tsx
 // writes: none
 
 import { withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
-import { openBoard } from "../lib/kanban_board.mjs";
+import { openBoard, openProposal } from "../lib/kanban_board.mjs";
 import { PROPOSALS, PROPOSAL_ACT, ROADMAP, WAIT_MS, answer, json, proposal, tab, until, watch } from "../lib/bug_hunt_faces.mjs";
 
 const P = proposal(11, "Case proposal: answer me four ways");
@@ -49,9 +51,8 @@ runCase(async (t) => {
 
   await tab(page, "Proposed features").click({ timeout: WAIT_MS });
   await page.locator('[data-proposed-features] [role="radio"]').filter({ hasText: /^\s*All\s*$/ }).first().click({ timeout: WAIT_MS });
-  const row = page.locator(`[data-proposal="${P.id}"]`).filter({ hasText: P.title }).first();
-  if (!(await row.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) return broken(`the face drew no row for the route's "${P.title}"`);
-  await row.locator("button[aria-controls]").first().click({ timeout: WAIT_MS });
+  const row = await openProposal(page, P.id).catch(() => null);
+  if (row === null) return broken(`the face drew no mark that opens the route's "${P.title}"`);
   const press = (act) => row.locator(`[data-proposal-press="${act}"]`).first();
   const shows = (locator, words) => until(page, async () => ((await locator.textContent().catch(() => "")) ?? "").includes(words), 5000);
   const gone = (locator) => locator.waitFor({ state: "hidden", timeout: WAIT_MS }).then(() => true, () => false);
@@ -95,12 +96,11 @@ runCase(async (t) => {
   await dismissConfirm.click({ timeout: WAIT_MS });
   if (!(await gone(dismissDialog))) return broken("a 200 on dismiss left its dialog open");
 
-  // PRIORITY: no question; a refusal is said on the row.
-  await row.locator('button.vv-select__trigger[aria-label="Priority"]').first().click({ timeout: WAIT_MS });
-  await page.locator('[role="listbox"][aria-label="Priority"] [role="option"]').filter({ hasText: /^\s*High\s*$/ }).first().click({ timeout: WAIT_MS });
+  // PRIORITY: no question; a refusal is said in the proposal's Opening.
+  await row.getByRole("radiogroup", { name: "Priority" }).getByRole("radio", { name: "High" }).first().click({ timeout: WAIT_MS });
   if (!(await until(page, () => posted("priority").length === 1))) return broken("setting Priority to High sent no POST /priority");
   if (posted("priority")[0].body?.priority !== "high") return broken(`Priority posted ${JSON.stringify(posted("priority")[0].body)}, not { priority: "high" }`);
-  if (!(await shows(row, REASON.priority))) return broken(`a 409 on priority is not said on its row ("${SENTENCE.priority}")`);
+  if (!(await shows(row, REASON.priority))) return broken(`a 409 on priority is not said in the proposal's Opening ("${SENTENCE.priority}")`);
 
   return held("promote { arc }, send-back, dismiss { reason } and priority { priority: high } each posted its route; each 409's sentence was said where it was asked and each 200 closed its question");
 });

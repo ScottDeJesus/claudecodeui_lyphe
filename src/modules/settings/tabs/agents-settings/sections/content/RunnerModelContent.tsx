@@ -10,6 +10,7 @@ import RunnerGeminiBudgetRow from '@/modules/settings/tabs/agents-settings/secti
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
 import RunnerBugBoardRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerBugBoardRow';
 import RunnerBugHuntersRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersRow';
+import RunnerCodeModeRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerCodeModeRow';
 import RunnerMainSessionDactylsRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerMainSessionDactylsRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
 import RunnerCpuLimitRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerCpuLimitRow';
@@ -28,11 +29,12 @@ import RunnerWeeklyStopRow from '@/modules/settings/tabs/agents-settings/section
  * The read, the write and the re-read live in `useDeepSeekFlashSwitch` and `useHealMasterSwitch` —
  * one hook per switch rather than one generalised switch, because switches sharing a module move
  * together the first time one of them is edited, and these must never. The weekly stop, the
- * CPU limit, the board-card numbers, the bug hunters' settings, the park-at-peak switch, the Gemini budget cap, the Custom compaction switch and Dactyls for the main session each have a row of
+ * CPU limit, the board-card numbers, the bug hunters' settings, the park-at-peak switch, the Gemini budget cap, the Custom compaction switch, Dactyls for the main session and Code Mode each have a row of
  * their own file (`RunnerWeeklyStopRow`, `RunnerCpuLimitRow`, `RunnerBugBoardRow`, `RunnerBugHuntersRow`, `RunnerParkAtPeakRow`, `RunnerGeminiBudgetRow`, `RunnerCompactionRow` — drawn
  * directly under the DeepSeek row, because it asks that row's question of a chat's compaction: which small model does
- * a big model's chore — and `RunnerMainSessionDactylsRow`, drawn directly under that one, because it asks the same of
- * a main session's edits) with a hook of its own, and the fourth heal switch, `useHealModelSwitch`, is drawn by `RunnerHealModelRow` — its own file, because
+ * a big model's chore — `RunnerMainSessionDactylsRow`, drawn directly under that one, because it asks the same of
+ * a main session's edits — and `RunnerCodeModeRow`, drawn directly under that one, because it asks whose hands do
+ * the work of a launch) with a hook of its own, and the fourth heal switch, `useHealModelSwitch`, is drawn by `RunnerHealModelRow` — its own file, because
  * the row that asks WHICH MODEL a heal runs on needs this card's heal poller and grew past what this file should hold.
  *
  * The heal row wears the heal panel's own `HeartPulseIcon`, so one shape means one thing wherever it
@@ -114,6 +116,7 @@ export default function RunnerModelContent() {
       </SettingRow>
       <RunnerCompactionRow />
       <RunnerMainSessionDactylsRow />
+      <RunnerCodeModeRow />
 
       {/* WHERE THE WEEKLY WINDOW STOPS — the usage pacer's line for the weekly window, its own file and hook,
           like the rows around it: plans stop starting when the week is on course to pass it. How many

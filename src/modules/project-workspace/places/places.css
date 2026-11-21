@@ -1,0 +1,206 @@
+/*
+ * THE MENU, THE WHEEL OF PLACES AND THE TRAIL (PlacesMenu and its PlacesDial, PlacesWheel, PlaceTrail, PlacesProvider's holds).
+ *
+ * The wheel unfolds out of the press that brought it up, on the lock spring: the whole of it grows from that press's middle at that
+ * press's size (`.places-wheel-body[data-unfold]`), the menu's dial hidden meanwhile, so the dial is seen to become the wheel. A key's
+ * wheel arrives from Kaylee's core in the middle, sector by sector, the inner ring first; a glyph arrives after its sector. Put away
+ * with nothing chosen, it folds back into its press, or settles off (accelerates away, never springs); a place chosen is on screen at
+ * once, with no wheel lingering over it. A place pointed at takes the accent: its
+ * sector the accent's soft fill and edge, its name the accent's ink. The place on screen is raised (the second surface, the strong edge).
+ *
+ * The ground is the dialog's own near-black, not a token, and for the dialog's reason (`feedback.css`): `--canvas` is near-white in day,
+ * and the wheel's sectors are `--surface`, so a token ground would erase them where they need it most.
+ */
+
+.places-wheel { position: fixed; inset: 0; z-index: 70; touch-action: none; user-select: none; -webkit-user-select: none; outline: none; }
+.places-wheel[data-leaving='true'] { pointer-events: none; }
+
+.places-wheel-ground {
+  position: absolute; inset: 0; background: rgba(16, 17, 22, 0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: places-fade var(--duration-fade) ease both;
+}
+/* At night the page under it is light on dark, and shows through more: the ground dims it further. */
+.dark .places-wheel-ground { background: rgba(16, 17, 22, 0.74); }
+
+/* What unfolds: the rings, the places and the core, as one body (`PlacesWheel` sets the press's offset, its scale and the wheel's middle
+ * as the origin). It takes no press itself; its sectors and places take their own. */
+.places-wheel-body { position: absolute; inset: 0; pointer-events: none; }
+.places-wheel-body[data-unfold] { animation: places-unfold var(--duration-lock) var(--ease-lock) both; }
+/* Unfolding, the parts come with the body: each only fades in, a little after the one before, rather than arriving on its own. */
+.places-wheel-body[data-unfold] .places-wheel-rings path,
+.places-wheel-body[data-unfold] .places-wheel-name,
+.places-wheel-body[data-unfold] .places-wheel-core { animation: places-fade var(--duration-fade) ease both; animation-delay: calc(var(--i, 0) * 12ms); }
+@keyframes places-unfold {
+  from { opacity: 0.4; transform: translate(var(--unfold-x), var(--unfold-y)) scale(var(--unfold-s)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes places-fold {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate(var(--unfold-x), var(--unfold-y)) scale(var(--unfold-s)); }
+}
+
+.places-wheel-rings { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.places-wheel-hair { fill: none; stroke: rgba(255, 255, 255, 0.08); stroke-width: 1; animation: places-fade var(--duration-fade) ease both; }
+
+.places-wheel-rings path {
+  pointer-events: auto; cursor: pointer; fill: var(--surface); fill-opacity: 0.94; stroke: var(--hairline); stroke-width: 1;
+  transform-box: view-box; transition: fill var(--duration-fade) ease, stroke var(--duration-fade) ease, fill-opacity var(--duration-fade) ease;
+  animation: places-arrive var(--duration-lock) var(--ease-lock) both; animation-delay: calc(var(--i, 0) * 24ms);
+}
+.places-wheel-rings path[data-ring='outer'] { fill-opacity: 0.84; stroke: var(--border); }
+.places-wheel-rings path[data-here='true'] { fill: var(--surface2); fill-opacity: 1; stroke: var(--border-strong); }
+.places-wheel-rings path[data-over='true'] { fill: var(--accent-soft); fill-opacity: 1; stroke: var(--accent); }
+
+/* The menu lies over the whole window and takes no press: its items take their own. */
+.places-wheel-menu { position: absolute; inset: 0; pointer-events: none; }
+.places-wheel-menu .places-wheel-name { pointer-events: auto; }
+
+/* A place over its sector: its glyph alone, but the last chat, which keeps its title and, at a desk, what it is. */
+.places-wheel-name {
+  position: absolute; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 44px;
+  min-height: 44px; justify-content: center; margin: 0; padding: 4px 6px; border: 0; border-radius: var(--radius-control); background: none;
+  color: var(--ink); cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; transition: color var(--duration-fade) ease;
+  animation: places-arrive var(--duration-lock) var(--ease-lock) both; animation-delay: calc(80ms + var(--i, 0) * 24ms);
+}
+.places-wheel-name:focus-visible { box-shadow: 0 0 0 1px var(--focus); }
+.places-wheel-name[data-ring='outer'] { color: var(--ink-muted); }
+.places-wheel-name[data-over='true'] { color: var(--accent-ink); }
+.places-wheel-glyph { width: 28px; height: 28px; flex: none; }
+.places-wheel-name[data-ring='outer'] .places-wheel-glyph { width: 20px; height: 20px; }
+.places-wheel-word {
+  max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 11px;
+  line-height: 14px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.places-wheel-sub {
+  font-family: var(--font-mono); font-size: 9px; line-height: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-muted); white-space: nowrap;
+}
+
+/* On a phone the glyphs are the fan's, a size down; the last chat's title in a finger's width. */
+.places-wheel[data-fan='true'] .places-wheel-glyph { width: 22px; height: 22px; }
+.places-wheel[data-fan='true'] .places-wheel-name[data-ring='outer'] .places-wheel-glyph { width: 18px; height: 18px; }
+.places-wheel[data-fan='true'] .places-wheel-word { max-width: 60px; font-size: 9px; line-height: 11px; letter-spacing: 0.12em; }
+
+.places-wheel-core { position: absolute; pointer-events: none; animation: places-arrive var(--duration-lock) var(--ease-lock) both; }
+
+.places-wheel-plate {
+  position: absolute; left: 50%; translate: -50% 0; max-width: calc(100vw - 24px); margin: 0; padding: 4px 10px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; background: var(--surface); box-shadow: 0 0 0 1px var(--hairline);
+  border-radius: var(--radius-control); color: var(--accent-ink); font-family: var(--font-mono); font-size: 10px; line-height: 14px;
+  font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; animation: places-fade 160ms ease both;
+}
+.places-wheel-plate[data-here='true'] { color: var(--ink); }
+/* The plate's second half, what waits at the place pointed at, in its mark's ink. */
+.places-wheel-plate-words[data-mark='owed'] { color: var(--accent-ink); }
+.places-wheel-plate-words[data-mark='done'] { color: var(--pos-ink); }
+
+/*
+ * WHAT WAITS (PlaceMarkDot), at the top right corner of a place's glyph in the wheel: the accent's bead for a word owed, breathing as
+ * the station's draft bead does; the green tick for finished work not yet seen, still. Each pops in after its place has arrived. (The
+ * menu shows the same marks as beads on its dial, at each place's bearing: `.places-dial-bead` above.)
+ */
+.places-wheel-glyph-box { position: relative; display: grid; place-items: center; }
+.places-mark {
+  position: absolute; top: -3px; right: -3px; display: grid; place-items: center; width: 8px; height: 8px; border-radius: 50%;
+  pointer-events: none; animation: places-mark-in var(--duration-lock) var(--ease-lock) both;
+}
+.places-mark[data-mark='owed'] {
+  background: var(--accent); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: places-mark-in var(--duration-lock) var(--ease-lock) both, places-mark-breathe 2.6s ease-in-out 600ms infinite;
+}
+.places-mark[data-mark='done'] { top: -5px; right: -5px; width: 12px; height: 12px; background: var(--pos-dot); color: var(--surface); }
+.places-mark[data-mark='done'] svg { width: 8px; height: 8px; }
+.places-wheel .places-mark { animation-delay: calc(220ms + var(--i, 0) * 24ms); }
+.places-wheel .places-mark[data-mark='owed'] { animation-delay: calc(220ms + var(--i, 0) * 24ms), calc(820ms + var(--i, 0) * 24ms); }
+@keyframes places-mark-in { from { opacity: 0; scale: 0.2; } to { opacity: 1; scale: 1; } }
+@keyframes places-mark-breathe { 50% { scale: 1.25; box-shadow: 0 0 14px 3px color-mix(in srgb, var(--accent) 70%, transparent); } }
+
+.places-wheel-acts {
+  position: absolute; left: 50%; translate: -50% 0; display: flex; gap: 8px; animation: places-fade var(--duration-fade) ease both;
+  animation-delay: 200ms;
+}
+
+/* Settling away: what stops being true accelerates off and never springs. Unfolded from a press, it folds back into that press whole. */
+.places-wheel[data-leaving='true'] .places-wheel-ground,
+.places-wheel[data-leaving='true'] .places-wheel-hair,
+.places-wheel[data-leaving='true'] .places-wheel-plate,
+.places-wheel[data-leaving='true'] .places-wheel-acts { animation: places-fade-out 200ms var(--ease-settle) both; }
+.places-wheel[data-leaving='true'] .places-wheel-rings path,
+.places-wheel[data-leaving='true'] .places-wheel-name,
+.places-wheel[data-leaving='true'] .places-wheel-core { animation: places-settle 200ms var(--ease-settle) both; }
+.places-wheel[data-leaving='true'] .places-wheel-body[data-unfold] { animation: places-fold 200ms var(--ease-settle) both; }
+.places-wheel[data-leaving='true'] .places-wheel-body[data-unfold] .places-wheel-rings path,
+.places-wheel[data-leaving='true'] .places-wheel-body[data-unfold] .places-wheel-name,
+.places-wheel[data-leaving='true'] .places-wheel-body[data-unfold] .places-wheel-core { animation: none; }
+
+/*
+ * THE MENU (PlacesMenu): an object, pressed as itself with no box round it, as a ring is. Its face is the wheel folded (PlacesDial): two
+ * hairline rings, a tick for each place at its bearing, the place on screen lit along its ring, Kaylee's core in the middle, and a bead
+ * where something waits at its place's bearing (the accent's, breathing, for a word owed; the green for finished work unseen). Under a
+ * pointer the rings come up to the ink. While the wheel is unfolded from it, its face is hidden; it comes back as the wheel folds into it.
+ */
+.places-menu {
+  display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--ink); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: transform 140ms var(--ease-lock);
+}
+.places-menu:active { transform: scale(0.94); }
+.places-dial { width: 100%; height: 100%; overflow: visible; transition: opacity var(--duration-fade) ease 140ms; }
+.places-menu[data-unfolded] .places-dial { opacity: 0; transition: opacity 80ms ease; }
+.places-dial-ring { fill: none; stroke: var(--border-strong); stroke-width: 1; vector-effect: non-scaling-stroke; transition: stroke var(--duration-fade) ease; }
+.places-dial-ticks {
+  fill: none; stroke: var(--ink-muted); stroke-width: 1.25; stroke-linecap: round; vector-effect: non-scaling-stroke;
+  transition: stroke var(--duration-fade) ease;
+}
+.places-dial-here { fill: none; stroke: var(--ink); stroke-width: 2.25; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.places-dial-bead {
+  stroke: var(--canvas); stroke-width: 2; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center;
+  animation: places-mark-in var(--duration-lock) var(--ease-lock) both; animation-delay: calc(var(--i, 0) * 60ms);
+}
+.places-dial-bead[data-mark='owed'] {
+  fill: var(--accent); filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent));
+  animation: places-mark-in var(--duration-lock) var(--ease-lock) both, places-dial-breathe 2.6s ease-in-out 600ms infinite;
+}
+.places-dial-bead[data-mark='done'] { fill: var(--pos-dot); }
+@media (hover: hover) and (pointer: fine) {
+  .places-menu:hover .places-dial-ring { stroke: var(--ink-mid); }
+  .places-menu:hover .places-dial-ticks { stroke: var(--ink); }
+}
+@keyframes places-dial-breathe { 50% { scale: 1.3; } }
+
+@keyframes places-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes places-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes places-arrive { from { opacity: 0; scale: 0.84; } to { opacity: 1; scale: 1; } }
+@keyframes places-settle { from { opacity: 1; scale: 1; } to { opacity: 0; scale: 0.92; } }
+
+/* THE HOLDS: what holds the trail or the places keeps the platform's own long press off it, and draws the hold as it fills. */
+[data-holds-trail], [data-holds-places] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+[data-holds-trail][data-holding], [data-holds-places][data-holding] { animation: places-hold 450ms linear both; }
+@keyframes places-hold { from { box-shadow: 0 0 0 0 transparent; } to { box-shadow: 0 0 0 3px var(--accent); } }
+
+/* THE TRAIL: its plate hangs over every page from the arrow that was held. */
+.places-trail-room { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+.places-trail-room .ast-opening { z-index: auto; }
+.places-trail-names { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.places-trail-names[data-list='true'] { grid-template-columns: minmax(0, 1fr); }
+.places-trail-step {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 44px; margin: 0; padding: 4px 8px 4px 0;
+  border: 0; background: none; text-align: left; cursor: pointer; color: var(--ink-mid); outline: none;
+  transition: color var(--duration-fade) ease;
+}
+.places-trail-step:hover, .places-trail-step:focus-visible { color: var(--accent-ink); }
+.places-trail-step:focus-visible { box-shadow: 0 0 0 1px var(--focus); }
+.places-trail-step[data-here='true'] { color: var(--ink); }
+.places-trail-name { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 13px; line-height: 17px; }
+.places-trail-kind, .places-trail-hint {
+  font-family: var(--font-mono); font-size: 9px; line-height: 12px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.places-trail-hint { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .places-wheel *, .places-wheel { animation-duration: 1ms !important; animation-delay: 0ms !important; transition: none !important; }
+  /* A mark stands still: shown at once, the bead lit without breathing; the menu's face changes without a fade. */
+  .places-mark, .places-dial-bead { animation: none !important; }
+  .places-dial, .places-menu { transition: none !important; }
+  [data-holds-trail][data-holding], [data-holds-places][data-holding] { animation: none; box-shadow: 0 0 0 3px var(--accent); }
+}

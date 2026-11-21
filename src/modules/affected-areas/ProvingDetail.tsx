@@ -6,7 +6,7 @@ import { capitalized, spoken } from '@/modules/affected-areas/utils/tourModel';
 import { atDefaultWords, lineWords, sameLine, tooFew } from '@/modules/affected-areas/utils/provingModel';
 import type { ProvingClass, SweepPoint } from '@/shared/affected-areas-types';
 import type { DataTableColumn } from '@/shared/types';
-import { Badge, DataTable } from '@/shared/ui';
+import { Badge, DataTable, Rule } from '@/shared/ui';
 
 type ProvingDetailProps = {
   kind: ProvingClass;
@@ -20,7 +20,6 @@ type ProvingDetailProps = {
   onSetThreshold: () => void;
 };
 
-const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
 
 /**
  * One row of the sweep: a line the engine priced (`point`), or the line in force or the stepper's line where it falls
@@ -134,7 +133,7 @@ export function ProvingDetail({ kind, kinds, line, pressing, refusal, onStep, on
         aria-labelledby={sweepId}
         className="flex min-w-0 flex-col gap-2.5 [@container(min-width:840px)]:col-start-2 [@container(min-width:840px)]:row-span-3 [@container(min-width:840px)]:row-start-1"
       >
-        <h3 id={sweepId} className={EYEBROW}>{t('affectedAreas.tables.detail.sweep')}</h3>
+        <Rule id={sweepId}>{t('affectedAreas.tables.detail.sweep')}</Rule>
         {kind.randomSlice.n === 0 ? (
           <p className="text-[13px] text-muted-foreground">{t('affectedAreas.tables.detail.noneJudged')}</p>
         ) : (
@@ -149,7 +148,7 @@ export function ProvingDetail({ kind, kinds, line, pressing, refusal, onStep, on
 
       {kind.renamedTo.length > 0 && (
         <section aria-labelledby={renamedId} className="flex min-w-0 flex-col gap-1.5 [@container(min-width:840px)]:col-start-1">
-          <h3 id={renamedId} className={EYEBROW}>{t('affectedAreas.tables.detail.renamedTo')}</h3>
+          <Rule id={renamedId}>{t('affectedAreas.tables.detail.renamedTo')}</Rule>
           <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13.5px]">
             {kind.renamedTo.map((renamed) => (
               <li key={renamed.class} className="flex items-baseline gap-2">
@@ -163,7 +162,7 @@ export function ProvingDetail({ kind, kinds, line, pressing, refusal, onStep, on
 
       {kind.notes.length > 0 && (
         <section aria-labelledby={notesId} className="flex min-w-0 flex-col gap-1.5 [@container(min-width:840px)]:col-start-1">
-          <h3 id={notesId} className={EYEBROW}>{t('affectedAreas.tables.detail.notes')}</h3>
+          <Rule id={notesId}>{t('affectedAreas.tables.detail.notes')}</Rule>
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px] text-foreground">
             {kind.notes.map((note, index) => <li key={index} className="[overflow-wrap:anywhere]">“{note}”</li>)}
           </ul>

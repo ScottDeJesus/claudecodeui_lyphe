@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { ComponentType, KeyboardEvent } from 'react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { Tone } from '@/shared/types';
@@ -28,12 +28,21 @@ export type TabItem = {
   attention?: string;
   /** The pill's register while nothing waits on the operator; `attention` outranks it. */
   tone?: Tone;
+  /**
+   * Its mark. Given, the tab draws it before its word, and below the large breakpoint the mark alone (the word stays its name and
+   * its hover title): a strip of many tabs folds to its marks where the room is short.
+   */
+  icon?: ComponentType<{ className?: string }>;
+  /** What the tab holds, in a few words: never drawn on the strip, only in its hover title after its label (`<label> · <hint>`). */
+  hint?: string;
 };
 
 /**
  * A tab's hover title. A tab carrying attention titles itself `<label> (<count>) · <attention>`:
  * the amber is a colour and the sentence is the point, so the sentence travels with the count in
  * words.
+ *
+ * A tab with a hint titles itself `<label> · <hint>`: what it holds, said where only a pointer asks.
  *
  * A tab without attention draws its own label and needs no title for it, except an `equal`-share
  * tab, which keeps the full label there since its slice of the row may have cut the word short.
@@ -44,7 +53,8 @@ function tabTitle(tab: TabItem, hasCount: boolean, equal: boolean): string | und
     const withCount = hasCount ? `${tab.label} (${tab.count})` : tab.label;
     return `${withCount} · ${tab.attention}`;
   }
-  return equal ? tab.label : undefined;
+  if (tab.hint !== undefined) return `${tab.label} · ${tab.hint}`;
+  return equal || tab.icon !== undefined ? tab.label : undefined;
 }
 
 /**
@@ -83,9 +93,11 @@ function markTone(tab: TabItem): Tone | undefined {
 function TabFace({ tab }: { tab: TabItem }) {
   const hasCount = typeof tab.count === 'number' && tab.count > 0;
 
+  const Icon = tab.icon;
   return (
     <>
-      {tab.label}
+      {Icon !== undefined && <Icon className="vv-tabs__icon" aria-hidden="true" />}
+      {Icon === undefined ? tab.label : <span className="max-lg:hidden">{tab.label}</span>}
       {/* Decoration: the tab's name is its aria-label, and the count reaches readers in the title
         * while attention is set. The register only colours the pill — whether one is drawn is the
         * count alone, so a tab with nothing to count draws none whatever its attention says. */}
@@ -128,8 +140,8 @@ type TabsProps = {
  * file-manager and document-preview modules for their view and sheet strips, by the api-tab module
  * for its sub-views, by the roadmap module for its two faces, by the inbox module for its Memory ·
  * Heal · Roadmap sections, by the affected-areas module for its face strip, by the cerberus module
- * for its tab's Fleet · History strip (`CerberusPanel`) and Fleet's Grid · List · Rings
- * (`FleetToolbar`), and by the chat module's tabbed code block. The same shape each time, so none
+ * for the seven faces at its foot (`CerberusFoot`, each a mark and its word), and by the chat
+ * module's tabbed code block. The same shape each time, so none
  * hand-rolls it.
  *
  * The `underline` register slides ONE indicator between tabs; the `segmented` one paints its own

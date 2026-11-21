@@ -1250,6 +1250,8 @@ that changed server code must not be verified against a process another phase le
 (`CLOUDCLI_SESSIONS_DIR`), so neither the operator's marker nor the operator's running chats are
 ever touched. It still runs against the live auth database; neither redirect isolates that. Cerberus's three roots are scratch values too (`CERBERUS_DB_PATH` and `CERBERUS_KEY_PATH` under `/tmp/apps-cerberus*`, `CERBERUS_LISTEN` on any free loopback port): `.env` carries the live `CERBERUS_LISTEN`, and without them this server would open the live Cerberus store and try the live tailnet address.
 
+**The probe server's environment.** `boot_probe_server` unsets the marks the plan runner stamps on a child (`PLAN_RUNNER_CHILD`, `PLAN_RUNNER_RUN_ID`, `PLAN_RUNNER_DACTYLS_MODE`, `PLAN_RUNNER_DEEPSEEK`, `MAIN_SHELVES_LOADER_DISABLE`, `JEV_*`, `PG_POOL_MAX`, `EIS_PG_POOL_*`) so the probe's chats are not taken for runner children; a seam a caller sets on purpose (`PLAN_RUNNER_CLAUDE_BIN`) is kept.
+
 **`PROBE_PORT` and the paths.** The six per-server paths (`APPS_PID_FILE`, `APPS_LOG`, `APPS_MARKER`, `APPS_SESSIONS_DIR`, `APPS_CERBERUS_DB`, `APPS_CERBERUS_KEY`) follow `PROBE_PORT`, so a second server on another port runs beside the first and neither `stop_probe_server` reaches the other's files:
 
 | `PROBE_PORT` | paths |
@@ -14258,3 +14260,56 @@ Returns `{config, unreadable, saving, texts, refusals, setNightly, typeField, le
 2026-11-19, from the screen at 1440×900 on :5183, `dispatcher hunt config --json` read after each: minutes 120→90→120 (200 each, the file followed); 900 → 409, `Not saved. Minutes must be a whole number from 15 to 600, not 900`, the field back to 120 and the file unchanged; Code's switch off (order `security,behaviour,ui,data`) and on (`…,code`); Security moved down and up; CloudCLI moved up and down. Screenshots at 1440×900 and 390×844.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/bugHuntersWire.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useBugHunters.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersSetting.tsx
+
+## MAN-10079 — Code Mode card — Settings → Agents: RunnerCodeModeRow, useCodeMode, GET/PUT /api/settings/code-mode
+
+`RunnerCodeModeRow.tsx` (Settings → Agents, drawn by `RunnerModelContent.tsx` directly under `RunnerMainSessionDactylsRow`) is the operator's card for Code Mode's per-kind switches (the verb and flags: MAN-10072). Code Mode: a launch works with two tools, one search and one script.
+
+## Status
+- 2026-11-20: WIRED. The card reads `useCodeMode()` (`kinds`, `unreadable`, `ready`, `why`); a press is `setEnabled(kind, next)`, Retry is `refresh()`. Nothing on the card holds a kind, a label or a sentence: all of it is the verb's.
+
+## The wires
+`code-mode` (`~/.claude/scripts/code-mode`, MAN-10072) is the switches' one reader and writer; CloudCLI reads and writes no flag file.
+
+| layer | file | does |
+|---|---|---|
+| verb client | `server/modules/settings/code-mode.ts` | `getCodeModeState()` runs `code-mode --status` (execFile, absolute path, 15 s, `userFacingEnv()` whole, cwd home) and answers its last stdout line, every field type-checked (one mistyped field anywhere → the whole answer untrusted); any failure answers `{ready: null, why: null, kinds: null}`, logged, never cached. `setCodeModeState(kind, enabled)` runs `code-mode set --by app:card -- <kind> on|off` and answers the status the verb printed. |
+| service | `settings.service.ts` | `getCodeMode` / `setCodeMode`, delegating verbatim. |
+| routes | `settings.routes.ts` | `GET /api/settings/code-mode`; `PUT /api/settings/code-mode` body `{"kind": string, "enabled": boolean}`. |
+| client | `src/shared/api.ts` | `api.settings.codeMode()`, `api.settings.saveCodeMode({kind, enabled})`. |
+| hook | `src/shared/hooks/useCodeMode.ts` | the one reader and writer in `src/`, on `useMainSessionDactylsSwitch`'s rules: read on mount, re-ask on `focus` and `visibilitychange`, no timer; one read in flight for the tab, one retry after 1.2 s; a single writer for the tab (a second press during a write is dropped); optimistic flip of that one kind, corrected by the PUT's answer; a failed PUT is re-read, and when that fails too EVERY kind's `enabled` goes `null` together (names and sentences kept). A body whose `kinds` is not a typed list (an error body, `kinds: null`) is "could not read", never off. |
+
+PUT answers:
+- 200: the verb's status after the write (`enabled` read back off disk, never the input).
+- 400 `INVALID_CODE_MODE_STATE`: `kind` not a non-empty string, or `enabled` not a boolean, or a body that is not an object. Nothing runs.
+- 400 `UNKNOWN_CODE_MODE_KIND`: the verb's exit 2 (`code-mode: no kind 'chats' — the kinds are: builders`). The verb refuses before writing. The `--` before the kind makes a kind spelled like a flag (`--status`) an unknown kind, never an option.
+- 502 `CODE_MODE_VERB_FAILED`: a timeout, a spawn failure, the verb's exit 3 refusal, or output that is not a typed status.
+
+A probe server started with `CODE_MODE_FLAG_DIR` on a scratch folder flips the scratch flags: the verb inherits the server's environment.
+
+## Composition
+Kit parts only: `SettingRow`, `SettingsToggle`, `Button`. Icon `SquareCode`. No component was added.
+
+| state (`data-runner-code-mode-card`) | drawn |
+|---|---|
+| `loading` | title row, `status.loading` |
+| `unknown` (`kinds` null or empty, or any kind `enabled === null`) | the `codeMode.unreadable` sentence + Retry; no switch |
+| `waiting` (`ready === false`, `why` non-empty) | warn-tone `data-runner-code-mode-waiting` line with ▲ in the title row; switches stay live |
+| `unread` (`ready === null`) | `data-runner-code-mode-unread` line, plain |
+| `ready` | title only; one row per kind |
+
+- A kind row: `label`, `says`, `report` (`data-runner-code-mode-report`, only when non-empty), the switch. Handle `data-runner-code-mode="<kind>:on|off|unknown"`.
+- A kind with `enabled === null` keeps its name and sentence, draws no switch.
+- Rows in the verb's order; the card holds no list of kinds.
+- The waiting `why` is NOT through `WholeWords`: it can end in a path that would overflow a phone.
+- The switch sits in a `<label>` 44px tall on touch (`finger:min-h-11`, the extra height given back so the track stays level with the name).
+
+## Strings
+`codeMode` in `src/modules/i18n/locales/en/common.json`, after `agentLaunch`: `title`, `switchName` (`Code Mode: {{label}}`, the switch's accessible name only), `waiting`, `readinessUnread`, `unreadable`. `buttons.retry` and `status.loading` are shared keys.
+- `says` and `report` are the verb's data, never keys.
+
+## Measured
+- 2026-11-20, the wired card: probe server (MAN-492) on :7897 with `CODE_MODE_FLAG_DIR` on a scratch folder, a Vite on :5199 (`CI=true SERVER_PORT=7897`) in front of it. GET, PUT builders on (flag file reads `on`), GET again, PUT `chats` and PUT `--status` (400 `UNKNOWN_CODE_MODE_KIND`, folder unchanged), PUT `enabled: "yes"` and a list body (400 `INVALID_CODE_MODE_STATE`); the real `~/.claude/state/code_mode/` never created. In the browser at 1440 and 390: card `ready`, handle `builders:on`; a press on the switch sent one PUT, removed the scratch flag and drew `builders:off`; no page error.
+- 2026-11-20: 9 states × 3 widths (1440, 390, 320 at 1.07 text scale) × light/dark, 54 pictures: no overflow, switch targets ≥44px on phones. At 320 scaled the kind rows sit 8px left of the title's sentences so the switch stays beside its name.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/code-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerCodeModeRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCodeMode.ts

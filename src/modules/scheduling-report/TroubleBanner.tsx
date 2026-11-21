@@ -1,4 +1,6 @@
-import { Banner, Button } from '@/shared/ui';
+import { RotateCwIcon } from 'lucide-react';
+
+import { Banner, Button, IconWord } from '@/shared/ui';
 
 type TroubleBannerProps = {
   /** What cannot be read, in the view's words. */
@@ -22,7 +24,11 @@ export function TroubleBanner({ title, detail, retry, onRetry }: TroubleBannerPr
   return (
     <Banner
       tone="warn"
-      action={<Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>{retry}</Button>}
+      action={(
+        <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0 max-md:h-11" aria-label={retry} title={retry} onClick={onRetry}>
+          <IconWord icon={RotateCwIcon} word={retry} />
+        </Button>
+      )}
     >
       <p className="text-sm font-medium">{title}</p>
       {detail !== null && <p className="mt-0.5 text-xs">{detail}</p>}

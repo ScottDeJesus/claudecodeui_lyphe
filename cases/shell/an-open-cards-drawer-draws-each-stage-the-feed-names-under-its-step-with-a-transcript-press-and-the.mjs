@@ -14,7 +14,7 @@
 
 import { withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
-import { CARDS, faceOf, openBoard } from "../lib/kanban_board.mjs";
+import { CARDS, openBoard, openDrawer } from "../lib/kanban_board.mjs";
 import { feedCards, stage, walk } from "../lib/kanban_feed.mjs";
 
 const PHONE = { width: 390, height: 844 };
@@ -48,8 +48,8 @@ runCase(async (t) => {
     if (request.url().includes("/api/dispatch-souls/launches/")) asked.push(new URL(request.url()).pathname);
   });
 
-  await faceOf(page, CARD.id).getByText(CARD.title).first().click({ timeout: WAIT_MS });
-  const drawer = page.getByRole("dialog").first();
+  // The card is a mark on its ring since the board's redraw to the design system (2026-11-20): it opens from the keyboard.
+  const drawer = await openDrawer(page, CARD.id);
   await drawer.waitFor({ timeout: WAIT_MS });
   const rows = drawer.locator("[data-stage]");
   await rows.first().waitFor({ timeout: WAIT_MS }).catch(() => {});

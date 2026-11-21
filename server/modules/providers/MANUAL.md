@@ -712,13 +712,13 @@ The Claude runtime learns a chat's tool sets through `context.toolsets` only (MA
 | `toolsetDigest(servers)` | `null` for null/undefined (nothing in play), `''` for `{}`, else sha256 of the map's JSON; digests only, never configs (a config can carry a token) |
 | `createToolsetSync(deps)` → `{ sync(boundMs) }` | one process's sync into its CLI; never throws, never retires the process |
 
-`ToolsetSyncDeps`: `getQuery`, `isClosing`, `context`, `appSessionId`, `onNode`, `setApplied(digest | null)`, optional `baseServerNames()` (omitted → the base-name guard is off; the runtime always passes it).
+`ToolsetSyncDeps`: `getQuery`, `isClosing`, `context`, `appSessionId`, `onNode`, `setApplied(digest | null)`, optional `baseServerNames()` (omitted → the base-name guard is off; the runtime always passes it), optional `codeModeSync()` (a Code Mode chat's bridge push, null for every other chat: when set, `runOnce` hands it the hook's map in place of `setMcpServers` — MAN-10092).
 
 ## Call-ins — `claude-runtime.provider.js`, `chat-process.ts`
 
 | where | call-in |
 | --- | --- |
-| `resolveSdkOptions` | `askToolsetLaunch` + `applyToolsetLaunch`; returns `toolsets: { digest: toolsetDigest(launch.servers), servers }` |
+| `resolveSdkOptions` | `askToolsetLaunch` + `applyToolsetLaunch`; returns `toolsets: { digest: toolsetDigest(launch.servers), servers }` — for a Code Mode chat `toolsets: { digest: null, servers: null }` instead (MAN-10092) |
 | `launchProfileOf(…, toolsets)` (5th arg) | `LaunchProfile.toolsets` = the digest the message WANTS; `null` when nothing is in play |
 | process creation | `createToolsetSync({ …, setApplied: d => { profile.toolsets = d }, baseServerNames: () => Object.keys(sdkOptions?.mcpServers ?? {}) })`; `handle.syncToolsets(boundMs)` |
 | `planLiveChanges` | `changes.toolsets = next.toolsets !== null && next.toolsets !== live.toolsets` (re-adopted: `next.toolsets !== null`); a tool-set difference is never a respawn reason |
@@ -1209,3 +1209,36 @@ Returns the uuids from the resume leaf back to the root. The file imports only `
 2026-11-03: 0 of 7,820 transcripts on disk hold a `<pasted_content` wrapper in a user message; the unwrap is proven on a fixture transcript.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-resume-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts
+
+## MAN-10092 — The Claude runtime's seams to Code Mode for chats — the ask, the launch, the bridge push, the held launch on a join
+
+The Claude runtime learns whether a chat works in Code Mode through `context.codeMode` only (MAN-8487) and imports nothing from `server/modules/code-mode/` (MAN-10091), which registers the hooks. Sibling of MAN-8495 (tool sets): the same context-hook shape. `claude-runtime.provider.js` takes call-in lines; every body is `list/claude/claude-code-mode-seams.ts`. A chat that is not in Code Mode runs every path exactly as before (INV-8471).
+
+## Functions — `claude-code-mode-seams.ts`
+
+| name | does |
+| --- | --- |
+| `CODE_MODE_SERVER_NAME` = `cm`, `CODE_MODE_SEARCH_TOOL` = `mcp__cm__search` | the one launch server and the one pre-allowed tool; `mcp__cm__execute` is not pre-allowed, so it still reaches `canUseTool` |
+| `askCodeModeLaunch(context, { appSessionId, onNode, cwd, servers }, deadlineMs = 15_000)` | `context.codeMode.launchFor`, rebuilt field by field (an off's string `prompt` and an on's non-empty string `agents` are kept, a wrong-typed one dropped; an answer without them is rebuilt as before); a throw, a reject, no answer in `deadlineMs` or an answer that is not a launch → `{ on: false }`, each distinct failure one `[Claude SDK] …; the chat launches without Code Mode` warning per server process. why: a failure of Code Mode must never break the message it rides on (INV-78) |
+| `applyCodeModeLaunch(sdkOptions, launch)` | off: nothing, except an off carrying `prompt` (the house telling a chat born in Code Mode it cannot be served this sitting) appends it after `systemPrompt.append`, a blank line between (`appendToSystemPrompt`). On: `tools` = `launch.tools` (replaces the `claude_code` preset); `mcpServers` REPLACED by `{ cm: launch.server }` and `strictMcpConfig = true` (servers named in a settings file do not load beside it); `env` merged; a launch carrying `agents` sets `extraArgs = { ...extraArgs, agents }`, the CLI's own `--agents <file>`; `launch.prompt` after `systemPrompt.append`, a blank line between; `mcp__cm__search` joins `allowedTools` once |
+| `createCodeModeServerSync({ context, appSessionId, baseServers, initialSetNames })` → `{ push(setServers, boundMs) }` | what a tool-set switch does in a Code Mode chat: `serversChanged({ appSessionId, servers: { ...setServers less base-named, ...baseServers } })`, bounded by `boundMs`, runs chained in call order; answers a `ToolsetSyncOutcome` (`added` / `removed` against the last confirmed push, starting from `initialSetNames`; a set's server named like a base server is left out and reported in `errors`, the same rule as `shapeForCli`); never throws |
+
+## Call-ins
+
+| where | call-in |
+| --- | --- |
+| `resolveSdkOptions(options, context, providerSessionId, heldCodeMode = null)` | after `loadMcpConfig`: `heldCodeMode ?? askCodeModeLaunch(context, { appSessionId, onNode, cwd, servers: { ...on-sets' servers, ...base map } })` (the base map `{}` when the MCP config is unreadable), then `applyCodeModeLaunch`. Returns `codeMode` (boolean), `codeModeLaunch`, and for an on launch `toolsets: { digest: toolsetDigest(null), servers: null }` (so nothing is held for and nothing sent to `setMcpServers`) with `codeModeServers: { baseServers, setNames }`; off: `codeModeServers: null` and today's `toolsets` |
+| `joinProcess` | `resolveSdkOptions(options, context, undefined, live.codeModeLaunch ?? { on: false })`: a join NEVER asks the house. why: `code-mode config --chat` is a launch write — it re-baselines the bridge's `servers_seen.json`, and a join that ran it erased the `tools changed:` notice the next call owed (measured 2026-11-20: with the ask on every message the notice never came; with the held launch it did). It also holds a process to the mode it was born in |
+| `spawnProcess` | `codeModeLaunch = resolved.codeModeLaunch`; `createToolsetSync({ …, codeModeSync: () => codeModeSync })`; `handle.codeModeLaunch` getter. `codeModeSync = createCodeModeServerSync(...)` (from `resolved.codeModeServers`, which both branches return) exists when the CLI was LAUNCHED in Code Mode and the chat has an app session id: for a fresh spawn the house's answer, for a re-adoption the mode its host recorded (`reattach.profile.codeMode === true`; a host from before the field reads off). A re-adoption recorded off passes `heldCodeMode = { on: false }` and is never asked; one recorded on is asked for the launch its joins reuse, and its sets go to the bridge even when that answer is off. why: a Code Mode CLI's only server is `cm`, so a set must never reach it through `setMcpServers`; a CLI launched off has no `cm` for the bridge to feed |
+| `createToolsetSync` (`claude-toolset-seams.ts`) | after the hook's answer, `servers` non-null and `deps.codeModeSync?.()` set → `push(servers, remainingMs())` in place of `setMcpServers`; the switch answers as it does today (`live: 'applied'`, per-server outcomes), no process replaced |
+| `launchProfileOf(…, accountSlug, codeMode = false)` (`chat-process.ts`) | `LaunchProfile.codeMode`; never a respawn reason. `planLiveChanges` compares the MCP map and the allowed list only when live and next share a mode (`sameMode`); they differ only for a process its host recorded in Code Mode whose re-ask at re-adoption answered off: it is kept, and its sets still go to the bridge (above) |
+
+## What a Code Mode chat launches with
+
+Measured 2026-11-20, CLI 2.1.330 (the case `a-code-mode-chats-real-cli-starts-with-cms-two-tools-and-the-eight-kept-and-no-other-mcp-server` holds it): `system/init` `mcp_servers` = `cm` alone; `tools` = cm's two and the eleven kept, 13 in all (`Agent` shows as `Task`), the to-do list as `TaskCreate`, `TaskGet`, `TaskList`, `TaskUpdate`. The CLI has no `TodoWrite`, so `CHAT_TOOLS` no longer names it. The profile records `mcpServers` `{"cm": …}`, `allowedTools` `["mcp__cm__search"]`, `codeMode: true`.
+
+## Probing
+
+`PROBE_PORT=<port>` with `boot_probe_server` (MAN-492), plus `DATABASE_PATH` on a `.backup` copy of the auth database (the minted token still verifies), `CODE_MODE_FLAG_DIR` on a scratch folder (`code-mode set chats on --by cli` moves only that flag) and `TOOLSETS_FILE` on a scratch registry. `system/init` is in the host journal, `$APPS_SESSIONS_DIR/<host>.ndjson`: copy it before `stop_probe_server`. The verb writes `~/.claude/state/code_mode/chats/<id>/` for each chat it answers on (seven-day retention).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-code-mode-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts

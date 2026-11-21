@@ -12,6 +12,7 @@ import cors from 'cors';
 
 import { AppError, findApplicationRoot, getModuleDirectory, IS_PLATFORM, terminalTextStyles } from '@/shared/utils.js';
 import { createAppsModule } from '@/modules/apps/index.js';
+import { createCodeModeModule } from '@/modules/code-mode/index.js';
 import { createToolsetsModule } from '@/modules/toolsets/index.js';
 import {
     closeSessionsWatcher,
@@ -359,6 +360,11 @@ app.use('/api/toolsets', authenticateToken, toolsets.userRouter);
 // enters a CLI's environment. The router's own first middleware checks a credential derived from the
 // chat (`chatCredential`), so a chat can switch its own sets and no other chat's.
 app.use('/api/toolsets-cmd', toolsets.commandRouter);
+
+// Code Mode for chats: registers the launch hook that asks the house whether a chat works with one
+// search and one script, and the hook that hands a Code Mode chat's changed servers to the house. No
+// route; the switch is the house's (`code-mode set chats on|off`, the Settings card).
+createCodeModeModule();
 
 // Installed CLI version + what the live runs are on (protected)
 app.use('/api/cli-version', authenticateToken, createCliVersionModule());

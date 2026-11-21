@@ -1,10 +1,12 @@
 import { Suspense } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 import { StandaloneShell } from '@/modules/standalone-shell';
+import { HEAD_PRESS } from '@/shared/constants';
 import { IS_PLATFORM } from '@/shared/utils';
 import type { LLMProvider } from '@/shared/types';
+import { Button } from '@/shared/ui';
 
 /**
  * For empty shell instances where no project is provided,
@@ -118,15 +120,11 @@ export default function ProviderLoginModal({
           (`pwa-notch-safe`, src/index.css) — its title and close button are the chrome that must
           clear the status bar, and the panel's own background has to reach the screen edge. */}
       <div className="pwa-notch-safe flex h-3/4 w-full max-w-4xl flex-col rounded-lg bg-card shadow-xl max-md:m-0 max-md:h-full max-md:max-w-none max-md:rounded-none md:m-4 md:h-3/4 md:max-w-4xl md:rounded-lg">
-        <div className="flex items-center justify-between border-b border-border p-4">
+        <div className="flex items-center gap-3 border-b border-border p-4">
+          <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onClose} aria-label={"Close login modal"} title={"Close login modal"}>
+            <ArrowLeft aria-hidden="true" />
+          </Button>
           <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground transition-colors hover:text-foreground"
-            aria-label="Close login modal"
-          >
-            <X className="h-6 w-6" />
-          </button>
         </div>
 
         <div className="flex-1 overflow-hidden">

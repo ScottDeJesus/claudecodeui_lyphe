@@ -39,7 +39,7 @@ type BadgeProps = React.HTMLAttributes<HTMLDivElement> & {
  * Used for short status labels by the accounts, agent-launch, browser-use, cerberus, chat,
  * deepseek-spend, dispatcher, git-panel, heal, jev, kanban, mcp, memory-intake, notes,
  * roadmap, runner-tab, schedules, settings, shell, sidebar, skills, standalone-shell, task-master and
- * universe modules, and by the kit's own `KanbanCard`. The cerberus tab's `StatusPill` draws a
+ * universe modules. The cerberus tab's `StatusPill` draws a
  * status's glyph and word in it. The dispatcher's lane-card heads and the roadmap's path also give it
  * a `kind`, for their Epic and Feature tags.
  */

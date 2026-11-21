@@ -823,3 +823,47 @@ export const CORE_BODY_SHARE = 0.35;
  * (`coreGaugeScale` in `shared/utils`); the instrument draws them there and the chat's core puts the outer one's press there.
  */
 export const CORE_GAUGE_GAPS: readonly [number, number] = [6, 13];
+
+// ---------------------------
+
+//----------------- PLACES ------------
+
+/**
+ * What a page's back arrow states when HOLDING IT opens the trail, the places the reader has been (project-workspace's
+ * `PlacesProvider` hears the long press; its `PlaceTrail` hangs from the arrow). Carried beside `WAY_BACK` by the chat's head
+ * (`ChatHead`) and the Bugs view's (`BugHead`). A plain press is still the way back.
+ */
+export const HOLDS_TRAIL = { 'data-holds-trail': '' } as const;
+
+/**
+ * What a core states when HOLDING IT opens the wheel of places, held: slide to a place and let go to go there. Carried by Kaylee's
+ * core on the sessions home (`WorkspaceHome`) and at the station (`StationKaylee`), through `CompanionCore`'s `pressMarks`. A plain
+ * press is still the core's own.
+ */
+export const HOLDS_PLACES = { 'data-holds-places': '' } as const;
+
+// ---------------------------
+
+//----------------- THE HEAD OF A PAGE ------------
+
+/**
+ * The row a page's head is drawn in: 12 px of air over a 36 px line at a desk, 4 px over a 28 px line under a finger, and 16 px (12
+ * under a finger) in from each side, so the way back and the Menu stand on the same spot of every page. Its presses stand at its top
+ * (`items-start`); what names the page sits between them (`HEAD_NAME`). The paddings are `!important` under a finger because
+ * `pwa-header-safe` sets the top padding in plain CSS. Drawn by project-workspace's `ScreenHead` and `ChatHead`, the kanban module's
+ * `BugHead`, and as the corner the sessions home (`WorkspaceHome`) and the station (`PlacesCorner`) keep the Menu in.
+ */
+export const HEAD_ROW = 'pwa-header-safe flex flex-none items-start gap-3 px-4 py-3 finger:gap-2 finger:px-3 finger:!pb-1 finger:!pt-1';
+
+/**
+ * A press in a page's head, the way back or the Menu: 36 px at a desk; drawn 28 px under a finger and still caught at 44 there by a
+ * transparent area grown 8 px past its box (the touch law's own way, which moves none of its neighbours). Used with `HEAD_ROW`.
+ */
+export const HEAD_PRESS = "relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']";
+
+/**
+ * What names the page between the presses of its head: at least a press tall, its words in the middle of that height. It may grow
+ * taller (the Bugs view's picker) without moving the presses, which stand at the row's top. Used with `HEAD_ROW`.
+ */
+export const HEAD_NAME = 'flex min-h-9 min-w-0 flex-1 items-center finger:min-h-7';
+

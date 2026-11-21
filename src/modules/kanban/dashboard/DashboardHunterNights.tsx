@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { DataTableColumn, HuntSittingRow, Tone } from '@/shared/types';
-import { Badge, DataTable, EmptyState } from '@/shared/ui';
+import { Badge, DataTable, EmptyState, Rule } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 
 /**
@@ -69,7 +69,7 @@ export function DashboardHunterNights({ sittings, hunterWord, nameOf }: Dashboar
   return (
     <div className="flex flex-col gap-3" role="group" aria-labelledby={headingId} data-hunter-nights={sittings.length}>
       <div className="flex flex-col gap-0.5">
-        <h4 id={headingId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.hunters.nights.title')}</h4>
+        <Rule id={headingId} level={4}>{t('kanban.dashboard.hunters.nights.title')}</Rule>
         <p className="text-xs text-muted-foreground">{t('kanban.dashboard.hunters.nights.about')}</p>
       </div>
       {rows.length === 0 ? (

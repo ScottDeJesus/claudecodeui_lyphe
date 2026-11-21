@@ -1,8 +1,9 @@
+import { Check, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { Button, Input } from '@/shared/ui';
+import { Button, IconWord, Input } from '@/shared/ui';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 
 type CheckLabelEditorProps = {
@@ -93,11 +94,11 @@ export function CheckLabelEditor({ value, onSave, onCancel, busy }: CheckLabelEd
         className="h-9 min-w-0 flex-[1_1_15rem]"
       />
       <span className="flex flex-none gap-1.5">
-        <Button type="submit" size="sm" disabled={busy || unchanged}>
-          {t('cerberus.sheet.save')}
+        <Button type="submit" size="sm" className="finger:size-11 finger:px-0" aria-label={t('cerberus.sheet.save')} title={t('cerberus.sheet.save')} disabled={busy || unchanged}>
+          <IconWord icon={Check} word={t('cerberus.sheet.save')} />
         </Button>
-        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onCancel}>
-          {t('cerberus.sheet.cancel')}
+        <Button type="button" size="sm" variant="outline" className="finger:size-11 finger:px-0" aria-label={t('cerberus.sheet.cancel')} title={t('cerberus.sheet.cancel')} disabled={busy} onClick={onCancel}>
+          <IconWord icon={X} word={t('cerberus.sheet.cancel')} />
         </Button>
       </span>
       {clears && (

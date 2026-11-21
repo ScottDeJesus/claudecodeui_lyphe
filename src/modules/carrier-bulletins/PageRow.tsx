@@ -38,7 +38,7 @@ export function PageRow({ page, showState, onOpen }: PageRowProps) {
       <button
         type="button"
         onClick={() => onOpen(page.page)}
-        className="grid w-full grid-cols-[minmax(0,1fr)_auto_1rem] items-center gap-x-3 gap-y-0.5 px-4 py-2.5 text-left hover:bg-background focus-visible:[outline-offset:-2px] [@container(min-width:720px)]:grid-cols-[4.5rem_11.5rem_minmax(0,1fr)_minmax(0,15rem)_1rem]"
+        className="grid w-full grid-cols-[minmax(0,1fr)_auto_1rem] items-center gap-x-3 gap-y-0.5 px-1 py-2.5 text-left hover:bg-muted focus-visible:[outline-offset:-2px] [@container(min-width:720px)]:grid-cols-[4.5rem_11.5rem_minmax(0,1fr)_minmax(0,15rem)_1rem]"
       >
         <span className="col-start-1 row-start-1 text-[14px] font-medium tabular-nums text-foreground">
           {t('cerberus.bulletins.pageRow.page', { page: page.page })}

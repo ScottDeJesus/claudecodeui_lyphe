@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactElement } from 'react';
-import { Pencil } from 'lucide-react';
+import { Bell, BellOff, Pencil } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { DiagnoseButton } from '@/modules/cerberus/DiagnoseButton';
@@ -7,7 +7,7 @@ import { AutoDiagnosisSwitch } from '@/modules/cerberus/sheet/AutoDiagnosisSwitc
 import { StatusPill } from '@/modules/cerberus/StatusMarks';
 import { hm, hms, stretchKey } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
-import { Badge, Button } from '@/shared/ui';
+import { Badge, Button, IconWord } from '@/shared/ui';
 
 type SelectedCheckProps = {
   check: CerberusCheckView;
@@ -94,9 +94,8 @@ export function SelectedCheck({
   // "Name this check" is a quiet text action, never a filled chip: a second filled pill beside the
   // status (in the accent green) would compete with a refused red or a failing amber for the eye.
   const nameAction = check.label === null ? (
-    <Button ref={nameTriggerRef} variant="outline" size="sm" className="h-8 px-2" onClick={onName}>
-      <Pencil aria-hidden />
-      {t('cerberus.sheet.nameThis')}
+    <Button ref={nameTriggerRef} variant="outline" size="sm" className="h-8 px-2 finger:size-11 finger:px-0" aria-label={t('cerberus.sheet.nameThis')} title={t('cerberus.sheet.nameThis')} onClick={onName}>
+      <IconWord icon={Pencil} word={t('cerberus.sheet.nameThis')} />
     </Button>
   ) : (
     <Button
@@ -142,8 +141,8 @@ export function SelectedCheck({
         )}
         {check.mute === null ? (
           onMute && (
-            <Button variant="outline" size="sm" onClick={onMute}>
-              {t('cerberus.sheet.mute')}
+            <Button variant="outline" size="sm" className="finger:size-11 finger:px-0" aria-label={t('cerberus.sheet.mute')} title={t('cerberus.sheet.mute')} onClick={onMute}>
+              <IconWord icon={BellOff} word={t('cerberus.sheet.mute')} />
             </Button>
           )
         ) : (
@@ -155,8 +154,8 @@ export function SelectedCheck({
                 {t('cerberus.sheet.muteNote', { time: hm(check.mute.until), reason: check.mute.reason })}
               </span>
             </Badge>
-            <Button variant="outline" size="sm" onClick={onUnmute}>
-              {t('cerberus.sheet.unmute')}
+            <Button variant="outline" size="sm" className="finger:size-11 finger:px-0" aria-label={t('cerberus.sheet.unmute')} title={t('cerberus.sheet.unmute')} onClick={onUnmute}>
+              <IconWord icon={Bell} word={t('cerberus.sheet.unmute')} />
             </Button>
           </>
         )}

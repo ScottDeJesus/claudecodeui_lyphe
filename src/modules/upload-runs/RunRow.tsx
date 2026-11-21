@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { RunFriction } from '@/modules/upload-runs/utils/uploadsModel';
 import { dayClockWord, durationWord, flowWord, jobWord, reasonWords, runLength, typeWord, verdictLook, whoWord } from '@/modules/upload-runs/utils/uploadsWords';
 import type { UploadRunSummary } from '@/shared/upload-runs-types';
-import { Badge, Chip } from '@/shared/ui';
+import { Badge } from '@/shared/ui';
 
 type RunRowProps = {
   run: UploadRunSummary;
@@ -66,8 +66,12 @@ export function RunRow({ run, friction, now, onOpenRun }: RunRowProps) {
         </span>
         {(run.reasons.length > 0 || friction !== undefined || run.imported) && (
           <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-            {run.reasons.slice(0, REASON_CHIPS).map((reason) => (
-              <Chip key={reason.code} size="sm" tone={run.dry_run ? 'neutral' : reason.tone}>{reasonWords(t, reason).chip}</Chip>
+            {/* Each reason a word in its tone's ink, parted by a dot: no box of its own inside the row. */}
+            {run.reasons.slice(0, REASON_CHIPS).map((reason, index) => (
+              <span key={reason.code} data-tone={run.dry_run ? 'neutral' : reason.tone} className="text-xs font-medium text-tone-ink" data-upload-reason-word={reason.code}>
+                {index > 0 && <span aria-hidden="true" className="mr-1.5 text-muted-foreground">·</span>}
+                {reasonWords(t, reason).chip}
+              </span>
             ))}
             {more > 0 && <span className="text-xs text-muted-foreground">{t(`${r}.moreReasons`, { count: more })}</span>}
             {friction !== undefined && friction.rows > 0 && (

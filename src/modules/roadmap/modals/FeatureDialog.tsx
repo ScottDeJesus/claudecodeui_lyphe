@@ -1,4 +1,4 @@
-import { Ban, FolderInput, MoreHorizontal, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Ban, FolderInput, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import { FeatureFacts } from '@/modules/roadmap/modals/FeatureFacts';
 import { ItemDialog } from '@/modules/roadmap/modals/ItemDialog';
 import { MoveDialog } from '@/modules/roadmap/modals/MoveDialog';
 import { PromoteDialog } from '@/modules/roadmap/modals/PromoteDialog';
+import { HEAD_PRESS } from '@/shared/constants';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import type { RoadmapAct, RoadmapEpic, RoadmapFeature, RoadmapMilestone, RoadmapPicture } from '@/shared/roadmap-types';
 import { ActionMenu, Banner, Button, Chip, Dialog, DialogContent, DialogTitle } from '@/shared/ui';
@@ -195,7 +196,10 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
           data-roadmap-word={word}
           className="flex max-h-[min(92dvh,52rem)] w-[calc(100vw-1rem)] max-w-xl flex-col overflow-hidden p-0"
         >
-          <header className="flex shrink-0 items-start gap-2 px-6 pb-4 pt-5">
+          <header className="flex shrink-0 items-start gap-3 px-6 pb-4 pt-5">
+            <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onClose} aria-label={t('roadmap.dialog.close')} title={t('roadmap.dialog.close')}>
+              <ArrowLeft aria-hidden="true" />
+            </Button>
             <div className="min-w-0 flex-1">
               <p className="line-clamp-2 break-words text-sm text-muted-foreground">
                 {t('roadmap.dialog.feature.path', { epic: epic.title, milestone: milestone.title })}
@@ -210,11 +214,8 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
               </div>
             </div>
             <div className="-mr-2 -mt-1 flex shrink-0 items-center">
-              {/* 44px on a phone, Verve's touch minimum: on a shipped feature the × is the one visible way out. */}
+              {/* 44px on a phone, Verve's touch minimum. The way out is the back arrow at the head's start. */}
               <ActionMenu label={t('roadmap.menu.actions', { title: feature.title })} items={upkeep} icon={MoreHorizontal} iconOnly variant="ghost" size="icon" triggerClassName="h-9 w-9 max-md:h-11 max-md:w-11" />
-              <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground max-md:h-11 max-md:w-11" aria-label={t('roadmap.dialog.close')} onClick={onClose}>
-                <X aria-hidden="true" />
-              </Button>
             </div>
           </header>
 

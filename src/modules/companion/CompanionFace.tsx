@@ -6,26 +6,34 @@ import { useCompanion } from '@/modules/companion/context/CompanionContext';
 import { useCompanionMaterial } from '@/modules/companion/hooks/useCompanionMaterial';
 import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
 import { useFaceSentences } from '@/modules/companion/hooks/useFaceInputs';
-import type { CompanionFaceLook } from '@/shared/types';
+import type { AstrolabeFrameInput, AstrolabeGauge, CompanionFaceLook } from '@/shared/types';
 
 type CompanionFaceProps = {
   /** The square she fills, in px: the disc's inside for the button, the station's own for her head and portrait. */
   size: number;
   /** Where the anchor she looks at lies from her, or null for none. The button gives it while she looks at something; the station gives none, for on the station she faces him. */
   look?: CompanionFaceLook | null;
+  /** The body alone, with no loop of its own (`CompanionAvatar`'s `bare`): for her core wearing its two rings (`CompanionCore`). */
+  bare?: boolean;
+  /** With `bare`: the measures worn as rings in orbit round the body, the inner first (her conversation's context, the account's week). */
+  gauges?: readonly AstrolabeGauge[];
+  /** What the body does, said outright in place of her presence: the wheel of places has her read toward the place pointed at. */
+  form?: AstrolabeFrameInput['state'];
+  /** With `form`: where what she reads lies, in degrees counter-clockwise from three o'clock (the place pointed at, on the wheel). */
+  bearing?: number;
 };
 
 /**
- * Her face bound to this page's provider. Consumed, through the barrel, by the project-workspace module's `WorkspaceHome` (the core
- * docked on the sessions home) and by the station module (the core in its halo), both looking at no anchor. The floating button
- * that also drew it is gone.
+ * Her face bound to this page's provider. Consumed by this module's `CompanionCore` (her core with its two rings, which the sessions home
+ * and the station draw), looking at no anchor; and, through the barrel, by project-workspace's `PlacesWheel`, her body bare at the
+ * wheel's middle, which reads toward the place pointed at (`form`, `bearing`). The floating button that also drew it is gone.
  *
  * It reads what the face needs from the provider and from `useCompanionPresence`, the same presence the status line and the button's
  * label read (MAN-9089): her state, the page player's `analyser`, `level` and `progress` (stable functions, so a frame sixty times a
  * second redraws nothing in React), the sentences she says (`useFaceSentences`), the material he chose for her (`useCompanionMaterial`)
  * and her name as he set it, the default while the page has not read it. The drawing is `CompanionAvatar`'s: the Astrolabe instrument.
  */
-export function CompanionFace({ size, look = null }: CompanionFaceProps) {
+export function CompanionFace({ size, look = null, bare = false, gauges, form, bearing }: CompanionFaceProps) {
   const { t } = useTranslation();
   const { picture, voice, clientId, level, progress, mouth, analyser } = useCompanion();
   const presence = useCompanionPresence();
@@ -34,5 +42,5 @@ export function CompanionFace({ size, look = null }: CompanionFaceProps) {
   const faceVoice = useMemo(() => ({ level, progress, mouth, analyser }), [level, progress, mouth, analyser]);
   const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
 
-  return <CompanionAvatar presence={presence} voice={faceVoice} sentences={sentences} look={look} material={material} size={size} name={name} />;
+  return <CompanionAvatar presence={presence} voice={faceVoice} sentences={sentences} look={look} material={material} size={size} name={name} bare={bare} gauges={gauges} form={form} bearing={bearing} />;
 }

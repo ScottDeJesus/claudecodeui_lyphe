@@ -1,11 +1,11 @@
-import { Check, ChevronDown, Loader2, PenLine, Undo2, X } from 'lucide-react';
+import { Check, ChevronDown, Loader2, PenLine, Tags, Undo2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { JudgmentPress, KeyCap, MarkRefusal } from '@/modules/affected-areas/MarkPress';
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
 import { kindName } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, MarkRequest, Region } from '@/shared/affected-areas-types';
-import { Badge, Button, buttonVariants, Menu } from '@/shared/ui';
+import { Badge, Button, buttonVariants, IconWord, Menu } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
@@ -120,9 +120,8 @@ export function MarkPresses({ region, codebook, browsing, out, refusal, note, on
             busy={busy}
             data-mark-press="keep"
             onClick={onKeep}
-          >
-            {t('affectedAreas.mark.keep', { kind: shownKind })}
-          </JudgmentPress>
+            word={t('affectedAreas.mark.keep', { kind: shownKind })}
+          />
         )}
         {!drawnByHand && renamedTo === null && (
           <JudgmentPress
@@ -133,8 +132,8 @@ export function MarkPresses({ region, codebook, browsing, out, refusal, note, on
             aria-keyshortcuts={browsing ? undefined : 'Y'}
             data-mark-press="confirm"
             onClick={() => onMark('confirm')}
+            word={t('affectedAreas.mark.confirm')}
           >
-            {t('affectedAreas.mark.confirm')}
             {!browsing && <KeyCap letter="Y" />}
           </JudgmentPress>
         )}
@@ -148,16 +147,28 @@ export function MarkPresses({ region, codebook, browsing, out, refusal, note, on
             busy={busy}
             aria-keyshortcuts={browsing ? undefined : 'Y'}
             data-mark-press="confirm"
+            aria-label={t('affectedAreas.mark.putBack', { kind: kindName(region.class, codebook) })}
+            title={t('affectedAreas.mark.putBack', { kind: kindName(region.class, codebook) })}
             onClick={() => onMark('confirm')}
           >
             {out === 'confirm' ? ring : <Undo2 aria-hidden="true" />}
-            {t('affectedAreas.mark.putBack', { kind: kindName(region.class, codebook) })}
+            <span className="finger:hidden">{t('affectedAreas.mark.putBack', { kind: kindName(region.class, codebook) })}</span>
             {!browsing && <KeyCap letter="Y" />}
           </Button>
         )}
         {!drawnByHand && (codebook === null ? (
-          <Button variant={null} size="sm" data-tone={REGION_LOOK.confirmed.tone} className={RENAME_FACE} disabled data-mark-press="rename">
-            {t('affectedAreas.mark.rename')}
+          <Button
+            variant={null}
+            size="sm"
+            data-tone={REGION_LOOK.confirmed.tone}
+            className={RENAME_FACE}
+            disabled
+            aria-label={t('affectedAreas.mark.rename')}
+            title={t('affectedAreas.mark.rename')}
+            data-mark-press="rename"
+          >
+            <Tags aria-hidden="true" />
+            <span className="finger:hidden">{t('affectedAreas.mark.rename')}</span>
             <ChevronDown aria-hidden="true" />
           </Button>
         ) : (
@@ -169,9 +180,12 @@ export function MarkPresses({ region, codebook, browsing, out, refusal, note, on
               <span
                 data-mark-press="rename"
                 data-tone={REGION_LOOK.confirmed.tone}
+                title={t('affectedAreas.mark.rename')}
                 className={cn(buttonVariants({ variant: null, size: 'sm' }), RENAME_FACE, busy && 'cursor-not-allowed opacity-70')}
               >
-                {t('affectedAreas.mark.rename')}
+                <Tags aria-hidden="true" />
+                {/* Out of sight under a finger, never out of hearing: the Menu's own button takes its name from this face. */}
+                <span className="finger:sr-only">{t('affectedAreas.mark.rename')}</span>
                 {renameGlyph}
                 {!browsing && <KeyCap letter="R" />}
               </span>
@@ -189,14 +203,22 @@ export function MarkPresses({ region, codebook, browsing, out, refusal, note, on
           aria-keyshortcuts={browsing ? undefined : 'N'}
           data-mark-press="not_a_change"
           onClick={() => onMark('not_a_change')}
+          word={t('affectedAreas.mark.notAChange')}
         >
-          {t('affectedAreas.mark.notAChange')}
           {!browsing && <KeyCap letter="N" />}
         </JudgmentPress>
         {!drawnByHand && (
-          <Button variant="ghost" size="sm" className="max-md:h-11" busy={busy} data-mark-press="note" onClick={onNote}>
-            <PenLine aria-hidden="true" />
-            {note === '' ? t('affectedAreas.mark.addNote') : t('affectedAreas.mark.editNote')}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="finger:size-11 finger:px-0 max-md:h-11"
+            busy={busy}
+            aria-label={note === '' ? t('affectedAreas.mark.addNote') : t('affectedAreas.mark.editNote')}
+            title={note === '' ? t('affectedAreas.mark.addNote') : t('affectedAreas.mark.editNote')}
+            data-mark-press="note"
+            onClick={onNote}
+          >
+            <IconWord icon={PenLine} word={note === '' ? t('affectedAreas.mark.addNote') : t('affectedAreas.mark.editNote')} />
           </Button>
         )}
       </div>}

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { KanbanWayIn } from '@/shared/kanban-types';
 import type { BugDashboardPart, DataTableColumn, TicketStats } from '@/shared/types';
-import { Banner, DataTable, EmptyState, Readout } from '@/shared/ui';
+import { Banner, DataTable, EmptyState, Readout, Rule } from '@/shared/ui';
 
 /**
  * WHERE TICKETS CAME FROM: the cards opened in the window, by who or what opened them, and how many of those are still
@@ -57,7 +57,7 @@ export function DashboardWaysIn({ waysIn, tickets, days }: DashboardWaysInProps)
   return (
     <section className="flex flex-col gap-3" aria-labelledby={headingId} data-dashboard-ways-in>
       <div className="flex flex-col gap-0.5">
-        <h3 id={headingId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.waysIn.title')}</h3>
+        <Rule id={headingId}>{t('kanban.dashboard.waysIn.title')}</Rule>
         <p className="text-xs text-muted-foreground">{t('kanban.dashboard.waysIn.about', { days })}</p>
       </div>
 
@@ -69,7 +69,7 @@ export function DashboardWaysIn({ waysIn, tickets, days }: DashboardWaysInProps)
         )}
 
         <div className="flex min-w-0 flex-col gap-3" role="group" aria-labelledby={cameBackId} data-dashboard-came-back={tickets.ok ? 'read' : 'unread'}>
-          <h4 id={cameBackId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.waysIn.cameBack.title')}</h4>
+          <Rule id={cameBackId} level={4}>{t('kanban.dashboard.waysIn.cameBack.title')}</Rule>
           {tickets.ok ? (
             <div className="grid grid-cols-2 gap-x-8 gap-y-4 lg:grid-cols-1">
               <Readout

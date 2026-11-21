@@ -10,8 +10,9 @@ import { RoomGallery } from '@/modules/affected-areas/RoomGallery';
 import { TourRooms } from '@/modules/affected-areas/TourRooms';
 import { addressBesideName, tourFacts, tourName } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Face, TourDetail, TourSummary } from '@/shared/affected-areas-types';
+import { useClaimHeadBack } from '@/shared/context/HeadBackContext';
 import type { AffectedAreasTrouble, DayOneSection, TourReaderProgress } from '@/shared/types';
-import { Button } from '@/shared/ui';
+import { Button, IconWord, Rule } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
 
 type TourScreenProps = {
@@ -42,7 +43,6 @@ type TourScreenProps = {
   onRetry: () => void;
 };
 
-const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
 
 /** Verve's waiting surface in the shape of the card and the gallery, while the detail is read. */
 function ReadingBody() {
@@ -60,6 +60,9 @@ function ReadingBody() {
 
 /**
  * A TOUR: whose it is, then what the reader is told about the job, then its rooms, then its day-one sketch, then its panos.
+ *
+ * The way back to all tours and the job's name are the screen head's while it stands (`useClaimHeadBack`: its arrow steps up to All
+ * tours, its title is the job); drawn on its own, with no head to claim, it draws them itself, at its top.
  *
  * Read top to bottom: All tours (the way back), the job's name, its address, and one line of what the tour holds
  * and how far it is read, with the walk beside them where the pano screen keeps its press (what it would spend —
@@ -80,15 +83,18 @@ export function TourScreen({
   const { t } = useTranslation();
   const panosHeadingId = useId();
   const tour = detail?.tour ?? summary;
+  // One way back per screen: the head's arrow steps up to all tours and its title is this job, while a head is there to say so.
+  const inHead = useClaimHeadBack({ label: t('affectedAreas.tour.back'), onBack, title: tour === null ? undefined : tourName(tour, t) });
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button variant="ghost" size="sm" className="-ml-3 max-md:h-11" onClick={onBack} {...WAY_BACK}>
-            <ChevronLeft aria-hidden="true" />
-            {t('affectedAreas.tour.back')}
-          </Button>
+          {!inHead && (
+            <Button variant="ghost" size="sm" className="-ml-3 finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.tour.back')} title={t('affectedAreas.tour.back')} onClick={onBack} {...WAY_BACK}>
+              <IconWord icon={ChevronLeft} word={t('affectedAreas.tour.back')} />
+            </Button>
+          )}
           {tour === null ? (
             <div aria-hidden="true" className="flex w-full flex-col gap-2 pt-1">
               <div className="vv-skeleton h-6 w-2/5" />
@@ -96,7 +102,7 @@ export function TourScreen({
             </div>
           ) : (
             <>
-              <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{tourName(tour, t)}</h2>
+              {!inHead && <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{tourName(tour, t)}</h2>}
               {addressBesideName(tour) !== null && (
                 <p className="text-[13.5px] text-muted-foreground [overflow-wrap:anywhere]">{addressBesideName(tour)}</p>
               )}
@@ -123,9 +129,7 @@ export function TourScreen({
               the tour too, and siblings may not share a key: so this one names itself. */}
           <DayOneSketch key={`day-one-${detail.tour.tourId}`} {...dayOne} codebook={codebook} onOpenPanoAt={onOpenPanoAt} onOpenPano={onOpenPano} />
           <section aria-labelledby={panosHeadingId} className="flex min-w-0 flex-col gap-3">
-            <h3 id={panosHeadingId} className={EYEBROW}>
-              {t('affectedAreas.tour.panosTitle')} · {detail.panos.length}
-            </h3>
+            <Rule id={panosHeadingId} end={String(detail.panos.length)}>{t('affectedAreas.tour.panosTitle')}</Rule>
             <RoomGallery
               key={detail.tour.tourId}
               panos={detail.panos}

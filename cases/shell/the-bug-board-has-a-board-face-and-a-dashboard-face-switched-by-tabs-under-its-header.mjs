@@ -7,7 +7,7 @@
 // The board is lib/kanban_board.mjs's: one made-up self-running board, every board request answered by the page itself,
 // so nothing reaches the board's server and nothing is written. Read at 1440x900, then at 390x844, then after a reload.
 //
-// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/KanbanBoardFace.tsx, src/shared/ui/Tabs.tsx
+// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/BugFoot.tsx, src/shared/ui/Tabs.tsx
 // writes: none
 
 import { withPage } from "../lib/app.mjs";

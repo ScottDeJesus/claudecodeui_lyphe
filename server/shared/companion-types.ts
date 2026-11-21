@@ -228,6 +228,15 @@ export type CompanionNote = { id: number; at: string; title: string; text: strin
 export type CompanionProcess = { state: 'asleep' | 'waking' | 'awake' | 'failed'; error: string | null };
 
 /**
+ * How full her conversation is, as her CLI last counted it: `used` tokens of the `closesAt` where her own compaction writes its note
+ * and begins a fresh conversation (the server's `closingPoint`), so `used / closesAt` reaches 1 where she starts fresh. Counted at
+ * each turn's end and at each launch (no model call), kept on her row so a restart keeps it, and `null` before a conversation's
+ * first count and once it has ended (a fresh start, a refused resume, Clear). Carried by `CompanionPicture.context` and announced
+ * by `companion_context`; her core wears it as its inner ring.
+ */
+export type CompanionContext = { used: number; closesAt: number };
+
+/**
  * How one of her turns ended: `answered` (she finished), `stopped` (the operator interrupted it) or
  * `failed` (the turn broke). Carried by the `ended` state of `companion_turn`.
  */
@@ -415,8 +424,8 @@ export type CompanionFace = { id: string | null; avatar: string; avatars: Compan
  * current `activity`, the `turnId` of a running turn (`null` when none), the `focus` chat, the
  * `draft`, the `pending` action waiting for his word (`null` for none), the `walk`, the `notes`, the
  * newest 200 `log` entries (newest last) and the `floor` — the client id of the page that holds the
- * floor, `null` for none — and her `face`, the one her pages draw. Every later change reaches the page as a
- * `CompanionFrame`, and a page that missed some reads the picture again.
+ * floor, `null` for none — her `face`, the one her pages draw, and how full her conversation is (`context`, `null` while
+ * not counted). Every later change reaches the page as a `CompanionFrame`, and a page that missed some reads the picture again.
  */
 export type CompanionPicture = {
   settings: CompanionSettings;
@@ -434,6 +443,7 @@ export type CompanionPicture = {
   work: CompanionWorkEntry[];
   floor: string | null;
   face: CompanionFace;
+  context: CompanionContext | null;
 };
 
 /**
@@ -442,7 +452,7 @@ export type CompanionPicture = {
  * one sentence of her turn as it is said; `companion_work` is one tool call of a turn, sent as it begins and again as it ends
  * (the same `id`, so a page keeps the newer); `companion_turn` marks a turn `started` or `ended` (the
  * `outcome` and `error` are set on `ended` only, `null` otherwise); `companion_activity`,
- * `companion_focus`, `companion_draft`, `companion_pending`, `companion_walk` and `companion_process` each
+ * `companion_focus`, `companion_draft`, `companion_pending`, `companion_walk`, `companion_process` and `companion_context` each
  * carry the new value of the matching picture field (`null` clears the focus, draft, pending action or
  * walk); `companion_note` adds a card, `companion_note_removed` withdraws one by `id` and `companion_note_pinned` says whether
  * the card with that `id` is pinned now; `companion_memory` says her memory changed, and a page that shows it reads it again;
@@ -475,6 +485,7 @@ export type CompanionFrame =
   | { kind: 'companion_note_pinned'; id: number; pinned: boolean }
   | { kind: 'companion_settings'; settings: CompanionSettings }
   | { kind: 'companion_process'; process: CompanionProcess }
+  | { kind: 'companion_context'; context: CompanionContext | null }
   | { kind: 'companion_open'; target: CompanionOpenTarget; floor: string; label: string }
   | { kind: 'companion_floor'; floor: string }
   | { kind: 'companion_face'; face: CompanionFace }

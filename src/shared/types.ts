@@ -5,7 +5,7 @@ import type { NavigateFunction } from 'react-router-dom';
 
 import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
-import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
+import type { CerberusStatus } from '@/shared/cerberus-types';
 import type { CompanionLogEntry, CompanionMouthPiece, CompanionSessionRef } from '@/shared/companion-types';
 import type { KanbanChangelogEntry, KanbanPriority, KanbanStats } from '@/shared/kanban-types';
 import type { RoadmapEpic, RoadmapFeature, RoadmapMilestone } from '@/shared/roadmap-types';
@@ -1248,6 +1248,19 @@ export type AstrolabeInstrument = {
 
 // ---------------------------
 
+//----------------- ASTROLABE TRACK AND OPENING ------------
+
+/** A point on the page, in client coordinates: where a slot of the kit's `Hoop` or a step of its `Track` stands, for an `Opening` to hang from. */
+export type AstrolabePoint = { x: number; y: number };
+
+/**
+ * One step of the kit's `Track`, a thing's course: its key, its name, and where the course stands at it (`done` behind, `live` being
+ * worked, `waiting` on you, `failed`, or `next` ahead).
+ */
+export type AstrolabeTrackStep = { id: string; label: string; state: 'done' | 'live' | 'next' | 'failed' | 'waiting' };
+
+// ---------------------------
+
 //----------------- COMPANION PRESENCE ON THE PAGE ------------
 
 /**
@@ -2201,11 +2214,12 @@ export type WorkspaceView = {
   hiddenFromNav: boolean;
 };
 
-/** One row of the command palette's Navigate group: `key` is its React key, `label` the name after "Go to", `keywords` the words the search also matches, and `run` the act the row performs when chosen. ProjectCommandPalette builds the list; CommandPalette only draws it. */
+/** One row of the command palette's Places group: `key` is its React key, `label` the name after "Go to", `keywords` the words the search also matches, `icon` the glyph drawn before it (none for a plugin's view), and `run` the act the row performs when chosen. ProjectCommandPalette builds the list (the wheel's places first, then the other views); CommandPalette only draws it. */
 export type PaletteNavRow = {
   key: string;
   label: string;
   keywords: string;
+  icon?: ComponentType<{ className?: string }>;
   run: () => void;
 };
 
@@ -3096,8 +3110,8 @@ export type SessionPanelInput = { kind: SessionPanelKind | null; title: string |
 // `src/modules/cerberus/StatusMarks.tsx`. Nothing else in the tab decides a status's tone, icon or shape.
 
 /**
- * The shape of a status's minute cell, and of a service's square in a collapsed node card. The shape
- * carries the status alongside its colour, with the word in the mark's tooltip (MAN-578):
+ * The shape of a status's minute cell. The shape carries the status alongside its colour, with the
+ * word in the mark's tooltip (MAN-578):
  * - `soft`: the tone's wash with no edge. Passing.
  * - `outline`: the wash inside the tone's edge. Close to the limit.
  * - `solid`: filled with the tone's dot. Failing and refused.
@@ -3130,7 +3144,7 @@ export type CerberusEnrollInput = { name: string; desc?: string };
 // ---------------------------
 
 //----------------- CERBERUS NODE PROJECTS ------------
-// What a node card's projects section (`src/modules/cerberus/fleet/NodeProjects.tsx`) hears back when it
+// What a machine's projects section (`src/modules/cerberus/fleet/NodeProjects.tsx`) hears back when it
 // moves a project onto its node, or back to this server (`PUT /api/projects/:projectId/node`).
 
 /**
@@ -3167,105 +3181,42 @@ export type FleetStatus = Exclude<CerberusStatus, 'not_enabled'> | 'fixing' | 'u
 export type CerberusMark = CerberusStatus | 'fixing';
 
 /**
- * The bucket a node's status falls in for counting and filtering: `needs` is failing, denied,
- * fixing and warn; `updating` is updating, paused and enrolling; every other status is its own bucket. `ok`
- * is a bucket the status bar counts but no filter button selects.
+ * The group a node's word falls in: `needs` is failing, denied, fixing and warn; `updating` is updating,
+ * paused and enrolling; every other word is its own group. Cerberus's instrument stands the runs of its
+ * hoop on these: Needs you, Updating, Passing (`ok`), and Silent for the rest.
  */
 export type FleetGroup = 'needs' | 'unknown' | 'muted' | 'updating' | 'empty' | 'ok';
 
-/** What the toolbar's filter buttons select: every node, or one bucket that is not plain passing. */
-export type FleetFilter = 'all' | Exclude<FleetGroup, 'ok'>;
-
-/** One filter button's live reading: which filter it is and how many nodes it holds right now. */
-export type FleetFilterGroup = { group: FleetFilter; count: number };
-
-/** One service of a node as the fleet lists it: its worst word and the counts its header row prints. */
-export type FleetService = {
-  service: string;
-  label: string | null;
-  status: CerberusStatus;
-  counts: CerberusServiceView['counts'];
-};
+/**
+ * What the fleet is doing, as Cerberus's core says it by its form (`CerberusInstrument`): a fix running on a machine (`fixing`, the
+ * core writes toward that machine's slot), a check needing a person (`needs`, the listening dish), a warden updating or a machine
+ * enrolling (`updating`, thinking), or nothing (`quiet`, the tide). Worked out by the cerberus module's `CerberusPanel`.
+ */
+export type FleetDoing = { kind: 'fixing'; nodeId: string } | { kind: 'needs' } | { kind: 'updating' } | { kind: 'quiet' };
 
 /**
- * One node as the Fleet views draw it. `status` is the node's own word (see `FleetStatus`), `link` is
- * the node's warden link as the read model states it, and `search` is the lower-cased text a search
- * box matches against — node id, description, service ids and labels. The warden version, the minute
- * cells and the checks stay on the overview's `CerberusNodeView`, found by `id`.
+ * One node as the fleet ranks it (`fleetItems`, worst first). `status` is the node's own word (see
+ * `FleetStatus`). The warden, the services, their minute cells and the checks stay on the overview's
+ * `CerberusNodeView`, found by `id`.
  */
 export type FleetItem = {
   id: string;
   desc: string | null;
   role: 'hub' | 'node';
-  link: CerberusNodeView['link'];
   status: FleetStatus;
   /** Who started the fix running on the node, while its `status` is `fixing`: "Fix running on its own" or "Fix running". Null otherwise. */
   fixBy: 'auto' | 'you' | null;
-  services: FleetService[];
-  search: string;
 };
-
-/**
- * How a spoke is drawn: `dashed` for a node with no result, `amber` (solid) for one that needs
- * attention, `plain` for every other. Selection is the view's own state and is not part of it.
- */
-export type RingSpokeKind = 'dashed' | 'amber' | 'plain';
-
-/**
- * One node placed in the rings, in pixels from the box's top-left corner. `ring` is 0 for the inner
- * ring, `angleDeg` the spoke's direction from the centre (0 = right, clockwise) and `length` its
- * reach in pixels. `dot` is the dot's diameter, `live` is whether the node's warden link is up (the
- * spoke carries a beat) and `labelled` whether its name is written beside it without being selected.
- */
-export type RingsNode = {
-  item: FleetItem;
-  ring: number;
-  x: number;
-  y: number;
-  angleDeg: number;
-  length: number;
-  dot: number;
-  spoke: RingSpokeKind;
-  live: boolean;
-  labelled: boolean;
-};
-
-/**
- * The rings, laid out for one box. `hub` is the hub item when the list handed in held it, drawn at
- * `center`; `guides` are the circles' radii in pixels; `nodes` are those that fit, worst first on the
- * inner ring, and `total` how many nodes there were around the hub, so `nodes.length < total` means
- * the rest are in Grid.
- */
-export type RingsLayout = {
-  center: { x: number; y: number };
-  hub: FleetItem | null;
-  guides: { radius: number }[];
-  nodes: RingsNode[];
-  total: number;
-};
-
-/**
- * How the Fleet view lays its nodes out: the toolbar's Grid · List · Rings. The view holds the choice;
- * the toolbar draws it.
- */
-export type FleetLayout = 'grid' | 'list' | 'rings';
-
-/**
- * One node as a page of the Fleet view draws it: its item, the overview's own node behind it (its
- * warden, its services and their minutes, which the item leaves behind), and whether it stands open.
- * The view builds the page; Grid and List draw it.
- */
-export type FleetEntry = { item: FleetItem; node: CerberusNodeView; open: boolean };
 
 /**
  * What opens the Cerberus check sheet, in `CheckSheet`'s own terms: the node, the service, the check
  * by its ID within the service (`session.valid`, its key after the first `/`), and the moment to look
  * up, epoch ms, left out for now. The caller resolves the check where it holds the data, so it is
- * never empty. A Fleet minute cell hands the check that set the minute — the service's worst check,
+ * never empty. A service's minute cell hands the check that set the minute — the service's worst check,
  * else its first, for a minute no check set — looked up at the moment the minute's word was reached
  * (`CerberusCell.at`, the moment the sheet's own strip uses), and now for the minute still running. A
- * Needs-you card, or a service row pressed as a whole, hands its check and now. The tab's root holds one and hands its fields to `CheckSheet` as they are.
- * A Needs-you card's run strip also hands `run`, the id of the run it shows, which the sheet's Fix output
+ * need, or a service row pressed as a whole, hands its check and now. The tab's root holds one and hands its fields to `CheckSheet` as they are.
+ * A need's run strip also hands `run`, the id of the run it shows, which the sheet's Fix output
  * opens on.
  */
 export type CerberusSheetTarget = { node: string; service: string; check: string; lookupAt?: number; run?: string };
@@ -4212,29 +4163,66 @@ export type RoadmapDotState = 'shipped' | 'inFlight' | 'designing' | 'proposed' 
 export type RoadmapTreeSelection = { kind: 'roadmap' } | { kind: 'milestone' | 'epic' | 'feature'; name: string };
 
 // ---------------------------
-//----------------- SESSIONS HALO: what the halo and its painter share ------------
+//----------------- THE HOOP: the kit's set of things as slots on a band round a core, and what its painter and its users share ------------
 
 /**
- * One chat as a slot on the halo, the simple chat list drawn as a hoop round the companion's core: the chat's `id` and `title`, the
- * folder it stands in (`folder` its id and `folderName` its name, both null for a chat in none), where it stands (`asleep` with no
- * live session host, `idle` awake and still, `working` while its turn runs, `waiting` while it waits on the reader), whether a reply
- * is `unread`, and its `helpers`: one entry for each subagent still at work, the material of its model (`SubagentDot`). Laid out
- * by the sidebar module's `SessionsHalo` and drawn by its `haloPainter`.
+ * How a thing on the kit's hoop (`Hoop`) stands, drawn in the square on its slot's face: `asleep` the frame alone (a chat with no
+ * live host, a bug in the backlog, a silent machine, a proposal that ended), `idle` the square lit and still, `working` a ring of
+ * accent dashes turning in it, `waiting` the square filled in the accent and breathing (a word is owed), `done` the square green
+ * (finished, passing), `failed` the square in the danger ink, and `more` three dots: a run's further things, past what its run shows.
  */
-export type SessionsHaloSlot = {
+export type HoopSlotState = 'asleep' | 'idle' | 'working' | 'waiting' | 'done' | 'failed' | 'more';
+
+/**
+ * One thing on the kit's hoop, a slot on its band. `id` is its key, never shown. `group` is the run it stands in (a folder, a lane,
+ * a state; null for none) and `groupName` the run's name, written along the ground (null writes none): a run's things stand side by
+ * side. `title` and `words` are read out under the hoop while it faces you: its name, then how it stands in words. `state` is its
+ * square (`HoopSlotState`); `edge` how much of its top edge is lit, 0 to 1 (whole for a chat's reply unread, a bug's checklist done,
+ * a machine's checks passing); `beads` one bead along its foot for each helper at work, in its model's material (three at most are
+ * drawn); `height` how tall it stands, as a share of the band (1 when absent): a thing that matters more stands taller. Made by the
+ * sidebar module's `SessionsHalo`, the kanban module's `bugHoop` and `proposalHoop` and the cerberus module's `fleetHoop`; drawn by
+ * the kit's `hoopPainter`.
+ */
+export type HoopSlot = {
   id: string;
+  group: string | null;
+  groupName: string | null;
   title: string;
-  folder: string | null;
-  folderName: string | null;
-  state: 'asleep' | 'idle' | 'working' | 'waiting';
-  unread: boolean;
-  helpers: readonly SubagentDot[];
+  words: string;
+  state: HoopSlotState;
+  edge: number;
+  beads: readonly SubagentDot[];
+  height?: number;
 };
+
+/**
+ * A dealing between what stands in a hoop's middle and one of its things: the thing by id, and the way the words go (`in`: read from
+ * it; `out`: written to it). The kit's `Hoop` draws it as a line from the core's edge to that slot, a bead travelling it.
+ */
+export type HoopLink = { id: string; way: 'in' | 'out' };
+
+/**
+ * What the kit's `Hoop` answers through its ref: where a thing's slot stands on the page right now (`pointOf`, the middle of its top
+ * edge; null for a thing not on the hoop), for an `Opening` to hang from; and its direction from the hoop's middle (`azimuthOf`,
+ * degrees counter-clockwise from three o'clock), for a core that reads from it or writes to it.
+ */
+export type HoopHandle = {
+  pointOf: (id: string) => AstrolabePoint | null;
+  azimuthOf: (id: string) => number | null;
+};
+
+/**
+ * The one measure an instrument's core wears (the kit's `InstrumentCore`): a flat ring round the body, filled clockwise from twelve
+ * (`value`, 0 to 1), named on a plate when it is pointed at (`label` · `detail`). It is grey until it passes `warn` (0.8 when absent),
+ * then yellow, then red from `danger` (1 when absent); a measure that is never a load, such as a share finished, passes thresholds it
+ * cannot reach.
+ */
+export type InstrumentMeasure = { value: number; label: string; detail?: string; warn?: number; danger?: number };
 
 /**
  * One subagent still at work, as the dot a chat draws for it: the material its model wears (`modelMaterialOf`: Opus the tube,
  * Haiku the wire, Sonnet the plasma, any other model Mercury), or null for an agent whose model is not known. Made by the sidebar
- * module's `subagentDots`; drawn by its `SessionTile` and its `haloPainter`.
+ * module's `subagentDots`; drawn by its `SessionTile` and by the kit's `hoopPainter` as a slot's beads.
  */
 export type SubagentDot = CompanionMaterial | null;
 
@@ -4439,3 +4427,78 @@ export type LocaleWords = { key: string; english: string };
  * `STATION_NEED_KINDS`, which gives each its glyph, its word, its tone and its one act.
  */
 export type StationNeedKind = Exclude<StationNeed['kind'], 'ask'> | StationAskKind;
+
+// ---------------------------
+
+//----------------- PLACES: the wheel of places, the trail and the palette's Places group ------------
+
+/**
+ * A place the app's navigation leads to, by the name the reader knows it by: the two pages over the workspace (`home`, `station`), the
+ * last chat (`chat`), the workspace's screens (`roadmap` is the `runner` view, `bugs` the `kanban` view, the others by their own ids)
+ * and Settings, a door. The wheel draws each at a fixed bearing, so a place keeps its angle whatever else is there.
+ */
+export type PlaceId = 'home' | 'station' | 'roadmap' | 'bugs' | 'chat' | 'cerberus' | 'inbox' | 'api' | 'universe' | 'schedules' | 'settings';
+
+/**
+ * One place as the navigation lists it, resolved for the page on screen: its name (the chat's own title for `chat`), its glyph (which
+ * is all the wheel draws of it, but for the last chat's title), the ring it stands on (the five visited most on the inner, the rest on
+ * the outer), whether it is where the reader is (`here`), the words the palette's search also matches, what waits there (`mark`, or null
+ * while nothing does), and `go`, the press that takes the reader there (to the part that answers the mark, when one stands). Built by
+ * project-workspace's `PlacesProvider`; read by its wheel (`PlacesWheel`) and by its command palette's Places group.
+ */
+export type Place = {
+  id: PlaceId;
+  label: string;
+  icon: ComponentType<{ className?: string; strokeWidth?: string | number }>;
+  ring: 'inner' | 'outer';
+  here: boolean;
+  keywords: string;
+  mark: PlaceMark | null;
+  go: () => void;
+};
+
+/**
+ * What waits at a place, drawn on its glyph in the wheel and, gathered, on the menu that brings the wheel up: `owed`, a word of the
+ * reader's is owed there (the accent, breathing); `done`, work finished there that has not been looked at yet (the green tick). `words`
+ * say what, after the place's name: on the wheel's plate, and to a reader of the screen. Built by project-workspace's `PlacesProvider`
+ * from the figures each place's own screen already reads; drawn by its `PlacesWheel` and `PlacesMenu`.
+ */
+export type PlaceMark = {
+  kind: 'owed' | 'done';
+  words: string;
+};
+
+/**
+ * One step of the trail: a place the reader has stood on in this page's life, newest last. `key` tells two steps apart (`home`,
+ * `station`, `view:<tab>`, `chat:<session id>`), `label` is its name and `kind` the sort of place it is, said under the name. Recorded
+ * by project-workspace's `PlacesProvider`, which also takes the reader back to one; drawn by its `PlaceTrail`, the course a held back
+ * arrow opens.
+ */
+export type PlaceTrailStep = {
+  key: string;
+  label: string;
+  kind: 'page' | 'screen' | 'chat';
+};
+
+/**
+ * A page inside a screen claiming the screen's one way back while it stands (`shared/context/HeadBackContext`): the head's back arrow
+ * then steps up to where it says, named `label` ("All carriers"), and goes there by `onBack`; the head's title says `title` ("Allstate")
+ * under an eyebrow of the screen's name and `within`, the levels the page stands inside, outermost first ("Bulletins"). Claimed by the
+ * carrier-bulletins module's `CarrierPages` and `PageScreen` and the affected-areas module's `TourScreen` and `PanoScreen`; drawn by
+ * project-workspace's `ScreenHead`.
+ */
+export type HeadBackClaim = {
+  label: string;
+  onBack: () => void;
+  title?: string;
+  within?: string[];
+};
+
+//----------------- SOUNDS: the app's sound set (src/shared/sounds) ------------
+
+/**
+ * One of the app's sounds, by the moment it marks: a question or a permission prompt waiting in a chat (`asking`), a plan on the roadmap
+ * stopped on an ask (`planAsks`), a turn ended (`finished`), and Kaylee's ears opening and closing a recording (`listenOpen`,
+ * `listenClose`). Played by `shared/sounds`; named by `shared/utils.ts`'s notification sounds and the companion module's earcons.
+ */
+export type SoundName = 'asking' | 'planAsks' | 'finished' | 'listenOpen' | 'listenClose';

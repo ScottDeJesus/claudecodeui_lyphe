@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { DrawerDecisions } from '@/modules/kanban/card-drawer/DrawerDecisions';
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
 import type { KanbanCardDetail, KanbanQuestion } from '@/shared/kanban-types';
-import { Badge, Button, Chip, Input } from '@/shared/ui';
+import { Button, Rule } from '@/shared/ui';
 
 /**
  * WHAT THE RUN IS WAITING TO BE TOLD, and the one control that unblocks it.
@@ -16,16 +16,19 @@ import { Badge, Button, Chip, Input } from '@/shared/ui';
  * UNDER THE QUESTIONS, THE DECISIONS TAKEN WITHOUT ASKING (`DrawerDecisions`), newest first: the
  * choices that were obvious enough not to stop for, on record where the ones that did stop are.
  *
- * UNANSWERED IS THE LOUD STATE. An open question is amber and never red: nothing is broken, a
- * decision is simply owed. Answered rows keep their place and go quiet — they are the record of
- * what was decided, and a reader who wants to revisit one presses Change rather than hunting for
- * it somewhere else.
+ * EACH QUESTION IS THE DESIGN SYSTEM'S CHOICE, asked from the card that needs the answer: the
+ * question, then each option a row on a hairline, the chosen ones in the accent (a word is owed),
+ * "Select all that apply" over a question that takes several, and Other as the last row, whose
+ * field opens under it. The count of what is still open stands at the end of the section's Rule,
+ * amber and never red: nothing is broken, a decision is simply owed. Answered, a question keeps
+ * its place and goes quiet — the question, then what was decided after a green tick — and a
+ * reader who wants to revisit one presses Change rather than hunting for it somewhere else.
  *
  * THE ANSWER GOES THROUGH `answerQuestion` on `useKanbanMutations`, handed down by the shell: that
  * hook is where a write becomes a toast and where a refusal keeps the server's own sentence, so
  * this file reaches the network through nothing of its own.
  *
- * A SELECTION IS NOT AN ANSWER UNTIL IT IS SENT. Chips move a local draft; the Answer press is
+ * A SELECTION IS NOT AN ANSWER UNTIL IT IS SENT. The rows move a local draft; the Answer press is
  * the write. That is deliberate on a multi-select question, where the reader's first two presses
  * are rarely their whole answer, and it is kept on single-select ones so both behave the same way
  * under the same hand.
@@ -43,24 +46,17 @@ export function DrawerQuestions({ detail, writes }: DrawerQuestionsProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const open = detail.questions.filter((question) => !question.answered).length;
+  // Nothing asked and nothing decided: the section is absent, not a heading over nothing.
+  if (detail.questions.length === 0 && !detail.decisions.some((decision) => decision.questionId === null)) return null;
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={headingId}>
-      <div className="flex items-center gap-2">
-        <h3 id={headingId} className="text-sm font-semibold text-foreground">
-          {t('kanban.questions.title')}
-        </h3>
-        {open > 0 && (
-          <Badge tone="warn" className="vv-badge--compact">
-            {t('kanban.questions.unanswered', { count: open })}
-          </Badge>
-        )}
-      </div>
+    <section className="flex flex-col gap-3" aria-labelledby={headingId} data-drawer-questions="">
+      <Rule id={headingId} end={open > 0 ? t('kanban.questions.unanswered', { count: open }) : undefined} endTone="warn">
+        {t('kanban.questions.title')}
+      </Rule>
 
-      {detail.questions.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('kanban.questions.none')}</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
+      {detail.questions.length > 0 && (
+        <ul className="flex flex-col gap-5">
           {detail.questions.map((question) => (
             <QuestionRow key={question.id} question={question} answerQuestion={writes.answerQuestion} />
           ))}
@@ -94,8 +90,7 @@ function QuestionRow({
   // reader's own words and no other way: its field stands open, and there is no "Something else"
   // to press, because there is nothing for it to be other than.
   const freeOnly = question.otherOn && question.options.length === 0;
-  // Otherwise seeded from the question's own text rather than from `otherOn`: `otherOn` says the
-  // asker ALLOWED a free answer, this says the reader is giving one.
+  // Otherwise seeded from the question's own text: this says the reader is giving a free answer.
   const [usingOther, setUsingOther] = useState(freeOnly || question.other.trim().length > 0);
   const [changing, setChanging] = useState(false);
 
@@ -123,72 +118,61 @@ function QuestionRow({
   const decision = [...question.selected, question.other].filter((part) => part.trim().length > 0).join(' · ');
 
   return (
-    <li className="vv-card flex flex-col gap-2 p-3">
-      <p className="text-sm leading-snug text-foreground">{question.text}</p>
+    <li className="ast-choice" data-multi={question.multi ? 'true' : 'false'} data-question={question.id}>
+      <p className="ast-choice-q">{question.text}</p>
 
       {answered ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {/* The decision itself, not a checkmark: "answered" tells the reader nothing they can
-              act on, and the word that was chosen tells them everything. */}
-          <Badge tone="positive" className="vv-badge--compact">
-            {decision.length > 0 ? decision : t('kanban.questions.answeredBlank')}
-          </Badge>
-          <Button variant="outline" size="sm" className="ml-auto h-7 px-2" onClick={() => setChanging(true)}>
+        <div className="flex items-start gap-2">
+          {/* The decision itself, not a checkmark alone: "answered" tells the reader nothing they can act on, and the word that
+              was chosen tells them everything. */}
+          <p className="ast-choice-said min-w-0 flex-1">{decision.length > 0 ? decision : t('kanban.questions.answeredBlank')}</p>
+          <Button variant="outline" size="sm" className="h-7 shrink-0 px-2 finger:h-11" onClick={() => setChanging(true)}>
             {t('kanban.questions.change')}
           </Button>
         </div>
       ) : (
         <>
-          {question.multi && (
-            <p className="text-xs text-muted-foreground">{t('kanban.questions.multiHint')}</p>
+          {question.multi && <p className="-mt-1 text-xs text-muted-foreground">{t('kanban.questions.multiHint')}</p>}
+
+          {!freeOnly && (
+            <div className="ast-choice-list" role="group" aria-label={question.text}>
+              {question.options.map((option) => (
+                <button key={option} type="button" className="ast-choice-opt" aria-pressed={selected.includes(option)} onClick={() => choose(option)}>
+                  <span className="ast-choice-opt-mark" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">{option}</span>
+                </button>
+              ))}
+
+              {/* Always offered beside the options: when none of them is what the reader wants, their own words are the
+                  answer, and the run is handed them as "In his words". */}
+              <button type="button" className="ast-choice-opt" aria-pressed={usingOther} onClick={() => setUsingOther((using) => !using)}>
+                <span className="ast-choice-opt-mark" aria-hidden="true" />
+                <span className="min-w-0 flex-1">{t('kanban.questions.other')}</span>
+              </button>
+            </div>
           )}
 
-          <div className={`flex flex-wrap gap-2${freeOnly ? ' hidden' : ''}`} role="group" aria-label={question.text}>
-            {question.options.map((option) => (
-              <Chip
-                key={option}
-                size="sm"
-                selected={selected.includes(option)}
-                onClick={() => choose(option)}
-              >
-                {option}
-              </Chip>
-            ))}
-
-            {/* Offered only when the asker allowed it. A free-text answer nobody asked for is a
-                decision recorded in a vocabulary the run cannot read. */}
-            {question.otherOn && !freeOnly && (
-              <Chip
-                size="sm"
-                selected={usingOther}
-                onClick={() => setUsingOther((using) => !using)}
-              >
-                {t('kanban.questions.other')}
-              </Chip>
-            )}
-          </div>
-
           {usingOther && (
-            <Input
+            <input
               id={otherId}
               value={other}
               onChange={(event) => setOther(event.target.value)}
               placeholder={t('kanban.questions.otherPlaceholder')}
               // With nothing else to pick, the field IS the question's answer and is named for it.
               aria-label={freeOnly ? question.text : t('kanban.questions.other')}
-              className="h-8"
+              className="bug-field"
             />
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2">
             {question.answered && (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 px-2"
+                className="h-7 px-2 finger:h-11"
                 onClick={() => {
-                  // Cancel DISCARDS: the row returns to the decision on RECORD, so a later Change
-                  // opens what is stored rather than the draft the reader walked away from.
+                  // Cancel DISCARDS: the row returns to the decision on RECORD, so a later Change opens what is stored rather
+                  // than the draft the reader walked away from.
                   setSelected(question.selected);
                   setOther(question.other);
                   setUsingOther(freeOnly || question.other.trim().length > 0);
@@ -201,11 +185,11 @@ function QuestionRow({
             <Button
               variant="tonal"
               size="sm"
-              className="ml-auto h-8"
-              // Refused before it is pressed rather than after a round trip: the server filters an
-              // empty selection away too, and an answer of nothing is not an answer.
+              className="h-8 finger:h-11"
+              // Refused before it is pressed rather than after a round trip: the server filters an empty selection away too,
+              // and an answer of nothing is not an answer.
               disabled={!canAnswer}
-              onClick={answer}
+              onClick={() => void answer()}
             >
               {t('kanban.questions.answer')}
             </Button>

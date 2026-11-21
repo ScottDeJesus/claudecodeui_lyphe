@@ -1,11 +1,11 @@
-// The two facts about warden updates that the header's button and the Update wardens dialog must read the
+// The two facts about warden updates that the fleet's Opening's button and the Update wardens dialog must read the
 // same way, so they live in one file: which node can take the release, and where a running batch stands.
 import type { CerberusUpdateView, CerberusWardens } from '@/shared/cerberus-types';
 
 /**
  * Whether a node can take the release: its warden is behind and has said hello. The server counts a node with
  * no version as behind, but one that has never said hello is on no link to offer the release on, so neither
- * the header nor the dialog offers what would answer "Update 0 nodes".
+ * the fleet's Opening nor the dialog offers what would answer "Update 0 nodes".
  */
 export function canTake(node: CerberusWardens['nodes'][number]): boolean {
   return node.behind && node.version !== null;

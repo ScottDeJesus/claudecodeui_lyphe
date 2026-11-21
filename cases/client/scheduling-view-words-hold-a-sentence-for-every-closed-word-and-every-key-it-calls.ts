@@ -6,7 +6,7 @@
 //
 // The closed words are seam 4's (eis_backend/scheduling_report/contracts.py, entries.py, verdict.py), as
 // src/shared/scheduling-report-types.ts mirrors them. Matched by the words an object holds, never by where the builder put
-// it, except tab, tabHint, often and openers, which the design names. Read with i18next and the TypeScript compiler.
+// it, except tab, often and openers, which the design names. Read with i18next and the TypeScript compiler.
 //
 // protects: src/modules/i18n/locales/en/common.json, src/modules/scheduling-report, src/shared/ui/HowOften.tsx
 // writes: none
@@ -60,7 +60,6 @@ runCase(async () => {
   const wrong: string[] = [];
 
   if (i18n.t(`${ROOT}.tab`) !== "Scheduling") wrong.push(`${ROOT}.tab reads ${JSON.stringify(i18n.t(`${ROOT}.tab`))}, not "Scheduling"`);
-  if (!resolves(`${ROOT}.tabHint`)) wrong.push(`${ROOT}.tabHint has no words`);
 
   // How often: every leaf the shared picture reads, as its own props comment lists them.
   const howOften = await readFile(HOW_OFTEN, "utf8");
@@ -127,5 +126,5 @@ runCase(async () => {
   if (unresolved.length > 0) wrong.push(`keys that draw their own path: ${unresolved.slice(0, 8).join("; ")}${unresolved.length > 8 ? ` (+${unresolved.length - 8})` : ""}`);
 
   if (wrong.length > 0) return broken(wrong.join("; "));
-  return held(`tab, tabHint, ${leaves.length} often leaves, 11 openers, the 20 reasons (${reasonHome?.[0]}), results and surfaces all worded; ${named.length} keys named across ${files.length} files all resolve`);
+  return held(`tab, ${leaves.length} often leaves, 11 openers, the 20 reasons (${reasonHome?.[0]}), results and surfaces all worded; ${named.length} keys named across ${files.length} files all resolve`);
 });

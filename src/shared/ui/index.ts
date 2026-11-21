@@ -59,36 +59,32 @@
 // lands LATER in the cascade than every file below and wins any equal-specificity tie with them.
 import '@/shared/ui/verve/controls.css';
 import '@/shared/ui/verve/feedback.css';
-// The FAB and split-pane paint shares no selector with the files either side of it, so its only
-// constraint is that board.css stays last, below.
+// The FAB and split-pane paint shares no selector with the files either side of it, so its place is free.
 import '@/shared/ui/verve/surfaces.css';
 // panels.css holds the paint of TextArea, Sheet, Timeline, Steps, Checkbox and DialogFrame. `.vv-textarea` composes
 // `.vv-input` (controls.css) and wins each tie it has — against `.vv-input`'s colours, against
 // src/index.css's pins on every `textarea` and against `text-sm`'s line height — by specificity, never by
 // order. The Sheet, Timeline, Steps, Checkbox and DialogFrame rules share no selector with any sibling. So nothing
-// here depends on its place against controls.css, feedback.css or surfaces.css, and the one constraint
-// is that board.css stays last, below.
+// here depends on its place against controls.css, feedback.css or surfaces.css.
 import '@/shared/ui/verve/panels.css';
 // media.css holds the paint of RegionImage, SphereView and Gallery. Its place is free: no selector in it is shared with
 // any sibling sheet (`.vv-region*`, `.vv-sphere*` and `.vv-gallery*` are its own), and every rule reads only tokens, so
 // nothing depends on its landing before or after controls.css, feedback.css, surfaces.css or panels.css.
-// The one constraint is still that board.css stays last, below.
 import '@/shared/ui/verve/media.css';
 // spots.css holds RegionImage's spots: where a camera stood, a round press laid on the picture. It was opened beside
 // media.css rather than squeezed into it (media.css stood at 280 lines; README rule 6), and its place is as free:
-// `.vv-region-spot` is its own selector and no rule in it leans on a sibling sheet. The one constraint is still that board.css stays last.
+// `.vv-region-spot` is its own selector and no rule in it leans on a sibling sheet.
 import '@/shared/ui/verve/spots.css';
 // data.css holds the paint of SegmentedControl and DataTable. Like media.css, its place is free: `.vv-segmented*` and
-// `.vv-datatable*` are its own and every rule reads only tokens. The one constraint is still that board.css stays last, below.
+// `.vv-datatable*` are its own and every rule reads only tokens.
 import '@/shared/ui/verve/data.css';
 // readings.css holds the paint of Readout and DayBars. Its place is as free as data.css's: `.vv-readout*` and `.vv-daybars*`
 // are its own and every rule reads only tokens. It was opened beside data.css rather than squeezed into it (data.css stood
-// at 220 lines; MANUAL rule 6). The one constraint is still that board.css stays last, below.
+// at 220 lines; MANUAL rule 6).
 import '@/shared/ui/verve/readings.css';
-// The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
-// `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
-// `.vv-card` won every one of those at equal specificity and a selected card lost its wash.
-import '@/shared/ui/verve/board.css';
+// astrolabe.css holds the paint of the design system's own objects, the Hoop's core, Track, Opening and Rule, and of Steps, Trace,
+// Choice and Files (`.ast-*`, every selector its own, every rule reading only tokens), so its place is as free as readings.css's.
+import '@/shared/ui/verve/astrolabe.css';
 
 export { ActionMenu } from '@/shared/ui/ActionMenu';
 export type { ActionMenuItem } from '@/shared/ui/ActionMenu';
@@ -142,18 +138,28 @@ export { Field } from '@/shared/ui/Field';
 export { Gallery } from '@/shared/ui/Gallery';
 // Holds a whole page of the app (the workspace, Kaylee Station) mounted and out of reach while the other page is on screen.
 export { HeldPage } from '@/shared/ui/HeldPage';
+// The design system's Hoop: a set of things as slots on a band round a core, the standard way a set you turn through is drawn (the
+// chats round a core, the bug board, the fleet), and the core with its one measure that the instruments stand in its middle. The
+// sizes are the hoop's own, for a caller that sizes the box round it or stands something by its middle.
+export { Hoop } from '@/shared/ui/Hoop';
+export { hoopHeightFor, hoopMiddle, hoopWidthFor } from '@/shared/ui/hoopPainter';
+export { InstrumentCore } from '@/shared/ui/InstrumentCore';
 // How often: a window's items by day (stacked clean / hiccup / test columns) and by local hour, each with its sentence. The
 // Cerberus tab's Uploads view draws it, handing in its own words as a key prefix.
 export { HowOften } from '@/shared/ui/HowOften';
+// A worded button's face: its mark and its word at a desk, its mark alone under a finger, the word kept as its name. The cerberus
+// tab draws its worded buttons with it, in its own faces and in the four views it borrows.
+export { IconWord } from '@/shared/ui/IconWord';
 export { Input } from '@/shared/ui/Input';
-export { KanbanCard } from '@/shared/ui/KanbanCard';
-export type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/ui/KanbanCard';
-export type { KanbanCardLink } from '@/shared/ui/KanbanCardLinks';
-export { KanbanLane } from '@/shared/ui/KanbanLane';
 export { Lightbox } from '@/shared/ui/Lightbox';
 export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';
 export { Menu } from '@/shared/ui/Menu';
+export { KeyValueList } from '@/shared/ui/KeyValueList';
 export { Meter } from '@/shared/ui/Meter';
+// The design system's Opening (Astrolabe's "what a deliberate click opened, hung from the mark it came out of") and Track ("one
+// thing's course"), ported from its bundle, beside its Hoop above: the kanban module's bug board is the first screen built on
+// them, and every screen redrawn to the design system after it is meant to reach for them before anything else.
+export { Opening } from '@/shared/ui/Opening';
 export { PillBar, Pill } from '@/shared/ui/PillBar';
 export {
   PromptInput,
@@ -177,6 +183,9 @@ export { QuestionOptionRow } from '@/shared/ui/QuestionOptionRow';
 // Astrolabe's Readout and ReadoutRow as one piece: a figure, its name, an optional unit, tone and comparison, and an em-dash
 // for a reading nobody has. Admitted because Astrolabe draws it; the kanban module's bug dashboard reads its numbers with it.
 export { Readout } from '@/shared/ui/Readout';
+// The design system's Rule: a section's heading with its hairline drawn out of the words, and its figure or its one press at the
+// line's end. The kanban module's open bug and dashboard head their sections with it.
+export { Rule } from '@/shared/ui/Rule';
 // A photo with its regions drawn over it: one SVG in the image's own 0..1 space (outline weight constant at any size
 // and zoom), a numbered badge at each region's corner, a press on either selecting it. The affected-areas module draws
 // a view's regions with it; the photo-match viewer is next. It also takes a box dragged on the photo (`drawing`) and
@@ -213,6 +222,7 @@ export { Stepper } from '@/shared/ui/Stepper';
 export { Steps } from '@/shared/ui/Steps';
 export { Switch } from '@/shared/ui/Switch';
 export { Tabs } from '@/shared/ui/Tabs';
+export { Track } from '@/shared/ui/Track';
 // A status sentence with each hyphenated word (a model id, a version) held whole: the Custom compaction
 // row and the Dactyls field in Edit Agent Chains draw their Waiting line's reason through it.
 export { WholeWords } from '@/shared/ui/WholeWords';

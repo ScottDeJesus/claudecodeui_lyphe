@@ -10,7 +10,7 @@ import { faceService } from './face/face.service.js';
 /**
  * The whole of her as a page reads it (`GET /api/companion`): settings, the picker's models, her process, her
  * activity, the turn in flight, the focus, the draft, the action waiting for his word, the walk, the notes, the
- * newest 200 log lines, the floor (the page that holds her voice) and her face (the one her pages draw,
+ * newest 200 log lines, the floor (the page that holds her voice), how full her conversation is (`context`, her CLI's last count) and her face (the one her pages draw,
  * `faceService.faceOf`: the look he wears, which is the house's first until he picks, and the looks he may wear: the house's, then his photo, each with its bake while it is being made). Every later change
  * reaches a page as a frame, and a page that missed some reads this again, so nothing here is derived from anything but
  * what a frame would also have told it. The pending action is the stored one WITHOUT its pin (`withoutPin`): what the prepare pinned is the server's alone and no picture carries it.
@@ -63,7 +63,7 @@ export async function modelOptions(): Promise<CompanionPicture['models']> {
 export async function buildPicture(account: CompanionAccount): Promise<CompanionPicture> {
   const models = await modelOptions();
   const { store, session } = account;
-  const { focus, draft, pending, walk, floor } = store.readState();
+  const { focus, draft, pending, walk, floor, context } = store.readState();
   const log = store.readLog(PICTURE_LOG_ROWS);
   return {
     settings: readCompanionSettings(account.userId),
@@ -81,5 +81,6 @@ export async function buildPicture(account: CompanionAccount): Promise<Companion
     work: store.listWork(log[0]?.id ?? 0),
     floor,
     face: faceService.faceOf(account.userId),
+    context,
   };
 }

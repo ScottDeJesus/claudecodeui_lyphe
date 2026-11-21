@@ -142,6 +142,11 @@ export function createSettingsRouter(
   // also carries the dactyl's words, its readiness and the week's hand ledger, which are not the file's.
   router.get('/main-session-dactyls', respond(() => service.getMainSessionDactyls()));
   router.put('/main-session-dactyls', respond((req) => service.setMainSessionDactyls(req.body?.enabled)));
+  // The Code Mode switches, host-wide like the ones above: flag files steering which runner launches work with
+  // two tools, so no `userId` is read. The PUT body names one kind and its position; `code-mode` is the switches'
+  // one writer and the judge of which kinds exist, so a kind it does not know is its 400, and nothing moves.
+  router.get('/code-mode', respond(() => service.getCodeMode()));
+  router.put('/code-mode', respond((req) => service.setCodeMode(req.body?.kind, req.body?.enabled)));
   // The usage pacer's weekly stop, host-wide like the switches above: it steers the pacer on this host, so
   // no `userId` is read. One integer on the PUT body, because the file holds one line — a whole percent.
   router.get('/weekly-stop', respond(() => service.getWeeklyStop()));

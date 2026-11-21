@@ -1,4 +1,4 @@
-import { ArrowRight, Maximize2 } from 'lucide-react';
+import { ArrowRight, Maximize2, RotateCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +10,7 @@ import { cubeFaces, sphereShapes } from '@/modules/affected-areas/utils/sphereFa
 import { FACES, areaWords, kindName, panoCounts } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Face, Region, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
 import type { PanoRoom, RegionLayer, SphereLook, SphereTrouble } from '@/shared/types';
-import { Badge, Banner, Button, SphereView } from '@/shared/ui';
+import { Badge, Banner, Button, IconWord, SphereView } from '@/shared/ui';
 
 type PanoSphereProps = {
   /** The open pano's id: the sphere is keyed by it, so no outline of the last pano outlives it. */
@@ -103,12 +103,15 @@ function ChosenArea({ region, panoRoom, face, codebook, onMarkOn }: ChosenAreaPr
       <Button
         variant="tonal"
         size="sm"
-        className="flex-none max-md:h-11"
+        className="flex-none finger:size-11 finger:px-0 max-md:h-11"
         data-sphere-press="mark-on"
+        aria-label={t('affectedAreas.sphere.markOn', { view })}
+        title={t('affectedAreas.sphere.markOn', { view })}
         // That view shown with the area still chosen: its presses stand under its photo, and nothing is sent from here.
         onClick={() => onMarkOn(face, region.regionId)}
       >
-        {t('affectedAreas.sphere.markOn', { view })}
+        {/* The word first and its mark after it, as a way on reads; the mark alone under a finger. */}
+        <span className="finger:hidden">{t('affectedAreas.sphere.markOn', { view })}</span>
         <ArrowRight aria-hidden="true" />
       </Button>
     </section>
@@ -210,14 +213,16 @@ export function PanoSphere({
                 <Button
                   variant="tonal"
                   size="sm"
-                  className="h-8 flex-none px-2.5 text-xs max-md:h-11"
+                  className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0 max-md:h-11"
+                  aria-label={t('affectedAreas.trouble.retry')}
+                  title={t('affectedAreas.trouble.retry')}
                   // The root reads the six photos again under a new attempt, and the report is let go with it.
                   onClick={() => {
                     setReported(null);
                     onRetryPhotos();
                   }}
                 >
-                  {t('affectedAreas.trouble.retry')}
+                  <IconWord icon={RotateCw} word={t('affectedAreas.trouble.retry')} />
                 </Button>
               )}
             >
@@ -263,13 +268,14 @@ export function PanoSphere({
             <Button
               variant="ghost"
               size="sm"
-              className="flex-none max-md:h-11"
+              className="flex-none finger:size-11 finger:px-0 max-md:h-11"
+              aria-label={t('affectedAreas.pano.enlarge')}
+              title={t('affectedAreas.pano.enlarge')}
               disabled={faces === null}
               // On 360° Enlarge is the sphere's own fullscreen; its exit, Escape or its own button, says false through it.
               onClick={() => onFullscreen(true)}
             >
-              <Maximize2 aria-hidden="true" />
-              {t('affectedAreas.pano.enlarge')}
+              <IconWord icon={Maximize2} word={t('affectedAreas.pano.enlarge')} />
             </Button>
           )}
         </div>

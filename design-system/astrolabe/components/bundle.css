@@ -182,13 +182,36 @@ body { margin: 0; background: var(--ground); color: var(--ink); font-family: var
 .ast-scene[data-near="true"] .ast-scene-instrument::before { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .ast-scene-instrument { transition-duration: var(--duration-fade); transition-timing-function: ease; } }
 
-/* ---------- rings: things you turn through ---------- */
-.ast-rings { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-.ast-rings-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
-.ast-rings-core { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; pointer-events: none; }
-.ast-rings-core > * { width: 100%; height: 100%; }
-.ast-rings-core > .ast-canvas { min-height: 0; }
-.ast-rings-slider:focus { outline: none; }
+/* ---------- Hoop: a set of things as slots on a band round the core. The canvas draws the band; the core and its measures stand
+   in its middle, each its own press; what faces you is read out under it. ---------- */
+.ast-hoop { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.ast-hoop-stage { position: relative; flex: none; }
+.ast-hoop-canvas { position: absolute; inset: 0; display: block; touch-action: none; outline: none; -webkit-tap-highlight-color: transparent; }
+.ast-hoop-middle { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; pointer-events: none; }
+.ast-hoop-middle > .ast-hoop-gauge-press, .ast-hoop-middle > .ast-hoop-core { grid-area: 1 / 1; pointer-events: auto; }
+.ast-hoop-core-art { grid-area: 1 / 1; display: grid; place-items: center; pointer-events: none; }
+.ast-hoop-core-art > * { width: 100%; height: 100%; }
+.ast-hoop-core-art > .ast-canvas { min-height: 0; }
+.ast-hoop-gauges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.ast-hoop-gauge-track { fill: none; stroke: var(--ink-muted); stroke-opacity: 0.22; stroke-width: 2.5; }
+.ast-hoop-gauge-lit { fill: none; stroke: var(--ink-muted); stroke-opacity: 0.85; stroke-width: 2.5; stroke-linecap: round; transition: stroke-dasharray var(--duration-lock) var(--ease-lock), stroke-width var(--duration-fade) ease, stroke-opacity var(--duration-fade) ease; }
+.ast-hoop-gauge-head { transition: transform var(--duration-lock) var(--ease-lock); }
+.ast-hoop-gauge-head circle { fill: var(--ink-muted); }
+.ast-hoop-gauge[data-level="warn"] .ast-hoop-gauge-lit { stroke: var(--warn-dot); stroke-opacity: 1; }
+.ast-hoop-gauge[data-level="warn"] .ast-hoop-gauge-head circle { fill: var(--warn-dot); }
+.ast-hoop-gauge[data-level="danger"] .ast-hoop-gauge-lit { stroke: var(--danger-dot); stroke-opacity: 1; }
+.ast-hoop-gauge[data-level="danger"] .ast-hoop-gauge-head circle { fill: var(--danger-dot); }
+.ast-hoop-gauge-press { position: relative; margin: 0; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.ast-hoop-gauge-press:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+.ast-hoop-gauge-plate { position: absolute; left: 50%; bottom: calc(100% - 4px); transform: translateX(-50%); padding: 3px 7px; white-space: nowrap; pointer-events: none; font-family: var(--font-mono); font-size: 10px; line-height: 14px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); background: var(--panel); border-radius: var(--radius-control); box-shadow: var(--shadow-float); opacity: 0; transition: opacity var(--duration-fade) ease; }
+.ast-hoop-gauge-press:hover .ast-hoop-gauge-plate, .ast-hoop-gauge-press:focus-visible .ast-hoop-gauge-plate { opacity: 1; }
+.ast-hoop-core { position: relative; margin: 0; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.ast-hoop-core:focus-visible { outline: 1px solid var(--focus); outline-offset: 4px; }
+.ast-hoop-reading { flex: none; height: 28px; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.ast-hoop-reading p { margin: 0; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 10px; line-height: 14px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted); }
+.ast-hoop-name { color: var(--ink); }
+.ast-hoop-owed { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .ast-hoop-gauge-lit, .ast-hoop-gauge-head { transition: none; } }
 
 /* ---------- track: one thing's course ---------- */
 .ast-track { position: relative; height: var(--size-control); min-width: 120px; }

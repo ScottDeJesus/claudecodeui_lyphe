@@ -5,9 +5,8 @@ import { RegionList } from '@/modules/affected-areas/RegionList';
 import { FACES, kindName, listWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, ViewDetail } from '@/shared/affected-areas-types';
 import type { PanoRoom } from '@/shared/types';
+import { Rule } from '@/shared/ui';
 
-/** The house's section eyebrow (MAN-742): a view's name over its list, as "Panos · 12" stands over the tour's gallery. */
-const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
 
 type PanoAreasProps = {
   /** The pano's six views with what the reader marked on each, from its detail. */
@@ -53,7 +52,7 @@ export function PanoAreas({ views, panoRoom, selectedRegionId, codebook, onSelec
         const headingId = `${headingBase}-${view.face}`;
         return (
           <div key={view.face} className="flex min-w-0 flex-col gap-2">
-            <h3 id={headingId} className={EYEBROW}>{faceName}</h3>
+            <Rule id={headingId}>{faceName}</Rule>
             <RegionList
               regions={view.regions}
               panoRoom={panoRoom}

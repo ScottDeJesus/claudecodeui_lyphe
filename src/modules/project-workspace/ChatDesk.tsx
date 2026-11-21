@@ -5,9 +5,10 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import { RoadmapCircle } from '@/modules/roadmap';
 import { SessionFollowups } from '@/modules/session-panel';
-import { haloHeightFor, haloMiddle, SessionsHalo } from '@/modules/sidebar';
+import { SessionsHalo } from '@/modules/sidebar';
 import { ChatCorePlaceProvider } from '@/shared/context/ChatCorePlaceContext';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
+import { hoopHeightFor, hoopMiddle } from '@/shared/ui';
 
 /** Where the roadmap's circle rests over the side column: its middle at least this far down, and its radius. The station's own two numbers. */
 const CIRCLE_TOP = 66;
@@ -25,7 +26,7 @@ const CORE_RADIUS = 60;
  */
 const HOOP_LEAN = 0.72;
 
-/** The hoop's reading line, drawn under its circle inside its box (`SessionsHalo`'s `data-halo-reading`, 28 px tall): it lifts the circle, and the core in it, by half as much. */
+/** The hoop's reading line, drawn under its circle inside its box (the kit `Hoop`'s `data-hoop-reading`, 28 px tall): it lifts the circle, and the core in it, by half as much. */
 const HOOP_READING = 28;
 
 type ChatDeskProps = {
@@ -33,14 +34,13 @@ type ChatDeskProps = {
   side: number;
   /** The open chat, by id; null on a chat not yet begun. The hoop of chats round the core arrives turned to it. */
   sessionId: string | null;
-  /** The chat's head (`ChatHead`), the first line over the chat; null while another header stands in for it. */
-  head: ReactNode;
   /** The chat's pane. It keeps one place in the tree whether or not the column is drawn, so the chat is never remounted by a resize. */
   children: ReactNode;
 };
 
 /**
- * THE CHAT'S SCREEN, LAID OUT. On a narrow screen it is the head and the chat under it, one column, the chat's core beside its line.
+ * THE CHAT'S SCREEN UNDER ITS HEAD, LAID OUT (the head, `ChatHead`, is every screen's, over the whole of this). On a narrow screen it
+ * is the chat, one column, the chat's core beside its line.
  *
  * AT A DESK IT IS THE STATION'S ARRANGEMENT: a column at the start, and the chat beside it as a surface of its own, wider (its words
  * run to 1100 px). In the column, from the top: the roadmap as its small circle (`RoadmapCircle`: a press stands the whole stack up
@@ -56,7 +56,7 @@ type ChatDeskProps = {
  *
  * Used by `WorkspaceMain`, as the Chat view's pane.
  */
-export function ChatDesk({ side, sessionId, head, children }: ChatDeskProps) {
+export function ChatDesk({ side, sessionId, children }: ChatDeskProps) {
   const doors = useStationDoors();
   // The box the core is drawn into. State, not a ref: the core's portal is made when the box arrives and unmade when it leaves.
   const [corePlace, setCorePlace] = useState<HTMLDivElement | null>(null);
@@ -72,11 +72,11 @@ export function ChatDesk({ side, sessionId, head, children }: ChatDeskProps) {
   // The core's centre is the chat surface's middle: its 16 px of air above and 12 px below put that 2 px under the desk's.
   const circleY = Math.max(CIRCLE_TOP, deskHeight / 2 + 2 - CIRCLE_OVER_CORE);
   const beside = side > 0;
-  // The hoop's box holds the core this many px above its own middle (the circle's middle, `haloMiddle`, and the reading line under the
+  // The hoop's box holds the core this many px above its own middle (the circle's middle, `hoopMiddle`, and the reading line under the
   // circle); the column lowers the hoop by as much, so the core's centre, not the hoop's, is level with the chat's (`--core-lift`).
   const hoopWidth = side - 2 * HOOP_INSET;
-  const hoopHeight = haloHeightFor(hoopWidth, HOOP_LEAN);
-  const coreLift = beside ? HOOP_READING / 2 + hoopHeight / 2 - haloMiddle(hoopWidth, hoopHeight, HOOP_LEAN).y : 0;
+  const hoopHeight = hoopHeightFor(hoopWidth, HOOP_LEAN);
+  const coreLift = beside ? HOOP_READING / 2 + hoopHeight / 2 - hoopMiddle(hoopWidth, hoopHeight, HOOP_LEAN).y : 0;
 
   return (
     <ChatCorePlaceProvider value={beside ? corePlace : null}>
@@ -103,7 +103,6 @@ export function ChatDesk({ side, sessionId, head, children }: ChatDeskProps) {
           </aside>
         )}
         <div className="chat-desk__main">
-          {head}
           <div className="chat-desk__body">{children}</div>
         </div>
         {beside && <RoadmapCircle rest={{ cx: side / 2, cy: circleY, radius: CIRCLE_RADIUS }} />}

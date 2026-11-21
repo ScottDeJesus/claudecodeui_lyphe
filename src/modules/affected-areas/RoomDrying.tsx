@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { capitalized, listWords, spoken } from '@/modules/affected-areas/utils/tourModel';
 import type { DryingEntry, MaterialEntry, RoomEntry } from '@/shared/affected-areas-types';
 import type { Tone } from '@/shared/types';
-import { Card } from '@/shared/ui';
+import { Rule } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 
 type RoomDryingProps = {
@@ -76,8 +76,8 @@ export function RoomDrying({ room }: RoomDryingProps) {
   const demo = demoLine(room, t);
 
   return (
-    <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2.5 px-[18px] py-4">
-      <h3 id={headingId} className="text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.drying.title')}</h3>
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2.5">
+      <Rule id={headingId}>{t('affectedAreas.drying.title')}</Rule>
       {drying === null ? (
         <p className="text-[13.5px] text-muted-foreground">{t('affectedAreas.drying.none')}</p>
       ) : (
@@ -98,6 +98,6 @@ export function RoomDrying({ room }: RoomDryingProps) {
         </>
       )}
       {demo !== null && <p className="text-[13.5px] text-foreground">{demo}</p>}
-    </Card>
+    </section>
   );
 }

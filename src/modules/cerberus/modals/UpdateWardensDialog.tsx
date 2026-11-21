@@ -1,3 +1,4 @@
+import { ArrowUpCircle, Check, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +10,7 @@ import { canTake, freshestBatch } from '@/modules/cerberus/utils/wardenUpdates';
 import type { CerberusStartedBatch, CerberusUpdateView, CerberusWardens } from '@/shared/cerberus-types';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import type { Tone } from '@/shared/types';
-import { Button, Checkbox, DialogFrame } from '@/shared/ui';
+import { Button, Checkbox, DialogFrame, IconWord } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /** One enrolled node as `GET /wardens` lists it: its warden's version (null before its first hello) and whether that is behind. */
@@ -88,8 +89,8 @@ type UpdateWardensDialogProps = {
  * when the batch's read says so. With no release built (`latest` null) there is nothing to offer, and it draws
  * nothing.
  *
- * For the cerberus module's `CerberusPanel`, which hosts one and opens it from the header's Update wardens
- * button.
+ * For the cerberus module's `CerberusPanel`, which hosts one and opens it from the fleet's Opening (`FleetOpening`, the
+ * core's): its Update wardens button.
  */
 export function UpdateWardensDialog({ open, onClose }: UpdateWardensDialogProps) {
   if (!open) return null;
@@ -182,7 +183,7 @@ function UpdateWardensFlow({ onClose }: { onClose: () => void }) {
         </p>
 
         {/* A Checkbox the keyboard reaches is scrolled into view clear of the pinned footer, never under it. */}
-        <ul className="overflow-hidden rounded-xl border border-border [&_input]:scroll-mb-28">
+        <ul className="border-y border-border [&_input]:scroll-mb-28">
           {wardens.nodes.map((node) => (
             <NodeRow
               key={node.node}
@@ -217,29 +218,31 @@ function UpdateWardensFlow({ onClose }: { onClose: () => void }) {
           <div className="ml-auto flex flex-wrap justify-end gap-3">
             {phase === 'choosing' && (
               <>
-                <Button variant="outline" className="max-md:h-11" disabled={starting} onClick={dismiss}>
-                  {t('cerberus.updates.cancel')}
+                <Button variant="outline" className="finger:size-11 finger:px-0 max-md:h-11" disabled={starting} aria-label={t('cerberus.updates.cancel')} title={t('cerberus.updates.cancel')} onClick={dismiss}>
+                  <IconWord icon={X} word={t('cerberus.updates.cancel')} />
                 </Button>
                 {/* `busy`, not disabled, as Mute's and Promote's: a disabled button drops the focus it holds the
                     moment the press goes out. With nothing ticked it is aria-disabled: refused, focus kept. */}
                 <Button
-                  className="max-md:h-11"
+                  className="finger:size-11 finger:px-0 max-md:h-11"
                   busy={starting}
                   aria-disabled={ticked.length === 0 || undefined}
+                  aria-label={t('cerberus.updates.start', { count: ticked.length })}
+                  title={t('cerberus.updates.start', { count: ticked.length })}
                   onClick={onStart}
                 >
-                  {t('cerberus.updates.start', { count: ticked.length })}
+                  <IconWord icon={ArrowUpCircle} word={t('cerberus.updates.start', { count: ticked.length })} />
                 </Button>
               </>
             )}
             {phase === 'running' && (
-              <Button variant="outline" className="max-md:h-11" onClick={onClose}>
-                {t('cerberus.updates.close')}
+              <Button variant="outline" className="finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.updates.close')} title={t('cerberus.updates.close')} onClick={onClose}>
+                <IconWord icon={X} word={t('cerberus.updates.close')} />
               </Button>
             )}
             {phase === 'ended' && (
-              <Button className="max-md:h-11" onClick={onClose}>
-                {t('cerberus.updates.finish')}
+              <Button className="finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.updates.finish')} title={t('cerberus.updates.finish')} onClick={onClose}>
+                <IconWord icon={Check} word={t('cerberus.updates.finish')} />
               </Button>
             )}
           </div>
@@ -270,7 +273,7 @@ function NodeRow({ node, update, offer, checked, disabled, onToggle, t }: NodeRo
   if (offer) {
     // The row's padding is the label's own, so the whole row — 44 px tall — is one press target.
     return (
-      <li className="border-t border-border px-4 first:border-t-0">
+      <li className="border-t border-border first:border-t-0">
         <Checkbox className="py-3" checked={checked} disabled={disabled} label={label} onChange={(next) => onToggle(node.node, next)} />
       </li>
     );
@@ -279,7 +282,7 @@ function NodeRow({ node, update, offer, checked, disabled, onToggle, t }: NodeRo
   const state = rowState(t, node, update);
   const steps = update?.steps ?? [];
   return (
-    <li className="flex flex-col gap-1.5 border-t border-border px-4 py-3 first:border-t-0">
+    <li className="flex flex-col gap-1.5 border-t border-border py-3 first:border-t-0">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <p id={labelId} className="min-w-0 text-[14.5px] leading-[1.4] [overflow-wrap:anywhere]">
           {label}

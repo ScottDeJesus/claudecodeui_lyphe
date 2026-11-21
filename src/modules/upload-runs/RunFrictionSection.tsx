@@ -1,11 +1,11 @@
-import { Undo2Icon } from 'lucide-react';
+import { RotateCwIcon, Undo2Icon } from 'lucide-react';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { HealCardView, HealItemRow } from '@/modules/heal';
 import type { HealCard, HealItem, HealSessionsAnswer } from '@/modules/heal';
 import { agoWord } from '@/modules/upload-runs/utils/uploadsWords';
-import { Banner, Button } from '@/shared/ui';
+import { Banner, Button, IconWord } from '@/shared/ui';
 
 type RunFrictionSectionProps = {
   /** The heal answer for this run's Claude session; null while it is out, or when it could not be read. */
@@ -49,14 +49,18 @@ type RunFrictionSectionProps = {
 export function RunFrictionSection({ friction, frictionFailed, noSession, now, onRetry, onOpenFriction, onOpenBrief }: RunFrictionSectionProps) {
   const { t } = useTranslation();
   const f = 'cerberus.uploads.sheet.friction';
-  const quiet = 'm-0 rounded-lg border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground';
+  const quiet = 'm-0 text-[13px] text-muted-foreground';
 
   if (frictionFailed) {
     return (
       <div role="alert" data-uploads-friction="unread">
         <Banner
           tone="warn"
-          action={<Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>{t('cerberus.uploads.trouble.retry')}</Button>}
+          action={(
+            <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.uploads.trouble.retry')} title={t('cerberus.uploads.trouble.retry')} onClick={onRetry}>
+              <IconWord icon={RotateCwIcon} word={t('cerberus.uploads.trouble.retry')} />
+            </Button>
+          )}
         >
           <p className="text-[13px] font-medium">{t(`${f}.unread`)}</p>
         </Banner>
@@ -76,7 +80,7 @@ export function RunFrictionSection({ friction, frictionFailed, noSession, now, o
   return (
     <div className="flex min-w-0 flex-col gap-4" data-uploads-friction={friction.items.length}>
       {/* A hairline over every row but the first, and none between a came-back line and the row it stands over. */}
-      <ul className="m-0 flex min-w-0 list-none flex-col rounded-lg border border-border p-0 [&>li+li]:border-t [&>li+li]:border-border [&>li[data-upload-regression]+li]:border-t-0">
+      <ul className="m-0 flex min-w-0 list-none flex-col border-y border-border p-0 [&>li+li]:border-t [&>li+li]:border-border [&>li[data-upload-regression]+li]:border-t-0">
         {friction.items.map((item) => (
           <Fragment key={item.id}>
             {item.regression !== null && (

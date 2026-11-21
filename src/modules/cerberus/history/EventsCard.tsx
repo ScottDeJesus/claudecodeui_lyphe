@@ -1,9 +1,10 @@
+import { ChevronsDown } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import type { CerberusFeedFoot, TimelineEvent } from '@/shared/types';
-import { Button, Card, EmptyState, Timeline } from '@/shared/ui';
+import { Button, IconWord, Rule, Timeline } from '@/shared/ui';
 
 type EventsCardProps = {
   /** The feed's rows, newest first, `null` until the first page answers. */
@@ -58,8 +59,17 @@ function FeedFoot({ earlier, onEarlier }: { earlier: CerberusFeedFoot; onEarlier
   const reading = earlier === 'reading';
   return (
     <div className="border-t border-muted pt-2">
-      <Button variant="outline" size="sm" className="max-md:h-11" disabled={reading} aria-busy={reading || undefined} onClick={onEarlier}>
-        {reading ? t('cerberus.history.readingEarlier') : t('cerberus.history.showEarlier')}
+      <Button
+        variant="outline"
+        size="sm"
+        className="finger:size-11 finger:px-0"
+        aria-label={reading ? t('cerberus.history.readingEarlier') : t('cerberus.history.showEarlier')}
+        title={reading ? t('cerberus.history.readingEarlier') : t('cerberus.history.showEarlier')}
+        disabled={reading}
+        aria-busy={reading || undefined}
+        onClick={onEarlier}
+      >
+        <IconWord icon={ChevronsDown} word={reading ? t('cerberus.history.readingEarlier') : t('cerberus.history.showEarlier')} />
       </Button>
     </div>
   );
@@ -81,7 +91,7 @@ export function EventsCard({ events, since, failed, earlier, openIndex, onToggle
   const headingId = useId();
   let body;
   if (events === null) body = failed ? <UnreachableBanner onRetry={onRetry} /> : <WaitingFeed />;
-  else if (events.length === 0) body = <EmptyState title={t('cerberus.history.empty')} message={t('cerberus.history.emptyMessage')} />;
+  else if (events.length === 0) body = <p className="text-[13px] text-muted-foreground">{t('cerberus.history.empty')}. {t('cerberus.history.emptyMessage')}</p>;
   else {
     body = (
       <>
@@ -91,11 +101,9 @@ export function EventsCard({ events, since, failed, earlier, openIndex, onToggle
     );
   }
   return (
-    <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2 px-[18px] py-4">
-      <h2 id={headingId} className="text-xs uppercase tracking-[0.14em] text-ink-faint">
-        {since === null ? t('cerberus.history.everything') : t('cerberus.history.since', { time: since })}
-      </h2>
+    <section role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2">
+      <Rule id={headingId}>{since === null ? t('cerberus.history.everything') : t('cerberus.history.since', { time: since })}</Rule>
       {body}
-    </Card>
+    </section>
   );
 }

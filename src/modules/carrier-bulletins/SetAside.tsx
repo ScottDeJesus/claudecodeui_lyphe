@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Labeled, PageQuote } from '@/modules/carrier-bulletins/QuotedWords';
 import type { NotPlaced, PageFailure } from '@/shared/carrier-bulletins-types';
-import { Card } from '@/shared/ui';
+import { Rule } from '@/shared/ui';
 
 type SetAsideProps = {
   notPlaced: NotPlaced[];
@@ -32,49 +32,41 @@ export function SetAside({ notPlaced, failures }: SetAsideProps) {
     <>
       {notPlaced.length > 0 && (
         <section aria-labelledby={notPlacedId} className="flex min-w-0 flex-col gap-2">
-          <h3 id={notPlacedId} className="text-xs uppercase tracking-[0.14em] text-ink-faint">
-            {t('cerberus.bulletins.notPlaced.title')} · {notPlaced.length}
-          </h3>
+          <Rule id={notPlacedId} end={String(notPlaced.length)}>{t('cerberus.bulletins.notPlaced.title')}</Rule>
           <p className="text-[12.5px] text-muted-foreground">{t('cerberus.bulletins.notPlaced.why')}</p>
-          <Card className="overflow-hidden">
-            <ul aria-labelledby={notPlacedId} className="m-0 list-none divide-y divide-border p-0">
-              {notPlaced.map((duty, index) => (
-                // A duty has no id on the wire; its place in the reading is its identity on this page.
-                <li key={index} className="flex flex-col gap-1.5 px-4 py-3">
-                  <PageQuote words={duty.quote} />
-                  <Labeled label={t('cerberus.bulletins.notPlaced.asks')} words={duty.doubt} />
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <ul aria-labelledby={notPlacedId} className="m-0 list-none divide-y divide-border border-y border-border p-0">
+            {notPlaced.map((duty, index) => (
+              // A duty has no id on the wire; its place in the reading is its identity on this page.
+              <li key={index} className="flex flex-col gap-1.5 py-3">
+                <PageQuote words={duty.quote} />
+                <Labeled label={t('cerberus.bulletins.notPlaced.asks')} words={duty.doubt} />
+              </li>
+            ))}
+          </ul>
         </section>
       )}
       {failures.length > 0 && (
         <section aria-labelledby={failuresId} className="flex min-w-0 flex-col gap-2">
-          <h3 id={failuresId} className="text-xs uppercase tracking-[0.14em] text-ink-faint">
-            {t('cerberus.bulletins.failure.title')} · {failures.length}
-          </h3>
-          <Card className="overflow-hidden">
-            <ul aria-labelledby={failuresId} className="m-0 list-none divide-y divide-border p-0">
-              {failures.map((failure, index) => (
-                // A refused entry has no id on the wire; its place in the reading is its identity on this page.
-                <li key={index} className="flex flex-col gap-1.5 px-4 py-3">
-                  <p className="text-[13.5px] font-medium leading-snug text-foreground [overflow-wrap:anywhere]">
-                    {failure.words ?? t('cerberus.bulletins.failure.added')}
-                  </p>
-                  <p className="text-[12.5px] text-muted-foreground">
-                    {failure.said === '(no entry)'
-                      ? t('cerberus.bulletins.failure.noEntry')
-                      : t('cerberus.bulletins.failure.said', { said: t(`cerberus.bulletins.verdict.${failure.said}`) })}
-                  </p>
-                  {failure.quote !== null && <PageQuote words={failure.quote} />}
-                  <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[12.5px] leading-relaxed text-warn-ink">
-                    {failure.failures.map((check, at) => <li key={at} className="[overflow-wrap:anywhere]">{check}</li>)}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <Rule id={failuresId} end={String(failures.length)} endTone="warn">{t('cerberus.bulletins.failure.title')}</Rule>
+          <ul aria-labelledby={failuresId} className="m-0 list-none divide-y divide-border border-y border-border p-0">
+            {failures.map((failure, index) => (
+              // A refused entry has no id on the wire; its place in the reading is its identity on this page.
+              <li key={index} className="flex flex-col gap-1.5 py-3">
+                <p className="text-[13.5px] font-medium leading-snug text-foreground [overflow-wrap:anywhere]">
+                  {failure.words ?? t('cerberus.bulletins.failure.added')}
+                </p>
+                <p className="text-[12.5px] text-muted-foreground">
+                  {failure.said === '(no entry)'
+                    ? t('cerberus.bulletins.failure.noEntry')
+                    : t('cerberus.bulletins.failure.said', { said: t(`cerberus.bulletins.verdict.${failure.said}`) })}
+                </p>
+                {failure.quote !== null && <PageQuote words={failure.quote} />}
+                <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[12.5px] leading-relaxed text-warn-ink">
+                  {failure.failures.map((check, at) => <li key={at} className="[overflow-wrap:anywhere]">{check}</li>)}
+                </ul>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </>

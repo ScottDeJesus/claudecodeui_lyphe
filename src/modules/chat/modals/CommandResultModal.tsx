@@ -1,24 +1,7 @@
 import { memo, useMemo, useState } from 'react';
-import {
-  Activity,
-  BadgeCheck,
-  CircleHelp,
-  Coins,
-  Cpu,
-  Gauge,
-  Package,
-  Plus,
-  RotateCcw,
-  Shrink,
-  Search,
-  Server,
-  Sparkles,
-  TerminalSquare,
-  Timer,
-  Loader2,
-  X,
-} from 'lucide-react';
+import { Activity, ArrowLeft, BadgeCheck, CircleHelp, Coins, Cpu, Gauge, Loader2, Package, Plus, RotateCcw, Search, Server, Shrink, Sparkles, TerminalSquare, Timer } from 'lucide-react';
 
+import { HEAD_PRESS } from '@/shared/constants';
 import { Badge, Button, Dialog, DialogContent, DialogTitle, Input } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type {
@@ -624,10 +607,13 @@ function CommandResultModal({
         <DialogTitle>{activeMeta?.title || 'Command Result'}</DialogTitle>
 
         <div
-          className={`flex shrink-0 items-start justify-between gap-3 border-b border-border bg-popover ${
+          className={`flex shrink-0 items-start gap-3 border-b border-border bg-popover ${
             isModelsModal ? 'px-4 py-3 sm:px-5 sm:py-4' : 'px-4 py-4 sm:px-6 sm:py-5'
           }`}
         >
+          <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onClose} aria-label={"Close command result modal"} title={"Close command result modal"}>
+            <ArrowLeft aria-hidden="true" />
+          </Button>
           <div className="flex min-w-0 items-center gap-3">
             <div
               className={`flex shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-foreground ${
@@ -649,16 +635,6 @@ function CommandResultModal({
             </div>
           </div>
 
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Close command result modal"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="settings-content-enter min-h-0 flex-1 overflow-hidden px-4 py-4 sm:px-6 sm:py-5">

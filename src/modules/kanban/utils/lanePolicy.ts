@@ -122,19 +122,39 @@ export function kanbanLanes(autonomy: boolean): KanbanLaneSpec[] {
     : [backlog, todo, inProgress, done];
 }
 
-/**
- * The statuses a lane absorbs only while autonomy is OFF — the cards that wait on an answer,
- * which have a lane of their own when it is on. The board says so once, over the rail.
- *
- * DERIVED, never restated: it is the difference between the statuses the board gives a lane of
- * their own and the statuses it shows, so a third lane that folds a status in with autonomy off
- * lands in this answer without anyone remembering to come back here.
- */
-export function foldedStatuses(autonomy: boolean): KanbanStatus[] {
-  if (autonomy) return [];
+/** One run of the bug board's hoop: its key, the i18n key of its name, and the lanes whose cards stand in it, in their order. */
+export type KanbanGroupSpec = { id: string; titleKey: string; laneIds: string[] };
 
-  const withOwnLane = new Set(kanbanLanes(true).flatMap((spec) => spec.statuses));
-  return kanbanLanes(false)
-    .flatMap((spec) => spec.statuses)
-    .filter((status) => !withOwnLane.has(status));
+/**
+ * THE BOARD ROUND ITS HOOP, in the order the runs stand round it: what the board has in hand first, then what waits to be taken up,
+ * then what is not ready, then finished work, which holds the most. Each run's cards stand side by side with its name along the
+ * ground, the way a folder's chats stand on the halo.
+ *
+ * TO DO'S RUN CARRIES THE OPEN QUESTIONS TOO, whatever the autonomy setting: on the hoop a card that waits on an answer is already
+ * its own sign (its square turns the accent and breathes), so a run of its own would only say it twice. The lanes stay as
+ * `kanbanLanes` composes them, so a card can still be moved into Open questions from its own course.
+ *
+ * Read by the panel's instrument (`BugInstrument`) through `utils/bugHoop`. A lane named here that the autonomy setting does not
+ * compose (Open questions with autonomy off, whose cards To Do already holds) is simply not read.
+ */
+export function kanbanGroups(): KanbanGroupSpec[] {
+  return [
+    { id: 'active', titleKey: 'kanban.lanes.active', laneIds: ['active'] },
+    { id: 'todo', titleKey: 'kanban.lanes.todo', laneIds: ['todo', 'questions'] },
+    { id: 'not_ready', titleKey: 'kanban.lanes.backlog', laneIds: ['not_ready'] },
+    { id: DONE_LANE_ID, titleKey: 'kanban.lanes.done', laneIds: [DONE_LANE_ID] },
+  ];
+}
+
+/**
+ * The lane a new card is made in: To Do, the lane every board takes new work through whatever its autonomy setting (with it on
+ * the only lane that takes any). A card meant for the backlog is moved there from its own course. Null for lanes that hold no To Do.
+ */
+export function newCardLane(specs: KanbanLaneSpec[]): KanbanLaneSpec | null {
+  return specs.find((spec) => spec.id === 'todo') ?? null;
+}
+
+/** The lane a card of this status sits in, or null for a status no lane shows. */
+export function laneOfStatus(specs: KanbanLaneSpec[], status: KanbanStatus): KanbanLaneSpec | null {
+  return specs.find((spec) => spec.statuses.includes(status)) ?? null;
 }

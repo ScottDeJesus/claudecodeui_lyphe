@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import { Play } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,7 +8,7 @@ import { useClock } from '@/modules/cerberus/hooks/useClock';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import { hm, localIso, sameLocalDay } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCatalogEntryView } from '@/shared/cerberus-types';
-import { Badge, Button, Card, Switch } from '@/shared/ui';
+import { Badge, Button, IconWord, Switch } from '@/shared/ui';
 import { cn, formatShortDate } from '@/shared/utils';
 
 /** How long an entry reads as new after it is added: its "New · HH:MM" and its wash. */
@@ -92,7 +93,7 @@ function EntryRow({ entry, index, isNew, busy, blocked, now, onAuto, onRun }: En
     <li
       data-tone={isNew ? 'positive' : undefined}
       className={cn(
-        'flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border px-5 py-4 first:border-t-0 motion-safe:animate-shape-rise',
+        'flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border py-4 first:border-t-0 motion-safe:animate-shape-rise',
         isNew && 'bg-tone-soft/70',
       )}
       style={{ animationDelay: `${Math.min(index, STAGGER_ROWS) * STAGGER_MS}ms` }}
@@ -147,10 +148,12 @@ function EntryRow({ entry, index, isNew, busy, blocked, now, onAuto, onRun }: En
         busy={busy}
         aria-describedby={held ? reasonId : undefined}
         // One width for both words, so the columns stand in line down the catalog whichever a row reads.
-        className="min-w-24"
+        className="min-w-24 finger:size-11 finger:min-w-0 finger:px-0"
+        aria-label={busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')}
+        title={busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')}
         onClick={() => onRun(entry)}
       >
-        {busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')}
+        <IconWord icon={Play} word={busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')} />
       </Button>
     </li>
   );
@@ -161,7 +164,7 @@ function ReadingRows() {
   return (
     <ul aria-busy="true">
       {[0, 1, 2].map((row) => (
-        <li key={row} className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border px-5 py-4 first:border-t-0">
+        <li key={row} className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border py-4 first:border-t-0">
           <div className="flex min-w-0 flex-[2_1_250px] flex-col gap-1.5">
             <div className="vv-skeleton h-[18px] w-3/5" />
             <div className="vv-skeleton h-3.5 w-4/5" />
@@ -220,8 +223,8 @@ export function CatalogView() {
   const autoCount = entries?.filter((entry) => entry.auto).length ?? 0;
 
   let body;
-  if (ordered === null) body = failed ? <div className="p-4"><UnreachableBanner onRetry={onRetry} /></div> : <ReadingRows />;
-  else if (ordered.length === 0) body = <p className="px-5 py-4 text-[13.5px] text-muted-foreground">{t('cerberus.catalog.empty')}</p>;
+  if (ordered === null) body = failed ? <div className="py-4"><UnreachableBanner onRetry={onRetry} /></div> : <ReadingRows />;
+  else if (ordered.length === 0) body = <p className="py-4 text-[13.5px] text-muted-foreground">{t('cerberus.catalog.empty')}</p>;
   else body = (
     <ul>
       {ordered.map((entry, index) => (
@@ -248,7 +251,7 @@ export function CatalogView() {
           <p className="text-[12.5px] text-muted-foreground">{t('cerberus.catalog.count', { count: entries.length, auto: autoCount })}</p>
         )}
       </div>
-      <Card className="overflow-hidden">{body}</Card>
+      <div className="border-y border-border">{body}</div>
     </div>
   );
 }

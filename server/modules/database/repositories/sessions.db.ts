@@ -235,7 +235,7 @@ export const sessionsDb = {
    * Unlike `createAppSession` this writes `provider_session_id` and
    * `jsonl_path` immediately, because a fork's transcript file exists before
    * the row does — and the filesystem watcher would otherwise index it as an
-   * unrelated session under its own id.
+   * unrelated session under its own id. The new row carries the source's `code_mode`.
    */
   createForkedSession(input: {
     sessionId: string;
@@ -256,9 +256,10 @@ export const sessionsDb = {
     // The new row goes in FIRST: the watcher row's followups move onto it (a foreign key needs its
     // parent to exist), and only then is the watcher row deleted, so the cascade finds nothing to take.
     db.transaction(() => {
+      // The fork resumes the source's transcript, which was taught the source's tools, so it is born in the source's mode (a source with no word gives NULL, as the source has).
       db.prepare(
-        `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, model, effort, forked_from_session_id, isArchived, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, model, effort, forked_from_session_id, code_mode, isArchived, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT code_mode FROM sessions WHERE session_id = ?), 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       ).run(
         input.sessionId,
         input.provider,
@@ -268,6 +269,7 @@ export const sessionsDb = {
         input.jsonlPath,
         input.model,
         input.effort,
+        input.forkedFromSessionId,
         input.forkedFromSessionId,
       );
       followupsDb.moveToSession(input.providerSessionId, input.sessionId);
@@ -475,15 +477,84 @@ export const sessionsDb = {
    *
    * Called both when the user picks a model for the session and on every send,
    * so the row always reflects what the session last ran with and reopening it
-   * restores that model instead of a catalog default.
+   * restores that model instead of a catalog default. A different model than the
+   * one recorded lets go of the window reported for the old one (`context_window`):
+   * that window was the old model's, and the next turn reports the new one's.
    */
   setSessionModel(sessionId: string, model: string): void {
     const db = getConnection();
+    // SET reads the row as it was, so `model IS ?` compares the recorded model with the new one.
     db.prepare(
       `UPDATE sessions
-       SET model = ?
+       SET context_window = CASE WHEN model IS ? THEN context_window ELSE NULL END,
+           model = ?
        WHERE session_id = ?`
-    ).run(model, sessionId);
+    ).run(model, model, sessionId);
+  },
+
+  /**
+   * Records the context window, in tokens, the Claude SDK reported for the model the session behind `providerSessionId` ran on, so
+   * its context is measured against the right window after a restart too. Written by the providers module's token usage service
+   * (`rememberClaudeContextWindow`) when a turn reports a window it did not hold already.
+   */
+  setContextWindow(providerSessionId: string, contextWindow: number): void {
+    const db = getConnection();
+    db.prepare(
+      `UPDATE sessions
+       SET context_window = ?
+       WHERE provider_session_id = ?`
+    ).run(contextWindow, providerSessionId);
+  },
+
+  /**
+   * What the window of the session behind `providerSessionId` can be read from: the window the SDK last reported for it (NULL before
+   * any) and the model the app last recorded for it (NULL before any), or null for a provider id no row carries. Read by the
+   * providers module's token usage service (`getReportedClaudeContextWindow`) when its own memory holds no report.
+   */
+  contextWindowOf(providerSessionId: string): { contextWindow: number | null; model: string | null } | null {
+    const db = getConnection();
+    const row = db
+      .prepare(
+        `SELECT context_window, model
+         FROM sessions
+         WHERE provider_session_id = ?
+         ORDER BY updated_at DESC
+         LIMIT 1`
+      )
+      .get(providerSessionId) as { context_window: number | null; model: string | null } | undefined;
+    return row === undefined ? null : { contextWindow: row.context_window, model: row.model };
+  },
+
+  /**
+   * The window the Claude SDK most recently reported for any session recorded on `model` (the value a chat stores: `sonnet[1m]`,
+   * `fable`), or null when no session on it has reported one. Read by the providers module's token usage service
+   * (`claudeModelContextWindow`) for a chat whose own turns have reported none yet: the model's window is learned from the person's
+   * own chats, never written down.
+   */
+  latestContextWindowForModel(model: string): number | null {
+    const db = getConnection();
+    const row = db
+      .prepare(
+        `SELECT context_window
+         FROM sessions
+         WHERE model = ? AND context_window > 0
+         ORDER BY updated_at DESC
+         LIMIT 1`
+      )
+      .get(model) as { context_window: number } | undefined;
+    return row?.context_window ?? null;
+  },
+
+  /**
+   * Every distinct window the Claude SDK has reported for any session, smallest first. Read by the providers module's token usage
+   * service (`fallbackClaudeContextWindow`) to measure a conversation that outgrows the fallback against a window that is real.
+   */
+  reportedContextWindows(): number[] {
+    const db = getConnection();
+    const rows = db
+      .prepare('SELECT DISTINCT context_window FROM sessions WHERE context_window > 0 ORDER BY context_window')
+      .all() as Array<{ context_window: number }>;
+    return rows.map((row) => row.context_window);
   },
 
   /**

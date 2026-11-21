@@ -42,13 +42,13 @@
         h('div', { style: { fontFamily: 'var(--font-sans)', fontWeight: 300, fontSize: 28, lineHeight: 1.2, letterSpacing: '-0.015em', marginBottom: 12, color: 'var(--ink)' } }, 'Skills drive the recommendations'),
         h('p', { className: 'field-text', style: { color: 'var(--ink-quiet)', margin: 0 } }, 'A technician is recommended for a visit when their skills match the job. The ranking is computed once, when the visit is created, and again whenever a profile changes.')));
   }
-  var RINGS = [{ id: 'chats', label: 'Chats', items: CHATS, defaultValue: 'sched' }, { id: 'runs', label: 'Runs', items: RUNS, defaultValue: 'scheduling' }, { id: 'road', label: 'Roadmap', items: ROAD, defaultValue: 'm4' }];
+  var RUNS_OF = [{ id: 'chats', label: 'Chats', items: CHATS }, { id: 'runs', label: 'Runs', items: RUNS }, { id: 'road', label: 'Roadmap', items: ROAD }];
   function Demo() {
     var s = React.useState(false), work = s[0];
     React.useEffect(function () { var id = setInterval(function () { s[1](function (v) { return !v; }); }, 4200); return function () { clearInterval(id); }; }, []);
     return h('div', { style: { height: 520 } }, h(A.Scene, {
       work: work ? h(Work) : null,
-      instrument: h(A.Rings, { rings: RINGS, label: 'Workspace' }, h(A.Core, { state: 'idle', signal: 'demo' })),
+      instrument: h(A.Hoop, { runs: RUNS_OF, defaultValue: 'sched', label: 'Workspace' }, h(A.Core, { state: 'idle', signal: 'demo' })),
       controls: h(A.Composer, { value: '', placeholder: work ? 'To this chat · describe what you want next' : 'To Kaylee · say it or type it', label: 'Message', style: { flex: '1 1 320px', maxWidth: 440 } }),
     }));
   }

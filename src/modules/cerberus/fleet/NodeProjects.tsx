@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -5,7 +6,7 @@ import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useProjectChoices } from '@/modules/cerberus/context/ProjectChoicesContext';
 import type { CerberusNodeProject, CerberusNodeView, CerberusOverview } from '@/shared/cerberus-types';
 import type { CerberusProjectMove, ProjectChoice } from '@/shared/types';
-import { ActionMenu, Banner, Button } from '@/shared/ui';
+import { ActionMenu, Banner, Button, Rule } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /** A move still out: the project, and whether it is on its way here or back to this server. */
@@ -52,49 +53,44 @@ type NodeProjectsProps = {
   /** The projects that run on it, as the overview lists them (`CerberusNodeView.projects`). */
   projects: CerberusNodeProject[];
   /**
-   * `grid` closes an open node card: a canvas band under its services, at their edge. `list` closes a
-   * list row's open band, at the indent its service rows keep.
-   */
-  face: 'grid' | 'list';
-  /**
    * Where focus goes when the last project of a node that is not co-located has moved back and this section,
-   * with the ✕ that held focus, is gone: the card's own header button. Without it, or while the section stays
-   * drawn, the heading takes focus.
+   * with the ✕ that held focus, is gone: the machine's Opening. Without it, or while the section stays drawn,
+   * the heading takes focus.
    */
   returnFocus?: () => void;
 };
 
 /**
  * PROJECTS THAT RUN HERE: the projects whose Claude chats a co-located node's warden hosts, and the
- * menu that puts one more there. It follows the node's services on its open card, in both faces, and is
+ * menu that puts one more there. It follows the node's services in its Opening, under its own Rule, and is
  * drawn for a node on this machine and for any node that still holds projects, and for no other: a node that
  * is no longer on this machine (`colocated` false) draws its rows alone, so each project can be moved back,
  * under "Projects assigned here" and one line saying the node is no longer on this machine.
  *
- * - Each project is a tile, its name over its path (both data, wrapped rather than cut), with ✕ to move
- *   it back to this server. The tiles wrap, so ✕ stays beside its own name at any width. The name is the
+ * - Each project is a row, its name over its path (both data, wrapped rather than cut), with ✕ to move
+ *   it back to this server; rows are parted by hairlines, with no frame of their own. The name is the
  *   sidebar's, as it is in the menu and the toasts, so a project never reads under two.
  * - "Run a project here" opens the projects on no node, by name, each with its path under it, so two
- *   folders of one name read apart. It is the kit's portalled `ActionMenu`, not a `Select`: a node card
- *   clips what overflows it (`overflow-hidden`, in Grid and in List), and a Select's list is drawn in
- *   place. Choosing one IS the move, which is what a menu item is.
+ *   folders of one name read apart. It is the kit's portalled `ActionMenu`, not a `Select`: an Opening
+ *   scrolls what overflows it, and a Select's list is drawn in place. Choosing one IS the move, which is
+ *   what a menu item is.
  * - While the node's warden is not reporting, a warn banner under the heading leads with what that
  *   costs: "Messages in eis1's projects are refused until its warden reports." It is the one time these
  *   projects cannot run; a move still lands then, and its toast says the same.
- * - With nothing assigned, a dashed line says what assigning does. With nothing left to offer, the
+ * - With nothing assigned, one quiet line says what assigning does. With nothing left to offer, the
  *   menu gives way to a line saying so; with no list handed down (a section drawn outside a panel), the
  *   menu's trigger stands disabled, so no "nothing left" is said of a list nobody has read.
- * - A move shows on its tile until it answers: a project picked appears at once, dashed, "Moving
- *   here…"; a ✕ pressed reads "Moving back…" and keeps focus, taking no second press (`aria-disabled`,
- *   never `disabled`). Moves answer one by one, so the rest of the section stays live. When a move back
- *   empties a node that is not co-located the section goes with the ✕ that held focus, and focus goes to
- *   `returnFocus`, the card's header; where the section stays, its heading takes focus.
+ * - A move shows on its row until it answers: a project picked appears at once, faint, "Moving here…"; a ✕
+ *   pressed reads "Moving back…" and keeps focus, taking no second press (`aria-disabled`, never
+ *   `disabled`). Moves answer one by one, so the rest of the section stays live. When a move back empties a
+ *   node that is not co-located the section goes with the ✕ that held focus, and focus goes to
+ *   `returnFocus`, the Opening; where the section stays, its heading takes focus.
  * - When the server refuses a move here (409 `PROJECT_NODE_NOT_COLOCATED`), a warn banner under the
  *   menu says so in words, until the next press. Any other failure is the write's own toast.
  *
- * For Fleet's `NodeCard` (Grid and List) and the rings' `RingsNodePanel`, on every node's open card.
+ * For a machine's Opening (`NodeOpening`).
  */
-export function NodeProjects({ node, colocated, link, projects, face, returnFocus }: NodeProjectsProps) {
+export function NodeProjects({ node, colocated, link, projects, returnFocus }: NodeProjectsProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -123,7 +119,7 @@ export function NodeProjects({ node, colocated, link, projects, face, returnFocu
   const [refused, setRefused] = useState<string | null>(null);
   // The project whose move back has landed: once the overview drops its tile, the ✕ that held focus
   // has gone with it, and the heading takes focus rather than the top of the page — or, when the section
-  // went too (a node that is not co-located, its last project), the card's header does.
+  // went too (a node that is not co-located, its last project), the Opening does.
   const leftRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -158,33 +154,27 @@ export function NodeProjects({ node, colocated, link, projects, face, returnFocu
     .sort((a, b) => a.name.localeCompare(b.name) || byPath(a, b));
 
   // The one decision of whether a node has this section: a node that cannot take a project and holds none (the
-  // hub, a remote node) has nothing to draw, so its card and the rings' panel draw this for every node.
+  // hub, a remote node) has nothing to draw, so a machine's Opening draws this for every node.
   if (!colocated && tiles.length === 0) return null;
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className={cn(
-        'flex flex-col gap-2.5 border-t border-border pb-4 pt-3',
-        face === 'grid' ? 'bg-background px-4' : 'pl-[clamp(16px,10cqi,60px)] pr-4',
-      )}
-    >
-      <h3 ref={headingRef} id={headingId} tabIndex={-1} className="text-xs uppercase tracking-[.14em] text-muted-foreground">
+    <section aria-labelledby={headingId} className="flex flex-col gap-2.5" data-cerberus-projects="">
+      <Rule id={headingId} headingRef={headingRef} level={4} end={tiles.length > 0 ? String(tiles.length) : undefined}>
         {t(colocated ? 'cerberus.node.projects.title' : 'cerberus.node.projects.titleAway')}
-      </h3>
+      </Rule>
 
       {/* Silent, or never heard: the warden line above says how; this says what it costs these projects. */}
       {colocated && link !== 'reporting' && <Banner tone="warn">{t('cerberus.node.projects.notReporting', { node })}</Banner>}
       {!colocated && <p className="text-[12.5px] text-muted-foreground">{t('cerberus.node.projects.awayNote', { node })}</p>}
 
       {tiles.length === 0 ? (
-        <p className="rounded-[10px] border border-dashed border-input px-3.5 py-3 text-[13px] text-muted-foreground">
-          <span className="font-medium text-secondary-foreground">{t('cerberus.node.projects.emptyLead')}</span>
+        <p className="text-[12.5px] text-muted-foreground">
+          <span className="text-foreground">{t('cerberus.node.projects.emptyLead')}</span>
           {/* "Pick a project below" while there is one to pick, or may be: with none, the line under the tiles says so. */}
           {(choices === null || offered.length > 0) && <> {t('cerberus.node.projects.emptyMessage', { node })}</>}
         </p>
       ) : (
-        <ul className="flex flex-wrap gap-2">
+        <ul className="flex flex-col">
           {tiles.map((project) => {
             const moving = movingOf(project.projectId);
             const moveBack = t('cerberus.node.projects.moveBack', { name: project.name });
@@ -192,13 +182,10 @@ export function NodeProjects({ node, colocated, link, projects, face, returnFocu
               <li
                 key={project.projectId}
                 aria-busy={moving !== null || undefined}
-                className={cn(
-                  'flex min-w-0 max-w-full flex-[1_1_260px] items-center gap-2 rounded-[10px] border bg-card py-1.5 pl-3.5 pr-1.5 sm:max-w-[420px]',
-                  moving === 'here' ? 'border-dashed border-input' : 'border-border',
-                )}
+                className="flex min-w-0 items-center gap-2 border-t border-border py-1.5 first:border-t-0"
               >
                 <div className="min-w-0 flex-1 py-1">
-                  <p className="text-sm font-medium [overflow-wrap:anywhere]">{project.name}</p>
+                  <p className={cn('text-sm font-medium [overflow-wrap:anywhere]', moving === 'here' && 'text-muted-foreground')}>{project.name}</p>
                   <p className="font-mono text-[11.5px] text-muted-foreground [overflow-wrap:anywhere]">{project.path}</p>
                 </div>
                 {moving === 'here' ? (
@@ -214,13 +201,13 @@ export function NodeProjects({ node, colocated, link, projects, face, returnFocu
                     busy={moving === 'back'}
                     onClick={() => void move(project, 'back')}
                     // Muted ink, not the ghost's accent: moving a project back is a quiet, reversible act, and
-                    // the card's green already means "passing".
+                    // green already means "passing".
                     className={cn(
                       'flex-none text-muted-foreground',
                       moving === null ? 'w-9 px-0 hover:text-foreground max-md:size-11' : 'cursor-not-allowed px-2 text-[12.5px]',
                     )}
                   >
-                    {moving === null ? <span aria-hidden>✕</span> : t('cerberus.node.projects.movingBack')}
+                    {moving === null ? <X aria-hidden="true" /> : t('cerberus.node.projects.movingBack')}
                   </Button>
                 )}
               </li>

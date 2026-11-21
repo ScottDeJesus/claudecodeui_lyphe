@@ -1,3 +1,4 @@
+import { BookPlus, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,7 +7,7 @@ import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
-import { Button, Chip, DialogFrame, Field, Input, Switch } from '@/shared/ui';
+import { Button, Chip, DialogFrame, Field, IconWord, Input, Switch } from '@/shared/ui';
 
 /** The limits the dialog offers, in runs an hour: the prototype's three chips. */
 const LIMITS = [1, 2, 4] as const;
@@ -222,13 +223,13 @@ function PromoteForm({ diagnosis, proposal, check, onClose, onPromoted }: Promot
         </Field>
 
         <div className="mt-1.5 flex flex-wrap justify-end gap-3">
-          <Button type="button" variant="outline" className="max-md:h-11" disabled={busy} onClick={dismiss}>
-            {t('cerberus.promote.cancel')}
+          <Button type="button" variant="outline" className="finger:size-11 finger:px-0 max-md:h-11" disabled={busy} aria-label={t('cerberus.promote.cancel')} title={t('cerberus.promote.cancel')} onClick={dismiss}>
+            <IconWord icon={X} word={t('cerberus.promote.cancel')} />
           </Button>
           {/* `busy`, not disabled, as Mute's: a disabled button gives up the focus it holds the moment the
               write goes out. With no name it is aria-disabled: refused, and still where the focus is. */}
-          <Button type="submit" className="max-md:h-11" busy={busy} aria-disabled={blank || undefined}>
-            {t('cerberus.promote.confirm')}
+          <Button type="submit" className="finger:size-11 finger:px-0 max-md:h-11" busy={busy} aria-disabled={blank || undefined} aria-label={t('cerberus.promote.confirm')} title={t('cerberus.promote.confirm')}>
+            <IconWord icon={BookPlus} word={t('cerberus.promote.confirm')} />
           </Button>
         </div>
       </form>

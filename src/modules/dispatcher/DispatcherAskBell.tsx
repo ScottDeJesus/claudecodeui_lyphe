@@ -37,7 +37,8 @@ const HEARD_LIMIT = 200;
  *     nothing rings — what changed is the words, not the question.
  *
  * ONE RING PER PICTURE, however many identities are new: the chime says "a plan wants your word",
- * never how many, and three prompts raised by one frame are not three bells.
+ * never how many, and three prompts raised by one frame are not three bells. Its sound is the set's
+ * own for a plan's ask (`planAsks`: a far horn, A then the B flat above it), not a chat's question.
  *
  * IT READS THE PICTURE, NOT `useDispatcherPlans`. The ask is the store's own record on the plan, and
  * a plan the operator has put away is still on the lane and still owes him a word — so the bell asks
@@ -71,7 +72,7 @@ export function DispatcherAskBell() {
     // it is the silence the decisions above ask for, and never a ring.
     if (previous === null) return;
     const remembered = new Set(previous);
-    if (identities.some((identity) => !remembered.has(identity))) void playNotificationSound();
+    if (identities.some((identity) => !remembered.has(identity))) void playNotificationSound({ sound: 'planAsks' });
   }, [value]);
 
   return null;

@@ -14,11 +14,6 @@ type ServiceRowProps = {
   /** The node the service runs on: half of every sheet target the row hands up. */
   node: string;
   service: CerberusServiceView;
-  /**
-   * `grid` is a row of an open node card, on the card's surface. `list` is a row of a list's open band,
-   * on the canvas and indented under its node, a little tighter.
-   */
-  face: 'grid' | 'list';
   /** Opens the check sheet: a minute at the check that set it, or the row as a whole at now. */
   onOpenCell: (target: CerberusSheetTarget) => void;
 };
@@ -37,7 +32,7 @@ function checkIdFor(service: CerberusServiceView, worst: string | null): string 
 }
 
 /**
- * ONE SERVICE OF AN OPEN NODE: its plain name over its raw id, a pill saying how it stands, and its
+ * ONE SERVICE OF AN OPEN MACHINE: its plain name over its raw id, a pill saying how it stands, and its
  * last 30 minutes. With no label yet, the raw id stands in as the name, in mono, and is not written a
  * second time under itself.
  *
@@ -57,11 +52,11 @@ function checkIdFor(service: CerberusServiceView, worst: string | null): string 
  * are one button, which opens the sheet at now, and the sheet's own strip steps through every minute
  * from the keyboard.
  *
- * Used by Fleet's `NodeCard`, for each service of an open node in Grid and in List.
+ * Used by a machine's Opening (`NodeOpening`), for each of its services: rows on the Opening's own ground, parted by hairlines,
+ * the first under its Rule's.
  */
-export function ServiceRow({ node, service, face, onOpenCell }: ServiceRowProps) {
+export function ServiceRow({ node, service, onOpenCell }: ServiceRowProps) {
   const { t } = useTranslation();
-  const grid = face === 'grid';
   const newest: CerberusCell | undefined = service.cells[service.cells.length - 1];
   // The run going on one of this service's checks, which the pill speaks of in place of the service's word.
   const { overview } = useCerberus();
@@ -84,9 +79,8 @@ export function ServiceRow({ node, service, face, onOpenCell }: ServiceRowProps)
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pr-4',
-        'transition-[background-color,transform] duration-move ease-enter hover:translate-x-[3px] motion-reduce:hover:translate-x-0',
-        grid ? 'py-2.5 pl-4 hover:bg-background' : 'py-[9px] pl-[clamp(16px,10cqi,60px)] hover:bg-card',
+        'flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border py-2.5 first:border-t-0',
+        'transition-transform duration-move ease-enter hover:translate-x-[3px] motion-reduce:hover:translate-x-0',
       )}
     >
       <button
@@ -99,7 +93,7 @@ export function ServiceRow({ node, service, face, onOpenCell }: ServiceRowProps)
         <span className="min-w-0 flex-[1_1_150px]">
           {service.label !== null ? (
             <>
-              <span className={cn('block truncate font-medium', grid ? 'text-sm' : 'text-[13.5px]')}>{service.label}</span>
+              <span className="block truncate text-sm font-medium">{service.label}</span>
               <span className="block truncate font-mono text-[11px] text-ink-faint">{service.service}</span>
             </>
           ) : (
@@ -124,8 +118,7 @@ export function ServiceRow({ node, service, face, onOpenCell }: ServiceRowProps)
               // word was reached (`cell.at`), as the sheet's strip does, and at now for the minute still running.
               onClick={() => openAt(cell.worst, isNewest ? undefined : cell.at)}
               className={cn(
-                'w-[7px] cursor-pointer transition-transform duration-move ease-spring hover:scale-y-[1.3] motion-reduce:transition-none',
-                grid ? 'h-[22px]' : 'h-5',
+                'h-[22px] w-[7px] cursor-pointer transition-transform duration-move ease-spring hover:scale-y-[1.3] motion-reduce:transition-none',
                 isNewest && (cell.status === 'failing' ? 'motion-safe:animate-cerberus-ring-warn' : 'motion-safe:animate-cerberus-breathe'),
               )}
             />

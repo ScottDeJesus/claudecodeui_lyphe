@@ -1,4 +1,4 @@
-import { FilterXIcon } from 'lucide-react';
+import { ChevronsDownIcon, FilterXIcon, RotateCwIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,7 +7,7 @@ import { TestRunsChip } from '@/modules/upload-runs/TestRunsChip';
 import type { RunFriction, UploadsFilters } from '@/modules/upload-runs/utils/uploadsModel';
 import { whoWord } from '@/modules/upload-runs/utils/uploadsWords';
 import type { UploadRunSummary, UploadRunsOverview } from '@/shared/upload-runs-types';
-import { Banner, Button, Chip, EmptyState } from '@/shared/ui';
+import { Banner, Button, Chip, IconWord } from '@/shared/ui';
 
 type RunListProps = {
   /** The window as the server answered it: the people who pressed, the accounts that have runs, whether it was cut short. */
@@ -91,7 +91,11 @@ export function RunList({ overview, runs, filters, friction, frictionFailed, now
         // The ledger was not read: the rows below carry no friction mark, and this line is why, with the way to read it again.
         <Banner
           tone="warn"
-          action={<Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>{t('cerberus.uploads.trouble.retry')}</Button>}
+          action={(
+            <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.uploads.trouble.retry')} title={t('cerberus.uploads.trouble.retry')} onClick={onRetry}>
+              <IconWord icon={RotateCwIcon} word={t('cerberus.uploads.trouble.retry')} />
+            </Button>
+          )}
         >
           <p className="text-xs">{t(`${r}.frictionUnread`)}</p>
         </Banner>
@@ -100,17 +104,29 @@ export function RunList({ overview, runs, filters, friction, frictionFailed, now
 
       {runs.length === 0 ? (
         // The filters match nothing: the chips stay above, and the way back is the action.
-        <EmptyState size="sm" icon={FilterXIcon} title={t(`${r}.noMatch`)} actionLabel={t(`${r}.clear`)} onAction={() => onFilter(NO_FILTERS)} />
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3" data-uploads-no-match>
+          <p className="m-0 text-[13px] text-muted-foreground">{t(`${r}.noMatch`)}</p>
+          <Button variant="outline" size="sm" className="h-8 finger:size-11 finger:px-0 max-md:h-11" aria-label={t(`${r}.clear`)} title={t(`${r}.clear`)} onClick={() => onFilter(NO_FILTERS)}>
+            <IconWord icon={FilterXIcon} word={t(`${r}.clear`)} />
+          </Button>
+        </div>
       ) : (
         <>
-          <ul className="flex min-w-0 flex-col divide-y divide-border overflow-hidden rounded-lg border border-border">
+          <ul className="flex min-w-0 flex-col divide-y divide-border border-y border-border">
             {shown.map((run) => (
               <RunRow key={run.session_id} run={run} friction={run.claude_session_id === null ? undefined : friction?.get(run.claude_session_id)} now={now} onOpenRun={onOpenRun} />
             ))}
           </ul>
           {rest > 0 && (
-            <Button variant="outline" size="sm" className="h-8 self-start max-md:h-11" onClick={() => setLimit((count) => count + PAGE)}>
-              {rest <= PAGE ? t(`${r}.more`, { count: rest }) : t(`${r}.moreOf`, { count: PAGE, rest })}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 self-start finger:size-11 finger:px-0 max-md:h-11"
+              aria-label={rest <= PAGE ? t(`${r}.more`, { count: rest }) : t(`${r}.moreOf`, { count: PAGE, rest })}
+              title={rest <= PAGE ? t(`${r}.more`, { count: rest }) : t(`${r}.moreOf`, { count: PAGE, rest })}
+              onClick={() => setLimit((count) => count + PAGE)}
+            >
+              <IconWord icon={ChevronsDownIcon} word={rest <= PAGE ? t(`${r}.more`, { count: rest }) : t(`${r}.moreOf`, { count: PAGE, rest })} />
             </Button>
           )}
         </>

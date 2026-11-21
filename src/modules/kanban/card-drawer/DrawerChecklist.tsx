@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, CircleDot, StickyNote } from 'lucide-react';
+import { Check, Plus, StickyNote } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,16 +6,17 @@ import { DrawerStepStages } from '@/modules/kanban/card-drawer/DrawerStepStages'
 import type { KanbanMutations } from '@/modules/kanban/hooks/useKanbanMutations';
 import { flowOf, type KanbanFlow, type KanbanWalk, type KanbanWalkStage } from '@/modules/kanban/utils/walkModel';
 import type { KanbanCardDetail, KanbanChecklistItem } from '@/shared/kanban-types';
-import { Button, Input, Meter } from '@/shared/ui';
+import { Button, Meter, Rule, SignalLoop } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
  * HOW FAR THE RUN HAS GOT: the steps, where it is standing, and what it left beside each one.
  *
  * THE METER IS THE HEADLINE. A reader opening a card mid-build asks one question first — how much
- * of this is done — and the answer is a bar and a figure at the top of the section, not a count
- * they assemble by reading fourteen rows. It reads `done` over TOTAL, the same two numbers the
- * card's face carries, off the same fetch, so the drawer can never contradict the board.
+ * of this is done — and the answer is a small ring with its figure at the end of the section's
+ * Rule, not a count they assemble by reading fourteen rows. It reads `done` over TOTAL, the same
+ * two numbers the card's slot carries, off the same fetch, so the Opening can never contradict
+ * the board. A checklist nobody has written has no ring: zero of zero is no reading.
  *
  * THREE STATES, ONE CONTROL. `pending`, `active` and `done` are the checklist's OWN vocabulary —
  * a different one from a card's status, which is the lane policy's and is never named on this
@@ -27,10 +28,10 @@ import { cn } from '@/shared/utils';
  * a write becomes a toast and where a refusal keeps the server's own sentence, so this file reaches
  * the network through nothing of its own.
  *
- * COLOUR SAYS DONE, WEIGHT SAYS THE REST. Only the accent is spent, and only on progress: an
- * unfinished step is not a warning and a note is not a verdict. What a finished row loses is ink,
- * not hue — struck through and muted, so a glance down the list reads as a front line rather than
- * a colour chart.
+ * THE DESIGN SYSTEM'S STEPS. Each step's mark stands on one hairline, lit where the steps are
+ * done: a done step settles with a green tick (finished is green), the step in hand works (the
+ * loop in small), the rest wait as a faint ring. What a finished row loses is ink, not hue, so a
+ * glance down the list reads as a front line rather than a colour chart. The mark is the press.
  *
  * A NOTE IS DRAWN WHOLE, LINE BY LINE. A walk writes what it found under the step that found it,
  * and the root-cause step's note is four lines: the cause, then what was searched for the same
@@ -55,12 +56,12 @@ type DrawerChecklistProps = {
 
 type ChecklistState = KanbanChecklistItem['state'];
 
-/** The mark each state wears, and the name of the press that leaves it. */
+/** The name of the press that lands on each state, and the state as the design system's Steps draws it. */
 const STATES = {
-  pending: { icon: Circle, className: 'text-ink-faint', markKey: 'kanban.checklist.markPending' },
-  active: { icon: CircleDot, className: 'text-accent-ink', markKey: 'kanban.checklist.markActive' },
-  done: { icon: CheckCircle2, className: 'text-accent-ink', markKey: 'kanban.checklist.markDone' },
-} satisfies Record<ChecklistState, { icon: typeof Circle; className: string; markKey: string }>;
+  pending: { markKey: 'kanban.checklist.markPending', drawn: 'next' },
+  active: { markKey: 'kanban.checklist.markActive', drawn: 'live' },
+  done: { markKey: 'kanban.checklist.markDone', drawn: 'done' },
+} satisfies Record<ChecklistState, { markKey: string; drawn: 'next' | 'live' | 'done' }>;
 
 /** Forward, and round: a step marked done by mistake is one press from being open again. */
 const NEXT_STATE = { pending: 'active', active: 'done', done: 'pending' } satisfies Record<ChecklistState, ChecklistState>;
@@ -114,29 +115,26 @@ export function DrawerChecklist({ detail, writes, walk, onReadStage }: DrawerChe
   };
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={headingId}>
-      <div className="flex items-center gap-3">
-        <h3 id={headingId} className="text-sm font-semibold text-foreground">
-          {t('kanban.checklist.title')}
-        </h3>
+    <section className="flex flex-col gap-3" aria-labelledby={headingId} data-drawer-checklist="">
+      <Rule
+        id={headingId}
+        end={
+          total > 0 && (
+            <Meter
+              variant="ring"
+              percent={Math.round((done / total) * 100)}
+              label={`${done}/${total}`}
+              ariaLabel={t('kanban.checklist.progressAria')}
+              value={`${done}/${total}`}
+            />
+          )
+        }
+      >
+        {t('kanban.checklist.title')}
+      </Rule>
 
-        {/* An empty checklist reports `—` rather than `0/0`: a bar at zero claims a run that has
-            done none of its work, where the truth is that nobody has written the work down. */}
-        <div className="ml-auto w-36 shrink-0">
-          <Meter
-            variant="inline"
-            percent={total === 0 ? null : Math.round((done / total) * 100)}
-            label={t('kanban.checklist.progress')}
-            ariaLabel={t('kanban.checklist.progressAria')}
-            value={`${done}/${total}`}
-          />
-        </div>
-      </div>
-
-      {total === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('kanban.checklist.none')}</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
+      {total > 0 && (
+        <ol className="ast-steps">
           {detail.checklist.map((item, index) => (
             <ChecklistRow
               key={item.id}
@@ -146,31 +144,34 @@ export function DrawerChecklist({ detail, writes, walk, onReadStage }: DrawerChe
               onReadStage={onReadStage}
             />
           ))}
-        </ul>
+        </ol>
       )}
 
       {unplaced.length > 0 && (
-        <div className="flex flex-col gap-1 pl-6" data-unplaced-stages>
+        <div className="flex flex-col gap-1 pl-[30px]" data-unplaced-stages>
           <span className="text-xs text-muted-foreground">{t('kanban.stages.earlier')}</span>
           <DrawerStepStages stages={unplaced} onRead={onReadStage} />
         </div>
       )}
 
-      <div className="flex gap-2">
-        <Input
+      <div className="bug-add pl-[30px]">
+        <input
           id={addId}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') add();
+            if (event.key === 'Enter') void add();
           }}
           placeholder={t('kanban.checklist.addPlaceholder')}
           aria-label={t('kanban.checklist.add')}
-          className="h-8"
+          className="bug-field"
         />
-        <Button variant="tonal" size="sm" className="h-8 shrink-0" onClick={add}>
-          {t('kanban.checklist.add')}
-        </Button>
+        {/* The press arrives with what it adds: a step being typed. Enter adds it too. */}
+        {draft.trim().length > 0 && (
+          <Button variant="outline" size="icon" className="size-7 shrink-0 finger:size-11" aria-label={t('kanban.checklist.add')} title={t('kanban.checklist.add')} onClick={() => void add()}>
+            <Plus aria-hidden="true" />
+          </Button>
+        )}
       </div>
     </section>
   );
@@ -198,11 +199,9 @@ function ChecklistRow({
   const [editingNote, setEditingNote] = useState(false);
 
   const next = NEXT_STATE[item.state];
-  const state = STATES[item.state];
-  const Mark = state.icon;
 
-  // The mark follows `item.state` — which the shell's re-read refreshes — so a refused press leaves
-  // the row where it was without anything here having to put it back.
+  // The mark follows `item.state` — which the shell's re-read refreshes — so a refused press leaves the row where it was without
+  // anything here having to put it back.
   const cycle = () => {
     void updateChecklistItem(item.id, { state: next });
   };
@@ -212,55 +211,55 @@ function ChecklistRow({
       setEditingNote(false);
       return;
     }
-    // The editor closes on the ANSWER: a note the server did not take stays open under the reader's
-    // hands rather than closing over text that is nowhere else.
+    // The editor closes on the ANSWER: a note the server did not take stays open under the reader's hands rather than closing
+    // over text that is nowhere else.
     if (await updateChecklistItem(item.id, { note })) setEditingNote(false);
   };
 
   return (
-    <li className="flex items-start gap-2">
+    <li className="ast-step group" data-state={STATES[item.state].drawn}>
       <button
         type="button"
-        className="mt-0.5 shrink-0"
-        // The name of the PRESS, not of the state: the icon already says where the row stands.
+        className="ast-step-mark"
+        // The name of the PRESS, not of the state: the mark already says where the row stands.
         aria-label={t(STATES[next].markKey)}
         title={t(STATES[next].markKey)}
         onClick={cycle}
       >
-        <Mark className={cn('h-4 w-4', state.className)} aria-hidden="true" />
+        {item.state === 'done' ? (
+          <span key="done" className="ast-step-glyph" aria-hidden="true">✓</span>
+        ) : item.state === 'active' ? (
+          <SignalLoop state="working" size={14} />
+        ) : (
+          <span className="ast-step-ring" aria-hidden="true" />
+        )}
       </button>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span
-          className={cn(
-            'text-sm leading-snug',
-            item.state === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'
-          )}
-        >
-          {item.text}
-        </span>
+      <div className="ast-step-body">
+        <span className="ast-step-label">{item.text}</span>
 
         {editingNote ? (
-          <div className="flex gap-2">
-            <Input
+          <div className="bug-add">
+            <input
               value={note}
               onChange={(event) => setNote(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') saveNote();
+                if (event.key === 'Enter') void saveNote();
               }}
               placeholder={t('kanban.checklist.notePlaceholder')}
               aria-label={t('kanban.checklist.note')}
-              className="h-7 text-xs"
+              className="bug-field"
+              autoFocus
             />
-            <Button variant="tonal" size="sm" className="h-7 shrink-0 px-2" onClick={saveNote}>
-              {t('kanban.checklist.noteSave')}
+            <Button variant="outline" size="icon" className="size-7 shrink-0 finger:size-11" aria-label={t('kanban.checklist.noteSave')} title={t('kanban.checklist.noteSave')} onClick={() => void saveNote()}>
+              <Check aria-hidden="true" />
             </Button>
           </div>
         ) : (
           item.note.trim().length > 0 && (
-            // One block per line the note was written on. An empty line keeps its height, so a
-            // note written in two parts is still read in two parts.
-            <p className="flex flex-col gap-0.5 text-xs leading-snug text-muted-foreground" data-step-note>
+            // One block per line the note was written on. An empty line keeps its height, so a note written in two parts is
+            // still read in two parts.
+            <p className="ast-step-detail flex flex-col gap-0.5" data-step-note>
               {item.note.split('\n').map((line, index) => (
                 <span key={index} className="block min-h-[1em] break-words">{line}</span>
               ))}
@@ -271,21 +270,19 @@ function ChecklistRow({
         <DrawerStepStages stages={stages} onRead={onReadStage} />
       </div>
 
-      {/* One affordance on the row, and no delete: `api.kanban` carries no checklist removal —
-          the server's DELETE route has no client verb, and `src/shared/api.ts` is closed to this
-          phase and to the one that fills it. A button that cannot be wired is a button that lies
-          about what this screen can do, so it is not drawn. A step written by mistake is cycled
-          back to pending and left. */}
+      {/* One affordance on the row, and no delete: `api.kanban` carries no checklist removal, so a button that cannot be wired is
+          not drawn. A step written by mistake is cycled back to pending and left. Quiet until the row is pointed at or focused
+          (always there under a finger). */}
       <Button
-        variant="ghost"
+        variant="outline"
         size="icon"
-        // Muted on purpose: the accent on this row belongs to the state mark, which means
-        // progress. A second green glyph beside it is a column of colour that says nothing.
-        className="h-7 w-7 shrink-0 text-muted-foreground"
+        className={cn('size-7 shrink-0 text-muted-foreground transition-opacity finger:size-11', editingNote ? 'opacity-100' : 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 finger:opacity-100')}
         aria-label={t('kanban.checklist.note')}
+        title={t('kanban.checklist.note')}
+        aria-pressed={editingNote}
         onClick={() => setEditingNote((editing) => !editing)}
       >
-        <StickyNote className="h-3.5 w-3.5" aria-hidden="true" />
+        <StickyNote aria-hidden="true" />
       </Button>
     </li>
   );

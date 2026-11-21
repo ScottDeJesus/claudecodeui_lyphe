@@ -1,16 +1,17 @@
 // A proposed feature's cards open on their board (bug-hunters, seam 11, wired in phase 16). An open proposal's stopgap
 // ticket, once a board placed it, is a press that turns the Bugs view to its Board face with that card's drawer open;
-// so is the card a sent-back proposal became, drawn under its line without opening the row. Pressing writes nothing.
+// so is the card a sent-back proposal became. Since the board's redraw to the design system (2026-11-20) a proposal is a
+// mark on a ring and both presses are in its Opening (lib/kanban_board.mjs's openProposal). Pressing writes nothing.
 //
 // The board is lib/kanban_board.mjs's made-up board, its cards the ones the presses name; the proposals are answered by
 // this case. Nothing reaches the server and nothing is written.
 //
-// protects: src/modules/kanban/proposed/ProposalRow.tsx, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/KanbanPanel.tsx
+// protects: src/modules/kanban/proposed/ProposalOpening.tsx, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/KanbanPanel.tsx
 // writes: none
 
 import { withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
-import { BOARD, CARDS, openBoard } from "../lib/kanban_board.mjs";
+import { BOARD, CARDS, openBoard, openProposal } from "../lib/kanban_board.mjs";
 import { PROPOSALS, PROPOSAL_ACT, WAIT_MS, answer, json, proposal, tab, watch } from "../lib/bug_hunt_faces.mjs";
 
 const OPEN = proposal(21, "Case proposal: stopgap first", {
@@ -44,11 +45,10 @@ runCase(async (t) => {
 
   await toProposed();
   await page.locator('[data-proposed-features] [role="radio"]').filter({ hasText: /^\s*All\s*$/ }).first().click({ timeout: WAIT_MS });
-  const openRow = page.locator(`[data-proposal="${OPEN.id}"]`).filter({ hasText: OPEN.title }).first();
-  if (!(await openRow.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) return broken(`the face drew no row for the route's "${OPEN.title}"`);
-  await openRow.locator("button[aria-controls]").first().click({ timeout: WAIT_MS });
+  const openRow = await openProposal(page, OPEN.id).catch(() => null);
+  if (openRow === null) return broken(`the face drew no mark that opens the route's "${OPEN.title}"`);
   const stopgap = openRow.locator(`[data-proposal-card="${CARDS.bug.id}"]`).first();
-  if (!(await stopgap.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) return broken("the opened row draws no press for its placed stopgap ticket");
+  if (!(await stopgap.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) return broken("the opened proposal draws no press for its placed stopgap ticket");
   await stopgap.click();
   const first = await opened(CARDS.bug);
   if (first.face !== "board" || !first.drawer) {
@@ -58,8 +58,10 @@ runCase(async (t) => {
   await page.getByRole("dialog").filter({ hasText: CARDS.bug.title }).first().waitFor({ state: "hidden", timeout: WAIT_MS }).catch(() => {});
 
   await toProposed();
-  const sentCard = page.locator(`[data-proposal="${SENT.id}"]`).filter({ hasText: SENT.title }).locator(`[data-proposal-card="${CARDS.change.id}"]`).first();
-  if (!(await sentCard.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) return broken("the sent-back row draws no press for the card it became");
+  const sentRow = await openProposal(page, SENT.id).catch(() => null);
+  if (sentRow === null) return broken(`the face drew no mark that opens the sent-back "${SENT.title}"`);
+  const sentCard = sentRow.locator(`[data-proposal-card="${CARDS.change.id}"]`).first();
+  if (!(await sentCard.waitFor({ timeout: WAIT_MS }).then(() => true, () => false))) return broken("the sent-back proposal draws no press for the card it became");
   await sentCard.click();
   const second = await opened(CARDS.change);
   if (second.face !== "board" || !second.drawer) {

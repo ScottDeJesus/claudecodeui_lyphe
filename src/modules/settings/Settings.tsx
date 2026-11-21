@@ -1,9 +1,10 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { announceAccountsChanged } from '@/modules/accounts';
 import { ProviderLoginModal } from '@/modules/provider-auth';
+import { HEAD_PRESS } from '@/shared/constants';
 import { Button } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
 import SettingsSidebar from '@/modules/settings/SettingsSidebar';
@@ -166,26 +167,26 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
     <div className="vv-dialog__backdrop modal-backdrop fixed inset-0 z-[9999] flex items-center justify-center md:p-4">
       <div className="pwa-notch-safe vv-dialog__panel flex h-full w-full flex-col overflow-hidden max-md:rounded-none md:h-[90vh] md:max-w-4xl">
         {/* Header */}
+        {/* The way out first, as on every page's head: the back arrow at the start, never a cross at the end. */}
         <div className="flex flex-shrink-0 items-center gap-3 border-b border-border px-4 py-3.5 md:px-5">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onClose}
+            aria-label={t('close')}
+            title={t('close')}
+            // Escape presses it (`useEscapeBack`): Close is Settings' way back, and it is the last one in the document while
+            // Settings is up. A form of its own opened over it covers this button, and the key then does nothing here.
+            {...WAY_BACK}
+            className={HEAD_PRESS}
+          >
+            <ArrowLeft aria-hidden="true" />
+          </Button>
           <h2 className="font-serif text-[22px] font-normal leading-none text-foreground">{t('title')}</h2>
           <span className="hidden text-xs text-muted-foreground sm:inline">{t('savedAsYouChange')}</span>
-          <div className="ml-auto flex items-center gap-2">
-            {saveStatus === 'success' && (
-              <span className="animate-in fade-in text-xs text-muted-foreground">{t('saveStatus.success')}</span>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              aria-label={t('close')}
-              // Escape presses it (`useEscapeBack`): Close is Settings' way back, and it is the last one in the document while
-              // Settings is up. A form of its own opened over it covers this button, and the key then does nothing here.
-              {...WAY_BACK}
-              className="h-10 w-10 touch-manipulation p-0 text-muted-foreground hover:text-foreground active:bg-accent/50"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
+          {saveStatus === 'success' && (
+            <span className="animate-in fade-in ml-auto text-xs text-muted-foreground">{t('saveStatus.success')}</span>
+          )}
         </div>
 
         {/* Body: sidebar + content */}

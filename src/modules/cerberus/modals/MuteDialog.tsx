@@ -1,3 +1,4 @@
+import { BellOff, X } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -5,7 +6,7 @@ import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { hm, sameLocalDay } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCheckView } from '@/shared/cerberus-types';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
-import { Button, Chip, DialogFrame, Field, TextArea } from '@/shared/ui';
+import { Button, Chip, DialogFrame, Field, IconWord, TextArea } from '@/shared/ui';
 
 /**
  * How long a mute lasts, as the chips offer it: 15 min, 1 hour, 4 hours, or until the next 08:00 local —
@@ -85,8 +86,8 @@ type MuteDialogProps = {
  * provider's toast. While the write is out the chips and the field hold still, and Cancel, the ✕,
  * Escape and the backdrop wait for its answer.
  *
- * For the cerberus module's `CerberusPanel`, which hosts one and opens it from a Needs-you card's Mute
- * and from the check sheet's.
+ * For the cerberus module's `CerberusPanel`, which hosts one and opens it from a need's Mute (in a
+ * machine's Opening) and from the check sheet's.
  */
 export function MuteDialog({ open, check, onClose }: MuteDialogProps) {
   if (!open || check === null) return null;
@@ -211,13 +212,13 @@ function MuteForm({ check, onClose }: { check: CerberusCheckView; onClose: () =>
         </Field>
 
         <div className="mt-1.5 flex flex-wrap justify-end gap-3">
-          <Button type="button" variant="outline" className="max-md:h-11" disabled={busy} onClick={dismiss}>
-            {t('cerberus.mute.cancel')}
+          <Button type="button" variant="outline" className="finger:size-11 finger:px-0 max-md:h-11" disabled={busy} aria-label={t('cerberus.mute.cancel')} title={t('cerberus.mute.cancel')} onClick={dismiss}>
+            <IconWord icon={X} word={t('cerberus.mute.cancel')} />
           </Button>
           {/* `busy`, not `disabled`: a disabled button gives up the focus it holds the moment the write
               goes out, and a refusal would hand the person back a page with none. */}
-          <Button type="submit" className="max-md:h-11" busy={busy}>
-            {t('cerberus.mute.confirm', { time: hm(until) })}
+          <Button type="submit" className="finger:size-11 finger:px-0 max-md:h-11" busy={busy} aria-label={t('cerberus.mute.confirm', { time: hm(until) })} title={t('cerberus.mute.confirm', { time: hm(until) })}>
+            <IconWord icon={BellOff} word={t('cerberus.mute.confirm', { time: hm(until) })} />
           </Button>
         </div>
       </form>

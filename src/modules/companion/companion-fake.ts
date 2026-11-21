@@ -312,7 +312,7 @@ const FAILED_SENTENCE = "Kaylee couldn't start: the Claude login on this box has
 /** A picture: the defaults of an awake, idle companion with an empty panel, and whatever a state changes. */
 const picture = (change: Partial<CompanionPicture>): CompanionPicture => ({
   settings: FAKE_SETTINGS, models: MODELS, process: AWAKE, activity: IDLE, turnId: null, focus: null,
-  draft: null, pending: null, walk: null, notes: [], log: [], work: [], floor: 'fixture-page', face: NO_FACE, ...change,
+  draft: null, pending: null, walk: null, notes: [], log: [], work: [], floor: 'fixture-page', face: NO_FACE, context: null, ...change,
 });
 
 /** One state of the panel: her picture, whether the draft's target is working, and the page's open state. */

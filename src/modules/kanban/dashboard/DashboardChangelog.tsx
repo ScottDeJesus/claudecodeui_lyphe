@@ -3,7 +3,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { KanbanChangelogEntry, KanbanChangelogKind } from '@/shared/kanban-types';
-import { Badge, Button, EmptyState } from '@/shared/ui';
+import { Button, EmptyState, Rule } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 
 /**
@@ -46,36 +46,36 @@ export function DashboardChangelog({ entries, allBoards, onOpenCard, onCopyMarkd
 
   return (
     <section className="flex flex-col gap-3" aria-labelledby={headingId} data-dashboard-changelog>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id={headingId} className="text-sm font-semibold text-foreground">{t('kanban.dashboard.changelog.title')}</h3>
-        {entries.length > 0 && (
-          <Button variant="outline" size="sm" className="finger:h-11" data-dashboard-copy onClick={onCopyMarkdown}>
-            <Copy aria-hidden="true" />
-            {t('kanban.dashboard.changelog.copy')}
-          </Button>
-        )}
-      </div>
+      <Rule
+        id={headingId}
+        end={
+          entries.length > 0 && (
+            <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2 finger:size-11 finger:px-0" data-dashboard-copy aria-label={t('kanban.dashboard.changelog.copy')} title={t('kanban.dashboard.changelog.copy')} onClick={onCopyMarkdown}>
+              <Copy aria-hidden="true" />
+              <span className="font-sans text-xs normal-case tracking-normal finger:sr-only">{t('kanban.dashboard.changelog.copy')}</span>
+            </Button>
+          )
+        }
+      >
+        {t('kanban.dashboard.changelog.title')}
+      </Rule>
 
       {entries.length === 0 ? (
         <EmptyState size="sm" title={t('kanban.dashboard.changelog.empty')} message={t('kanban.dashboard.changelog.emptyMessage')} />
       ) : (
-        <ol className="flex flex-col gap-4">
-          {entries.map((entry) => (
-            <li key={`${entry.boardId}/${entry.cardId}`} className="flex flex-col gap-1.5">
-              <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <time dateTime={entry.doneAt} className="font-mono tabular-nums">{formatShortDate(entry.doneAt) ?? '—'}</time>
-                {entry.kind !== null && <Badge tone="neutral" className="vv-badge--compact">{t(KIND_KEYS[entry.kind])}</Badge>}
+        <ol className="ast-trace">
+          {entries.map((entry, index) => (
+            <li key={`${entry.boardId}/${entry.cardId}`} className="ast-trace-item" data-latest={index === 0 ? 'true' : 'false'}>
+              <span className="ast-trace-bead" aria-hidden="true" />
+              <span className="ast-trace-head">
+                <time dateTime={entry.doneAt}>{formatShortDate(entry.doneAt) ?? '—'}</time>
+                {entry.kind !== null && <span className="ast-trace-src">{t(KIND_KEYS[entry.kind])}</span>}
               </span>
-              <span className="text-sm leading-snug text-foreground">{entry.changelog}</span>
-              <Button
-                variant="ghost"
-                className="-mx-2 h-auto min-h-8 justify-start gap-1.5 self-start whitespace-normal px-2 py-1 text-left text-xs font-normal text-muted-foreground finger:min-h-11"
-                data-dashboard-card={entry.cardId}
-                onClick={() => onOpenCard(entry.cardId, entry.boardId)}
-              >
+              <p className="ast-trace-text">{entry.changelog}</p>
+              <button type="button" className="dash-link" data-dashboard-card={entry.cardId} onClick={() => onOpenCard(entry.cardId, entry.boardId)}>
                 <span className="min-w-0 break-words">{allBoards ? t('kanban.dashboard.changelog.cardOn', { title: entry.title, board: entry.boardName }) : entry.title}</span>
-                <ChevronRight className="shrink-0" aria-hidden="true" />
-              </Button>
+                <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
+              </button>
             </li>
           ))}
         </ol>

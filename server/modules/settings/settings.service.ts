@@ -3,6 +3,7 @@ import { AppError } from '@/shared/utils.js';
 import { getCustomCompactionState, setCustomCompactionState } from './custom-compaction-switch.js';
 import { getDactylsState, setDactylsState } from './dactyls-switch.js';
 import { getMainSessionDactylsState, setMainSessionDactylsState } from './main-session-dactyls-switch.js';
+import { getCodeModeState, setCodeModeState } from './code-mode.js';
 import { kickDispatcher } from './dispatcher-kick.js';
 import { JEV_SCOPES } from './jev-switches.js';
 import type { JevScopeKey, JevSwitches } from './jev-switches.js';
@@ -299,6 +300,16 @@ export function createSettingsService(dependencies: SettingsDependencies) {
     },
     async setMainSessionDactyls(enabledInput: unknown) {
       return setMainSessionDactylsState(enabledInput);
+    },
+    /**
+     * The Code Mode switches. Bodies in `code-mode.ts`, delegated verbatim as the pairs above; no dispatcher
+     * kick, because a switch takes effect at the next launch and nothing queues on it.
+     */
+    async getCodeMode() {
+      return getCodeModeState();
+    },
+    async setCodeMode(kindInput: unknown, enabledInput: unknown) {
+      return setCodeModeState(kindInput, enabledInput);
     },
     /**
      * Where the usage pacer stops starting plans on the weekly window, in whole percent. Both bodies

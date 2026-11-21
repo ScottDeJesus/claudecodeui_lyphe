@@ -3,8 +3,8 @@
  * Update wardens dialog ticks nodes with, and the DialogFrame all four of its dialogs sit in.
  *
  * The fifth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
- * feedback.css is at it, surfaces.css belongs to the three kit pieces that are mechanism, and
- * board.css to the board. README rule 6: the next file opens the same way again.
+ * feedback.css is at it, and surfaces.css belongs to the three kit pieces that are mechanism. README rule 6:
+ * the next file opens the same way again.
  *
  * Same contract as its siblings. A library class string carries `vv-<name>` plus layout utilities
  * and nothing else; colour comes from tokens.css and nowhere else; no rule declares a `--tone-*`
@@ -21,8 +21,8 @@
  *    Cerberus tab draws the same way cannot drift, and the name has a consumer that makes Tailwind
  *    emit it. The rule here is its geometry.
  *
- * Imported once, for side effect, from src/shared/ui/index.ts — after surfaces.css and before
- * board.css, which keeps the last word. Nothing here depends on its place against controls.css or
+ * Imported once, for side effect, from src/shared/ui/index.ts — after surfaces.css. Nothing here
+ * depends on its place against controls.css or
  * against src/index.css, which lands after this sheet: whatever has to beat `.vv-input`, a utility
  * in the class string or one of index.css's pins does so on specificity. The Sheet, Timeline, Steps,
  * Checkbox and DialogFrame rules share no selector with any sibling, so for them the order decides nothing.
@@ -131,24 +131,10 @@
   line-height: 1.2;
   color: var(--ink);
   /* A service id is one unbroken token (`snake_case_service_name`); it wraps rather than widening the
-   * head past the panel and taking the ✕ with it. */
+   * head past the panel. */
   overflow-wrap: anywhere;
 }
 .vv-sheet__accent { color: var(--accent-ink); }
-.vv-sheet__close {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--surface2);
-  color: var(--ink-muted);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-.vv-sheet__close:hover { background: var(--border); }
 .vv-sheet__body { padding: 18px 20px; }
 .vv-sheet__body[data-flush] { padding: 0; }
 .vv-sheet__foot { padding: 14px 20px; border-top: 1px solid var(--border); }
@@ -300,10 +286,11 @@
  * key is not a phrase: it keeps mono, a smaller size and stands upright, and its element spells `font-mono` so it is
  * the one mono face every other raw key on the screen is.
  *
- * The gutter is shared because the ✕ is placed from it: the padding eases from 18 px on a phone to 32 px at a desk and
- * the ✕ keeps the frame's right edge. The ✕ is 32 px at a desk; below md it grows to Verve's 44 px touch minimum, 6 px
- * each way about its own centre, so it stays where it was and the title's 48 px of room still clears it. Change the
- * frame's padding and the ✕'s offsets together. A `disabled` ✕ is a write waiting: dimmed, and it takes no press. */
+ * The gutter is shared because the way back is placed from it: the padding eases from 18 px on a phone to 32 px at a desk
+ * and the back arrow keeps the frame's left edge, at the head's start as on every page. It is the kit's outline press, 36 px
+ * at a desk as a head's is; below md it grows to Verve's 44 px touch minimum, 4 px each way about its own centre, so it
+ * stays where it was and the title's 48 px of room still clears it. Change the frame's padding and the arrow's offsets
+ * together. A `disabled` arrow is a write waiting: dimmed, and it takes no press. */
 .vv-dialogframe {
   --vv-dialogframe-gutter: clamp(18px, 5vw, 32px);
   position: relative;
@@ -320,30 +307,22 @@
 }
 .vv-dialogframe__accent { color: var(--accent-ink); }
 .vv-dialogframe__key { font-size: 0.62em; color: var(--accent-ink); }
-.vv-dialogframe__close {
+/* Two classes, so its place and size outrank the kit press's own (`buttonVariants`). */
+.vv-dialogframe .vv-dialogframe__close {
   position: absolute;
-  top: clamp(19px, 5vw, 29px);
-  right: var(--vv-dialogframe-gutter);
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--surface2);
-  color: var(--ink-muted);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
+  top: clamp(17px, 5vw, 27px);
+  left: var(--vv-dialogframe-gutter);
+  width: 36px;
+  height: 36px;
 }
-.vv-dialogframe__close:hover { background: var(--border); }
-.vv-dialogframe__close:disabled { pointer-events: none; opacity: 0.5; }
+.vv-dialogframe .vv-dialogframe__close:disabled { pointer-events: none; opacity: 0.5; }
 @media (max-width: 639.98px) {
   .vv-dialogframe__title { font-size: 25px; }
 }
 @media (max-width: 767.98px) {
-  .vv-dialogframe__close {
-    top: calc(clamp(19px, 5vw, 29px) - 6px);
-    right: calc(var(--vv-dialogframe-gutter) - 6px);
+  .vv-dialogframe .vv-dialogframe__close {
+    top: calc(clamp(17px, 5vw, 27px) - 4px);
+    left: calc(var(--vv-dialogframe-gutter) - 4px);
     width: 44px;
     height: 44px;
   }

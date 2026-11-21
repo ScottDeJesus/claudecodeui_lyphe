@@ -1,13 +1,11 @@
 import { Download } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
-import { isUpdateJobActive, useClaudeUpdates } from '@/modules/claude-updates/hooks/useClaudeUpdates';
-import { UPDATE_STEP_LABELS } from '@/modules/claude-updates/updateWording';
+import { useClaudeUpdateLine } from '@/modules/claude-updates/hooks/useClaudeUpdateLine';
 
 /**
  * The sidebar's own line for Claude: an offer when there is one, and the job that is taking it when
  * one is running. It lives in the list's foot, so it returns the moment a collapsed list shows again; the
- * rail draws no mark for it.
+ * rail draws no mark for it (the wheel of places marks Settings while an offer stands, off the same line).
  *
  * ABSENT IS THE DEFAULT. A package whose update this pipeline cannot install here is not an offer,
  * and a process with nothing on disk to move has nothing to announce; in either case the row
@@ -18,46 +16,9 @@ import { UPDATE_STEP_LABELS } from '@/modules/claude-updates/updateWording';
  * second press.
  */
 
-/** The two lines the row draws: what is on offer or running, and what it is. Null = draw nothing. */
-function useUpdatesFooterLine(): { title: string; detail: string } | null {
-  const { t } = useTranslation('settings');
-  const { report } = useClaudeUpdates();
-
-  if (report === null) return null;
-
-  const job = report.job;
-  if (isUpdateJobActive(job)) {
-    const running = job.steps.find((step) => step.state === 'running') ?? null;
-    const step = running === null ? null : UPDATE_STEP_LABELS[running.key];
-    return {
-      title: t('updates.footer.updating', { defaultValue: 'Updating Claude…' }),
-      detail:
-        step === null
-          ? t('updates.footer.working', { defaultValue: 'Working…' })
-          : t(step.key, { defaultValue: step.defaultValue }),
-    };
-  }
-
-  const offered = report.packages.filter((pkg) => pkg.updateAvailable && pkg.updatable);
-  const cli = offered.find((pkg) => pkg.key === 'cli');
-  const sdk = offered.find((pkg) => pkg.key === 'sdk');
-  const one = cli ?? sdk;
-  if (one === undefined) return null;
-
-  return {
-    // "Claude Code 2.1.284 · SDK 0.3.284"; one package alone names itself and stops. The labels are
-    // the server's own, so a row and the card under it never spell a package two ways.
-    title:
-      cli === undefined || sdk === undefined
-        ? `${one.label} ${one.latest}`
-        : `${cli.label} ${cli.latest} · ${t('updates.footer.sdkShort', { defaultValue: 'SDK' })} ${sdk.latest}`,
-    detail: t('updates.footer.available', { defaultValue: 'Update available' }),
-  };
-}
-
 /** The sidebar footer's row, above the app's own update row. Renders nothing when there is no offer. */
 export function ClaudeUpdateFooterRow({ onOpen }: { onOpen: () => void }) {
-  const line = useUpdatesFooterLine();
+  const line = useClaudeUpdateLine();
   if (line === null) return null;
 
   return (

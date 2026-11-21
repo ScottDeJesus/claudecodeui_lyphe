@@ -1,10 +1,11 @@
-import { AudioLines, Crosshair, LayoutDashboard, X } from 'lucide-react';
+import { ArrowLeft, AudioLines, Crosshair, LayoutDashboard } from 'lucide-react';
 import { type PointerEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionControls } from '@/modules/companion/CompanionControls';
 import { CompanionStatus } from '@/modules/companion/CompanionStatus';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
+import { HEAD_PRESS } from '@/shared/constants';
 import type { CompanionEars, CompanionPresence, CompanionVoice } from '@/shared/types';
 import { Button, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -46,11 +47,11 @@ type CompanionHeaderProps = {
  * controls. Drawn by this module's CompanionPanel; the status line and the controls are `CompanionStatus` and
  * `CompanionControls`, the pieces the station draws too, so this file keeps only what is the panel's own.
  *
- * ROW ONE: her mark, her name, and the status line under it (`CompanionStatus`: `role="status"`, so a change is announced;
- * it draws what she is doing from `presence` alone, her process included); at the far end Stop — only while her turn runs,
- * the one urgent press, so it stands beside the way out (the controls own it and draw it into this row's `stopSlot`) — then,
- * given `onOpenStation`, the station button (on a phone her panel is the full-screen sheet he talks to her in, and the
- * command palette is two presses away behind the drawer) and the panel's own close. ROW TWO, only while she holds one: the
+ * ROW ONE: the panel's way out, the back arrow at the start as on every page's head; her mark, her name, and the status line
+ * under it (`CompanionStatus`: `role="status"`, so a change is announced; it draws what she is doing from `presence` alone,
+ * her process included); at the far end Stop — only while her turn runs, the one urgent press (the controls own it and draw it
+ * into this row's `stopSlot`) — then, given `onOpenStation`, the station button (on a phone her panel is the full-screen sheet
+ * he talks to her in, and the command palette is two presses away behind the drawer). ROW TWO, only while she holds one: the
  * focus chat, "Focus · Kanban lanes · its project", the chat "it" and "this" mean in what she says. Then `CompanionControls`:
  * ROW THREE, the model picker, the Live switch and Clear behind its question; ROW FOUR, given `voice`, "Voice on this
  * device"; ROW FIVE, given `ears`, "Listen for her name on this device", and while it is on what her ears are doing.
@@ -72,6 +73,10 @@ export function CompanionHeader({
     <div data-companion-header="" onPointerDown={onMovePress} className={cn('shrink-0 border-b border-border bg-card', onMovePress && 'cursor-grab touch-none')}>
       {/* While the panel floats under a finger-sized grip (12px strips where the browser names touch its primary pointer), the row keeps 12px at its right, so the close button's whole box stands clear of the right edge's strip. */}
       <div className={cn('flex items-center gap-2.5 py-2.5 pl-3 pr-2', onMovePress && '[@media(pointer:coarse)]:pr-3')}>
+        {/* The panel's way out first, as on every page's head: the back arrow at the start, never a cross at the end. */}
+        <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onClose} aria-label={t('companion.panel.close', { name })} title={t('companion.panel.close', { name })}>
+          <ArrowLeft aria-hidden="true" />
+        </Button>
         <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-ink">
           <AudioLines className="size-4" strokeWidth={1.75} />
         </span>
@@ -95,19 +100,6 @@ export function CompanionHeader({
             </Button>
           </Tooltip>
         )}
-        <Tooltip content={t('companion.panel.close', { name })} position="bottom">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('companion.panel.close', { name })}
-            // 32px to look at; a transparent catch makes it 40px to hit under a mouse and 44px under a finger, Verve's
-            // touch floor — on a phone this is the sheet's only way out.
-            className="relative h-8 w-8 shrink-0 text-muted-foreground before:absolute before:-inset-1 before:content-[''] hover:text-foreground [@media(pointer:coarse)]:before:-inset-1.5"
-            onClick={onClose}
-          >
-            <X aria-hidden="true" />
-          </Button>
-        </Tooltip>
       </div>
 
       {focus && (

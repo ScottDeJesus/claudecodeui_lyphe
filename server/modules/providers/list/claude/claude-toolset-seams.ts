@@ -16,7 +16,9 @@
  * the launch's `mcpServers` option (a launch argument: changing it replaces the process), and
  * `toggleMcpServer` is never called (it writes `disabledMcpServers` into the project's entry in
  * `~/.claude.json`, shared by every session in the folder). With one mechanism, on, off, a fresh
- * process and a re-adopted one are the same code.
+ * process and a re-adopted one are the same code. The one exception is a chat launched in Code Mode:
+ * its sets reach its bridge through `context.codeMode.serversChanged` (claude-code-mode-seams.ts),
+ * and its CLI is sent nothing.
  *
  * A set's server must not take a BASE server's name. Measured on Claude Code 2.1.301 (the 2.1.300 source
  * read said such a call is ignored; it is not): a `setMcpServers` naming a launch-option server takes
@@ -36,6 +38,8 @@ import type { McpSetServersResult, Query } from '@anthropic-ai/claude-agent-sdk'
 
 import type { ChatToolsetLaunch, ToolsetServerConfig, ToolsetSyncOutcome } from '@/shared/toolset-types.js';
 import type { ProviderRuntimeContext } from '@/shared/types.js';
+
+import type { CodeModeServerSync } from './claude-code-mode-seams.js';
 
 type ToolsetContext = Pick<ProviderRuntimeContext, 'toolsets'>;
 
@@ -159,6 +163,8 @@ export type ToolsetSyncDeps = {
   setApplied: (digest: string | null) => void;
   /** The names of the BASE servers the process was launched with (its `mcpServers` option); none when omitted. */
   baseServerNames?: () => readonly string[];
+  /** The bridge push of a chat launched in Code Mode, or null for every other chat (whose sets ride setMcpServers). */
+  codeModeSync?: () => CodeModeServerSync | null;
 };
 
 const reasonOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -252,6 +258,9 @@ export function createToolsetSync(deps: ToolsetSyncDeps): { sync(boundMs: number
     const { servers } = launch;
     // Nothing in play for this chat (the hook has said why when it was worth saying): no request, no line.
     if (servers === null) return { live: true, confirmed: true, added: [], removed: [], errors: {} };
+    // A Code Mode chat's only launch server is `cm`: its sets reach it through the bridge, and setMcpServers is sent nothing.
+    const codeMode = deps.codeModeSync?.() ?? null;
+    if (codeMode) return codeMode.push(servers, remainingMs());
     const query = deps.getQuery();
     if (!query) return { live: false };
 

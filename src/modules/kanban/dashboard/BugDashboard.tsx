@@ -14,7 +14,7 @@ import { plainSentence, readDispatcherAnswer } from '@/modules/kanban/utils/disp
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
 import type { BugDashboardView, HuntSkippedUnit } from '@/shared/types';
-import { Banner, EmptyState, SegmentedControl, Select, Spinner } from '@/shared/ui';
+import { Banner, EmptyState, SegmentedControl, Spinner } from '@/shared/ui';
 import { copyTextToClipboard } from '@/shared/utils';
 
 /**
@@ -23,8 +23,9 @@ import { copyTextToClipboard } from '@/shared/utils';
  * bug hunters are on and how far they have got; what got fixed. Last, and only while there are any, the tickets no
  * board could take.
  *
- * TWO CONTROLS, AND THEY STAY PUT. Which boards (this one, or all) and how far back (7, 30 or 90 days) stand at the
- * head in every state, a spinner and a failure included, so the way to ask a different question never moves. What
+ * TWO CONTROLS, AND THEY STAY PUT. Which boards (this one, or all) and how far back (7, 30 or 90 days), each the kit's
+ * segmented control, stand at the head in every state, a spinner and a failure included, so the way to ask a different
+ * question never moves. What
  * they are set to is the panel's, not this face's: it survives a visit to the Board face and a board switch.
  *
  * ONE READ, FOUR STATES. Still reading: the ring, under the controls. The route did not answer: one sentence and
@@ -38,6 +39,10 @@ import { copyTextToClipboard } from '@/shared/utils';
  * THE HUNTERS' THREE PRESSES ARE THIS FACE'S WRITES, as the changelog's copy is: the section is handed each as a
  * callback, with which one is out and the dispatcher's sentence for one that did not do what was asked, and calls no
  * route itself.
+ *
+ * IT READS AS ONE INSTRUMENT'S READOUT, in the design system's voice: each section under its Rule (its count or its one
+ * press at the line's end), tables as rules between rows with no frame, what happened as a Trace, a card as a row that opens
+ * it, each hunter's pass as a ring (`bugScreen.css`, under `.bug-dashboard`).
  *
  * IT COMPOSES, IT DOES NOT BUILD. Every piece is the kit's, and each section is a file of its own that is handed its
  * part of the answer and fetches nothing.
@@ -207,7 +212,7 @@ export function BugDashboard({ boardId, view, onView, onOpenCard }: BugDashboard
 
   return (
     <div
-      className="min-h-0 flex-1 overflow-y-auto"
+      className="bug-dashboard min-h-0 flex-1 overflow-y-auto"
       data-bug-dashboard={reading.status}
       aria-busy={reading.status === 'loading' || (reading.status === 'ready' && reading.stale)}
     >
@@ -222,19 +227,16 @@ export function BugDashboard({ boardId, view, onView, onOpenCard }: BugDashboard
             value={view.scope}
             onChange={(scope) => onView({ ...view, scope })}
           />
-          {/* A block wrapper at a fixed width: `Select`'s root is a block, and as a flex item it would shrink to its text. */}
-          <div className="w-40">
-            <Select
-              size="sm"
-              ariaLabel={t('kanban.dashboard.window.label')}
-              options={WINDOWS.map((days) => ({ value: String(days), label: t('kanban.dashboard.window.days', { days }) }))}
-              value={String(view.days)}
-              onChange={(next) => {
-                const days = WINDOWS.find((candidate) => String(candidate) === next);
-                if (days !== undefined) onView({ ...view, days });
-              }}
-            />
-          </div>
+          {/* Three windows, all worth seeing at once, so a segmented control and not a list to open. */}
+          <SegmentedControl
+            label={t('kanban.dashboard.window.label')}
+            options={WINDOWS.map((days) => ({ value: String(days), label: t('kanban.dashboard.window.short', { days, defaultValue: '{{days}} days' }) }))}
+            value={String(view.days)}
+            onChange={(next) => {
+              const days = WINDOWS.find((candidate) => String(candidate) === next);
+              if (days !== undefined) onView({ ...view, days });
+            }}
+          />
         </div>
 
         {body()}

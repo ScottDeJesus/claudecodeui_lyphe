@@ -1,10 +1,11 @@
+import { Check, Copy, RotateCw } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { hm } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusEnrollment, CerberusEnrollmentStatus } from '@/shared/cerberus-types';
 import type { CerberusEnrollRefusal } from '@/shared/types';
-import { Banner, Button, Spinner } from '@/shared/ui';
+import { Banner, Button, IconWord, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
@@ -84,10 +85,22 @@ export function EnrollInstall({ issued, status, copied, issuing, refusal, onCopy
         <code className={cn('min-w-0 flex-1 select-all font-mono text-xs leading-[1.6] text-secondary-foreground [overflow-wrap:anywhere]', expired && 'line-through')}>
           {issued.command}
         </code>
-        <Button type="button" variant="outline" size="sm" autoFocus className="h-8 flex-none px-3 max-md:h-11" disabled={expired} onClick={onCopy}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          autoFocus
+          className="h-8 flex-none px-3 finger:size-11 finger:px-0 max-md:h-11"
+          disabled={expired}
+          aria-label={copied ? t('cerberus.enroll.copied') : t('cerberus.enroll.copy')}
+          title={copied ? t('cerberus.enroll.copied') : t('cerberus.enroll.copy')}
+          onClick={onCopy}
+        >
+          {/* Under a finger its mark alone: the copy mark, then the tick once it has copied. */}
+          <span aria-hidden className="hidden finger:contents">{copied ? <Check /> : <Copy />}</span>
           {/* Both words in one cell, the one not said held invisible, so the button is always as wide as the
               wider of them and the command beside it never re-wraps when Copy turns into "✓ Copied". */}
-          <span className="grid justify-items-center">
+          <span className="grid justify-items-center finger:hidden">
             <span className="col-start-1 row-start-1">{copied ? t('cerberus.enroll.copied') : t('cerberus.enroll.copy')}</span>
             <span aria-hidden className="invisible col-start-1 row-start-1">{copied ? t('cerberus.enroll.copy') : t('cerberus.enroll.copied')}</span>
           </span>
@@ -105,18 +118,20 @@ export function EnrollInstall({ issued, status, copied, issuing, refusal, onCopy
               variant="tonal"
               size="sm"
               autoFocus
-              className="mt-2.5 h-8 px-3 max-md:h-11"
+              className="mt-2.5 h-8 px-3 finger:size-11 finger:px-0 max-md:h-11"
               busy={issuing}
+              aria-label={t('cerberus.enroll.getNewCommand')}
+              title={t('cerberus.enroll.getNewCommand')}
               onClick={onReissue}
             >
-              {t('cerberus.enroll.getNewCommand')}
+              <IconWord icon={RotateCw} word={t('cerberus.enroll.getNewCommand')} />
             </Button>
           </Banner>
         </div>
       ) : (
         <>
           <p className="text-[12.5px] text-muted-foreground">{t('cerberus.enroll.expires', { time: hm(issued.expiresAt) })}</p>
-          <section aria-labelledby={listeningId} className="flex flex-col gap-2 rounded-xl border border-border px-4 py-3.5">
+          <section aria-labelledby={listeningId} className="flex flex-col gap-2 border-y border-border py-3.5">
             <div className="flex items-center gap-3">
               <Spinner size={20} />
               <h3 id={listeningId} className="m-0 text-sm font-medium [overflow-wrap:anywhere]">

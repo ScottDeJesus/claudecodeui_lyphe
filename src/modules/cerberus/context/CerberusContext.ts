@@ -65,7 +65,7 @@ export type CerberusValue = {
   setAuto: (id: string, on: boolean) => Promise<boolean>;
   /**
    * Where the fleet's wardens stand against the release center holds, read beside the overview and again on
-   * `cerberus_changed`. `null` until a read answers: the header draws no update button and the dialog nothing
+   * `cerberus_changed`. `null` until a read answers: the fleet's Opening draws no update button and the dialog nothing
    * until then, so "not read yet" never looks like "nothing to update".
    */
   wardens: CerberusWardens | null;

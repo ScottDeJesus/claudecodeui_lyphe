@@ -6,7 +6,7 @@ import { placementNotes } from '@/modules/affected-areas/utils/dayOneModel';
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
 import type { Region } from '@/shared/affected-areas-types';
 import type { PanoRoom } from '@/shared/types';
-import { Badge, Card } from '@/shared/ui';
+import { Badge, Rule } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type RegionListProps = {
@@ -84,12 +84,10 @@ export function RegionList({ regions, panoRoom, selectedId, kindLabel, label, he
   }, [selectedId]);
 
   return (
-    <Card role="region" aria-labelledby={headingId ?? ownHeadingId} className="flex min-w-0 flex-col overflow-hidden">
-      {/* A caller that draws the card's heading (360°'s view name) hands its id in; its own title gives way to it. */}
-      {headingId === undefined && (
-        <h3 id={ownHeadingId} className="px-4 pb-2 pt-4 text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.pano.markedTitle')}</h3>
-      )}
-      <ul ref={listRef} aria-label={label} className="m-0 list-none divide-y divide-border border-t border-border p-0">
+    <section aria-labelledby={headingId ?? ownHeadingId} className="flex min-w-0 flex-col gap-2">
+      {/* A caller that draws the list's heading (360°'s view name) hands its id in; its own Rule gives way to it. */}
+      {headingId === undefined && <Rule id={ownHeadingId}>{t('affectedAreas.pano.markedTitle')}</Rule>}
+      <ul ref={listRef} aria-label={label} className="m-0 list-none divide-y divide-border border-b border-border p-0">
         {regions.map((region) => {
           const look = REGION_LOOK[regionState(region)];
           const selected = region.regionId === selectedId;
@@ -100,8 +98,8 @@ export function RegionList({ regions, panoRoom, selectedId, kindLabel, label, he
                 aria-current={selected || undefined}
                 onClick={() => onSelect(region.regionId)}
                 className={cn(
-                  'relative flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-background focus-visible:[outline-offset:-2px]',
-                  selected && 'bg-background before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-primary',
+                  'relative flex w-full items-start gap-3 px-3 py-3 text-left hover:bg-muted focus-visible:[outline-offset:-2px]',
+                  selected && 'bg-muted before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-primary',
                 )}
               >
                 <Badge as="span" tone={look.tone} className="min-w-[26px] flex-none justify-center border-tone-dot px-1.5 font-bold tabular-nums">
@@ -121,6 +119,6 @@ export function RegionList({ regions, panoRoom, selectedId, kindLabel, label, he
           );
         })}
       </ul>
-    </Card>
+    </section>
   );
 }

@@ -1,3 +1,4 @@
+import { Check, SquareTerminal, X } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +11,7 @@ import type { CerberusEnrollment, CerberusOverview } from '@/shared/cerberus-typ
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import type { CerberusEnrollRefusal } from '@/shared/types';
-import { Button, DialogFrame, Field, Input, Steps } from '@/shared/ui';
+import { Button, DialogFrame, Field, IconWord, Input, Steps } from '@/shared/ui';
 import { copyTextToClipboard } from '@/shared/utils';
 
 /** The server's node grammar (`NODE_ID_PATTERN`) allows 32 characters; the field stops there as it is typed. */
@@ -64,8 +65,8 @@ type EnrollDialogProps = {
  * whose token is out. Closing at any step is safe: a token already issued still works until it expires,
  * and the node turns up in Fleet when its warden speaks.
  *
- * For the cerberus module's `CerberusPanel`, which hosts one and opens it from the header's "Enroll a
- * node".
+ * For the cerberus module's `CerberusPanel`, which hosts one and opens it from the plus at the fleet's foot
+ * (`CerberusFoot`) and from the fleet's Opening (`FleetOpening`): "Enroll a node".
  */
 export function EnrollDialog({ open, onClose }: EnrollDialogProps) {
   if (!open) return null;
@@ -220,15 +221,22 @@ function EnrollFlow({ onClose }: { onClose: () => void }) {
             </Field>
             {problem !== null && <EnrollRefusal refusal={problem} />}
             <div className="mt-1.5 flex flex-wrap justify-end gap-3">
-              <Button type="button" variant="outline" className="max-md:h-11" onClick={onClose}>
-                {t('cerberus.enroll.cancel')}
+              <Button type="button" variant="outline" className="finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.enroll.cancel')} title={t('cerberus.enroll.cancel')} onClick={onClose}>
+                <IconWord icon={X} word={t('cerberus.enroll.cancel')} />
               </Button>
               {/* Never `disabled`: a disabled button gives up the focus it holds, and the 409 that says the name
                   is taken turns `nameError` on under the very press that is holding it. A name that cannot be
                   sent or a gateway that is down is `aria-disabled`, and the ask in flight is `busy`; either
                   way the button refuses the press itself and keeps its place in the tab order. */}
-              <Button type="submit" className="max-md:h-11" aria-disabled={nameError !== null || gatewayDown} busy={issuing}>
-                {t('cerberus.enroll.getCommand')}
+              <Button
+                type="submit"
+                className="finger:size-11 finger:px-0 max-md:h-11"
+                aria-disabled={nameError !== null || gatewayDown}
+                busy={issuing}
+                aria-label={t('cerberus.enroll.getCommand')}
+                title={t('cerberus.enroll.getCommand')}
+              >
+                <IconWord icon={SquareTerminal} word={t('cerberus.enroll.getCommand')} />
               </Button>
             </div>
           </form>
@@ -269,8 +277,8 @@ function EnrollFlow({ onClose }: { onClose: () => void }) {
             </p>
             <p className="text-[13px] text-muted-foreground">{t('cerberus.enroll.inFleet')}</p>
             <div className="mt-2.5 flex justify-end">
-              <Button type="button" autoFocus className="max-md:h-11" onClick={onClose}>
-                {t('cerberus.enroll.finish')}
+              <Button type="button" autoFocus className="finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.enroll.finish')} title={t('cerberus.enroll.finish')} onClick={onClose}>
+                <IconWord icon={Check} word={t('cerberus.enroll.finish')} />
               </Button>
             </div>
           </div>

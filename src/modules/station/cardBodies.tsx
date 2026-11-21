@@ -12,16 +12,16 @@ import { cn } from '@/shared/utils';
  * other file parses her words a second way. Every text is drawn through the chat's own `Markdown` (the chat module's barrel), so a card renders whatever a chat renders —
  * headings, lists, tables, links, code and the sandboxed `widget` fence — laid out by the shape the reader that put it up gave it.
  *
- * Every body reads at body size, its lines kept to a reading measure (`MEASURE`) however wide the stage. A list's row wraps
+ * Every body reads at body size and runs to the panel's width, which the station keeps to a reading measure (`MEASURE`). A list's row wraps
  * where a line may break (a space, a run id's dash, a path's slash); a token no break can split is never cut: the list scrolls
  * sideways inside the card for it, never the page.
  */
 
 /**
- * The reading measure: a line of her text runs at most 72 characters, however wide the stage stands. The box takes the body's
- * size too, so its `ch` is a character of the text it holds and not of the stage around it.
+ * The reading measure: a line of her text runs to the panel's width, which the station holds to 1,100 px of words at a desk (the shell's
+ * `STAGE_TRACK_MAX`), as a chat's are. The box takes the body's size, so the text is the body's and not the panel's.
  */
-const MEASURE = 'max-w-[72ch] text-base';
+const MEASURE = 'min-w-0 text-base';
 
 /** Body size and the ink of what she wrote, for every body's text. */
 const BODY_TEXT = 'text-base leading-relaxed text-foreground';

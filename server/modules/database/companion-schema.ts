@@ -27,6 +27,7 @@
  * prompt as the conversation in `provider_session_id` began with them: written with the id, nulled with it, and compared with the
  * launch's own before the conversation is resumed. So is `companion_state.handover` (`addCompanionHandoverColumn`), the short account of
  * the conversation that refusal dropped: written before the fresh start, carried once by the first message after it, then emptied when the launch that was handed that message reports `init`.
+ * So is `companion_state.context_json` (`addCompanionContextColumn`), how full that conversation was at her CLI's last count: nulled with the id and by Clear.
  * So is `companion_state.memory_forget_line` (`addCompanionMemoryForgetLineColumn`),
  * the id of the log line of his that the last forget of her memory used; Clear leaves it. So are `companion_state.face_id`, `face_pending_id` and
  * `face_error` (`addCompanionFaceColumns`), the face made from his photo, the one being made from his upload and the last bake's failure, and

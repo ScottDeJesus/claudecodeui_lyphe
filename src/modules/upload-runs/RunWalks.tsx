@@ -1,9 +1,10 @@
+import { ChevronRightIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { dayClockWord } from '@/modules/upload-runs/utils/uploadsWords';
 import type { Tone } from '@/shared/types';
 import type { UploadWalk } from '@/shared/upload-runs-types';
-import { Badge, Card, CardContent, Chip } from '@/shared/ui';
+import { Badge } from '@/shared/ui';
 
 type RunWalksProps = {
   /** The walks that carry this run's invocation, in the order the read gives them. */
@@ -46,19 +47,18 @@ export function RunWalks({ walks, live, walkStep }: RunWalksProps) {
   const w = 'cerberus.uploads.sheet.walks';
 
   if (walks.length === 0) {
-    return <p className="m-0 rounded-lg border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground" data-uploads-walks="0">{t(live ? `${w}.noneYet` : `${w}.none`)}</p>;
+    return <p className="m-0 text-[13px] text-muted-foreground" data-uploads-walks="0">{t(live ? `${w}.noneYet` : `${w}.none`)}</p>;
   }
 
   return (
-    <ul className="m-0 flex min-w-0 list-none flex-col gap-3 p-0" data-uploads-walks={walks.length}>
+    <ul className="m-0 flex min-w-0 list-none flex-col divide-y divide-border border-y border-border p-0" data-uploads-walks={walks.length}>
       {walks.map((walk) => {
         const inFlight = live && walk.outcome === IN_FLIGHT;
         const standing = inFlight ? walkStep ?? walk.steps[walk.steps.length - 1]?.step ?? null : null;
         const named = walk.steps.filter((step) => stepTone(step.status) !== undefined);
         return (
-          <li key={walk.id} className="min-w-0">
-            <Card className="w-full min-w-0" data-upload-walk={walk.id} data-upload-walk-armed={walk.armed}>
-              <CardContent className="flex min-w-0 flex-col gap-3 p-3.5">
+          <li key={walk.id} className="min-w-0 py-3.5" data-upload-walk={walk.id} data-upload-walk-armed={walk.armed}>
+            <div className="flex min-w-0 flex-col gap-3">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="min-w-0 break-words font-mono text-sm text-foreground">{walk.variant === null ? walk.archetype : `${walk.archetype} · ${walk.variant}`}</span>
                   <Badge as="span" tone={walk.armed ? 'info' : 'neutral'}>{t(walk.armed ? `${w}.armed` : `${w}.preview`)}</Badge>
@@ -78,13 +78,13 @@ export function RunWalks({ walks, live, walkStep }: RunWalksProps) {
                 {walk.steps.length === 0 ? (
                   <p className="m-0 text-xs text-muted-foreground">{t(`${w}.noSteps`)}</p>
                 ) : (
-                  <ol className="m-0 flex min-w-0 list-none flex-wrap gap-1.5 p-0" aria-label={t(`${w}.steps`, { count: walk.steps.length })}>
+                  // The steps in their order, one after another as words: each its name, then its status in its tone's ink when it has one.
+                  <ol className="m-0 flex min-w-0 list-none flex-wrap items-center gap-x-1.5 gap-y-1 p-0 font-mono text-xs" aria-label={t(`${w}.steps`, { count: walk.steps.length })}>
                     {walk.steps.map((step, index) => (
-                      <li key={`${index}:${step.step ?? ''}`} className="min-w-0">
-                        <Chip size="sm" tone={stepTone(step.status)} className="max-w-full">
-                          <span className="min-w-0 truncate font-mono">{step.step ?? t(`${w}.unreadableStep`)}</span>
-                          <span className="flex-none text-muted-foreground">{step.status}</span>
-                        </Chip>
+                      <li key={`${index}:${step.step ?? ''}`} className="flex min-w-0 max-w-full items-center gap-1.5">
+                        {index > 0 && <ChevronRightIcon className="size-3 flex-none text-muted-foreground" aria-hidden="true" />}
+                        <span className="min-w-0 truncate text-foreground">{step.step ?? t(`${w}.unreadableStep`)}</span>
+                        <span data-tone={stepTone(step.status)} className={stepTone(step.status) === undefined ? 'flex-none text-muted-foreground' : 'flex-none text-tone-ink'}>{step.status}</span>
                       </li>
                     ))}
                   </ol>
@@ -105,8 +105,7 @@ export function RunWalks({ walks, live, walkStep }: RunWalksProps) {
                   </ul>
                 )}
                 {walk.cleared_at !== null && <p className="m-0 text-xs text-muted-foreground">{t(`${w}.cleared`, { when: dayClockWord(walk.cleared_at) })}</p>}
-              </CardContent>
-            </Card>
+            </div>
           </li>
         );
       })}

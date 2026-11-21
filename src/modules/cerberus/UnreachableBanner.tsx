@@ -1,6 +1,7 @@
+import { RotateCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { Banner, Button } from '@/shared/ui';
+import { Banner, Button, IconWord } from '@/shared/ui';
 
 /**
  * "Cerberus can't be reached" with Try again: what a card draws where its read of center did not
@@ -28,8 +29,8 @@ export function UnreachableBanner({ onRetry, detail }: { onRetry: () => void; de
       <Banner
         tone="warn"
         action={(
-          <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>
-            {t('cerberus.errors.retry')}
+          <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0" aria-label={t('cerberus.errors.retry')} title={t('cerberus.errors.retry')} onClick={onRetry}>
+            <IconWord icon={RotateCw} word={t('cerberus.errors.retry')} />
           </Button>
         )}
       >

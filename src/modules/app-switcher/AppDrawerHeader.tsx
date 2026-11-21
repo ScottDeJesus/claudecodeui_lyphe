@@ -1,7 +1,8 @@
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
+import { HEAD_PRESS } from '@/shared/constants';
 import { Button, DialogTitle } from '@/shared/ui';
 
 type AppDrawerHeaderProps = {
@@ -45,22 +46,16 @@ export function AppDrawerHeader({ titleId, onDismiss }: AppDrawerHeaderProps) {
 
   return (
     <header className="flex shrink-0 flex-col gap-1 px-[22px] pb-4 pt-[calc(env(safe-area-inset-top)+26px)]">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onDismiss} aria-label={t('applications.closeDrawer')} title={t('applications.closeDrawer')}>
+          <ArrowLeft aria-hidden="true" />
+        </Button>
         <DialogTitle
           id={titleId}
           className="not-sr-only min-w-0 font-serif text-[30px] font-normal leading-[1.1] text-foreground"
         >
           <Trans i18nKey="applications.heading" components={{ em: <i className="text-accent-ink" /> }} />
         </DialogTitle>
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label={t('applications.closeDrawer')}
-          className="h-9 w-9 flex-none rounded-full border border-border bg-card text-muted-foreground hover:text-accent-ink"
-          onClick={onDismiss}
-        >
-          <X />
-        </Button>
       </div>
       {/* The count line holds its height when it is empty, so the sheet never jumps as it reads. */}
       <div className="flex min-h-[20px] items-center justify-between gap-3">

@@ -1,8 +1,9 @@
+import { Stethoscope } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
-import { Button } from '@/shared/ui';
+import { Button, IconWord } from '@/shared/ui';
 
 type DiagnoseButtonProps = {
   /** The node the check runs on, and the check's key (`<service>/<id>`): what the diagnosis is asked about. */
@@ -28,8 +29,8 @@ type DiagnoseButtonProps = {
  *
  * A 44 px catch under a finger (a touch screen, or a window under 768 px), the house's touch floor.
  *
- * For the cerberus module's `NeedsYouCard`, where a need with no diagnosis since it went bad offers it (its `NeedCard`,
- * which the station's check stage draws too), and `SelectedCheck`, the sheet's action row.
+ * For the cerberus module's `NeedCard`, where a need with no diagnosis since it went bad offers it (in a machine's
+ * Opening, and on the station's check stage), and `SelectedCheck`, the sheet's action row.
  */
 export function DiagnoseButton({ node, checkKey, label, disabled = false, onStarted }: DiagnoseButtonProps) {
   const { t } = useTranslation();
@@ -49,8 +50,17 @@ export function DiagnoseButton({ node, checkKey, label, disabled = false, onStar
   };
 
   return (
-    <Button variant="outline" size="sm" disabled={disabled} busy={pressing} className="finger:h-11" onClick={() => void onPress()}>
-      {pressing ? t('cerberus.diagnosis.diagnosing') : label}
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={disabled}
+      busy={pressing}
+      className="finger:size-11 finger:px-0"
+      aria-label={pressing ? t('cerberus.diagnosis.diagnosing') : label}
+      title={pressing ? t('cerberus.diagnosis.diagnosing') : label}
+      onClick={() => void onPress()}
+    >
+      <IconWord icon={Stethoscope} word={pressing ? t('cerberus.diagnosis.diagnosing') : label} />
     </Button>
   );
 }

@@ -24,6 +24,7 @@
  *   with) are launch arguments and are not. The version is the one launch argument that is
  *   ORDERED rather than compared: only a process behind the binary is replaced, never one ahead
  *   of a reading.
+ *   Whether a process runs in Code Mode is recorded and never compared: a chat keeps the mode it was born in.
  *
  * consumer: claude-runtime.provider.js, session-host/idle-version-sweep.ts (the version rule)
  */
@@ -71,6 +72,12 @@ export type LaunchProfile = {
    * has none, and reads as not taken over.
    */
   compactionTakenOver: boolean;
+  /**
+   * Whether the process was launched in Code Mode (one MCP server, `cm`, and the built-in tools the house
+   * names; claude-code-mode-seams.ts). Never a reason to replace a process: a chat keeps the mode it was
+   * started in. A profile recorded before this field existed has none, and reads as not in Code Mode.
+   */
+  codeMode: boolean;
   /**
    * The digest of the tool-set map APPLIED to this process: '' for none, null when not known (a
    * re-adopted process, or a sync that failed, went unanswered or left a server unconnected, which
@@ -121,10 +128,11 @@ export function launchProfileOf(
   mcpUnreadable = false,
   unknown = false,
   cliVersion: string | null = null,
-  mcpSignIn: Record<string, string> | null = null,
   toolsets: string | null = null,
   account: string | null = null,
-  accountSlug: string | null = null
+  accountSlug: string | null = null,
+  codeMode = false,
+  mcpSignIn: Record<string, string> | null = null
 ): LaunchProfile {
   const permissionMode = sdkOptions.permissionMode ?? 'default';
   return {
@@ -139,6 +147,7 @@ export function launchProfileOf(
     effort: sdkOptions.effort ?? null,
     ultracode: typeof sdkOptions.settings === 'object' && sdkOptions.settings?.ultracode === true,
     compactionTakenOver: compactionTakenOverOf(sdkOptions.settings),
+    codeMode,
     toolsets,
     allowedTools: [...(sdkOptions.allowedTools ?? [])],
     disallowedTools: [...(sdkOptions.disallowedTools ?? [])],
@@ -222,8 +231,12 @@ export function planLiveChanges(
       }
     };
   }
+  // A joining message reuses its process's own Code Mode launch, so the modes differ only for a process
+  // re-adopted under another answer than its host recorded: it is kept, and its MCP map and allowed
+  // list are the mode's, not changes.
+  const sameMode = (next.codeMode === true) === (live.codeMode === true);
   // An unreadable config (a write in progress) is not a changed one; only a read map compares.
-  if (next.mcpServers !== null && next.mcpServers !== live.mcpServers) {
+  if (sameMode && next.mcpServers !== null && next.mcpServers !== live.mcpServers) {
     return { respawn: 'the MCP server configuration changed', changes: null };
   }
   // A sign-in lives in the credentials file, not the MCP config, and the process read it once at
@@ -238,11 +251,11 @@ export function planLiveChanges(
   if (!sameList(next.disallowedTools, live.disallowedTools)) {
     return { respawn: 'the disallowed tool list changed', changes: null };
   }
-  if (live.allowedTools.some((tool) => !next.allowedTools.includes(tool))) {
+  if (sameMode && live.allowedTools.some((tool) => !next.allowedTools.includes(tool))) {
     return { respawn: 'a tool was removed from the allowed list', changes: null };
   }
   const effortChanged = next.effort !== live.effort || next.ultracode !== live.ultracode;
-  const toolsChanged = !sameList(next.allowedTools, live.allowedTools);
+  const toolsChanged = sameMode && !sameList(next.allowedTools, live.allowedTools);
   return {
     respawn: null,
     changes: {

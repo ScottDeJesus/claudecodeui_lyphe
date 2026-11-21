@@ -1,10 +1,11 @@
+import { ChevronsDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { StatusPill } from '@/modules/cerberus/StatusMarks';
 import { hms, localIso } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusResultRow } from '@/shared/cerberus-types';
-import { Button } from '@/shared/ui';
+import { Button, IconWord } from '@/shared/ui';
 
 /**
  * How many rows show before "Show N more". It matches the prototype's twelve, which is enough for a
@@ -66,8 +67,8 @@ export function RecordedResults({ rows, emptyText }: { rows: CerberusResultRow[]
       </ol>
       {hiddenCount > 0 && (
         <div className="border-t border-border pt-2">
-          <Button variant="outline" size="sm" onClick={() => setShowingAll(true)}>
-            {t('cerberus.sheet.moreResults', { count: hiddenCount })}
+          <Button variant="outline" size="sm" className="finger:size-11 finger:px-0" aria-label={t('cerberus.sheet.moreResults', { count: hiddenCount })} title={t('cerberus.sheet.moreResults', { count: hiddenCount })} onClick={() => setShowingAll(true)}>
+            <IconWord icon={ChevronsDown} word={t('cerberus.sheet.moreResults', { count: hiddenCount })} />
           </Button>
         </div>
       )}

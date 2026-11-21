@@ -14166,19 +14166,6 @@ probe-key: dff5f681cd1ce1a0eb4df2e8ca7872d27d7bc470
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs
 
-## INV-9987 — probe — After one resize from a phone width to a desktop width she is not seated in her rail cell (S6)
-
-After one resize from a phone width to a desktop width she is not seated in her rail cell (S6)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/kaylee--avatar--fill/athena-1-probes/crossing.mjs
-```
-
-measured 2026-10-27 by chain chain-kaylee--avatar--fill-20261027-210922-d372, finding M1, MEDIUM
-probe-key: a418cb5f13b657ca717d5cdface260190b59fb1c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-presence-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-speaking.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-live.mjs
-
 ## INV-9989 — probe — The speaking probe's header says the whole-viewport shot is "of the same moment" as the kept clip; it is not, and the phone `-page.png` shows a closed mouth
 
 The speaking probe's header says the whole-viewport shot is "of the same moment" as the kept clip; it is not, and the phone `-page.png` shows a closed mouth
@@ -14202,32 +14189,6 @@ bash /home/lyphe/.claude/state/pipeline-reviews/kaylee--avatar--fill/athena-1-pr
 
 measured 2026-10-27 by chain chain-kaylee--avatar--fill-20261027-210922-d372, finding L2, LOW
 probe-key: e0fca11415f2b93127f4a2376987af38370f5409
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-presence-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-speaking.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-live.mjs
-
-## INV-9991 — probe — `readSafeInsets()` adds and removes a node on `document.body` on every tracked re-measure
-
-`readSafeInsets()` adds and removes a node on `document.body` on every tracked re-measure
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/kaylee--avatar--fill/athena-1-probes/body-probe-node.mjs
-```
-
-measured 2026-10-27 by chain chain-kaylee--avatar--fill-20261027-210922-d372, finding L3, LOW
-probe-key: 3dcae5ebb76a2959dbf956610a405ce440be46b7
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-presence-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-speaking.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-live.mjs
-
-## INV-9992 — probe — Her disc can be dropped under the applications button and then cannot be pressed or dragged
-
-Her disc can be dropped under the applications button and then cannot be pressed or dragged
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/kaylee--avatar--fill/athena-1-probes/under-apps.mjs
-```
-
-measured 2026-10-27 by chain chain-kaylee--avatar--fill-20261027-210922-d372, finding L4, LOW
-probe-key: 73dcf84384f40fe81dd68562c26ffc14f1931225
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-presence-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-speaking.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-live.mjs
 
@@ -14377,43 +14338,6 @@ measured 2026-10-27 by chain chain-kaylee--avatar--docs-20261027-224039-ed3f, fi
 probe-key: 58bc75659ea8e7694693d6eec1bef534403002ca
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
-## INV-10004 — probe — (MEDIUM) — a standing live probe can no longer start while she is asleep: `.verify/kaylee-fab-motion.mjs:73` waits for `, ready`
-
-(MEDIUM) — a standing live probe can no longer start while she is asleep: `.verify/kaylee-fab-motion.mjs:73` waits for `, ready`
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-#!/usr/bin/env bash
-D="$1"; V=/home/lyphe/.claude/claudecodeui_lyphe/.verify
-echo "the line: $(grep -n 'the button to read ready' "$V/kaylee-fab-motion.mjs" | cut -c1-110 || true)"
-cat > "$D/p.mjs" <<'JS'
-import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
-import { APP_URL } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { openReadOnlyPage } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/read-only-page.mjs';
-import { closeBrowser } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/guard-route.mjs';
-const browser = await pw.chromium.launch();
-try {
-  const { page, api } = await openReadOnlyPage(browser, { appUrl: APP_URL, viewport: { width: 1440, height: 900 }, dark: false, label: 'athena' });
-  await page.waitForSelector('[data-companion-fab] .vv-fab', { state: 'attached', timeout: 30000 });
-  await page.waitForTimeout(2500);
-  const label = await page.locator('[data-companion-fab] > .vv-fab').getAttribute('aria-label');
-  const process = (await api('/api/companion')).body.process.state;
-  console.log(`process ${process}; button label "${label}"; the motion probe's wait /, ready$/ would be met: ${/, ready$/.test(label ?? '')}`);
-} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
-finally { await closeBrowser(browser); }
-JS
-node "$D/p.mjs"
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D";; esac
-```
-
-measured 2026-10-28 by chain chain-kaylee--judgment--presence-20261028-000940-32cc, finding M2, MEDIUM
-probe-key: 83c24a819a4a31370d5338a19b3b274f856eb441
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-motion.mjs
 
 ## INV-10010 — probe — LOW — MAN-9130's frames paragraph keeps a result the probe as it stands has not produced
 
@@ -16595,63 +16519,6 @@ Detail: MAN-9223 (portrait), MAN-9238 (engine), MAN-9434 (her head; its rules IN
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSize.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceAtlas.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceHead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceMouth.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/portraitHead.ts
 
-## INV-10262 — probe — LOW — on a box with no face made yet, her initial does not follow the disc's easing
-
-LOW — on a box with no face made yet, her initial does not follow the disc's easing
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-export D
-cat > "$D/p.sh" <<'EOF'
-#!/bin/bash
-B=/home/lyphe/.claude/state/pipeline-reviews/kaylee--avatar--fill/athena-1-probes/base.mjs
-sed "s#export async function open({ viewport = { width: 1440, height: 900 }, stored = null, init = null } = {}) {#export async function open({ viewport = { width: 1440, height: 900 }, stored = null, init = null, preGoto = null } = {}) {#; s#  const page = await context.newPage();#  if (preGoto) await preGoto(context);\n  const page = await context.newPage();#; s#return { page, activity, close#return { page, activity, send: (o) => appSocket.send(JSON.stringify(o)), close#" "$B" > "$D/base2.mjs"
-cat > "$D/p.mjs" <<'EOF2'
-import { open, sleep, FAB } from './base2.mjs';
-// A box with no face made yet: GET /api/companion answers face.id null, so the disc draws her initial.
-const s = await open({ preGoto: async (context) => {
-  await context.route('**/api/companion', async (route) => {
-    if (route.request().method() !== 'GET') return route.continue();
-    const r = await route.fetch(); const j = await r.json(); j.face = { id: null, avatar: 'original', avatars: [] };
-    await route.fulfill({ response: r, body: JSON.stringify(j), headers: { ...r.headers(), 'content-type': 'application/json' } });
-  });
-} });
-const { page } = s;
-await page.waitForSelector(FAB, { state: 'attached' });
-await sleep(1000);
-await page.evaluate(() => {
-  window.__rec = [];
-  const tick = () => {
-    const fab = document.querySelector('[data-companion-fab] .vv-fab').getBoundingClientRect();
-    const ir = document.querySelector('[data-companion-fab] .kaylee-avatar .contents > *')?.getBoundingClientRect();
-    window.__rec.push([fab.width, ir ? ir.width : null]);
-    requestAnimationFrame(tick);
-  };
-  tick();
-});
-const rid = await page.evaluate(() => [...document.querySelectorAll('[data-page-anchor^="chat-row:"]')].map((e) => e.getAttribute('data-page-anchor').slice(9))[5]);
-s.send({ kind: 'companion_process', process: { state: 'awake', error: null } });
-await sleep(500);
-s.activity('reading_session', { session: { sessionId: rid, name: 'probe', project: 'p' } });
-await sleep(2500);
-s.activity('idle');
-await sleep(4500);
-const rows = await page.evaluate(() => window.__rec);
-let max = 0;
-for (const [disc, initial] of rows) if (initial !== null) max = Math.max(max, Math.abs(initial - disc));
-console.log('largest gap between the disc width and her initial width while she grows and shrinks, px:', Math.round(max));
-await s.close();
-EOF2
-cd "$D" && node p.mjs
-EOF
-bash "$D/p.sh"
-# expect: at most 3 (the initial follows the disc; today about 89)
-```
-
-measured 2026-10-29 by chain chain-kaylee--face--portrait-20261029-210254-7da2, finding L2, LOW; 2026-10-30 by chain kaylee--face--docs, finding L1: 89 px on the unchanged tree
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
-
 ## INV-10264 — probe — MEDIUM — MAN-9132 keeps a sentence that the same row's formulas and MAN-9130 contradict
 
 MEDIUM — MAN-9132 keeps a sentence that the same row's formulas and MAN-9130 contradict
@@ -16675,64 +16542,6 @@ measured 2026-10-30 by chain chain-kaylee--face--docs-20261029-235529-9ca0, find
 probe-key: 642bc6d1acbc416b0f310f49933f69cc1c84f23d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-presence-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-speaking.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/read-only-page.mjs
-
-## INV-10265 — probe — LOW — INV-10237 was retired as "cured" with a probe result that does not reproduce; the defect stands
-
-LOW — INV-10237 was retired as "cured" with a probe result that does not reproduce; the defect stands
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-export D
-cat > "$D/p.sh" <<'EOF'
-#!/bin/bash
-B=/home/lyphe/.claude/state/pipeline-reviews/kaylee--avatar--fill/athena-1-probes/base.mjs
-sed "s#export async function open({ viewport = { width: 1440, height: 900 }, stored = null, init = null } = {}) {#export async function open({ viewport = { width: 1440, height: 900 }, stored = null, init = null, preGoto = null } = {}) {#; s#  const page = await context.newPage();#  if (preGoto) await preGoto(context);\n  const page = await context.newPage();#; s#return { page, activity, close#return { page, activity, send: (o) => appSocket.send(JSON.stringify(o)), close#" "$B" > "$D/base2.mjs"
-cat > "$D/p.mjs" <<'EOF2'
-import { open, sleep, FAB } from './base2.mjs';
-// A box with no face made yet: GET /api/companion answers face.id null, so the disc draws her initial.
-const s = await open({ preGoto: async (context) => {
-  await context.route('**/api/companion', async (route) => {
-    if (route.request().method() !== 'GET') return route.continue();
-    const r = await route.fetch(); const j = await r.json(); j.face = { id: null, avatar: 'original', avatars: [] };
-    await route.fulfill({ response: r, body: JSON.stringify(j), headers: { ...r.headers(), 'content-type': 'application/json' } });
-  });
-} });
-const { page } = s;
-await page.waitForSelector(FAB, { state: 'attached' });
-await sleep(1000);
-await page.evaluate(() => {
-  window.__rec = [];
-  const tick = () => {
-    const fab = document.querySelector('[data-companion-fab] .vv-fab').getBoundingClientRect();
-    const ir = document.querySelector('[data-companion-fab] .kaylee-avatar .contents > *')?.getBoundingClientRect();
-    window.__rec.push([fab.width, ir ? ir.width : null]);
-    requestAnimationFrame(tick);
-  };
-  tick();
-});
-const rid = await page.evaluate(() => [...document.querySelectorAll('[data-page-anchor^="chat-row:"]')].map((e) => e.getAttribute('data-page-anchor').slice(9))[5]);
-s.send({ kind: 'companion_process', process: { state: 'awake', error: null } });
-await sleep(500);
-s.activity('reading_session', { session: { sessionId: rid, name: 'probe', project: 'p' } });
-await sleep(2500);
-s.activity('idle');
-await sleep(4500);
-const rows = await page.evaluate(() => window.__rec);
-let max = 0;
-for (const [disc, initial] of rows) if (initial !== null) max = Math.max(max, Math.abs(initial - disc));
-console.log('largest gap between the disc width and her initial width while she grows and shrinks, px:', Math.round(max));
-await s.close();
-EOF2
-cd "$D" && node p.mjs
-EOF
-bash "$D/p.sh"
-# expect: at most 3 (the initial follows the disc; today about 89)
-```
-
-measured 2026-10-30 by chain chain-kaylee--face--docs-20261029-235529-9ca0, finding L1, LOW
-probe-key: 4a717d92eb94314967314956a76b67f55c0832fa
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
 ## INV-10266 — probe — LOW — MAN-9234 and INV-10256 say the script deletes nothing and replaces one file; it replaces two
 
@@ -21125,112 +20934,6 @@ measured 2026-10-31 by chain chain-animate-kaylee--avatars--wire-20261031-225330
 probe-key: ccd077ad78d46d98727cf1bc930621d5c8328f2b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/companion-types.ts
-
-## INV-10594 — probe — MEDIUM — a laugh or gasp on the top of a breath shows ground at the disc's bottom rim, up to 0.7 px at DPR 1; the phase's own goal ("never shows the disc's rim") does not hold in pixels, and his page cannot see it
-
-MEDIUM — a laugh or gasp on the top of a breath shows ground at the disc's bottom rim, up to 0.7 px at DPR 1; the phase's own goal ("never shows the disc's rim") does not hold in pixels, and his page cannot see it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'INNER'
-D="$1"
-cat > "$D/rim.mjs" <<'JS'
-// usage: node rimsweep.mjs <dpr> <clip>:<share> <size,size,...>   laugh:0.17 = the laugh's first peak, gasp:0.29 = the gasp's peak, laugh:0 = the clip at rest (control)
-// Her hair canvas painted flat black over a green ground, the portrait unclipped, every animation paused at the worst instant
-// (breath 38%, laugh `lift-share`, sway 50% — each shifted by its own delay): the painted extent down the centre column, in device px,
-// against the disc's box. A negative margin is ground showing at the rim.
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
-import { mountStage } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mouth-page-stage.mjs';
-import { unmountReactHost } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs';
-
-const DPR = Number(process.argv[2]); const [CLIP, SHARE] = process.argv[3].split(':'); const ALL = process.argv[4].split(',').map(Number);
-const batches = []; { let cur = [], w = 48; for (const n of ALL) { if (w + n + 28 > 1380) { batches.push(cur); cur = []; w = 48; } cur.push(n); w += n + 28; } batches.push(cur); }
-const AT = { 'kaylee-breath': 0.38, [`kaylee-${CLIP}`]: Number(SHARE), 'kaylee-sway': 0.5 };
-const first = await openConsole({}); const faceId = (await first.api('/api/companion')).body?.face?.id; await first.browser.close();
-const { page, browser } = await openConsole({ contextOptions: { deviceScaleFactor: DPR } });
-const rows = [];
-try {
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await reloadApp(page);
-  await page.waitForSelector('[data-companion-fab] .kaylee-portrait[data-frame]', { timeout: 60_000 });
-  let bi = 0;
-  for (const sizes of batches) {
-    const host = `rim-host-${bi++}`;
-    await mountStage(page, { hostId: host, faceId, sizes, spec: { text: '', mood: '', sounds: [], pieces: [], announcedAtS: 0, pcm: '' } });
-    await page.waitForFunction(({ id, n }) => document.querySelectorAll(`#${id} .kaylee-portrait[data-frame]`).length === n, { id: host, n: sizes.length });
-    await page.waitForTimeout(1200);
-    await page.evaluate(({ at, host, clip }) => {
-      document.getElementById(host).style.background = '#00ff00';
-      document.querySelectorAll('[data-avatar]').forEach((s) => { s.style.background = '#00ff00'; s.style.boxShadow = 'none'; });
-      document.querySelectorAll('.kaylee-portrait').forEach((p) => {
-        p.style.overflow = 'visible'; p.style.borderRadius = '0'; p.style.animation = 'none';
-        p.querySelector('.kaylee-portrait__layer--face').style.display = 'none';
-        const c = p.querySelector('.kaylee-portrait__layer--hair canvas'); const x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height);
-        p.setAttribute('data-motion', clip);
-        for (const a of p.getAnimations({ subtree: true })) {
-          const share = at[a.animationName]; if (share === undefined) continue;
-          const t = a.effect.getTiming(); a.pause(); a.currentTime = t.delay + share * t.duration;
-        }
-      });
-    }, { at: AT, host, clip: CLIP });
-    await page.waitForTimeout(300);
-    for (const size of sizes) {
-      const box = await page.locator(`[data-avatar="s${size}"]`).evaluate((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
-      const pad = 12;
-      const png = (await page.screenshot({ clip: { x: box.x - pad, y: box.y - pad, width: box.w + 2 * pad, height: box.h + 2 * pad } })).toString('base64');
-      rows.push([size, await page.evaluate(async ({ png, pad, box, dpr }) => {
-        const bmp = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
-        const c = new OffscreenCanvas(bmp.width, bmp.height); const x = c.getContext('2d'); x.drawImage(bmp, 0, 0);
-        const d = x.getImageData(0, 0, bmp.width, bmp.height).data; const cx = Math.round(bmp.width / 2);
-        const col = []; for (let py = 0; py < bmp.height; py++) col.push(1 - d[(py * bmp.width + cx) * 4 + 1] / 255);
-        const f = col.findIndex((v) => v > 0.02); const l = col.length - 1 - [...col].reverse().findIndex((v) => v > 0.02);
-        return { top: pad * dpr - (f + (1 - col[f])), bottom: (l + col[l]) - (pad + box.h) * dpr };
-      }, { png, pad, box, dpr: DPR })]);
-    }
-    await unmountReactHost(page, host);
-  }
-} finally { await browser.close(); }
-const worst = rows.map(([s, m]) => [s, Math.min(m.top, m.bottom)]).sort((a, b) => a[1] - b[1]);
-console.log(`dpr ${DPR} ${CLIP} at ${SHARE}: ${rows.length} sizes; margins in device px (negative = ground showing at the rim)`);
-console.log('worst 6:', worst.slice(0, 6).map(([n, v]) => `${n}px ${v.toFixed(2)}`).join('  '));
-console.log('exposed deeper than 0.25 px:', worst.filter(([, v]) => v < -0.25).map(([n, v]) => `${n}px ${v.toFixed(2)}`).join('  ') || 'none');
-JS
-node "$D/rim.mjs" 1 laugh:0.17 55,91,115,190,289,424 2>&1 | tail -3 | cut -c1-260
-INNER
-bash "$D/p.sh" "$D"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: 91px −0.70, 190px −0.64, 55px −0.63, 424px −0.58 and 289px −0.58 are listed as "exposed deeper than 0.25 px" while 115px prints +0.59; cured when that line reads `none` (DPR 1, `laugh:0.17`)
-```
-
-measured 2026-11-01 by chain chain-animate-kaylee--breath-and-head--breath-20261031-225331-8646, finding M1, MEDIUM
-probe-key: ccdadef9fdba8f632449e8d77b9f072a2a8ec20d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-breath-page.mjs
-
-## INV-10595 — probe — LOW — his page cannot fail on the breath's shape: a breath that peaks at 50% instead of 38% passes `ALL PASS`
-
-LOW — his page cannot fail on the breath's shape: a breath that peaks at 50% instead of 38% passes `ALL PASS`
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'INNER'
-D="$1"; V=/home/lyphe/.claude/claudecodeui_lyphe/.verify
-sed -e "s#from './lib/#from '$V/lib/#" -e "s#new URL('./#new URL('file://$V/#" \
-  -e "s#^  await page.waitForSelector('\[data-companion-fab\]#  await page.addStyleTag({ content: '@keyframes kaylee-breath { 0%,100% { scale: 1; translate: 0 0; } 50% { scale: 1.006; translate: 0 -0.6%; } }' });\n&#" \
-  "$V/kaylee-breath-page.mjs" > "$D/mut.mjs"
-echo "injected lines: $(grep -c 'addStyleTag' "$D/mut.mjs")"
-node "$D/mut.mjs" 2>&1 | tail -1
-INNER
-bash "$D/p.sh" "$D"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: `injected lines: 1` then `ALL PASS` although the breath's peak now sits at 50%; cured when the page reads the breath's keyframes and prints FAIL
-```
-
-measured 2026-11-01 by chain chain-animate-kaylee--breath-and-head--breath-20261031-225331-8646, finding L1, LOW
-probe-key: 0b4281d424b766c7ab6db0b724032b8530fe5f68
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-breath-page.mjs
 
 ## INV-10596 — probe — LOW — the page reads three fixture files and ships 351 KB of PCM into the page for a sentence it never plays
 

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import { companionProviderOf } from '@/shared/companion-provider.js';
-import type { CompanionProcess } from '@/shared/companion-types.js';
+import type { CompanionContext, CompanionProcess } from '@/shared/companion-types.js';
 import type { ClaudeImageBlock } from '@/shared/image-attachments.js';
 
 import type { UnansweredMessage } from '../companion-unanswered.js';
@@ -514,6 +514,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     conversationId: () => deps.readProviderSession()?.id ?? null,
     say: onSystemLine,
     readSettings: deps.readSettings,
+    counted: guarded('context count', userId, (context: CompanionContext) => deps.onContext?.(context)),
   });
 
   /** A wake waits behind the handover being written: `condition` says she is waking; when nothing is left parked and no launch came of it she is asleep again. */

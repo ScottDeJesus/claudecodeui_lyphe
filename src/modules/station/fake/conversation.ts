@@ -139,7 +139,7 @@ export const picture = (change: Partial<CompanionPicture>): CompanionPicture => 
     { value: 'deepseek', label: 'DeepSeek' },
   ],
   process: { state: 'awake', error: null }, activity: IDLE, turnId: null, focus: null, draft: null, pending: null, walk: null,
-  notes: [], log: [], work: [], floor: 'fixture-station', face: { id: null, avatar: 'original', avatars: [] }, ...change,
+  notes: [], log: [], work: [], floor: 'fixture-station', face: { id: null, avatar: 'original', avatars: [] }, context: null, ...change,
 });
 
 /** Her picture in each of the station's four: what her head, her conversation and her talk control are drawn from. */

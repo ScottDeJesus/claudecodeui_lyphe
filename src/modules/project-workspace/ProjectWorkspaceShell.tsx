@@ -6,7 +6,9 @@ import { AppSwitcherProvider } from '@/modules/app-switcher';
 import { ChatHostProvider } from '@/modules/chat-host';
 import { useProjectChatState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import CompanionHost from '@/modules/project-workspace/CompanionHost';
+import { PlacesProvider } from '@/modules/project-workspace/context/PlacesContext';
 import { WorkspaceHomeLayer } from '@/modules/project-workspace/home/WorkspaceHomeLayer';
+import { HeadBackProvider } from '@/shared/context/HeadBackContext';
 import { PageAnchorsProvider } from '@/shared/context/PageAnchorsContext';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import WorkspaceFrame from '@/modules/project-workspace/WorkspaceFrame';
@@ -36,10 +38,16 @@ function ProjectWorkspaceShell({
           <AccountsProvider>
             {/* Kaylee's one picture, above her door, her panel and the palette's row. She knows nothing of routes: the chat she opens is this module's to bring forward. */}
             <CompanionHost navigate={navigate}>
-              <WorkspaceFrame isMobile={isMobile} ws={ws} sendMessage={sendMessage} navigate={navigate} />
-              {stationLayer}
-              {/* The sessions home, the workspace's own second page: his chats by folder, drawn over the frame while the router stands at `/home`. */}
-              <WorkspaceHomeLayer />
+              {/* The navigation, one for every page: the wheel of places, the trail a held back arrow opens, the palette's places. */}
+              <PlacesProvider>
+                {/* One way back per screen: a page inside a screen claims the screen head's back arrow (`ScreenHead`) while it stands. */}
+                <HeadBackProvider>
+                  <WorkspaceFrame isMobile={isMobile} ws={ws} sendMessage={sendMessage} navigate={navigate} />
+                  {stationLayer}
+                  {/* The sessions home, the workspace's own second page: his chats by folder, drawn over the frame while the router stands at `/home`. */}
+                  <WorkspaceHomeLayer />
+                </HeadBackProvider>
+              </PlacesProvider>
             </CompanionHost>
             {/* The account switcher, one for the workspace: an account ring on any page, or the rail's account button, opens it. */}
             <AccountSwitcher />
