@@ -1,8 +1,7 @@
 import { RotateCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { IconWord } from '@/modules/cerberus/IconWord';
-import { Banner, Button } from '@/shared/ui';
+import { Banner, Button, IconWord } from '@/shared/ui';
 
 /**
  * "Cerberus can't be reached" with Try again: what a card draws where its read of center did not

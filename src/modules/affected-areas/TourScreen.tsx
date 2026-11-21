@@ -11,7 +11,7 @@ import { TourRooms } from '@/modules/affected-areas/TourRooms';
 import { addressBesideName, tourFacts, tourName } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Face, TourDetail, TourSummary } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, DayOneSection, TourReaderProgress } from '@/shared/types';
-import { Button } from '@/shared/ui';
+import { Button, IconWord, Rule } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
 
 type TourScreenProps = {
@@ -42,7 +42,6 @@ type TourScreenProps = {
   onRetry: () => void;
 };
 
-const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
 
 /** Verve's waiting surface in the shape of the card and the gallery, while the detail is read. */
 function ReadingBody() {
@@ -85,9 +84,8 @@ export function TourScreen({
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button variant="ghost" size="sm" className="-ml-3 max-md:h-11" onClick={onBack} {...WAY_BACK}>
-            <ChevronLeft aria-hidden="true" />
-            {t('affectedAreas.tour.back')}
+          <Button variant="ghost" size="sm" className="-ml-3 finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.tour.back')} title={t('affectedAreas.tour.back')} onClick={onBack} {...WAY_BACK}>
+            <IconWord icon={ChevronLeft} word={t('affectedAreas.tour.back')} />
           </Button>
           {tour === null ? (
             <div aria-hidden="true" className="flex w-full flex-col gap-2 pt-1">
@@ -123,9 +121,7 @@ export function TourScreen({
               the tour too, and siblings may not share a key: so this one names itself. */}
           <DayOneSketch key={`day-one-${detail.tour.tourId}`} {...dayOne} codebook={codebook} onOpenPanoAt={onOpenPanoAt} onOpenPano={onOpenPano} />
           <section aria-labelledby={panosHeadingId} className="flex min-w-0 flex-col gap-3">
-            <h3 id={panosHeadingId} className={EYEBROW}>
-              {t('affectedAreas.tour.panosTitle')} · {detail.panos.length}
-            </h3>
+            <Rule id={panosHeadingId} end={String(detail.panos.length)}>{t('affectedAreas.tour.panosTitle')}</Rule>
             <RoomGallery
               key={detail.tour.tourId}
               panos={detail.panos}

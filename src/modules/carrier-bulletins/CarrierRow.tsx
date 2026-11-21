@@ -43,7 +43,7 @@ export function CarrierRow({ row, index, onOpen }: CarrierRowProps) {
         type="button"
         onClick={() => onOpen(row.bulletin_id)}
         style={{ animationDelay: `${Math.min(index, STAGGER_ROWS) * STAGGER_MS}ms` }}
-        className="flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-background focus-visible:[outline-offset:-2px] motion-safe:animate-[vv-rise_.4s_theme(transitionTimingFunction.enter)_both]"
+        className="flex w-full items-start gap-3 px-1 py-3.5 text-left hover:bg-muted focus-visible:[outline-offset:-2px] motion-safe:animate-[vv-rise_.4s_theme(transitionTimingFunction.enter)_both]"
       >
         <span className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">

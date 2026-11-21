@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -5,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { isThin, lineWords, sameLine } from '@/modules/affected-areas/utils/provingModel';
 import type { ProvingClass } from '@/shared/affected-areas-types';
 import { AFFECTED_AREAS_LANE_FAULTS } from '@/shared/constants';
-import { Banner, Button, Stepper } from '@/shared/ui';
+import { Banner, Button, IconWord, Rule, Stepper } from '@/shared/ui';
 
 type ThresholdControlProps = {
   /** The open kind, its line in force among its fields. */
@@ -58,7 +59,7 @@ export function ThresholdControl({ kind, line, pressing, refusal, onStep, onSetT
 
   return (
     <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2.5">
-      <h3 id={headingId} className="text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.tables.control.title')}</h3>
+      <Rule id={headingId}>{t('affectedAreas.tables.control.title')}</Rule>
       {refusal !== null && (
         <div role="alert">
           <Banner tone="warn">
@@ -78,8 +79,16 @@ export function ThresholdControl({ kind, line, pressing, refusal, onStep, onSetT
           increaseLabel={t('affectedAreas.tables.control.raise')}
           ariaLabel={t('affectedAreas.tables.control.label', { kind: kind.label })}
         />
-        <Button size="sm" className="max-md:h-11" busy={pressing} aria-disabled={!offered || undefined} onClick={onSetThreshold}>
-          {pressing ? t('affectedAreas.tables.control.setting') : t('affectedAreas.tables.setThreshold')}
+        <Button
+          size="sm"
+          className="finger:size-11 finger:px-0 max-md:h-11"
+          busy={pressing}
+          aria-disabled={!offered || undefined}
+          aria-label={pressing ? t('affectedAreas.tables.control.setting') : t('affectedAreas.tables.setThreshold')}
+          title={pressing ? t('affectedAreas.tables.control.setting') : t('affectedAreas.tables.setThreshold')}
+          onClick={onSetThreshold}
+        >
+          <IconWord icon={Check} word={pressing ? t('affectedAreas.tables.control.setting') : t('affectedAreas.tables.setThreshold')} />
         </Button>
       </div>
       {isThin(kind) && <p className="text-[12.5px] text-foreground">{t('affectedAreas.tables.control.thin')}</p>}

@@ -7,8 +7,8 @@ type RuleProps = {
   children: ReactNode;
   /** The heading's id, for the section it heads to be labelled by. */
   id?: string;
-  /** Its heading level: 3 for a section, 4 for a group inside one. */
-  level?: 3 | 4;
+  /** Its heading level: 3 for a section, 4 for a group inside one; 2 for a section that is a view's first heading. */
+  level?: 2 | 3 | 4;
   /**
    * The heading, for a section that hands focus to it when the press that held focus is gone (a row moved away). Given, the heading
    * takes focus from script (`tabIndex` -1) and never from Tab.
@@ -30,7 +30,7 @@ type RuleProps = {
  * Openings, its check sheet and its History.
  */
 export function Rule({ children, id, level = 3, headingRef, end, endTone, className }: RuleProps) {
-  const Heading = level === 4 ? 'h4' : 'h3';
+  const Heading = level === 4 ? 'h4' : level === 2 ? 'h2' : 'h3';
   return (
     <div className={cn('ast-hrule', className)}>
       <Heading ref={headingRef} id={id} tabIndex={headingRef === undefined ? undefined : -1} className="ast-hrule-label">

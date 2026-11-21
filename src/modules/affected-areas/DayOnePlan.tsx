@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import { Maximize2 } from 'lucide-react';
+import { Maximize2, RotateCw } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,7 +7,7 @@ import { feet, inches, numberedItems } from '@/modules/affected-areas/utils/dayO
 import { listWords, roomWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, DayOneFloor, Face, ScaleLine } from '@/shared/affected-areas-types';
 import type { Tone } from '@/shared/types';
-import { Button, Lightbox, RegionImage } from '@/shared/ui';
+import { Button, IconWord, Lightbox, RegionImage } from '@/shared/ui';
 
 type DayOnePlanProps = {
   /** The floor shown: its rooms, spots, areas, fixtures, contents, scale and pins, every position in 0..1 of its drawing. */
@@ -159,8 +159,8 @@ export function DayOnePlan({ floor, drawing, codebook, onOpenPanoAt, onOpenPano,
       {picture === null && (
         <div role="status" data-day-one-failed="" className="flex flex-col items-center justify-center gap-3 bg-card p-6 text-center ring-1 ring-border" style={box}>
           <p className="max-w-[36ch] text-[12.5px] text-muted-foreground">{t('affectedAreas.dayOne.plan.drawingFailed')}</p>
-          <Button variant="outline" size="sm" className="max-md:h-11" onClick={onRetryDrawing}>
-            {t('affectedAreas.trouble.retry')}
+          <Button variant="outline" size="sm" className="finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.trouble.retry')} title={t('affectedAreas.trouble.retry')} onClick={onRetryDrawing}>
+            <IconWord icon={RotateCw} word={t('affectedAreas.trouble.retry')} />
           </Button>
         </div>
       )}
@@ -195,9 +195,8 @@ export function DayOnePlan({ floor, drawing, codebook, onOpenPanoAt, onOpenPano,
           )}
         </ul>
         {typeof picture === 'string' && (
-          <Button variant="ghost" size="sm" className="flex-none max-md:h-11" onClick={() => setEnlarged(true)}>
-            <Maximize2 aria-hidden="true" />
-            {t('affectedAreas.pano.enlarge')}
+          <Button variant="ghost" size="sm" className="flex-none finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.pano.enlarge')} title={t('affectedAreas.pano.enlarge')} onClick={() => setEnlarged(true)}>
+            <IconWord icon={Maximize2} word={t('affectedAreas.pano.enlarge')} />
           </Button>
         )}
       </figcaption>

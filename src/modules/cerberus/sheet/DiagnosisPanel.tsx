@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useDiagnosis } from '@/modules/cerberus/hooks/useDiagnosis';
-import { IconWord } from '@/modules/cerberus/IconWord';
 import { FixOutput } from '@/modules/cerberus/sheet/FixOutput';
 import { MarkIcon } from '@/modules/cerberus/StatusMarks';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
@@ -13,7 +12,7 @@ import { RUN_LOOK } from '@/modules/cerberus/utils/cerberusStatus';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCatalogEntryView, CerberusDiagnosisStep, CerberusDiagnosisView, CerberusRunView } from '@/shared/cerberus-types';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { Badge, Button, CardFoldBody, Collapsible, CollapsibleTrigger, FoldChevron } from '@/shared/ui';
+import { Badge, Button, CardFoldBody, Collapsible, CollapsibleTrigger, FoldChevron, IconWord } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /** The card's frame and its eyebrows: Fix output's, so the two cards the sheet stacks read as one family. */

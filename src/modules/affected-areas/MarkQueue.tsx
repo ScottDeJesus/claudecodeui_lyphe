@@ -9,7 +9,7 @@ import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionL
 import { kindName, roomWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Queue, Region } from '@/shared/affected-areas-types';
 import type { MarkWalk, RegionShape } from '@/shared/types';
-import { Button, EmptyState, RegionImage, SegmentedControl, Select } from '@/shared/ui';
+import { Button, IconWord, RegionImage, SegmentedControl, Select } from '@/shared/ui';
 
 type QueueMode = Queue['mode'];
 
@@ -99,7 +99,15 @@ export function MarkQueue({ codebook, mode, kind, walk, photo, onMode, onKind, o
     const message = kind !== ''
       ? t('affectedAreas.mark.emptyKind', { kind: lowerFirst(kindName(kind, codebook)) })
       : t(mode === 'unsure' ? 'affectedAreas.mark.emptyUnsure' : 'affectedAreas.mark.emptyRandom');
-    body = <EmptyState icon={CheckCheck} title={t('affectedAreas.mark.emptyTitle')} message={message} />;
+    body = (
+      <p className="m-0 flex max-w-[760px] items-start gap-2.5 border-t border-border pt-4 text-[13.5px] text-muted-foreground" data-mark-queue-empty>
+        <CheckCheck aria-hidden="true" className="mt-0.5 size-4 flex-none" />
+        <span>
+          <span className="block text-foreground">{t('affectedAreas.mark.emptyTitle')}</span>
+          {message}
+        </span>
+      </p>
+    );
   } else {
     const region = item.region;
     const faceName = t(`affectedAreas.faces.${item.view.face}`);
@@ -158,9 +166,17 @@ export function MarkQueue({ codebook, mode, kind, walk, photo, onMode, onKind, o
         <section aria-labelledby={questionId} className="flex min-w-0 flex-col gap-3 [@container(min-width:720px)]:col-start-2 [@container(min-width:720px)]:row-start-3">
           <MarkBar key={region.regionId} region={region} codebook={codebook} queue={mode} onMarked={onMarked} />
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" className="max-md:h-11" aria-keyshortcuts="S" data-mark-press="skip" onClick={onSkip}>
-              <SkipForward aria-hidden="true" />
-              {t('affectedAreas.mark.skip')}
+            <Button
+              variant="outline"
+              size="sm"
+              className="finger:size-11 finger:px-0 max-md:h-11"
+              aria-keyshortcuts="S"
+              aria-label={t('affectedAreas.mark.skip')}
+              title={t('affectedAreas.mark.skip')}
+              data-mark-press="skip"
+              onClick={onSkip}
+            >
+              <IconWord icon={SkipForward} word={t('affectedAreas.mark.skip')} />
               <KeyCap letter="S" />
             </Button>
           </div>

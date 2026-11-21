@@ -7,8 +7,7 @@ import { AutoDiagnosisSwitch } from '@/modules/cerberus/sheet/AutoDiagnosisSwitc
 import { StatusPill } from '@/modules/cerberus/StatusMarks';
 import { hm, hms, stretchKey } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
-import { Badge, Button } from '@/shared/ui';
-import { IconWord } from '@/modules/cerberus/IconWord';
+import { Badge, Button, IconWord } from '@/shared/ui';
 
 type SelectedCheckProps = {
   check: CerberusCheckView;

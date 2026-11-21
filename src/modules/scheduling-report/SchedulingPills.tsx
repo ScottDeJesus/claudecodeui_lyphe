@@ -74,7 +74,8 @@ export function SchedulingPills({ tally, truncated, now, canGo, activePill, onSe
   ];
 
   return (
-    <PillBar className="w-full flex-wrap" role="group" aria-label={t(`${p}.label`)} data-scheduling-pills>
+    // No tray of its own: the pills stand between two hairlines on the view's ground.
+    <PillBar className="w-full flex-wrap rounded-none border-y border-border bg-transparent px-0 py-1" role="group" aria-label={t(`${p}.label`)} data-scheduling-pills>
       {pills.map((pill) => (
         <Pill
           key={pill.key}

@@ -1,10 +1,11 @@
+import { ChevronsUpIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useFollowNewest } from '@/modules/upload-runs/hooks/useFollowNewest';
 import { eventLines } from '@/modules/upload-runs/utils/uploadsWords';
 import type { UploadRunEvent } from '@/shared/upload-runs-types';
-import { Badge, Button, Timeline } from '@/shared/ui';
+import { Badge, Button, IconWord, Timeline } from '@/shared/ui';
 
 type RunEventsProps = {
   /** The page of events on screen, in order. */
@@ -64,8 +65,8 @@ export function RunEvents({ events, total, hasEarlier, live, imported, onShowEar
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
         <span>{hasEarlier ? t(`${e}.showing`, { shown: events.length.toLocaleString(), total: total.toLocaleString() }) : t(`${e}.count`, { count: Math.max(total, events.length) })}</span>
         {hasEarlier && (
-          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs finger:h-11" onClick={onShowEarlier} data-uploads-show-earlier="head">
-            {t(`${e}.showEarlier`)}
+          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs finger:size-11 finger:px-0" aria-label={t(`${e}.showEarlier`)} title={t(`${e}.showEarlier`)} onClick={onShowEarlier} data-uploads-show-earlier="head">
+            <IconWord icon={ChevronsUpIcon} word={t(`${e}.showEarlier`)} />
           </Button>
         )}
         {live && <Badge as="span" tone="info">{t(`${e}.following`)}</Badge>}
@@ -73,10 +74,10 @@ export function RunEvents({ events, total, hasEarlier, live, imported, onShowEar
       {imported && <p className="m-0 text-xs leading-relaxed text-muted-foreground">{t(`${e}.importedNote`)}</p>}
 
       {events.length === 0 ? (
-        <p className="m-0 rounded-lg border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">{t(live ? `${e}.noneYet` : `${e}.none`)}</p>
+        <p className="m-0 text-[13px] text-muted-foreground">{t(live ? `${e}.noneYet` : `${e}.none`)}</p>
       ) : (
         <div
-          className="flex max-h-[min(30rem,60vh)] min-w-0 flex-col-reverse overflow-y-auto rounded-lg border border-border px-3 py-1 [overflow-anchor:none]"
+          className="flex max-h-[min(30rem,60vh)] min-w-0 flex-col-reverse overflow-y-auto border-y border-border py-1 [overflow-anchor:none]"
           tabIndex={0}
           role="log"
           aria-label={t(`${e}.label`)}
@@ -88,8 +89,8 @@ export function RunEvents({ events, total, hasEarlier, live, imported, onShowEar
           <div className="min-w-0">
             {hasEarlier && (
               <div className="flex justify-center py-2">
-                <Button variant="outline" size="sm" className="h-8 max-md:h-11" onClick={onShowEarlier} data-uploads-show-earlier="pane">
-                  {t(`${e}.showEarlier`)}
+                <Button variant="outline" size="sm" className="h-8 finger:size-11 finger:px-0 max-md:h-11" aria-label={t(`${e}.showEarlier`)} title={t(`${e}.showEarlier`)} onClick={onShowEarlier} data-uploads-show-earlier="pane">
+                  <IconWord icon={ChevronsUpIcon} word={t(`${e}.showEarlier`)} />
                 </Button>
               </div>
             )}

@@ -5,7 +5,7 @@ import { RunList } from '@/modules/upload-runs/RunList';
 import { UploadTypeList } from '@/modules/upload-runs/UploadTypeList';
 import type { UploadsFilters, UploadsRead } from '@/modules/upload-runs/utils/uploadsModel';
 import type { UploadRunsOverview } from '@/shared/upload-runs-types';
-import { Badge, HowOften } from '@/shared/ui';
+import { HowOften, Rule } from '@/shared/ui';
 
 type UploadsBodyProps = {
   /** The window as the server answered it. */
@@ -30,8 +30,8 @@ type UploadsBodyProps = {
  * is one column in the same order, types, how often, runs, which is the order a phone reads them in. The columns flow in
  * the tab's own scroll; nothing here scrolls inside itself.
  *
- * Each section is addressable by id, so a pill can carry the reader to it, and is headed by the tab's eyebrow with a
- * short hint of how to read it.
+ * Each section is addressable by id, so a pill can carry the reader to it, and is headed by its Rule, with what it counts
+ * at the line's end.
  *
  * THE RUNS BADGE IS THE LIST'S OWN NUMBER. Hiccups only is applied here, once, and the same runs are counted for the
  * badge and handed to the list, so the badge never says 31 over ten rows. Uploads are counted apart from test runs
@@ -54,29 +54,25 @@ export function UploadsBody({ overview, read, filters, now, onFilter, onOpenRun,
       data-uploads-body
     >
       <div className="flex min-w-0 flex-col gap-7" data-uploads-column="left">
-        <UploadsSection id="uploads-types" title={t(`${s}.types`)} hint={t(`${s}.typesHint`)}>
+        <UploadsSection id="uploads-types" title={t(`${s}.types`)}>
           <UploadTypeList types={overview.types} runs={overview.runs} regression={read.regression} friction={read.friction} frictionFailed={read.frictionFailed} now={now} onOpenRun={onOpenRun} />
         </UploadsSection>
-        <UploadsSection id="uploads-often" title={t(`${s}.often`)} hint={t(`${s}.oftenHint`)}>
+        <UploadsSection id="uploads-often" title={t(`${s}.often`)}>
           <HowOften days={read.days} hours={read.hours} words="cerberus.uploads.often" />
         </UploadsSection>
       </div>
-      <UploadsSection id="uploads-runs" title={t(`${s}.runs`)} hint={t(`${s}.runsHint`)} badge={badge}>
+      <UploadsSection id="uploads-runs" title={t(`${s}.runs`)} badge={badge}>
         <RunList overview={overview} runs={listed} filters={filters} friction={read.friction} frictionFailed={read.frictionFailed} now={now} onFilter={onFilter} onOpenRun={onOpenRun} onRetry={onRetry} />
       </UploadsSection>
     </div>
   );
 }
 
-/** A titled block of the body, addressable by id so a pill can carry the reader to it. Its hint is set apart by space, with no dot of its own: when it wraps under the title, no stray mark leads its line. */
-function UploadsSection({ id, title, hint, badge, children }: { id: string; title: string; hint: string; badge?: string; children: ReactNode }) {
+/** A titled block of the body, addressable by id so a pill can carry the reader to it: its Rule, with what it counts at the line's end. */
+function UploadsSection({ id, title, badge, children }: { id: string; title: string; badge?: string; children: ReactNode }) {
   return (
     <section id={id} aria-labelledby={`${id}-title`} className="flex min-w-0 scroll-mt-4 flex-col gap-3" data-uploads-section={id}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 id={`${id}-title`} className="text-xs font-normal uppercase tracking-[0.14em] text-muted-foreground">{title}</h3>
-        {badge !== undefined && <Badge as="span" tone="neutral">{badge}</Badge>}
-        <span className="text-xs text-muted-foreground">{hint}</span>
-      </div>
+      <Rule id={`${id}-title`} end={badge}>{title}</Rule>
       {children}
     </section>
   );

@@ -1,8 +1,9 @@
+import { Check, X } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { MARK_NOTE_MAX } from '@/shared/constants';
-import { Button, DialogFrame, TextArea } from '@/shared/ui';
+import { Button, DialogFrame, IconWord, TextArea } from '@/shared/ui';
 
 type NoteDialogProps = {
   /** What the note is on, after the title: "2. Containment", "New area 4". */
@@ -57,11 +58,11 @@ export function NoteDialog({ subject, note, onKeep, onDismiss }: NoteDialogProps
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-3">
-          <Button type="button" variant="outline" className="max-md:h-11" onClick={onDismiss}>
-            {t('buttons.cancel')}
+          <Button type="button" variant="outline" className="finger:size-11 finger:px-0 max-md:h-11" aria-label={t('buttons.cancel')} title={t('buttons.cancel')} onClick={onDismiss}>
+            <IconWord icon={X} word={t('buttons.cancel')} />
           </Button>
-          <Button type="submit" className="max-md:h-11">
-            {t('affectedAreas.mark.keepNote')}
+          <Button type="submit" className="finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.mark.keepNote')} title={t('affectedAreas.mark.keepNote')}>
+            <IconWord icon={Check} word={t('affectedAreas.mark.keepNote')} />
           </Button>
         </div>
       </form>

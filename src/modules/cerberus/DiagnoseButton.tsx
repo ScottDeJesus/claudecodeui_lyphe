@@ -3,8 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
-import { IconWord } from '@/modules/cerberus/IconWord';
-import { Button } from '@/shared/ui';
+import { Button, IconWord } from '@/shared/ui';
 
 type DiagnoseButtonProps = {
   /** The node the check runs on, and the check's key (`<service>/<id>`): what the diagnosis is asked about. */

@@ -10,13 +10,12 @@ import { ServiceRow } from '@/modules/cerberus/fleet/ServiceRow';
 import { UpdatingPill } from '@/modules/cerberus/fleet/UpdatingPill';
 import { useClock } from '@/modules/cerberus/hooks/useClock';
 import { useLeavingNeeds } from '@/modules/cerberus/hooks/useLeavingNeeds';
-import { IconWord } from '@/modules/cerberus/IconWord';
 import { markLook, nodeMark } from '@/modules/cerberus/utils/cerberusStatus';
 import { hm } from '@/modules/cerberus/utils/cerberusTime';
 import { isRestarting, muteTimeLeft, nodeLine, sessionsTail, wardenLine } from '@/modules/cerberus/utils/fleetWords';
 import type { CerberusCheckView, CerberusNodeView, CerberusOverview } from '@/shared/cerberus-types';
 import type { CerberusSheetTarget, FleetItem } from '@/shared/types';
-import { Button, Rule } from '@/shared/ui';
+import { Button, IconWord, Rule } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type NodeOpeningProps = {

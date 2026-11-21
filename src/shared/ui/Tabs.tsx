@@ -33,12 +33,16 @@ export type TabItem = {
    * its hover title): a strip of many tabs folds to its marks where the room is short.
    */
   icon?: ComponentType<{ className?: string }>;
+  /** What the tab holds, in a few words: never drawn on the strip, only in its hover title after its label (`<label> · <hint>`). */
+  hint?: string;
 };
 
 /**
  * A tab's hover title. A tab carrying attention titles itself `<label> (<count>) · <attention>`:
  * the amber is a colour and the sentence is the point, so the sentence travels with the count in
  * words.
+ *
+ * A tab with a hint titles itself `<label> · <hint>`: what it holds, said where only a pointer asks.
  *
  * A tab without attention draws its own label and needs no title for it, except an `equal`-share
  * tab, which keeps the full label there since its slice of the row may have cut the word short.
@@ -49,6 +53,7 @@ function tabTitle(tab: TabItem, hasCount: boolean, equal: boolean): string | und
     const withCount = hasCount ? `${tab.label} (${tab.count})` : tab.label;
     return `${withCount} · ${tab.attention}`;
   }
+  if (tab.hint !== undefined) return `${tab.label} · ${tab.hint}`;
   return equal || tab.icon !== undefined ? tab.label : undefined;
 }
 

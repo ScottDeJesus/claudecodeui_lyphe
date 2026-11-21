@@ -4,9 +4,8 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
-import { IconWord } from '@/modules/cerberus/IconWord';
 import type { CerberusCatalogEntryView, CerberusRunView } from '@/shared/cerberus-types';
-import { Button, Rule } from '@/shared/ui';
+import { Button, IconWord, Rule } from '@/shared/ui';
 
 /** What an entry does on its own, as the sheet says it: its capped reason, "Runs on its own · at most 2 runs an hour", or "Offered · you press it". */
 function autoLine(t: TFunction, { capped, auto, limit }: CerberusCatalogEntryView): string {

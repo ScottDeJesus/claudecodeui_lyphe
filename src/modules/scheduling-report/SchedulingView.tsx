@@ -12,7 +12,7 @@ import { SchedulingPills } from '@/modules/scheduling-report/SchedulingPills';
 import { TroubleBanner } from '@/modules/scheduling-report/TroubleBanner';
 import type { SchedulingFilters, SchedulingPillKey, SchedulingTally, SchedulingWindow } from '@/modules/scheduling-report/utils/schedulingModel';
 import { agoWord, wasUndone } from '@/modules/scheduling-report/utils/schedulingWords';
-import { EmptyState } from '@/shared/ui';
+import { Button, IconWord } from '@/shared/ui';
 
 type SchedulingViewProps = {
   /** Whether the Cerberus tab is showing this view. The tab keeps it mounted while hidden: hidden, it reads nothing and raises no sheet. */
@@ -116,7 +116,6 @@ export function SchedulingView({ shown }: SchedulingViewProps) {
   if (overview === null) {
     return (
       <div className="flex min-w-0 max-w-[1180px] flex-col gap-5 px-[clamp(16px,4cqi,32px)] pb-7 pt-5" data-scheduling-view={read.phase}>
-        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{t('cerberus.scheduling.head.eyebrow')}</p>
         {read.phase === 'trouble' ? (
           // STATE: THE FIRST READ FAILED. There is no answer to show, so the view is its own banner: the lane's sentence and
           // Try again. Warn, not danger: nothing was refused, Restorly's server did not answer, and the next read may.
@@ -191,15 +190,24 @@ export function SchedulingView({ shown }: SchedulingViewProps) {
           // under it: the list that carries that chip is not drawn here, and a window whose only entries are a machine's
           // would otherwise hold entries no press could show. What it says of machine calls is of the answer in hand, not of
           // the chip just pressed: until the read for the press lands, the answer is the one without them.
-          <div className="flex min-w-0 flex-col gap-3">
-            <EmptyState
-              icon={CalendarSearchIcon}
-              title={t('cerberus.scheduling.empty.title', { days })}
-              message={t(overview.filters.machines ? 'cerberus.scheduling.empty.messageMachines' : 'cerberus.scheduling.empty.message')}
-              actionLabel={wider === undefined ? undefined : t('cerberus.scheduling.empty.wider', { days: wider })}
-              onAction={wider === undefined ? undefined : () => onWindow(wider)}
-            />
-            <div className="flex min-w-0 flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+          <div className="flex min-w-0 flex-col items-start gap-3 border-t border-border pt-4" data-scheduling-empty>
+            <p className="m-0 max-w-xl text-[13.5px] text-muted-foreground">
+              <span className="block text-foreground">{t('cerberus.scheduling.empty.title', { days })}</span>
+              {t(overview.filters.machines ? 'cerberus.scheduling.empty.messageMachines' : 'cerberus.scheduling.empty.message')}
+            </p>
+            {wider !== undefined && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 finger:size-11 finger:px-0 max-md:h-11"
+                aria-label={t('cerberus.scheduling.empty.wider', { days: wider })}
+                title={t('cerberus.scheduling.empty.wider', { days: wider })}
+                onClick={() => onWindow(wider)}
+              >
+                <IconWord icon={CalendarSearchIcon} word={t('cerberus.scheduling.empty.wider', { days: wider })} />
+              </Button>
+            )}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
               <MachineCallsChip selected={filters.machines} onToggle={() => onFilter({ ...filters, machines: !filters.machines })} />
               <span>{t('cerberus.scheduling.sessions.machinesTitle')}</span>
             </div>

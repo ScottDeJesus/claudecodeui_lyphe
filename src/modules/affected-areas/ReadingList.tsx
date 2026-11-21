@@ -1,5 +1,3 @@
-import { Card } from '@/shared/ui';
-
 /**
  * Verve's waiting surface in the shape of a list of areas, while the pano's regions are read.
  *
@@ -7,7 +5,7 @@ import { Card } from '@/shared/ui';
  */
 export function ReadingList() {
   return (
-    <Card aria-hidden="true" className="flex flex-col gap-3 px-4 py-4">
+    <div aria-hidden="true" className="flex flex-col gap-3 border-y border-border py-4">
       {[0, 1, 2].map((row) => (
         <div key={row} className="flex items-start gap-3">
           <div className="vv-skeleton h-6 w-[26px] flex-none rounded-full" />
@@ -17,6 +15,6 @@ export function ReadingList() {
           </div>
         </div>
       ))}
-    </Card>
+    </div>
   );
 }

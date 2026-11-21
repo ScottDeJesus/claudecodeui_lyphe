@@ -11,9 +11,8 @@ import { RUN_LOOK } from '@/modules/cerberus/utils/cerberusStatus';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCatalogEntryView, CerberusNeed, CerberusRunView } from '@/shared/cerberus-types';
 import type { CerberusSheetTarget, Tone } from '@/shared/types';
-import { Button } from '@/shared/ui';
+import { Button, IconWord } from '@/shared/ui';
 import { cn } from '@/shared/utils';
-import { IconWord } from '@/modules/cerberus/IconWord';
 
 /**
  * The strip's tone, icon and first line. A going run is info and wears no icon: its words say it. An

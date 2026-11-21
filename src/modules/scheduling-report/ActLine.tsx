@@ -41,7 +41,7 @@ export function ActLine({ act, foreign = false }: ActLineProps) {
   ];
 
   return (
-    <li className="flex min-w-0 flex-col gap-1.5 px-3.5 py-3 text-[13px] leading-snug" data-scheduling-act={act.id} data-scheduling-outcome={act.outcome}>
+    <li className="flex min-w-0 flex-col gap-1.5 py-3 text-[13px] leading-snug" data-scheduling-act={act.id} data-scheduling-outcome={act.outcome}>
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="flex-none font-mono text-xs tabular-nums text-muted-foreground">{foreign ? dayClockWord(act.at) : clockWord(act.at, true)}</span>
         <span className="min-w-0 break-words font-medium text-foreground">{pressedWord(t, act)}</span>

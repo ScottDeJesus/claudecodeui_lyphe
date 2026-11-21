@@ -2428,7 +2428,9 @@
     "fleet": {
       "tabs": {
         "fleet": "Fleet",
-        "history": "History"
+        "fleetHint": "Machines on rings by state, the worst nearest the core",
+        "history": "History",
+        "historyHint": "Look up any check at any moment"
       },
       "filters": {
         "needs": "Needs you",
@@ -2634,6 +2636,7 @@
     },
     "catalog": {
       "tab": "Catalog",
+      "tabHint": "Fixes Cerberus can offer, or run on its own",
       "intro": "Each entry pairs a check with a fix. Cerberus offers it when the check fails. Entries set to run on their own do so within their limit, and every run's output is kept. Anything that reaches outside the fleet stays a step you take.",
       "count_one": "{{count}} entry · {{auto}} run on their own",
       "count_other": "{{count}} entries · {{auto}} run on their own",
@@ -2880,10 +2883,12 @@
       "liftsTomorrow": "Lifts on its own at {{time}} tomorrow"
     },
     "tours": {
-      "tab": "Tours"
+      "tab": "Tours",
+      "tabHint": "Affected areas on DocuSketch tours"
     },
     "bulletins": {
       "tab": "Bulletins",
+      "tabHint": "What Claude read in each carrier's SERVPRO bulletin",
       "refresh": "Refresh",
       "trouble": {
         "retry": "Try again",
@@ -3126,9 +3131,9 @@
     },
     "uploads": {
       "tab": "Uploads",
+      "tabHint": "What happens when someone uses the Uploads page",
       "loading": "Reading the upload runs…",
       "head": {
-        "eyebrow": "Upload runs",
         "running": "An upload is",
         "runningAccent": "running",
         "waiting": "An upload is",
@@ -3222,11 +3227,8 @@
       },
       "sections": {
         "types": "By upload type",
-        "typesHint": "clean and hiccup runs, and which way hiccups are heading",
         "often": "How often",
-        "oftenHint": "presses by day and by hour, in your own clock",
         "runs": "Runs",
-        "runsHint": "newest first; press one to open it",
         "runsWithTests_one": "{{uploads}} + {{count}} test",
         "runsWithTests_other": "{{uploads}} + {{count}} tests"
       },
@@ -3574,9 +3576,9 @@
     },
     "scheduling": {
       "tab": "Scheduling",
+      "tabHint": "What happens when someone schedules a visit in Restorly",
       "loading": "Reading the scheduling sessions…",
       "head": {
-        "eyebrow": "Scheduling in Restorly",
         "bumps_one": "One session",
         "bumps_other": "{{count}} sessions",
         "bumpsMore_one": "At least one session",
@@ -3627,13 +3629,9 @@
       },
       "sections": {
         "kinds": "By what was done",
-        "kindsHint": "clean and bumped sessions, and which way speed bumps are heading",
         "often": "How often",
-        "oftenHint": "sessions by day and by hour, in your own clock",
         "starts": "Where it starts",
-        "startsHint": "the door the Schedule-a-visit form was opened from",
         "sessions": "Sessions",
-        "sessionsHint": "newest first; press one to open it",
         "sessionsWithMachines_one": "{{sessions}} + {{count}} machine call",
         "sessionsWithMachines_other": "{{sessions}} + {{count}} machine calls"
       },

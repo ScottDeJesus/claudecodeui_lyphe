@@ -1,3 +1,4 @@
+import { RotateCwIcon } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,7 +12,7 @@ import { RunWalks } from '@/modules/upload-runs/RunWalks';
 import type { RunSheetRead } from '@/modules/upload-runs/utils/uploadsModel';
 import { verdictHeading } from '@/modules/upload-runs/utils/uploadsWords';
 import type { UploadRunSummary } from '@/shared/upload-runs-types';
-import { Banner, Button, Sheet } from '@/shared/ui';
+import { Banner, Button, IconWord, Rule, Sheet } from '@/shared/ui';
 
 type RunSheetProps = {
   /** The run as the overview listed it, so the head stands while the run's own read is out; null when the window no longer lists it. */
@@ -42,7 +43,7 @@ const SECTIONS = ['bumps', 'events', 'walks', 'after', 'friction'] as const;
  * friction).
  *
  * THE STATES. While the run's own read is out, the head already stands from the overview's row and the five sections
- * are drawn as their eyebrows over shimmering rows, so nothing moves when the answer lands. When that read failed, the
+ * are drawn as their Rules over shimmering rows, so nothing moves when the answer lands. When that read failed, the
  * lane's own sentence stands under the head with Try again, and no section is drawn empty in its place. READ-ONLY: the
  * sheet has no footer, since Cerberus starts, answers and stops nothing.
  *
@@ -65,14 +66,18 @@ export function RunSheet({ summary, sheet, walkStep, now, onClose, onShowEarlier
           <div role="alert">
             <Banner
               tone="warn"
-              action={<Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>{t('cerberus.uploads.trouble.retry')}</Button>}
+              action={(
+              <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.uploads.trouble.retry')} title={t('cerberus.uploads.trouble.retry')} onClick={onRetry}>
+                <IconWord icon={RotateCwIcon} word={t('cerberus.uploads.trouble.retry')} />
+              </Button>
+            )}
             >
               <p className="text-sm font-medium">{t(`${s}.trouble`)}</p>
               {sheet.trouble !== null && <p className="mt-0.5 text-xs">{sheet.trouble}</p>}
             </Banner>
           </div>
         ) : whole === null || run === null ? (
-          // The run's read is out: the five eyebrows over shimmering rows, shaped as what will land under each.
+          // The run's read is out: the five Rules over shimmering rows, shaped as what will land under each.
           <div aria-busy="true" className="flex flex-col gap-[22px]">
             {SECTIONS.map((section) => (
               <SheetSection key={section} title={t(`${s}.${section}.title`)}>
@@ -107,12 +112,12 @@ export function RunSheet({ summary, sheet, walkStep, now, onClose, onShowEarlier
   );
 }
 
-/** One of the sheet's sections: its eyebrow, then what it holds. */
+/** One of the sheet's sections: its Rule, then what it holds. */
 function SheetSection({ title, children }: { title: string; children: ReactNode }) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2.5">
-      <h3 id={headingId} className="m-0 text-xs font-normal uppercase tracking-[0.14em] text-muted-foreground">{title}</h3>
+      <Rule id={headingId}>{title}</Rule>
       {children}
     </section>
   );

@@ -11,7 +11,7 @@ import { TroubleBanner } from '@/modules/scheduling-report/TroubleBanner';
 import type { EntrySheetRead } from '@/modules/scheduling-report/utils/schedulingModel';
 import { verdictHeading } from '@/modules/scheduling-report/utils/schedulingWords';
 import type { SchedulingEntry } from '@/shared/scheduling-report-types';
-import { Sheet } from '@/shared/ui';
+import { Rule, Sheet } from '@/shared/ui';
 
 type EntrySheetProps = {
   /** The entry as the overview listed it, so the head stands while the entry's own read is out; null when the window no longer lists it. */
@@ -42,7 +42,7 @@ const WITHOUT_REPORT = ['bumps', 'presses', 'visit'] as const;
  * are not known: two empty sections would say less than that line.
  *
  * THE STATES. While the entry's own read is out, the head already stands from the overview's row and the sections are
- * drawn as their eyebrows over shimmering rows, so nothing moves when the answer lands. When that read failed, the lane's
+ * drawn as their Rules over shimmering rows, so nothing moves when the answer lands. When that read failed, the lane's
  * own sentence stands under the head with Try again, and no section is drawn empty in its place. READ-ONLY: the sheet has
  * no footer, since Cerberus books, changes and cancels nothing.
  *
@@ -69,7 +69,7 @@ export function EntrySheet({ summary, sheet, now, onClose, onRetry }: EntrySheet
             <TroubleBanner title={t(`${s}.trouble`)} detail={sheet.trouble} retry={t('cerberus.scheduling.trouble.retry')} onRetry={onRetry} />
           </div>
         ) : whole === null || entry === null ? (
-          // The entry's read is out: the eyebrows over shimmering rows, shaped as what will land under each.
+          // The entry's read is out: the Rules over shimmering rows, shaped as what will land under each.
           <div aria-busy="true" className="flex flex-col gap-[22px]">
             {waiting.map((section) => (
               <SheetSection key={section} title={t(`${s}.${section}.title`)}>
@@ -95,12 +95,12 @@ export function EntrySheet({ summary, sheet, now, onClose, onRetry }: EntrySheet
   );
 }
 
-/** One of the sheet's sections: its eyebrow, then what it holds. */
+/** One of the sheet's sections: its Rule, then what it holds. */
 function SheetSection({ title, children }: { title: string; children: ReactNode }) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2.5">
-      <h3 id={headingId} className="m-0 text-xs font-normal uppercase tracking-[0.14em] text-muted-foreground">{title}</h3>
+      <Rule id={headingId}>{title}</Rule>
       {children}
     </section>
   );

@@ -5,11 +5,10 @@ import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useClock } from '@/modules/cerberus/hooks/useClock';
-import { IconWord } from '@/modules/cerberus/IconWord';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import { hm, localIso, sameLocalDay } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCatalogEntryView } from '@/shared/cerberus-types';
-import { Badge, Button, Switch } from '@/shared/ui';
+import { Badge, Button, IconWord, Switch } from '@/shared/ui';
 import { cn, formatShortDate } from '@/shared/utils';
 
 /** How long an entry reads as new after it is added: its "New · HH:MM" and its wash. */

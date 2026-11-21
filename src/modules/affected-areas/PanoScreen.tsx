@@ -17,7 +17,7 @@ import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionL
 import { areaWords, faceCounts, kindName, roomWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Face, PanoDetail, PanoEntry, Region, RoomEntry, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, PanoPress, PanoShown, RegionLayer, RegionShape, SphereLook, TourReaderProgress } from '@/shared/types';
-import { Button, Card, EmptyState, Lightbox, RegionImage } from '@/shared/ui';
+import { Button, IconWord, Lightbox, RegionImage } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
@@ -154,13 +154,20 @@ export function PanoScreen({
     list = detail === null ? <ReadingList /> : <PanoAreas views={detail.views} panoRoom={panoRoom} selectedRegionId={selectedRegionId} codebook={codebook} onSelectRegion={onSelectRegion} />;
   } else if (view?.read?.status !== 'read') {
     list = (
-      <Card className="flex flex-col gap-1 px-[18px] py-4">
+      <div className="flex flex-col gap-1 border-y border-border py-4">
         <p className="text-[15px] font-medium text-foreground">{t('affectedAreas.pano.unread', { face: faceName })}</p>
         <p className="text-[13.5px] text-muted-foreground">{t('affectedAreas.pano.unreadMessage')}</p>
-      </Card>
+      </div>
     );
   } else if (detail === null) list = trouble === null ? <ReadingList /> : null;
-  else if (regions.length === 0) list = <EmptyState title={t('affectedAreas.pano.nothing')} message={t('affectedAreas.pano.nothingMessage')} />;
+  else if (regions.length === 0) {
+    list = (
+      <p className="m-0 border-y border-border py-4 text-[13.5px] text-muted-foreground">
+        <span className="block text-foreground">{t('affectedAreas.pano.nothing')}</span>
+        {t('affectedAreas.pano.nothingMessage')}
+      </p>
+    );
+  }
   else {
     list = (
       <RegionList
@@ -177,9 +184,9 @@ export function PanoScreen({
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button variant="ghost" size="sm" className="-ml-3 max-w-full max-md:h-11" aria-label={t('affectedAreas.pano.back', { tour: tourName })} onClick={onBack} {...WAY_BACK}>
+          <Button variant="ghost" size="sm" className="-ml-3 max-w-full finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.pano.back', { tour: tourName })} onClick={onBack} {...WAY_BACK}>
             <ChevronLeft aria-hidden="true" />
-            <span className="truncate">{tourName}</span>
+            <span className="truncate finger:hidden">{tourName}</span>
           </Button>
           {entry === null && detail === null ? (
             <div aria-hidden="true" className="flex w-full flex-col gap-2 pt-1">
@@ -220,7 +227,15 @@ export function PanoScreen({
           refused is told so by the press above, which a promise that its views are coming would contradict. */}
       {detail === null && trouble !== null ? null : views.length === 0 ? (
         detail !== null ? (
-          press.plan?.status === 'refused' ? null : <EmptyState icon={Camera} title={t('affectedAreas.pano.uncut')} message={t('affectedAreas.pano.uncutMessage')} />
+          press.plan?.status === 'refused' ? null : (
+            <p className="m-0 flex max-w-[760px] items-start gap-2.5 border-t border-border pt-4 text-[13.5px] text-muted-foreground">
+              <Camera aria-hidden="true" className="mt-0.5 size-4 flex-none" />
+              <span>
+                <span className="block text-foreground">{t('affectedAreas.pano.uncut')}</span>
+                {t('affectedAreas.pano.uncutMessage')}
+              </span>
+            </p>
+          )
         ) : (
           <div aria-busy="true">
             <p role="status" className="sr-only">{t('affectedAreas.pano.reading')}</p>
@@ -267,9 +282,8 @@ export function PanoScreen({
               {shown !== 'sphere' && (
                 <figcaption className="flex items-center justify-between gap-3">
                   <span className="min-w-0 text-[12.5px] text-muted-foreground">{caption}</span>
-                  <Button variant="ghost" size="sm" className="flex-none max-md:h-11" onClick={onEnlarge}>
-                    <Maximize2 aria-hidden="true" />
-                    {t('affectedAreas.pano.enlarge')}
+                  <Button variant="ghost" size="sm" className="flex-none finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.pano.enlarge')} title={t('affectedAreas.pano.enlarge')} onClick={onEnlarge}>
+                    <IconWord icon={Maximize2} word={t('affectedAreas.pano.enlarge')} />
                   </Button>
                 </figcaption>
               )}

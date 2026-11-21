@@ -5,7 +5,7 @@ import { Labeled, PageQuote } from '@/modules/carrier-bulletins/QuotedWords';
 import { StateBadge } from '@/modules/carrier-bulletins/StateBadge';
 import { VERDICT_LOOK, VERDICT_ORDER } from '@/modules/carrier-bulletins/utils/bulletinModel';
 import type { JudgedRule } from '@/shared/carrier-bulletins-types';
-import { Card } from '@/shared/ui';
+import { Rule } from '@/shared/ui';
 
 type JudgedListProps = {
   judged: JudgedRule[];
@@ -44,41 +44,37 @@ export function JudgedList({ judged }: JudgedListProps) {
 
   return (
     <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2">
-      <h3 id={headingId} className="text-xs uppercase tracking-[0.14em] text-ink-faint">
-        {t('cerberus.bulletins.page.judgedTitle')} · {judged.length}
-      </h3>
-      <Card className="overflow-hidden">
-        <ul aria-labelledby={headingId} className="m-0 list-none divide-y divide-border p-0">
-          {ordered.map((rule, index) => {
-            // Claude's word and the stored one part only when the house refused the answer; a missing answer is the sixth word.
-            const refused = rule.said !== rule.verdict;
-            return (
-              // A judged rule has no id on the wire; its place in the ordered list is its identity on this page.
-              <li key={index} className="flex flex-col gap-1.5 px-4 py-3">
-                <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
-                  <p className="min-w-0 flex-[1_1_220px] text-[13.5px] font-medium leading-snug text-foreground [overflow-wrap:anywhere]">{rule.words}</p>
-                  <StateBadge tone={VERDICT_LOOK[rule.verdict].tone} icon={VERDICT_LOOK[rule.verdict].icon} words={t(`cerberus.bulletins.verdict.${rule.verdict}`)} />
-                </div>
-                {rule.from_revision !== null && (
-                  <p className="text-[12px] text-muted-foreground">
-                    {t('cerberus.bulletins.judged.fromRevision')} {rule.from_revision}
-                  </p>
-                )}
-                {refused && (
-                  <p className="text-[12.5px] text-warn-ink">
-                    {rule.said === '(no entry)'
-                      ? t('cerberus.bulletins.judged.noEntry')
-                      : t('cerberus.bulletins.judged.refused', { said: t(`cerberus.bulletins.verdict.${rule.said}`) })}
-                  </p>
-                )}
-                {rule.reason !== null && <Labeled label={t('cerberus.bulletins.judged.why')} words={rule.reason} />}
-                {rule.duplicate_of_words !== null && <Labeled label={t('cerberus.bulletins.judged.sameAs')} words={rule.duplicate_of_words} />}
-                {quoteAdds(rule) && <PageQuote words={rule.quote} />}
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
+      <Rule id={headingId} end={String(judged.length)}>{t('cerberus.bulletins.page.judgedTitle')}</Rule>
+      <ul aria-labelledby={headingId} className="m-0 list-none divide-y divide-border border-b border-border p-0">
+        {ordered.map((rule, index) => {
+          // Claude's word and the stored one part only when the house refused the answer; a missing answer is the sixth word.
+          const refused = rule.said !== rule.verdict;
+          return (
+            // A judged rule has no id on the wire; its place in the ordered list is its identity on this page.
+            <li key={index} className="flex flex-col gap-1.5 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+                <p className="min-w-0 flex-[1_1_220px] text-[13.5px] font-medium leading-snug text-foreground [overflow-wrap:anywhere]">{rule.words}</p>
+                <StateBadge tone={VERDICT_LOOK[rule.verdict].tone} icon={VERDICT_LOOK[rule.verdict].icon} words={t(`cerberus.bulletins.verdict.${rule.verdict}`)} />
+              </div>
+              {rule.from_revision !== null && (
+                <p className="text-[12px] text-muted-foreground">
+                  {t('cerberus.bulletins.judged.fromRevision')} {rule.from_revision}
+                </p>
+              )}
+              {refused && (
+                <p className="text-[12.5px] text-warn-ink">
+                  {rule.said === '(no entry)'
+                    ? t('cerberus.bulletins.judged.noEntry')
+                    : t('cerberus.bulletins.judged.refused', { said: t(`cerberus.bulletins.verdict.${rule.said}`) })}
+                </p>
+              )}
+              {rule.reason !== null && <Labeled label={t('cerberus.bulletins.judged.why')} words={rule.reason} />}
+              {rule.duplicate_of_words !== null && <Labeled label={t('cerberus.bulletins.judged.sameAs')} words={rule.duplicate_of_words} />}
+              {quoteAdds(rule) && <PageQuote words={rule.quote} />}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

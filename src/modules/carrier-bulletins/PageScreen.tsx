@@ -10,7 +10,7 @@ import { neighbours, PAGE_STATE_LOOK, pageStateOf, partOfPage } from '@/modules/
 import { stampWords } from '@/modules/carrier-bulletins/utils/bulletinWords';
 import type { BulletinPage, OverviewRow, PageReading } from '@/shared/carrier-bulletins-types';
 import type { AffectedAreasTrouble } from '@/shared/types';
-import { Button } from '@/shared/ui';
+import { Button, IconWord } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
 
 type PageScreenProps = {
@@ -73,13 +73,13 @@ export function PageScreen({
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-3 max-w-full max-md:h-11"
+            className="-ml-3 max-w-full finger:size-11 finger:px-0 max-md:h-11"
             aria-label={carrier === '' ? t('cerberus.bulletins.carrier.back') : t('cerberus.bulletins.page.back', { carrier })}
             onClick={onBack}
             {...WAY_BACK}
           >
             <ChevronLeft aria-hidden="true" />
-            <span className="truncate">{carrier === '' ? t('cerberus.bulletins.carrier.back') : carrier}</span>
+            <span className="truncate finger:hidden">{carrier === '' ? t('cerberus.bulletins.carrier.back') : carrier}</span>
           </Button>
           <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground">
             {row === null ? t('cerberus.bulletins.page.title', { page }) : t('cerberus.bulletins.page.titleOf', { page, count: row.pages })}
@@ -103,14 +103,28 @@ export function PageScreen({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {previous !== null && (
-            <Button variant="ghost" size="sm" className="h-8 max-md:h-11" onClick={() => onOpenPage(previous)}>
-              <ChevronLeft aria-hidden="true" />
-              {t('cerberus.bulletins.page.goTo', { page: previous })}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 finger:size-11 finger:px-0 max-md:h-11"
+              aria-label={t('cerberus.bulletins.page.goTo', { page: previous })}
+              title={t('cerberus.bulletins.page.goTo', { page: previous })}
+              onClick={() => onOpenPage(previous)}
+            >
+              <IconWord icon={ChevronLeft} word={t('cerberus.bulletins.page.goTo', { page: previous })} />
             </Button>
           )}
           {next !== null && (
-            <Button variant="ghost" size="sm" className="h-8 max-md:h-11" onClick={() => onOpenPage(next)}>
-              {t('cerberus.bulletins.page.goTo', { page: next })}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 finger:size-11 finger:px-0 max-md:h-11"
+              aria-label={t('cerberus.bulletins.page.goTo', { page: next })}
+              title={t('cerberus.bulletins.page.goTo', { page: next })}
+              onClick={() => onOpenPage(next)}
+            >
+              {/* The word first and its mark after it, as a way forward reads; the mark alone under a finger. */}
+              <span className="finger:hidden">{t('cerberus.bulletins.page.goTo', { page: next })}</span>
               <ChevronRight aria-hidden="true" />
             </Button>
           )}

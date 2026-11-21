@@ -6,7 +6,7 @@ import { JudgmentPress, MarkRefusal } from '@/modules/affected-areas/MarkPress';
 import { REGION_LOOK } from '@/modules/affected-areas/utils/regionLook';
 import type { Mark, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import { MARK_NOTE_MAX } from '@/shared/constants';
-import { Button, TextArea } from '@/shared/ui';
+import { Button, IconWord, TextArea } from '@/shared/ui';
 import { formatRelativeTime } from '@/shared/utils';
 
 type UnderstandingVerdictProps = {
@@ -55,8 +55,8 @@ function WrongNote({ sending, onSend, onCancel }: { sending: boolean; onSend: (n
           {t('affectedAreas.mark.noteCount', { used: draft.length, max: MARK_NOTE_MAX })}
         </span>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="ghost" size="sm" className="max-md:h-11" busy={sending} onClick={onCancel}>
-            {t('buttons.cancel')}
+          <Button type="button" variant="ghost" size="sm" className="finger:size-11 finger:px-0 max-md:h-11" busy={sending} aria-label={t('buttons.cancel')} title={t('buttons.cancel')} onClick={onCancel}>
+            <IconWord icon={X} word={t('buttons.cancel')} />
           </Button>
           <JudgmentPress
             type="submit"
@@ -64,9 +64,8 @@ function WrongNote({ sending, onSend, onCancel }: { sending: boolean; onSend: (n
             glyph={<X aria-hidden="true" />}
             out={sending}
             data-understanding-press="send-wrong"
-          >
-            {t('affectedAreas.understanding.markWrong')}
-          </JudgmentPress>
+            word={t('affectedAreas.understanding.markWrong')}
+          />
         </div>
       </div>
     </form>
@@ -106,9 +105,8 @@ export function UnderstandingVerdict({ out, refusal, mark, writing, onRight, onW
             busy={busy}
             data-understanding-press="right"
             onClick={onRight}
-          >
-            {t('affectedAreas.understanding.right')}
-          </JudgmentPress>
+            word={t('affectedAreas.understanding.right')}
+          />
           <JudgmentPress
             tone={REGION_LOOK.not_a_change.tone}
             glyph={<X aria-hidden="true" />}
@@ -116,9 +114,8 @@ export function UnderstandingVerdict({ out, refusal, mark, writing, onRight, onW
             aria-expanded={writing}
             data-understanding-press="wrong"
             onClick={onWrong}
-          >
-            {t('affectedAreas.understanding.wrong')}
-          </JudgmentPress>
+            word={t('affectedAreas.understanding.wrong')}
+          />
         </div>
       </div>
 

@@ -2,11 +2,10 @@ import { ChevronsDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { IconWord } from '@/modules/cerberus/IconWord';
 import { StatusPill } from '@/modules/cerberus/StatusMarks';
 import { hms, localIso } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusResultRow } from '@/shared/cerberus-types';
-import { Button } from '@/shared/ui';
+import { Button, IconWord } from '@/shared/ui';
 
 /**
  * How many rows show before "Show N more". It matches the prototype's twelve, which is enough for a
