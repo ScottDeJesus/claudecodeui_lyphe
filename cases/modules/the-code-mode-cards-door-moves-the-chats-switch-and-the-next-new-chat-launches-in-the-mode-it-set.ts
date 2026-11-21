@@ -16,7 +16,7 @@ import { chatConfigOf, contextOf, launchInput, newChat, openCodeModeGround, verb
 
 // interface A's sentence for the chats kind, word for word.
 const SAYS =
-  "A chat started after this is on works with one search and one script, and keeps the tools a conversation needs: asking you, launching work, skills, plans, the to-do list and the web. Its own MCP servers and tool sets are called from inside the script. A chat keeps the mode it was started in. Chats on a node, and Kaylee, are not changed.";
+  "A chat started after this is on works with one search and one script, and keeps the tools a conversation needs: asking you, launching work, skills, plans, the to-do list and the web. Its own MCP servers and tool sets are called from inside the script. A soul the chat dispatches works the same way, whatever the Dispatched souls switch reads. A chat keeps the mode it was started in. Chats on a node, and Kaylee, are not changed.";
 
 type Kind = { kind: string; label: string; says: string; enabled: boolean };
 type State = { ready: boolean | null; kinds: Kind[] | null };
