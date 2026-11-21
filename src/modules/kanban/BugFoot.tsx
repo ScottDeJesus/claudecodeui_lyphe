@@ -24,7 +24,7 @@ type BugFootProps = {
 
 /**
  * THE FOOT OF THE BUGS VIEW: the docked instrument at the start while the board's numbers are the work above
- * (still live: a mark still turns the accent there, and a press on it brings the board back), and in the middle the controls for
+ * (still live: a slot still turns the accent there, and a press on it brings the board back), and in the middle the controls for
  * what is present: the switch between the three faces, and, on the board, the plus that makes a bug (its mark alone, as the
  * design system's file button is: the word is its title and its name).
  *

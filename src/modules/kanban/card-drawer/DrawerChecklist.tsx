@@ -15,7 +15,7 @@ import { cn } from '@/shared/utils';
  * THE METER IS THE HEADLINE. A reader opening a card mid-build asks one question first — how much
  * of this is done — and the answer is a small ring with its figure at the end of the section's
  * Rule, not a count they assemble by reading fourteen rows. It reads `done` over TOTAL, the same
- * two numbers the card's mark carries, off the same fetch, so the Opening can never contradict
+ * two numbers the card's slot carries, off the same fetch, so the Opening can never contradict
  * the board. A checklist nobody has written has no ring: zero of zero is no reading.
  *
  * THREE STATES, ONE CONTROL. `pending`, `active` and `done` are the checklist's OWN vocabulary —

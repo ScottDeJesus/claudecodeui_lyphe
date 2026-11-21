@@ -139,7 +139,7 @@ export { Gallery } from '@/shared/ui/Gallery';
 // Holds a whole page of the app (the workspace, Kaylee Station) mounted and out of reach while the other page is on screen.
 export { HeldPage } from '@/shared/ui/HeldPage';
 // The design system's Hoop: a set of things as slots on a band round a core, the standard way a set you turn through is drawn (the
-// chats round a core), and the core with its one measure that the instruments stand in its middle. The
+// chats round a core, the bug board), and the core with its one measure that the instruments stand in its middle. The
 // sizes are the hoop's own, for a caller that sizes the box round it or stands something by its middle.
 export { Hoop } from '@/shared/ui/Hoop';
 export { hoopHeightFor, hoopMiddle, hoopWidthFor } from '@/shared/ui/hoopPainter';

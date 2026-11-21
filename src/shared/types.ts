@@ -4234,7 +4234,7 @@ export type HoopSlotState = 'asleep' | 'idle' | 'working' | 'waiting' | 'done' |
  * square (`HoopSlotState`); `edge` how much of its top edge is lit, 0 to 1 (whole for a chat's reply unread, a bug's checklist done,
  * a machine's checks passing); `beads` one bead along its foot for each helper at work, in its model's material (three at most are
  * drawn); `height` how tall it stands, as a share of the band (1 when absent): a thing that matters more stands taller. Made by the
- * sidebar module's `SessionsHalo`; drawn by the kit's `hoopPainter`.
+ * sidebar module's `SessionsHalo` and the kanban module's `bugHoop` and `proposalHoop`; drawn by the kit's `hoopPainter`.
  */
 export type HoopSlot = {
   id: string;

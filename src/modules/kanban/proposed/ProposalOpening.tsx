@@ -8,7 +8,7 @@ import { KeyValueList, Rule, SegmentedControl } from '@/shared/ui';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
 /**
- * ONE PROPOSED FEATURE, OPENED: what is inside the Opening hung from its mark on the instrument (`ProposedFeatures`), read down to
+ * ONE PROPOSED FEATURE, OPENED: what is inside the Opening hung from its slot on the instrument (`ProposedFeatures`), read down to
  * the decision.
  *
  * ITS FACTS FIRST, ON THE LABEL COLUMN: the board it was found for, who proposed it, when, and the folder. Then its words as

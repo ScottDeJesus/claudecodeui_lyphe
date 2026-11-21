@@ -18,8 +18,8 @@ type BugBoardOpeningProps = {
 
 /**
  * THE BOARD'S FIVE COUNTS, in one fixed order: what is building, what is asking you, what is queued, then the two backlogs every
- * board shares (lessons and memories, said so beside their number). The rings already show the first three as marks; here they
- * are numbers, which the rings never say.
+ * board shares (lessons and memories, said so beside their number). The hoop already shows the first three as slots; here they
+ * are numbers, which the hoop never says.
  */
 const REGISTERS: Array<{ key: keyof KanbanVitals; wordsKey: string; words: string; estate: boolean }> = [
   { key: 'building', wordsKey: 'kanban.ring.vitals.building', words: 'Building', estate: false },
@@ -36,7 +36,7 @@ const CAPTION = 'font-mono text-[10px] uppercase leading-[14px] tracking-[0.24em
  * WHAT THE BOARD'S CORE OPENS: the board itself. Whether it runs itself (the switch the old header carried: its word its position,
  * On or Off, its name "Turn this board on or off", refused the same way while the board names no repository), the repositories its cards are built in, its counts as the board
  * feed keeps them (the two backlogs that belong to every board said so), and, behind its mark (`⋯`), the things done to a board:
- * its repositories, its name, another board, archiving this one, and clearing its Done ring (every finished card archived at
+ * its repositories, its name, another board, archiving this one, and clearing its Done run (every finished card archived at
  * once). Switching boards is the head's (`BugHead`): the board's name there is its picker.
  *
  * Drawn inside the Opening the panel hangs from the core (`KanbanPanel`).

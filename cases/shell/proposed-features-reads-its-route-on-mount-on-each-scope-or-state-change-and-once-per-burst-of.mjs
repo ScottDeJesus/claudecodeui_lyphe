@@ -5,8 +5,8 @@
 // boards → All boards again with board=all; a burst of three dispatcher_state frames on the app's socket is coalesced
 // into one or two more reads (with no timer the face cannot know a burst is over), never one per frame; with nothing
 // arriving nothing is read. The face draws the route's proposals and none of the stand-in it drew before it was wired: since
-// the board's redraw to the design system (2026-11-20) each is a mark on its state's ring round the board's core, and the
-// ended one opens from its mark (lib/kanban_board.mjs's openProposal).
+// the board's redraw to the design system (2026-11-20) each is a slot in its state's run of the hoop round the board's core,
+// and the ended one opens from its slot (lib/kanban_board.mjs's openProposal).
 //
 // The board is lib/kanban_board.mjs's made-up board; the proposals' answer is this case's, and the app's socket is
 // handed on with the server's board and dispatcher frames held back (lib/bug_hunt_faces.mjs). Nothing is written.
@@ -56,14 +56,21 @@ runCase(async (t) => {
   if ((await readsAfter(afterTab + 1)) !== afterTab + 1 || gets()[afterTab].query.board !== BOARD.id || gets()[afterTab].query.state !== "all") {
     return broken(`Which proposals → All left the reads at ${said()}, not one more for ${BOARD.id}/all`);
   }
-  // Each proposal is a mark on its state's ring: the open two on Open, the dismissed one on Dismissed.
+  // Each proposal is a slot in its state's run of the hoop: the open two in Open, the dismissed one in Dismissed. The hoop's slider
+  // names its slots in order (`data-ring-items`) and the run of each at the same place (`data-ring-groups`).
   const ringOf = (id) => page.locator(`[data-kanban-panel] [data-bug-instrument] [role="slider"][data-ring-items~="proposal:${id}"]`).first();
+  const runOf = async (id) => {
+    const slider = ringOf(id);
+    const items = ((await slider.getAttribute("data-ring-items", { timeout: 2000 })) ?? "").split(" ");
+    const groups = ((await slider.getAttribute("data-ring-groups", { timeout: 2000 })) ?? "").split(" ");
+    return groups[items.indexOf(`proposal:${id}`)] ?? null;
+  };
   if (!(await ringOf(ENDED.id).waitFor({ state: "attached", timeout: WAIT_MS }).then(() => true, () => false))) {
     return broken(`the route answered three proposals for state=all and the face drew no mark for "${ENDED.title}" (data-proposed-features=${await page.locator("[data-proposed-features]").first().getAttribute("data-proposed-features")})`);
   }
   for (const p of [...OPEN, ENDED]) {
-    const ring = await ringOf(p.id).getAttribute("data-ring", { timeout: 2000 }).catch(() => null);
-    if (ring !== p.state) return broken(`"${p.title}" is drawn on the ${ring ?? "no"} ring, not its state's (${p.state})`);
+    const run = await runOf(p.id).catch(() => null);
+    if (run !== p.state) return broken(`"${p.title}" stands in the ${run ?? "no"} run, not its state's (${p.state})`);
   }
   const ended = await openProposal(page, ENDED.id).catch(() => null);
   if (ended === null || !((await ended.textContent()) ?? "").includes(ENDED.title)) return broken(`the dismissed "${ENDED.title}" does not open from its mark`);
