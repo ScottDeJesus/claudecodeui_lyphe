@@ -235,7 +235,7 @@ export const sessionsDb = {
    * Unlike `createAppSession` this writes `provider_session_id` and
    * `jsonl_path` immediately, because a fork's transcript file exists before
    * the row does — and the filesystem watcher would otherwise index it as an
-   * unrelated session under its own id.
+   * unrelated session under its own id. The new row carries the source's `code_mode`.
    */
   createForkedSession(input: {
     sessionId: string;
@@ -256,9 +256,10 @@ export const sessionsDb = {
     // The new row goes in FIRST: the watcher row's followups move onto it (a foreign key needs its
     // parent to exist), and only then is the watcher row deleted, so the cascade finds nothing to take.
     db.transaction(() => {
+      // The fork resumes the source's transcript, which was taught the source's tools, so it is born in the source's mode (a source with no word gives NULL, as the source has).
       db.prepare(
-        `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, model, effort, forked_from_session_id, isArchived, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, model, effort, forked_from_session_id, code_mode, isArchived, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT code_mode FROM sessions WHERE session_id = ?), 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       ).run(
         input.sessionId,
         input.provider,
@@ -268,6 +269,7 @@ export const sessionsDb = {
         input.jsonlPath,
         input.model,
         input.effort,
+        input.forkedFromSessionId,
         input.forkedFromSessionId,
       );
       followupsDb.moveToSession(input.providerSessionId, input.sessionId);

@@ -58,9 +58,11 @@ function logFailureOnce(message: string): void {
  */
 function rebuildLaunch(answer: unknown): ChatCodeModeLaunch | null {
   if (!isRecord(answer)) return null;
-  if (answer.on === false) return { on: false };
+  if (answer.on === false) {
+    return typeof answer.prompt === 'string' ? { on: false, prompt: answer.prompt } : { on: false };
+  }
   if (answer.on !== true) return null;
-  const { tools, prompt, server, env } = answer;
+  const { tools, prompt, server, env, agents } = answer;
   if (!isStringArray(tools) || typeof prompt !== 'string' || !isRecord(server) || !isRecord(env)) return null;
   const { command, args } = server;
   if (typeof command !== 'string' || command === '' || !isStringArray(args)) return null;
@@ -69,7 +71,14 @@ function rebuildLaunch(answer: unknown): ChatCodeModeLaunch | null {
     if (typeof value !== 'string') return null;
     copiedEnv[name] = value;
   }
-  return { on: true, tools: [...tools], server: { command, args: [...args] }, prompt, env: copiedEnv };
+  return {
+    on: true,
+    tools: [...tools],
+    server: { command, args: [...args] },
+    prompt,
+    env: copiedEnv,
+    ...(typeof agents === 'string' && agents !== '' ? { agents } : {})
+  };
 }
 
 /**
@@ -113,13 +122,25 @@ type CodeModeOptionsShape = {
   env?: Record<string, string | undefined>;
   systemPrompt?: unknown;
   allowedTools?: string[];
+  extraArgs?: Record<string, string | null>;
 };
 
+function appendToSystemPrompt(sdkOptions: CodeModeOptionsShape, text: string): void {
+  const { systemPrompt } = sdkOptions;
+  if (isRecord(systemPrompt)) {
+    const existing = typeof systemPrompt.append === 'string' ? systemPrompt.append : '';
+    systemPrompt.append = existing === '' ? text : `${existing}\n\n${text}`;
+  }
+}
+
 /**
- * Puts a Code Mode launch on the chat's options. An `{ on: false }` launch changes nothing.
+ * Puts a Code Mode launch on the chat's options. An `{ on: false }` launch changes nothing but appending its `prompt`, when it has one, to `systemPrompt.append`.
  */
 export function applyCodeModeLaunch(sdkOptions: CodeModeOptionsShape, launch: ChatCodeModeLaunch): void {
-  if (launch.on === false) return;
+  if (launch.on === false) {
+    if (typeof launch.prompt === 'string' && launch.prompt !== '') appendToSystemPrompt(sdkOptions, launch.prompt);
+    return;
+  }
   // The list replaces the claude_code preset, so every built-in it does not name is off.
   sdkOptions.tools = [...launch.tools];
   // Replaced, not added to: `cm` is the chat's only MCP server, so nothing else the launch would carry reaches the CLI.
@@ -127,11 +148,9 @@ export function applyCodeModeLaunch(sdkOptions: CodeModeOptionsShape, launch: Ch
   // Servers named in a settings file would load beside `cm` without this.
   sdkOptions.strictMcpConfig = true;
   sdkOptions.env = { ...sdkOptions.env, ...launch.env };
-  const { systemPrompt } = sdkOptions;
-  if (isRecord(systemPrompt)) {
-    const existing = typeof systemPrompt.append === 'string' ? systemPrompt.append : '';
-    systemPrompt.append = existing === '' ? launch.prompt : `${existing}\n\n${launch.prompt}`;
-  }
+  // The CLI's own `--agents <file>`, the form every runner child already rides: the souls this chat dispatches work in Code Mode through its `cm`.
+  if (launch.agents !== undefined) sdkOptions.extraArgs = { ...sdkOptions.extraArgs, agents: launch.agents };
+  appendToSystemPrompt(sdkOptions, launch.prompt);
   const allowed = sdkOptions.allowedTools ?? [];
   sdkOptions.allowedTools = allowed.includes(CODE_MODE_SEARCH_TOOL) ? allowed : [...allowed, CODE_MODE_SEARCH_TOOL];
 }

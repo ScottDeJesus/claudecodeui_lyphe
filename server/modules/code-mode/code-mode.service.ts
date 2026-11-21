@@ -43,9 +43,12 @@ const off = (): ChatCodeModeLaunch => ({ on: false });
 
 /**
  * A chat keeps the mode it was started in: the stored word is passed as `--born` so the verb never
- * re-reads the switch for it, and only the switch's own answer is stored, and only for a chat whose row held nothing; an off that carries the house's reason (not ready, no folder) is a failure like the rest: logged once, stored nowhere, asked again at the next message. Any
- * failure answers off and stores nothing, so the next message asks again; a chat the mode cannot
- * serve launches as it does today.
+ * re-reads the switch for it, and only the switch's own answer is stored, and only for a chat
+ * whose row held nothing. An off that carries the house's reason (not ready, no folder) is logged
+ * once and stored nowhere, and its `prompt`, when the house sent one, rides the launch. Any
+ * failure answers off and stores nothing; a chat the mode cannot serve launches as it does today.
+ * A chat's mode is settled by its first message: once its row holds a conversation, an undecided
+ * row reads born off.
  */
 async function launchFor(input: {
   appSessionId: string | null;
@@ -182,6 +185,7 @@ function isStringArray(value: unknown): value is string[] {
  * The verb's last line as a launch, or null when it is not one. Every field is checked and the launch
  * is rebuilt field by field: the runtime installs what comes back, so a field the verb printed beyond
  * the contract must not ride into it. The verb's `why` is kept beside the launch, never inside it; a non-empty `why` is the house saying it could not serve this chat.
+ * An off may carry `prompt`; an on may carry `agents`, kept only when it is an absolute path.
  */
 function parseLaunch(line: string): { launch: ChatCodeModeLaunch; why: string } | null {
   let value: unknown;
@@ -194,11 +198,17 @@ function parseLaunch(line: string): { launch: ChatCodeModeLaunch; why: string } 
   if (value.why !== undefined && typeof value.why !== 'string') return null;
   const why = typeof value.why === 'string' ? value.why.trim() : '';
 
-  if (value.on === false) return { launch: off(), why };
+  if (value.on === false) {
+    const offPrompt = value.prompt;
+    return { launch: typeof offPrompt === 'string' ? { on: false, prompt: offPrompt } : off(), why };
+  }
   if (value.on !== true) return null;
 
-  const { tools, server, prompt, env } = value;
+  const { tools, server, prompt, env, agents } = value;
   if (!isStringArray(tools) || !isRecord(server) || typeof prompt !== 'string' || !isRecord(env)) return null;
+  // Absolute only: the path becomes the CLI's `--agents` argument, and a relative path would resolve
+  // against wherever the CLI starts.
+  const agentsPath = typeof agents === 'string' && path.isAbsolute(agents) ? agents : undefined;
 
   const { command, args } = server;
   if (typeof command !== 'string' || command === '' || !isStringArray(args)) return null;
@@ -216,6 +226,7 @@ function parseLaunch(line: string): { launch: ChatCodeModeLaunch; why: string } 
       server: { command, args: [...args] },
       prompt,
       env: copiedEnv,
+      ...(agentsPath !== undefined ? { agents: agentsPath } : {}),
     },
     why: '',
   };

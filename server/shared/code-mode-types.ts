@@ -11,10 +11,14 @@
 // `server/shared/types.ts` opens it only for the one field it carries, `ProviderRuntimeContext.codeMode`.
 
 /**
- * What the code-mode module answers the Claude runtime for one launch. Produced by the module's `launchFor` (from the house's `code-mode config --chat` verb's last stdout line); read by the runtime, which on `on: true` replaces the chat's tool list and MCP servers with these.
+ * What the code-mode module answers the Claude runtime for one launch. Produced by the module's `launchFor` (from the house's `code-mode config --chat` verb's last stdout line); read by the runtime, which on `on: true` replaces the chat's tool list and MCP servers with these; on `on: false` it changes nothing but appending `prompt` when there is one.
  */
 export type ChatCodeModeLaunch =
-  | { on: false }
+  | {
+      on: false;
+      /** Appended to the system prompt: the house telling a chat born in Code Mode that it cannot be served this sitting and its built-in tools are back. */
+      prompt?: string;
+    }
   | {
       on: true;
       /** Built-in tools the chat keeps; this list replaces the preset, so anything unnamed is off. */
@@ -25,6 +29,8 @@ export type ChatCodeModeLaunch =
       prompt: string;
       /** Variables added to the CLI's environment. */
       env: Record<string, string>;
+      /** Absolute path of an --agents file: the definitions of every soul the chat can dispatch, in Code Mode through this chat's `cm`. */
+      agents?: string;
     };
 
 /**
