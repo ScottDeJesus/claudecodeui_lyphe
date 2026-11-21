@@ -1250,6 +1250,8 @@ that changed server code must not be verified against a process another phase le
 (`CLOUDCLI_SESSIONS_DIR`), so neither the operator's marker nor the operator's running chats are
 ever touched. It still runs against the live auth database; neither redirect isolates that. Cerberus's three roots are scratch values too (`CERBERUS_DB_PATH` and `CERBERUS_KEY_PATH` under `/tmp/apps-cerberus*`, `CERBERUS_LISTEN` on any free loopback port): `.env` carries the live `CERBERUS_LISTEN`, and without them this server would open the live Cerberus store and try the live tailnet address.
 
+**The probe server's environment.** `boot_probe_server` unsets the marks the plan runner stamps on a child (`PLAN_RUNNER_CHILD`, `PLAN_RUNNER_RUN_ID`, `PLAN_RUNNER_DACTYLS_MODE`, `PLAN_RUNNER_DEEPSEEK`, `MAIN_SHELVES_LOADER_DISABLE`, `JEV_*`, `PG_POOL_MAX`, `EIS_PG_POOL_*`) so the probe's chats are not taken for runner children; a seam a caller sets on purpose (`PLAN_RUNNER_CLAUDE_BIN`) is kept.
+
 **`PROBE_PORT` and the paths.** The six per-server paths (`APPS_PID_FILE`, `APPS_LOG`, `APPS_MARKER`, `APPS_SESSIONS_DIR`, `APPS_CERBERUS_DB`, `APPS_CERBERUS_KEY`) follow `PROBE_PORT`, so a second server on another port runs beside the first and neither `stop_probe_server` reaches the other's files:
 
 | `PROBE_PORT` | paths |

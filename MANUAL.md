@@ -3016,10 +3016,13 @@ The seams tool sets cross, as types and one hook. The Claude runtime reaches the
 | `ProviderRuntimeContext.toolsets` (`ChatToolsetHooks`) | `server/shared/types.ts` | always present; one hook, `launchFor({ appSessionId, onNode })` → `ChatToolsetLaunch` |
 | `useChatToolsets(hooks)` | `provider-runtime.service.ts` | stores the hooks every context carries |
 | `INERT_TOOLSET_HOOKS` | same | default; `launchFor` answers `{ env: {}, servers: null, promptLine: null }`, a fresh object per call, so a launch is today's |
+| `ProviderRuntimeContext.codeMode` (`ChatCodeModeHooks`, `server/shared/code-mode-types.ts`) | `server/shared/types.ts` | the context's third hook, always present; `launchFor({ appSessionId, onNode, cwd, servers })` → `ChatCodeModeLaunch` (`{ on: false }` or `{ on: true, tools, server, prompt, env }`), `serversChanged({ appSessionId, servers })` → void. Neither shape crosses a wire, so `src/shared` has no mirror; the file is listed in `.oxlintrc.json` (INV-6548) |
+| `useChatCodeMode(hooks)` | `provider-runtime.service.ts` | stores the hooks; called by `server/modules/code-mode/` at boot (MAN-10091) |
+| `INERT_CODE_MODE_HOOKS` | same | default; `launchFor` answers `{ on: false }` (a fresh object per call), `serversChanged` does nothing, so a launch is today's |
 | `IProviderRuntime.syncToolsets?(appSessionId)` | `server/shared/interfaces.ts` | optional; only a runtime with a live process per chat has it; answers `ToolsetSyncOutcome` |
 | `syncToolsets(provider, appSessionId)` | `provider-runtime.service.ts` | asks the provider's runtime, calling the verb as a method (`this` holds); answers `{ live: false }` for a runtime without the verb, a sync that throws or rejects, or a provider that fails to resolve; the last three log `[provider-runtime] could not sync the tool sets of <provider> session <id>:` |
 
-- `context.toolsets` is one delegating object that reads the registered hooks at CALL time, so a context built before `useChatToolsets` sees the hooks afterwards. why: a Claude process keeps the context of the message that spawned it.
+- `context.toolsets` and `context.codeMode` are each one delegating object that reads the registered hooks at CALL time, so a context built before `useChatToolsets` / `useChatCodeMode` sees the hooks afterwards. why: a Claude process keeps the context of the message that spawned it. The runtime imports nothing from `server/modules/code-mode/` either.
 
 - `useChatToolsets` is called by `toolsets.module.ts` at boot (MAN-8499); `session_toolsets_changed` is emitted by `toolsets.service.ts` after a switch that changed the on-sets (MAN-8500). The Claude runtime reads `context.toolsets` at every launch and answers `syncToolsets` for a chat with a live process (its call-ins, the one `setMcpServers` mechanism and the base-name guard: MAN-8495); a chat without one answers `live: 'next-message'`.
 - A probe script imports the app through `modules/providers/index.ts`. Importing `provider-runtime.service.ts` first dies on `Cannot access 'providerRegistry' before initialization` (circular import).
@@ -3038,7 +3041,7 @@ The seams tool sets cross, as types and one hook. The Claude runtime reaches the
 
 - `export { JWT_SECRET }` from `auth.middleware.js`; the toolsets module derives each chat's credential from it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/toolset-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/toolset-types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/code-mode-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/toolset-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/toolset-types.ts
 
 ## MAN-8490 — Composer tool-set section — ComposerToolsetSection, useSessionToolsets, the pill's count, the busy and waiting rows
 

@@ -79,6 +79,7 @@ import {
 import { readReportedContextWindow, resolveContextWindow } from './claude-context-window.js';
 import { reportRestoredTurn } from './claude-compaction-restore.js';
 import { applyToolsetLaunch, askToolsetLaunch, createToolsetSync, toolsetDigest } from './claude-toolset-seams.js';
+import { applyCodeModeLaunch, askCodeModeLaunch, createCodeModeServerSync } from './claude-code-mode-seams.js';
 import { assertProjectFolderExists, ProjectFolderMissingError } from './claude-project-folder.js';
 import { confirmResumableProviderSession } from './claude-resumable-session.js';
 import { describeErrorResult } from './claude-error-result.js';
@@ -848,8 +849,10 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
  * `providerSessionId` is the id the launch resumes: a spawn passes the one it has already confirmed
  * (`confirmResumableProviderSession`), a join leaves it to be read off the row — a live process takes no
  * resume, so its profile never depends on whether the conversation is on disk.
+ * `heldCodeMode` is the Code Mode launch a JOIN's process was born with: a join launches nothing, so it never asks the
+ * house (whose answer is a launch write: it re-baselines the bridge's `tools changed:` notice) and keeps its process's mode.
  */
-async function resolveSdkOptions(options, context, providerSessionId = context.resolveProviderSessionId(options.sessionId)) {
+async function resolveSdkOptions(options, context, providerSessionId = context.resolveProviderSessionId(options.sessionId), heldCodeMode = null) {
   const { sessionId } = options;
   const resolvedModel = await context.resolveResumeModel(sessionId, options.model);
   let effortModels = CLAUDE_FALLBACK_MODELS;
@@ -877,7 +880,21 @@ async function resolveSdkOptions(options, context, providerSessionId = context.r
   if (mcpServers && !mcpUnreadable) {
     sdkOptions.mcpServers = mcpServers;
   }
-  return { sdkOptions, mcpUnreadable, toolsets: { digest: toolsetDigest(launch.servers), servers: launch.servers } };
+  // Code Mode (claude-code-mode-seams.ts) is asked with the chat's own servers and its on-sets'; a base
+  // server keeps its name over a set's. A Code Mode launch holds no set in the CLI, so the sync sends it nothing.
+  const baseServers = mcpServers && !mcpUnreadable ? mcpServers : {};
+  const codeMode = heldCodeMode ?? await askCodeModeLaunch(context, {
+    appSessionId: options.sessionId ?? null,
+    onNode: Boolean(options.node),
+    cwd: options.cwd,
+    servers: { ...(launch.servers ?? {}), ...baseServers },
+  });
+  applyCodeModeLaunch(sdkOptions, codeMode);
+  if (codeMode.on) {
+    const codeModeServers = { baseServers, setNames: Object.keys(launch.servers ?? {}) };
+    return { sdkOptions, mcpUnreadable, toolsets: { digest: toolsetDigest(null), servers: null }, codeMode: true, codeModeServers, codeModeLaunch: codeMode };
+  }
+  return { sdkOptions, mcpUnreadable, toolsets: { digest: toolsetDigest(launch.servers), servers: launch.servers }, codeMode: false, codeModeServers: { baseServers, setNames: Object.keys(launch.servers ?? {}) }, codeModeLaunch: codeMode };
 }
 
 /**
@@ -893,7 +910,7 @@ async function resolveSdkOptions(options, context, providerSessionId = context.r
  */
 async function joinProcess(live, command, options, ws, context) {
   const { sessionId } = options;
-  const resolved = await resolveSdkOptions(options, context);
+  const resolved = await resolveSdkOptions(options, context, undefined, live.codeModeLaunch ?? { on: false });
   // Asked ONLY when the running process has announced a version of its own: with nothing to
   // compare it against, this would spend a probe (and on a cold cache a subprocess) on the send
   // path for an answer nothing reads.
@@ -902,7 +919,7 @@ async function joinProcess(live, command, options, ws, context) {
     : null;
   const chosen = chosenAccount();
   const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion,
-    resolved.toolsets.digest, chosen?.digest ?? null, chosen?.slug ?? null);
+    resolved.toolsets.digest, chosen?.digest ?? null, chosen?.slug ?? null, resolved.codeMode);
   const plan = planLiveChanges(live.profile, next, { resumeFromScratch: options.resumeFromScratch === true });
   if (plan.respawn) {
     console.log(`[Claude SDK] Replacing the process for session ${sessionId}: ${plan.respawn}`);
@@ -1144,6 +1161,10 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
   const isBusy = () => pendingTurn !== null || turnInFlight || hasBackgroundWork();
   const processAbort = new AbortController();
 
+  // A Code Mode launch's bridge push (claude-code-mode-seams.ts), set once its options are resolved; null for every other chat.
+  let codeModeSync = null;
+  // The Code Mode launch this process was born with; a joining message reuses it rather than asking again.
+  let codeModeLaunch = { on: false };
   // Pushes the chat's on-sets into the CLI (claude-toolset-seams.ts); every run on this process goes through it, in order.
   const toolsetSync = createToolsetSync({
     getQuery: () => queryInstance,
@@ -1153,7 +1174,8 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
     onNode: Boolean(options.node),
     setApplied: (digest) => { profile.toolsets = digest; },
     // The launch's own servers: a set's server must not take one of their names (claude-toolset-seams.ts).
-    baseServerNames: () => Object.keys(sdkOptions?.mcpServers ?? {})
+    baseServerNames: () => Object.keys(sdkOptions?.mcpServers ?? {}),
+    codeModeSync: () => codeModeSync
   });
 
   // The handle later messages join through, registered under the session key.
@@ -1164,6 +1186,10 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
     /** Syncs the tool sets into the CLI; never rejects. Asked by a joining message, a fresh spawn and `claudeRuntime.syncToolsets`. */
     syncToolsets(boundMs) {
       return toolsetSync.sync(boundMs);
+    },
+    /** The Code Mode launch this process was born with (`{ on: false }` for every other chat); read by a joining message. */
+    get codeModeLaunch() {
+      return codeModeLaunch;
     },
     get profile() {
       return profile;
@@ -1386,8 +1412,16 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
         providerSessionId = await confirmResumableProviderSession({ appSessionId: sessionId ?? null, providerSessionId });
         capturedSessionId = providerSessionId;
       }
-      const resolved = await resolveSdkOptions(options, context, providerSessionId);
+      // A re-adopted process runs in the mode its host recorded (a host from before the field: not Code Mode). One
+      // recorded off is never asked again; one recorded on is asked for the launch a join reuses, but where its sets
+      // go is decided by the mode its CLI was launched in, whatever that answer says.
+      const recordedCodeMode = reattach?.profile ? reattach.profile.codeMode === true : null;
+      const resolved = await resolveSdkOptions(options, context, providerSessionId, recordedCodeMode === false ? { on: false } : null);
       sdkOptions = resolved.sdkOptions;
+      codeModeLaunch = resolved.codeModeLaunch;
+      if ((recordedCodeMode ?? resolved.codeMode) && sessionId) {
+        codeModeSync = createCodeModeServerSync({ context, appSessionId: sessionId, baseServers: resolved.codeModeServers.baseServers, initialSetNames: resolved.codeModeServers.setNames });
+      }
       // Makes the CLI echo each message it reads from stdin, at the moment it reads it. For a message the
       // composer steered into a turn that echo is the only word on when — and whether — Claude took it in;
       // the loop below drops every other echo, so nothing else on screen changes.
@@ -1413,9 +1447,9 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
       profile = reattach
         ? (reattach.profile
             ? { ...reattach.profile, unknown: false, cliVersion: reportedCliVersion }
-            : launchProfileOf(sdkOptions, resolved.mcpUnreadable, true, reportedCliVersion))
+            : launchProfileOf(sdkOptions, resolved.mcpUnreadable, true, reportedCliVersion, null, null, null, resolved.codeMode))
         : launchProfileOf(sdkOptions, resolved.mcpUnreadable, false, null, null,
-            launch?.account ?? null, launch?.slug ?? null);
+            launch?.account ?? null, launch?.slug ?? null, resolved.codeMode);
       // What tool sets the process HOLDS: none yet for a fresh one (its first sync, below, records them), and
       // unknown for a re-adopted one whatever its host recorded — the host knew only the spawn-time profile.
       profile.toolsets = reattach ? null : '';

@@ -1,6 +1,7 @@
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { providerModelsService } from '@/modules/providers/services/provider-models.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
+import type { ChatCodeModeHooks } from '@/shared/code-mode-types.js';
 import type { IProvider } from '@/shared/interfaces.js';
 import type { ChatToolsetHooks, ToolsetSyncOutcome } from '@/shared/toolset-types.js';
 import type {
@@ -53,6 +54,12 @@ const NOT_LIVE_ACTIVITY: ChatProcessActivity = { live: false, busy: false, why: 
 const INERT_TOOLSET_HOOKS: ChatToolsetHooks = {
   launchFor: async () => ({ env: {}, servers: null, promptLine: null }),
 };
+// What a chat is answered while the code-mode module has registered nothing: not in Code Mode, so its
+// launch is today's, and a changed server map has nobody to tell. A fresh object per call, as above.
+const INERT_CODE_MODE_HOOKS: ChatCodeModeHooks = {
+  launchFor: async () => ({ on: false }),
+  serversChanged: async () => {},
+};
 
 /**
  * Creates the application-facing provider runtime dispatcher.
@@ -85,6 +92,14 @@ export function createProviderRuntimeService(
     launchFor: (input) => toolsetHooks.launchFor(input),
   };
 
+  let codeModeHooks: ChatCodeModeHooks = INERT_CODE_MODE_HOOKS;
+  // The same shape and reason as `toolsets` above: read at CALL time, so a context built before the
+  // code-mode module registered (a process spawned by an earlier message) sees the hooks afterwards.
+  const codeMode: ChatCodeModeHooks = {
+    launchFor: (input) => codeModeHooks.launchFor(input),
+    serversChanged: (input) => codeModeHooks.serversChanged(input),
+  };
+
   const createRuntimeContext = (
     provider: IProvider,
   ): ProviderRuntimeContext => ({
@@ -103,6 +118,7 @@ export function createProviderRuntimeService(
     },
     compaction,
     toolsets,
+    codeMode,
   });
 
   const run = (
@@ -128,6 +144,12 @@ export function createProviderRuntimeService(
     // after carries it (see `toolsets` above).
     useChatToolsets(hooks: ChatToolsetHooks): void {
       toolsetHooks = hooks;
+    },
+
+    // Registered once, by the code-mode module when the app boots; every context built before or
+    // after carries it (see `codeMode` above).
+    useChatCodeMode(hooks: ChatCodeModeHooks): void {
+      codeModeHooks = hooks;
     },
 
     // Pushes the chat's on-sets into its live process, asked of the provider's runtime; a provider whose

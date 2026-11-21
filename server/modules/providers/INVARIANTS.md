@@ -171,3 +171,49 @@ Other runtimes, checked 2026-11-03. Codex already does this (`turn.failed` is an
 Proof: `bash .verify/probe-error-result.sh before|after` (a second server; a chat forced into the failure with no model call; then a Haiku turn the user stops), `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/probe-error-result-page.mjs` (the live page, one Haiku-model message, the row still there after the page's re-read) and `bash .verify/probe-cursor-error-result.sh` (the real Cursor runtime against a stub `cursor-agent`, the CLI not being installed here).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-error-result.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime-signals.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cursor/cursor-runtime.provider.js
+
+## INV-11914 — probe — a failed bridge rewrite answers `confirmed: true`, so the switch reads `connected`, and nothing retries it
+
+a failed bridge rewrite answers `confirmed: true`, so the switch reads `connected`, and nothing retries it
+
+```probe
+D=$(mktemp -d /tmp/athena-swallow.XXXXXX) || exit 1; cat > "$D/p.ts" <<'TS'
+import { randomUUID } from 'node:crypto';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const { codeModeService } = await import(R + '/code-mode/code-mode.service.ts');
+const { createCodeModeServerSync } = await import(R + '/providers/list/claude/claude-code-mode-seams.ts');
+const sync = createCodeModeServerSync({ context: { codeMode: codeModeService }, appSessionId: randomUUID(), baseServers: {}, initialSetNames: [] });
+const outcome = await sync.push({ 'probe-set': { command: 'true', args: [] } }, 30000);
+console.log('confirmed=' + String((outcome as any).confirmed) + ' added=' + JSON.stringify((outcome as any).added ?? null));
+process.exit(0);
+TS
+cat > "$D/p.sh" <<EOF
+cloudcli-tsx "$D/p.ts" 2>&1 | grep -E '^confirmed=|could not hand' || echo none
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-swallow.*) rm -rf "$D";; esac
+```
+
+measured 2026-11-20 by chain chain-code-mode--chats--runtime-20261120-201220-1b2b, finding L1, LOW
+probe-key: bdeb4ebe979c2d96313a2e24d61975bb7da21733
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-code-mode-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts
+
+## INV-11915 — probe — a project's own (local-scope) MCP servers never reach a Code Mode chat
+
+a project's own (local-scope) MCP servers never reach a Code Mode chat
+
+```probe
+D=$(mktemp -d /tmp/athena-projects.XXXXXX) || exit 1; cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "runtime reads claudeProjects: $(grep -c 'claudeConfig.claudeProjects' server/modules/providers/list/claude/claude-runtime.provider.js)"
+python3 -c '
+import json; c=json.load(open("/home/lyphe/.claude.json"))
+print("has claudeProjects:", "claudeProjects" in c, "| local mcpServers in:", sorted(k for k,e in c.get("projects",{}).items() if e.get("mcpServers")) or "none")'
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-projects.*) rm -rf "$D";; esac
+```
+
+measured 2026-11-20 by chain chain-code-mode--chats--runtime-20261120-201220-1b2b, finding L2, LOW
+probe-key: 926aabcae76b6e96b1f0a38164597a69da1c0164
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-code-mode-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts

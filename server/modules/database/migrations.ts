@@ -534,6 +534,16 @@ const addSessionToolsetsColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `sessions.code_mode`: whether a chat was started in Code Mode (1) or not (0). A chat keeps the mode it was started in, so its first launch writes the answer and every later launch reads it.
+ *
+ * Nothing is backfilled: NULL means no word was stored. A chat with no word that already holds a conversation reads as born off (`sessionUserStateDb.getCodeMode`), so every chat that existed before this column keeps launching without Code Mode; only a chat's first launch is decided by the switch.
+ */
+const addSessionCodeModeColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'code_mode', 'INTEGER');
+};
+
+/**
  * Adds `sessions.pinned`, and — only in the boot that actually adds the column — pins every chat the
  * simple chat list shows right now, so the operator can go through them and unpin what he does not
  * want kept.
@@ -938,6 +948,7 @@ export const runMigrations = (db: Database) => {
     addSessionUserStateColumns(db);
     addSimpleListFolders(db);
     addSessionToolsetsColumn(db);
+    addSessionCodeModeColumn(db);
     ensureProjectsForSessionPaths(db);
     // After the project rows exist: the rollout pin reads a chat's project to tell the feed's chats from the rest.
     addSessionPinnedColumn(db);

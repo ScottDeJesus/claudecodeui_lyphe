@@ -120,6 +120,11 @@ boot_probe_server() {
   # reuse decision.
   (
     cd "$APPS_REPO_ROOT" || exit 1
+    # The operator's server carries none of the marks the plan runner stamps on a child (souls.py, db_pools.py), so the
+    # probe's chats must not either, or the house's hooks take them for runner children. A seam a caller
+    # sets on purpose (PLAN_RUNNER_CLAUDE_BIN, …) is not a mark and is kept.
+    unset PLAN_RUNNER_CHILD PLAN_RUNNER_RUN_ID PLAN_RUNNER_DACTYLS_MODE PLAN_RUNNER_DEEPSEEK MAIN_SHELVES_LOADER_DISABLE \
+      JEV_CACHE JEV_BUDGET_KEY JEV_BUDGET_CALLS PG_POOL_MAX EIS_PG_POOL_MIN EIS_PG_POOL_MAX
     export SERVER_PORT="$PROBE_PORT"
     export CLOUDCLI_LOCAL_SERVER_MARKER="$APPS_MARKER"
     export CLOUDCLI_SESSIONS_DIR="$APPS_SESSIONS_DIR"

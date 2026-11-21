@@ -101,4 +101,36 @@ export const sessionUserStateDb = {
 
     return result.changes > 0;
   },
+
+  /**
+   * Whether a chat was started in Code Mode. true or false once its first launch stored a word. A chat
+   * with no word that already holds a conversation (its row carries the CLI's session id or transcript
+   * path — written once a run announces them) was started before its mode was decided, without Code Mode,
+   * so it reads false: a conversation never changes mode halfway through. null only for a chat with no
+   * word and no conversation yet — its first launch — or no row. A value other than 0 or 1 is read as
+   * no word, with one warning naming the session. Consumed by the code-mode module at every launch.
+   */
+  getCodeMode(sessionId: string): boolean | null {
+    const db = getConnection();
+    const row = db
+      .prepare(
+        'SELECT code_mode, (provider_session_id IS NOT NULL OR jsonl_path IS NOT NULL) AS held_conversation FROM sessions WHERE session_id = ?'
+      )
+      .get(sessionId) as { code_mode: number | null; held_conversation: number } | undefined;
+    if (!row) return null;
+    if (row.code_mode === 1) return true;
+    if (row.code_mode === 0) return false;
+    if (row.code_mode !== null) {
+      console.warn(`[sessions] session ${sessionId} has an unreadable code_mode value; reading it as undecided`);
+    }
+    return row.held_conversation === 1 ? false : null;
+  },
+
+  /** Records the mode a chat was started in (1 or 0). False when no row has the id. Consumed by the code-mode module, which writes it only for a chat whose row held nothing. */
+  setCodeMode(sessionId: string, on: boolean): boolean {
+    const db = getConnection();
+    const result = db.prepare('UPDATE sessions SET code_mode = ? WHERE session_id = ?').run(on ? 1 : 0, sessionId);
+
+    return result.changes > 0;
+  },
 };

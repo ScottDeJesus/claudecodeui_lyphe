@@ -3,6 +3,7 @@ import type { FileHandle } from 'node:fs/promises';
 import type { IncomingMessage } from 'node:http';
 import type { Readable } from 'node:stream';
 
+import type { ChatCodeModeHooks } from './code-mode-types.js';
 import type { KanbanCardSummary, KanbanLaneCount } from './kanban-types.js';
 import type { ChatToolsetHooks } from './toolset-types.js';
 
@@ -1070,6 +1071,8 @@ export type ProviderRuntimeContext = {
   compaction: ChatCompactionHooks;
   /** Tool sets' one hook; always present, and inert until the toolsets module registers it. */
   toolsets: ChatToolsetHooks;
+  /** Code Mode's two hooks (`launchFor`, `serversChanged`); always present, and inert until the code-mode module registers them. */
+  codeMode: ChatCodeModeHooks;
 };
 
 export type ProviderRunFunction = (
