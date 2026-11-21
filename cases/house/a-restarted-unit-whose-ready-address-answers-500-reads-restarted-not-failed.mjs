@@ -18,7 +18,7 @@ import net from "node:net";
 import path from "node:path";
 
 import { broken, held, runCase } from "../lib/case.mjs";
-import { pause, python, reviewFolder, roundDriver, stamp } from "../lib/house_live.mjs";
+import { pause, python, reviewFolder, roundDriver, stamp, userEnv } from "../lib/house_live.mjs";
 import { scratchDir } from "../lib/scratch.mjs";
 
 const SERVER = `import http.server, sys
@@ -64,11 +64,11 @@ runCase(async (t) => {
 
   const unit = `case-live-ready500-${process.pid}`;
   t.defer(() => {
-    spawnSync("systemctl", ["--user", "stop", unit], { timeout: 30000 });
-    spawnSync("systemctl", ["--user", "reset-failed", unit], { timeout: 30000 });
+    spawnSync("systemctl", ["--user", "stop", unit], { timeout: 30000, env: userEnv });
+    spawnSync("systemctl", ["--user", "reset-failed", unit], { timeout: 30000, env: userEnv });
   });
   execFileSync("systemd-run", ["--user", `--unit=${unit}`, "--collect", "--quiet", "/usr/bin/python3", server, String(port)],
-    { encoding: "utf8", timeout: 30000 });
+    { encoding: "utf8", timeout: 30000, env: userEnv });
   const first = await answers(ready);
   if (first !== 500) return broken(`the scratch server did not answer 500 before the round (${first}), so the round cannot be judged`);
 
