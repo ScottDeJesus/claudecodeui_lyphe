@@ -42,7 +42,7 @@ export function CerberusFoot({ face, onFace, needs, onEnroll, docked }: Cerberus
   const enroll = t('cerberus.header.enroll');
 
   return (
-    <footer data-cerberus-foot="" className="grid h-[72px] flex-none grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 pb-safe-area-inset-bottom md:h-[100px] md:gap-3 md:px-7">
+    <footer data-cerberus-foot="" className="grid h-[72px] flex-none grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,1fr)] items-center gap-0 px-3 pb-safe-area-inset-bottom max-sm:px-2 md:h-[100px] md:gap-3 md:px-7">
       <div className="flex min-w-0 items-center">
         {face !== 'fleet' && (
           <button
@@ -59,8 +59,9 @@ export function CerberusFoot({ face, onFace, needs, onEnroll, docked }: Cerberus
         )}
       </div>
       <div className="flex min-w-0 items-center gap-2">
-        {/* Under a finger each face is a 44 px press, its mark alone. */}
-        <div className="min-w-0 finger:[&_[role=tab]]:min-h-11 finger:[&_[role=tab]]:min-w-11 finger:[&_[role=tab]]:px-2 max-lg:[&_[role=tab]]:px-3">
+        {/* Under a finger each face is a 44 px press, its mark alone, and the faces stand flush so seven fit beside the plus on a
+            phone. On the narrowest the strip scrolls rather than run under the plus or off the screen. */}
+        <div className="min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden finger:[&_[role=tab]]:min-h-11 finger:[&_[role=tab]]:min-w-11 finger:[&_[role=tab]]:px-2 max-lg:[&_[role=tab]]:px-3 finger:[&_[role=tablist]]:gap-0 finger:[&_[role=tablist]]:p-0.5">
           <Tabs
             variant="segmented"
             ariaLabel={t('tabs.cerberus')}
