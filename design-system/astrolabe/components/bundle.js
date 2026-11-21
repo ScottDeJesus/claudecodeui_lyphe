@@ -1,4 +1,4 @@
-/* @ds-bundle: {"format":4,"namespace":"Astrolabe","components":[{"name":"Rings"},{"name":"Track"},{"name":"Core"},{"name":"Orbit"},{"name":"ArcGauge"},{"name":"SignalLoop"},{"name":"Spinner"},{"name":"Scene"},{"name":"Opening"},{"name":"Arrival"},{"name":"Sheet"},{"name":"Summon"},{"name":"Key"},{"name":"Trace"},{"name":"Steps"},{"name":"Roster"},{"name":"Excerpt"},{"name":"KeyValueList"},{"name":"ReadoutRow"},{"name":"Readout"},{"name":"BufferGauge"},{"name":"Badge"},{"name":"Reticle"},{"name":"Footprint"},{"name":"YourWords"},{"name":"Prepared"},{"name":"Stream"},{"name":"Exchange"},{"name":"Choice"},{"name":"Status"},{"name":"Plate"},{"name":"Rule"},{"name":"Transcript"},{"name":"Notice"},{"name":"Button"},{"name":"ToggleButton"},{"name":"FileButton"},{"name":"SegmentedControl"},{"name":"TextField"},{"name":"Select"},{"name":"Switch"},{"name":"Fader"},{"name":"Composer"},{"name":"Files"},{"name":"Questions"},{"name":"Form"},{"name":"ToolRow"},{"name":"Prose"},{"name":"Rail"},{"name":"Meter"},{"name":"Dock"},{"name":"Icon"}]} */
+/* @ds-bundle: {"format":4,"namespace":"Astrolabe","components":[{"name":"Hoop"},{"name":"Track"},{"name":"Core"},{"name":"Orbit"},{"name":"ArcGauge"},{"name":"SignalLoop"},{"name":"Spinner"},{"name":"Scene"},{"name":"Opening"},{"name":"Arrival"},{"name":"Sheet"},{"name":"Summon"},{"name":"Key"},{"name":"Trace"},{"name":"Steps"},{"name":"Roster"},{"name":"Excerpt"},{"name":"KeyValueList"},{"name":"ReadoutRow"},{"name":"Readout"},{"name":"BufferGauge"},{"name":"Badge"},{"name":"Reticle"},{"name":"Footprint"},{"name":"YourWords"},{"name":"Prepared"},{"name":"Stream"},{"name":"Exchange"},{"name":"Choice"},{"name":"Status"},{"name":"Plate"},{"name":"Rule"},{"name":"Transcript"},{"name":"Notice"},{"name":"Button"},{"name":"ToggleButton"},{"name":"FileButton"},{"name":"SegmentedControl"},{"name":"TextField"},{"name":"Select"},{"name":"Switch"},{"name":"Fader"},{"name":"Composer"},{"name":"Files"},{"name":"Questions"},{"name":"Form"},{"name":"ToolRow"},{"name":"Prose"},{"name":"Rail"},{"name":"Meter"},{"name":"Dock"},{"name":"Icon"}]} */
 /* Astrolabe — components for a voice instrument. Needs React 18 as window.React. Reads its colours, spaces and type from tokens.css. */
 (function () {
   'use strict';
@@ -1263,451 +1263,330 @@
      whisper-quiet until it is needed or you touch it, and it moves like a physical thing.
      ===================================================================================================== */
 
-  var RG_HALF = Math.PI / 2;
-  var RG_GLIDE = 0.38;   /* how long a flick carries (duration-glide) */
-  var RG_JUMP = 0.14;    /* how fast a tapped mark comes round (duration-jump) */
-  var RG_VMAX = 14;      /* rad/s, the hardest flick */
-  /* The rig's rings, inside out: its two armillary rings (b, a), its flat loop, and two more for larger sets. */
-  var RG_KIND = {
-    halo: { tone: 'halo', iota: 62, omega: 4.1, drift: 0.045, wob: 0 },
-    b: { tone: 'b', iota: 68, omega: 0.4, drift: 0.06, wob: 3 },
-    a: { tone: 'a', iota: 54, omega: 2.3, drift: -0.035, wob: 0 },
-    e: { tone: 'loop', iota: 46, omega: 5.3, drift: -0.05, wob: 0 },
-    loop: { tone: 'loop', iota: 0, omega: 0, drift: 0, wob: 0 },
-  };
-  var RG_SETS = {
-    1: [['a', 0.9]],
-    2: [['b', 0.68], ['a', 0.94]],
-    3: [['b', 0.58], ['a', 0.79], ['loop', 1]],
-    4: [['halo', 0.4], ['b', 0.6], ['a', 0.8], ['loop', 1]],
-    5: [['halo', 0.32], ['b', 0.49], ['a', 0.66], ['e', 0.83], ['loop', 1]],
-  };
-  var RG_STATES = { idle: 1, working: 1, waiting: 1, done: 1, failed: 1 };
-  var RG_WORD = { idle: 'not started', working: 'working', waiting: 'waiting on you', done: 'done', failed: 'failed' };
-  function rgMod(a, n) { return ((a % n) + n) % n; }
-  function rgStep(r) { return TAU / r.n; }
-  function rgAlign(r, x) { var st = rgStep(r); return RG_HALF + Math.round((x - RG_HALF) / st) * st; }
-  function rgIndex(r) { return rgMod(r.m, r.n); }            /* the thing whose mark sits at the pointer */
-  function rgMark(r, j) { return r.psi - j * rgStep(r); }      /* where thing j's mark is: things run clockwise, the way progress reads */
-  function rgFind(items, id) { for (var i = 0; i < items.length; i++) if (items[i] && String(items[i].id) === String(id)) return i; return -1; }
-  function rgState(it) { return it && RG_STATES[it.state] ? it.state : 'idle'; }
-  function rgBasis(r) { return { co: Math.cos(r.omega), so: Math.sin(r.omega), ci: Math.cos(r.iota), si: Math.sin(r.iota) }; }
-  /* A point of the ring on screen, and how far it sits toward you (positive) or away. */
-  function rgPt(E, B, rad, t) { var c = Math.cos(t), s = Math.sin(t); return [E.cx + rad * (c * B.co - s * B.so * B.ci), E.cy - rad * (c * B.so + s * B.co * B.ci), s * B.si]; }
-  /* The reverse: where on the ring's own plane a screen point falls, as an angle. It is what keeps a mark under your finger. */
-  function rgAngle(E, B, x, y) { var dx = x - E.cx, dy = -(y - E.cy); return Math.atan2((-dx * B.so + dy * B.co) / B.ci, dx * B.co + dy * B.so); }
-  function rgNearest(E, r, x, y) {
-    var B = rgBasis(r), rad = r.rf * E.Ro, N = 72, best = Infinity, bt = 0, i, k;
-    function tryAt(t) { var q = rgPt(E, B, rad, t), d = (q[0] - x) * (q[0] - x) + (q[1] - y) * (q[1] - y); if (d < best) { best = d; bt = t; } }
-    for (i = 0; i < N; i++) tryAt((i / N) * TAU);
-    var span = TAU / N;
-    for (k = 0; k < 5; k++) { span *= 0.5; var c = bt; tryAt(c - span); tryAt(c + span); }
-    return { d: Math.sqrt(best), front: Math.sin(bt) * B.si >= 0 };
-  }
-  /* The ring a pointer is on: the closest one inside the grab band, the near side winning where two cross. */
-  function rgAt(E, x, y, band) {
-    var hit = null, score = Infinity;
-    for (var i = 0; i < E.rings.length; i++) {
-      var r = E.rings[i];
-      if (r.leaving || r.life < 0.5 || r.holder !== null) continue;
-      var n = rgNearest(E, r, x, y);
-      if (n.d > band) continue;
-      var s = n.d - (n.front ? 1.5 : 0);
-      if (s < score) { score = s; hit = r; }
-    }
-    return hit;
-  }
-  /* The thing a point on a ring belongs to: each thing owns the span from its mark to the next one. */
-  function rgItemAt(E, r, x, y) { var a = rgAngle(E, rgBasis(r), x, y), st = rgStep(r); return Math.floor(wrapPi(r.psi - a) / st + 0.18); }
-  function rgRelease(r, v, now) {
-    var st = rgStep(r);
-    r.target = rgAlign(r, r.psi + v * RG_GLIDE);              /* the mark the flick would carry it to */
-    if (Math.abs(r.target - r.psi) < 0.9 * st) { r.mode = 'lock'; r.vel = v; } else { r.mode = 'seek'; r.tau = RG_GLIDE; r.vel = v; }
-  }
-  function rgJump(r, target) {
-    r.target = target;
-    if (Math.abs(target - r.psi) < 0.9 * rgStep(r)) r.mode = 'lock'; else { r.mode = 'seek'; r.tau = reducedMotion() ? 0.07 : RG_JUMP; }
-  }
-  /* Bring mark j round to the pointer, the short way. */
-  function rgBring(r, j) { rgJump(r, r.psi + wrapPi(RG_HALF - rgMark(r, j))); }
-  function rgAdvance(r, dt, now) {
-    var st = rgStep(r), locked = false;
-    if (r.mode === 'wheel' && now > r.wheelUntil) rgRelease(r, 0, now);
-    if (r.mode === 'seek') {
-      var d = (r.target - r.psi) * (1 - Math.exp(-dt / r.tau));
-      r.vel = d / dt; r.psi += d;
-      if (Math.abs(r.target - r.psi) < 0.9 * st) r.mode = 'lock';
-    } else if (r.mode === 'lock') {
-      var n = Math.max(1, Math.ceil(dt / 0.006)), hh = dt / n, w = SPRING.lock[0], z = reducedMotion() ? 1 : SPRING.lock[1];
-      for (var i = 0; i < n; i++) { r.vel += (-w * w * (r.psi - r.target) - 2 * z * w * r.vel) * hh; r.psi += r.vel * hh; }
-      if (Math.abs(r.psi - r.target) < 0.002 && Math.abs(r.vel) < 0.03) { r.psi = r.target; r.vel = 0; r.mode = 'rest'; r.lockFlash = 1; r.plateUntil = now + 1400; locked = true; }
-    }
-    var m = Math.round((r.psi - RG_HALF) / st);
-    if (m !== r.m) { r.m = m; r.flash = 1; }
-    springStep(r.pawl, r.mode === 'rest' ? 1 : 0, dt, 'lock');      /* the pointer lifts while the ring turns and drops in when it locks */
-    return locked;
-  }
-  /* One arc of a ring, on the near side or the far side only, so the far half can sit back. */
-  function rgArc(ctx, E, B, rad, t0, t1, front, flat) {
-    var n = Math.max(2, Math.ceil(Math.abs(t1 - t0) / (TAU / 96))), on = false;
-    ctx.beginPath();
-    for (var i = 0; i < n; i++) {
-      var u0 = lerp(t0, t1, i / n), u1 = lerp(t0, t1, (i + 1) / n);
-      if (!flat && (Math.sin((u0 + u1) / 2) >= 0) !== front) { on = false; continue; }
-      var q;
-      if (!on) { q = rgPt(E, B, rad, u0); ctx.moveTo(q[0], q[1]); on = true; }
-      q = rgPt(E, B, rad, u1); ctx.lineTo(q[0], q[1]);
-    }
-  }
-  function rgTick(ctx, E, B, rad, t, k0, k1) { var a = rgPt(E, B, rad * k0, t), b = rgPt(E, B, rad * k1, t); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+  /* The thing in a list with this id, by its string form. */
+  function findItem(items, id) { for (var i = 0; i < items.length; i++) if (items[i] && String(items[i].id) === String(id)) return i; return -1; }
 
-  function rgDrawRing(ctx, E, r, front, P) {
-    var B = rgBasis(r), rad = r.rf * E.Ro, tone = P[r.tone] || P.loop, flat = B.si < 0.06;
-    if (flat && !front) return;                             /* a face-on ring has no far side: it is drawn once */
-    var depth = Math.min(1, B.si * 1.15), vis = r.life * (1 - 0.45 * r.dim), act = r.act, near = !flat && !front ? 1 - depth : 1;
-    var st = rgStep(r), small = E.Ro < 90, k = rgIndex(r), lw = (r.tone === 'loop' ? 1.25 : 1) + 0.8 * act, j, t;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    /* the ring itself: a hairline, whisper-quiet */
-    rgArc(ctx, E, B, rad, flat || front ? 0 : Math.PI, flat ? TAU : front ? Math.PI : TAU, front, true);
-    if (act > 0.02) {
-      ctx.strokeStyle = rgba(tone, 0.05 * act * vis * lerp(0.4, 1, near)); ctx.lineWidth = lw + 13; ctx.stroke();
-      ctx.strokeStyle = rgba(tone, 0.1 * act * vis * lerp(0.4, 1, near)); ctx.lineWidth = lw + 5; ctx.stroke();
-    }
-    ctx.strokeStyle = rgba(tone, lerp(lerp(0.2, 0.34, act), lerp(0.42, 0.7, act), near) * vis); ctx.lineWidth = lw; ctx.stroke();
-
-    /* each thing's span: how far it has got, and what it is doing */
-    var gap = Math.min(0.07, st * 0.16), len = st - gap, per = Math.max(1, Math.round(24 / r.n));
-    for (j = 0; j < r.n; j++) {
-      var it = r.items[j] || {}, state = rgState(it), t0 = rgMark(r, j) - gap / 2, pr = state === 'done' ? 1 : clamp(+it.progress || 0, 0, 1);
-      var col = state === 'failed' ? P.danger : tone, head = t0 - len * pr, done = state === 'done';
-      if (pr > 0.001) {
-        rgArc(ctx, E, B, rad, t0, head, front, flat);
-        /* finished work rests: thinner and quieter than work in hand */
-        ctx.strokeStyle = rgba(col, lerp(done ? 0.28 : 0.34, done ? 0.56 : 0.98, near) * vis); ctx.lineWidth = done ? (small ? 1.3 : 1.5) : (small ? 1.6 : 2.1) + 0.6 * act; ctx.stroke();
-      }
-      if (state === 'working') {
-        /* work in progress: dashes crawl ahead of the head, and a bead rides it */
-        var ahead = Math.min(len * (1 - pr), Math.max(0.1, len * 0.3)), dash = Math.max(0.03, 7 / Math.max(20, rad)), ph = (E.work * 0.42) % dash;
-        ctx.strokeStyle = rgba(col, lerp(0.3, 0.9, near) * vis); ctx.lineWidth = small ? 1.3 : 1.6;
-        for (var u = ph - dash; u < ahead; u += dash) {
-          var a0 = Math.max(0, u), a1 = Math.min(ahead, u + dash * 0.5);
-          if (a1 > a0) { rgArc(ctx, E, B, rad, head - a0, head - a1, front, flat); ctx.stroke(); }
-        }
-        if (flat || (Math.sin(head) >= 0) === front) {
-          var hb = rgPt(E, B, rad, head);
-          ctx.beginPath(); ctx.arc(hb[0], hb[1], (small ? 2 : 2.6) + 0.9 * act, 0, TAU);
-          ctx.fillStyle = rgba(col, lerp(0.45, 1, near) * vis); ctx.fill();
-        }
-        /* helpers at work on it ride behind the bead, one small bead each */
-        var ag = Math.min(5, Math.max(0, Math.round(+it.agents || 0))), sp = Math.max(0.04, 8 / Math.max(20, rad));
-        for (var q = 1; q <= ag && !small; q++) {
-          var ta = head + q * sp;
-          if (ta > t0 || !(flat || (Math.sin(ta) >= 0) === front)) continue;
-          var ab = rgPt(E, B, rad * 1.035, ta);
-          ctx.beginPath(); ctx.arc(ab[0], ab[1], 1.5, 0, TAU);
-          ctx.fillStyle = rgba(P.ink, lerp(0.4, 0.9, near) * vis); ctx.fill();
-        }
-      } else if (state === 'failed' && (flat || (Math.sin(head) >= 0) === front)) {
-        ctx.beginPath(); rgTick(ctx, E, B, rad, head, 0.94, 1.06);
-        ctx.strokeStyle = rgba(P.danger, lerp(0.45, 1, near) * vis); ctx.lineWidth = 2; ctx.stroke();
-      }
-    }
-    /* the marks: one per thing, with the rig's fine divisions between them */
-    ctx.lineWidth = 1;
-    if (!small) {
-      ctx.beginPath();
-      for (j = 0; j < r.n * per; j++) {
-        if (j % per === 0) continue;
-        t = r.psi - (j * st) / per;
-        if (flat || (Math.sin(t) >= 0) === front) rgTick(ctx, E, B, rad, t, 1, 1.022);
-      }
-      ctx.strokeStyle = rgba(tone, lerp(0.09, lerp(0.2, 0.34, act), near) * vis); ctx.stroke();
-    }
-    ctx.beginPath();
-    for (j = 0; j < r.n; j++) {
-      t = rgMark(r, j);
-      if (j === k || rgState(r.items[j]) === 'waiting') continue;
-      if (flat || (Math.sin(t) >= 0) === front) rgTick(ctx, E, B, rad, t, 1, small ? 1.07 : 1.05);
-    }
-    ctx.strokeStyle = rgba(tone, lerp(lerp(0.26, 0.36, act), lerp(0.6, 0.95, act), near) * vis); ctx.stroke();
-    for (j = 0; j < r.n; j++) {
-      t = rgMark(r, j);
-      if (!(flat || (Math.sin(t) >= 0) === front)) continue;
-      var waiting = rgState(r.items[j]) === 'waiting';
-      if (waiting) {
-        /* waiting on you: the mark turns accent and holds a gate open, steady, with no blinking */
-        var g = Math.min(0.06, st * 0.2);
-        ctx.beginPath(); rgTick(ctx, E, B, rad, t, 0.93, 1.1); rgTick(ctx, E, B, rad, t - g, 0.965, 1.06); rgTick(ctx, E, B, rad, t + g, 0.965, 1.06);
-        ctx.strokeStyle = rgba(P.accent, lerp(0.5, 1, near) * vis); ctx.lineWidth = small ? 1.4 : 1.7; ctx.stroke();
-      } else if (j === k) {
-        var hot = clamp(Math.max(r.flash, r.lockFlash, act), 0, 1);
-        ctx.beginPath(); rgTick(ctx, E, B, rad, t, 1, 1.085 + 0.02 * act);
-        ctx.strokeStyle = rgba(mixc(P.ink, P.accent, hot), lerp(0.4, 1, near) * vis); ctx.lineWidth = 1.25 + 0.6 * act; ctx.stroke();
-      }
-    }
+  /* ---------- Hoop: a set of things as slots on a band that stands round the core, seen from a little above. The standard way a set
+     you turn through is drawn: each thing a slot with a face you can read and press; a run's things side by side, its name along the
+     ground; the thing at the front read out under it. A slot's square says what it is doing, its top edge how far it has got, the
+     beads at its foot who is helping, its height how much it matters. ---------- */
+  /* HOOP_CORE: the core's square as a share of the hoop's width; HOOP_BODY: its body's radius as a share of that square */
+  var HOOP_CORE = 0.28, HOOP_BODY = 0.235;
+  var HOOP_TILT = 0.52, HOOP_GAP = 0.09, HOOP_SQUARE = [0.24, 0.78], HOOP_EDGE = 0.84, HOOP_EDGE_MOST = 6, HOOP_BEAD = 0.11, HOOP_BAND_MOST = 64, HOOP_READING = 28;
+  var HOOP_PAL = [['ink', 'ink-strong', '#ffffff'], ['tone', 'ink', '#eef1f4'], ['muted', 'ink-muted', '#959da6'], ['accent', 'accent', '#f2a65a'], ['positive', 'positive-dot', '#6fd6ab'], ['danger', 'danger-dot', '#ff7b6b'], ['warn', 'warn-dot', '#e6c15a']];
+  function hoopGeometry(w, hh, lean) {
+    var r = Math.max(14, Math.min(w / 2 - 6, (hh - 18) / (2 * lean + 0.18)));
+    var band = clamp(r * 0.18, 12, HOOP_BAND_MOST);
+    return { cx: w / 2, cy: 4 + band + r * lean, r: r, band: band };
   }
-  function rgPlate(ctx, E, P, x, y, cap, label, alpha, hot) {
-    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-    ctx.font = canvasFont(P, 10, 400); var wc = cap ? ctx.measureText(cap).width : 0;
-    ctx.font = canvasFont(P, 12, 500); var wl = label ? ctx.measureText(label).width : 0;
-    var pw = Math.max(wc, wl) + 16, ph = cap && label ? 36 : 22;
-    x = clamp(x, pw / 2 + 2, E.W - pw / 2 - 2); y = clamp(y, ph / 2 + 2, E.H - ph / 2 - 2);
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x - pw / 2, y - ph / 2, pw, ph, 2); else ctx.rect(x - pw / 2, y - ph / 2, pw, ph);
-    ctx.fillStyle = rgba(P.ground, P.plate * alpha); ctx.fill();
-    if (cap) { ctx.font = canvasFont(P, 10, 400); ctx.fillStyle = rgba(P.muted, alpha); ctx.fillText(cap, x - pw / 2 + 8, y + (label ? -8 : 0.5)); }
-    if (label) { ctx.font = canvasFont(P, 12, 500); ctx.fillStyle = rgba(mixc(P.ink, P.accent, clamp(hot, 0, 1)), alpha); ctx.fillText(label, x - pw / 2 + 8, y + (cap ? 8 : 0.5)); }
+  function hoopHeightFor(w, lean) { return Math.round(18 + (2 * lean + 0.18) * (w / 2 - 6)); }
+  function hoopWidthFor(hh, lean) { return Math.max(0, Math.floor(2 * ((hh - 18) / (2 * lean + 0.18) + 6))); }
+  function hoopFold(a) { var t = ((a + Math.PI) % TAU + TAU) % TAU - Math.PI; return t === -Math.PI ? Math.PI : t; }
+  function hoopPalette(el) {
+    var cs = getComputedStyle(el), P = {};
+    for (var i = 0; i < HOOP_PAL.length; i++) P[HOOP_PAL[i][0]] = parseColor(cs.getPropertyValue('--' + HOOP_PAL[i][1]), HOOP_PAL[i][2]);
+    P.mono = (cs.getPropertyValue('--font-mono') || '').trim() || '"Geist Mono", ui-monospace, monospace';
+    return P;
   }
-  function rgDrawPointer(ctx, E, r, P) {
-    var B = rgBasis(r), rad = r.rf * E.Ro, q = rgPt(E, B, rad, RG_HALF), vis = r.life * (1 - 0.45 * r.dim), sc = clamp(E.Ro / 140, 0.5, 1);
-    var nx = -B.so, ny = -B.co;                             /* straight out from the ring, where it faces you */
-    var off = rad * 0.105 * B.ci + 5 * sc + (1 - r.pawl.x) * 5 * sc, hot = clamp(Math.max(r.act, r.flash, r.lockFlash), 0, 1);
-    var tx = q[0] + nx * off, ty = q[1] + ny * off, bx = q[0] + nx * (off + 8 * sc), by = q[1] + ny * (off + 8 * sc), qx = -ny * 4 * sc, qy = nx * 4 * sc;
-    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(bx + qx, by + qy); ctx.lineTo(bx - qx, by - qy); ctx.closePath();
-    ctx.fillStyle = rgba(mixc(P.muted, P.accent, hot), lerp(0.7, 1, hot) * vis); ctx.fill();
-    if (r.plate > 0.01) {                                   /* the name of what faces you, only while the ring is in use */
-      var it = r.items[rgIndex(r)] || {}, cap = (r.def.label || '') + (it.detail ? (r.def.label ? ' · ' : '') + it.detail : '');
-      rgPlate(ctx, E, P, q[0] + nx * (off + 8 * sc + 26), q[1] + ny * (off + 8 * sc + 26), cap.toUpperCase(), it.label || '', r.plate * vis, r.flash * 1.5);
+  /* The painter over one canvas: it lays the slots round the hoop, turns it, draws it, and says what a pointer is over. */
+  function hoopPainter(canvas) {
+    var ctx = canvas.getContext('2d');
+    var S = { slots: [], places: [], runs: [], w: 0, hh: 0, dpr: 1, cx: 0, cy: 0, r: 60, lean: HOOP_TILT, band: 18, names: true, P: null,
+      rot: 0, target: 0, hover: -1, pointer: null, drag: null, wheelAt: 0, still: false, focused: false, paths: [], link: null, hole: 0, at: 0 };
+    function point(a, up, out) { out = out || 1; return [S.cx + S.r * out * Math.sin(a), S.cy + S.r * out * S.lean * Math.cos(a) - up * S.band]; }
+    function piece(from, to, low, high) {
+      var path = new Path2D(), steps = Math.max(2, Math.ceil(Math.abs(to - from) / 0.12)), k, q;
+      for (k = 0; k <= steps; k++) { q = point(lerp(from, to, k / steps), low); if (k === 0) path.moveTo(q[0], q[1]); else path.lineTo(q[0], q[1]); }
+      for (k = steps; k >= 0; k--) { q = point(lerp(from, to, k / steps), high); path.lineTo(q[0], q[1]); }
+      path.closePath();
+      return path;
     }
+    function lay() {
+      var n = S.slots.length, groups = 0, i;
+      S.places = []; S.runs = [];
+      if (!n) return;
+      for (i = 0; i < n; i++) if (i === 0 || S.slots[i].group !== S.slots[i - 1].group) groups++;
+      var gap = groups > 1 ? Math.min(HOOP_GAP, TAU / n / 3) : 0, share = Math.min(TAU / 12, (TAU - groups * gap) / n), at = 0;
+      for (i = 0; i < n; i++) {
+        if (i === 0 || S.slots[i].group !== S.slots[i - 1].group) { if (i > 0) at += gap; S.runs.push({ from: at, to: at, name: S.slots[i].groupName }); }
+        S.places.push({ at: at + share / 2, width: share });
+        at += share;
+        S.runs[S.runs.length - 1].to = at;
+      }
+    }
+    function frontOf(turn) { var best = -1; for (var i = 0; i < S.places.length; i++) if (best === -1 || Math.abs(hoopFold(S.places[i].at + turn)) < Math.abs(hoopFold(S.places[best].at + turn))) best = i; return best; }
+    function turnTo(i) { if (i >= 0 && i < S.places.length) S.target = S.rot - hoopFold(S.places[i].at + S.rot); }
+    function slotAt(x, y) {
+      var found = -1;
+      for (var i = 0; i < S.paths.length; i++) {
+        var path = S.paths[i];
+        if (!path || !ctx.isPointInPath(path, x * S.dpr, y * S.dpr)) continue;
+        if (found === -1 || Math.cos(S.places[i].at + S.rot) > Math.cos(S.places[found].at + S.rot)) found = i;
+      }
+      return found;
+    }
+    function tallOf(slot) { return clamp(slot.height == null ? 1 : slot.height, 0.3, 1); }
+    function fillSquare(sq, c, fill, shade) {
+      ctx.fillStyle = rgba(c, fill * lerp(0.7, 1, shade)); ctx.fill(sq);
+      ctx.strokeStyle = rgba(c, lerp(0.7, 1, shade)); ctx.lineWidth = 1.25; ctx.stroke(sq);
+    }
+    function drawSlot(i, now) {
+      var P = S.P, slot = S.slots[i], place = S.places[i], tall = tallOf(slot), mid = place.at + S.rot, e = Math.min(0.02, place.width * 0.1);
+      var low = mid - place.width / 2 + e, high = mid + place.width / 2 - e, near = Math.cos(mid) > 0;
+      var shade = lerp(0.45, 1, Math.abs(Math.cos(mid))) * (near ? 1 : 0.62), whole = piece(low, high, 0, tall), k;
+      S.paths[i] = whole;
+      ctx.lineWidth = 1; ctx.strokeStyle = rgba(P.tone, 0.3 * shade); ctx.stroke(whole);
+      if (slot.state === 'more') {
+        var dot = clamp(S.band * tall * 0.07, 1.3, 2.4);
+        for (k = -1; k <= 1; k++) { var q = point(mid + k * (high - low) * 0.18, tall * (HOOP_SQUARE[0] + HOOP_SQUARE[1]) / 2); ctx.beginPath(); ctx.arc(q[0], q[1], dot, 0, TAU); ctx.fillStyle = rgba(P.muted, Math.min(1, shade + 0.2)); ctx.fill(); }
+      } else if (slot.state !== 'asleep') {
+        var sq = piece(low, high, HOOP_SQUARE[0] * tall, HOOP_SQUARE[1] * tall);
+        if (slot.state === 'waiting') {
+          var breath = S.still ? 1 : clamp(0.5 + 2.2 * Math.sin((now / 1000) * TAU / 1.15), 0, 1);
+          ctx.fillStyle = rgba(P.accent, lerp(0.3, 0.95, breath) * lerp(0.7, 1, shade)); ctx.fill(sq);
+          ctx.strokeStyle = rgba(P.accent, lerp(0.7, 1, shade)); ctx.lineWidth = 1.25; ctx.stroke(sq);
+        } else if (slot.state === 'done') fillSquare(sq, P.positive, 0.62, shade);
+        else if (slot.state === 'failed') fillSquare(sq, P.danger, 0.62, shade);
+        else {
+          ctx.fillStyle = rgba(P.tone, 0.2 * shade); ctx.fill(sq);
+          ctx.strokeStyle = rgba(P.tone, 0.5 * shade); ctx.lineWidth = 1; ctx.stroke(sq);
+          if (slot.state === 'working') {
+            var reach = Math.min(S.band * tall * (HOOP_SQUARE[1] - HOOP_SQUARE[0]) * 0.42, S.r * (high - low) * 0.32), across = reach / S.r, up = reach / S.band;
+            var middle = tall * (HOOP_SQUARE[0] + HOOP_SQUARE[1]) / 2, from = S.still ? 0 : ((now / 1000) / 2.4) * TAU, part = TAU / 12;
+            ctx.beginPath();
+            for (var d = 0; d < 12; d++) for (var st = 0; st <= 2; st++) {
+              var turn = from + d * part + (st / 2) * part * 0.56, pt = point(mid + across * Math.cos(turn), middle + up * Math.sin(turn));
+              if (st === 0) ctx.moveTo(pt[0], pt[1]); else ctx.lineTo(pt[0], pt[1]);
+            }
+            ctx.strokeStyle = rgba(P.accent, Math.min(1, shade + 0.25)); ctx.lineWidth = clamp((reach / 19) * 1.5, 1.1, 1.75); ctx.stroke();
+          }
+        }
+      }
+      var lit = clamp(slot.edge || 0, 0, 1);
+      if (lit > 0) {
+        var top = Math.max(HOOP_EDGE * tall, tall - HOOP_EDGE_MOST / S.band);
+        if (lit < 1) { ctx.fillStyle = rgba(P.tone, 0.14 * shade); ctx.fill(piece(low, high, top, tall)); }
+        ctx.fillStyle = rgba(P.ink, Math.min(1, shade + 0.25)); ctx.fill(piece(low, lerp(low, high, lit), top, tall));
+      }
+      if (slot.beads > 0) {
+        var n = Math.min(3, slot.beads), sway = S.still ? 0 : Math.sin(now / 450 + i) * (high - low) * 0.12, step = n > 1 ? ((high - low) * 0.5) / (n - 1) : 0, size = clamp(S.band * 0.08, 1.6, 3);
+        for (k = 0; k < n; k++) { var b = point(mid + sway + (k - (n - 1) / 2) * step, HOOP_BEAD * tall); ctx.beginPath(); ctx.arc(b[0], b[1], size, 0, TAU); ctx.fillStyle = rgba(P.ink, Math.min(1, shade + 0.3)); ctx.fill(); }
+      }
+      if (S.hover === i) { ctx.strokeStyle = rgba(P.ink, 0.9); ctx.lineWidth = 1.25; ctx.stroke(whole); }
+    }
+    function drawName(run) {
+      if (!run.name) return;
+      var mid = (run.from + run.to) / 2 + S.rot, facing = Math.cos(mid);
+      if (Math.abs(facing) < 0.3) return;
+      var near = facing > 0, out = near ? 1 + 15 / S.r : 1 - 15 / S.r, q = point(mid, 0, out), a = point(mid - 0.01, 0, out), b = point(mid + 0.01, 0, out);
+      var room = S.r * (run.to - run.from) * Math.abs(facing) - 6, name = String(run.name).toUpperCase();
+      ctx.font = '500 9px ' + S.P.mono;
+      var wide = ctx.measureText(name).width;
+      if (wide > room || (near && Math.abs(q[0] - S.cx) < wide / 2 + 8)) return;
+      ctx.save(); ctx.translate(q[0], q[1] + (near ? 3 : 0)); ctx.rotate(Math.atan2(b[1] - a[1], b[0] - a[0]) + (near ? 0 : Math.PI));
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = rgba(S.P.muted, near ? 0.95 : 0.6); ctx.fillText(name, 0, 0); ctx.restore();
+    }
+    function drawLink(now) {
+      if (!S.link) return;
+      var i = -1;
+      for (var k = 0; k < S.slots.length; k++) if (S.slots[k].id === S.link.id) i = k;
+      if (i === -1) return;
+      var s = point(S.places[i].at + S.rot, 0.5 * tallOf(S.slots[i])), mx = S.cx, my = S.cy - S.band / 2, reach = Math.hypot(s[0] - mx, s[1] - my);
+      if (reach <= S.hole + 4) return;
+      var ex = mx + ((s[0] - mx) / reach) * S.hole, ey = my + ((s[1] - my) / reach) * S.hole;
+      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(s[0], s[1]); ctx.strokeStyle = rgba(S.P.accent, 0.55); ctx.lineWidth = 1; ctx.stroke();
+      if (S.still) return;
+      var along = (now % 1100) / 1100, by = S.link.way === 'in' ? 1 - along : along;
+      ctx.beginPath(); ctx.arc(lerp(ex, s[0], by), lerp(ey, s[1], by), 2.5, 0, TAU); ctx.fillStyle = rgba(S.P.accent, 1); ctx.fill();
+    }
+    return {
+      resize: function (w, hh, dpr, lean) { S.w = w; S.hh = hh; S.dpr = dpr; S.lean = lean; fitCanvas(canvas, w, hh, dpr); var g = hoopGeometry(w, hh, lean); S.cx = g.cx; S.cy = g.cy; S.r = g.r; S.band = g.band; },
+      setStill: function (v) { S.still = v; },
+      setNames: function (v) { S.names = v; },
+      setFocused: function (v) { S.focused = v; },
+      setLink: function (l, hole) { S.link = l; S.hole = hole; },
+      setSlots: function (next) {
+        var kept = S.slots[frontOf(S.target)], keptId = kept ? kept.id : null;
+        S.slots = next; lay(); S.paths = next.map(function () { return null; }); S.hover = -1;
+        var at = -1;
+        for (var i = 0; i < next.length; i++) if (next[i].id === keptId) at = i;
+        var first = -1;
+        for (var j = 0; j < next.length && first === -1; j++) if (next[j].state === 'waiting') first = j;
+        var front = at !== -1 ? at : Math.max(0, first);
+        if (S.places.length) { S.target = -S.places[front].at; if (keptId === null || at === -1) S.rot = S.target; else S.rot += hoopFold(S.target - S.rot) - (S.target - S.rot); }
+      },
+      bring: function (id) { for (var i = 0; i < S.slots.length; i++) if (S.slots[i].id === id) { S.target = -S.places[i].at; S.rot = S.target; return true; } return false; },
+      pointOf: function (id) { for (var i = 0; i < S.slots.length; i++) if (S.slots[i].id === id) return point(S.places[i].at + S.rot, tallOf(S.slots[i])); return null; },
+      azimuthOf: function (id) {
+        for (var i = 0; i < S.slots.length; i++) if (S.slots[i].id === id) { var q = point(S.places[i].at + S.rot, 0.5 * tallOf(S.slots[i])); return (Math.atan2(S.cy - S.band / 2 - q[1], q[0] - S.cx) * 180) / Math.PI; }
+        return null;
+      },
+      frame: function (dt, now, el) {
+        if (!S.P || now - S.at > 400) { S.at = now; try { S.P = hoopPalette(el); } catch (e) { /* keep */ } }
+        if (!S.drag) S.rot = S.still || Math.abs(S.target - S.rot) < 0.0005 ? S.target : S.rot + (S.target - S.rot) * (1 - Math.exp(-dt * 11));
+        var P = S.P;
+        ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); ctx.clearRect(0, 0, S.w, S.hh); ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.r, S.r * S.lean, 0, 0, TAU); ctx.strokeStyle = rgba(P.tone, S.slots.length ? 0.14 : 0.3); ctx.lineWidth = 1; ctx.stroke();
+        var order = S.slots.map(function (_, i) { return i; }).sort(function (a, b) { return Math.cos(S.places[a].at + S.rot) - Math.cos(S.places[b].at + S.rot); });
+        for (var k = 0; k < order.length; k++) drawSlot(order[k], now);
+        if (S.pointer && !S.drag) S.hover = slotAt(S.pointer[0], S.pointer[1]);
+        if (S.names) for (var r = 0; r < S.runs.length; r++) drawName(S.runs[r]);
+        drawLink(now);
+        var front = frontOf(S.rot);
+        if (front !== -1) {
+          var q = point(0, 0);
+          ctx.beginPath(); ctx.moveTo(q[0], q[1] + 5); ctx.lineTo(q[0] + 4, q[1] + 12); ctx.lineTo(q[0] - 4, q[1] + 12); ctx.closePath(); ctx.fillStyle = rgba(P.muted, 0.8); ctx.fill();
+          if (S.focused && S.paths[front]) { ctx.strokeStyle = rgba(P.ink, 1); ctx.lineWidth = 1.5; ctx.stroke(S.paths[front]); }
+        }
+        return { front: front, hover: S.hover };
+      },
+      down: function (x, y) { var s = slotAt(x, y); if (s === -1) return false; S.drag = { x: x, moved: 0, rot: S.rot, slot: s }; return true; },
+      move: function (x, y) {
+        if (S.drag) { S.drag.moved = Math.max(S.drag.moved, Math.abs(x - S.drag.x)); if (S.drag.moved >= 5) { S.rot = S.drag.rot + (x - S.drag.x) / S.r; S.target = S.rot; } return true; }
+        S.pointer = [x, y]; S.hover = slotAt(x, y); return S.hover !== -1;
+      },
+      up: function () {
+        var d = S.drag; S.drag = null;
+        if (!d) return null;
+        if (d.moved >= 5) { turnTo(frontOf(S.rot)); return null; }
+        if (d.slot === frontOf(S.target)) return { open: d.slot };
+        turnTo(d.slot); return { turned: d.slot };
+      },
+      leave: function () { S.pointer = null; S.hover = -1; },
+      wheel: function (delta, now) {
+        var n = S.places.length;
+        if (n < 2 || now - S.wheelAt < 200) return n >= 2;
+        S.wheelAt = now; turnTo(((frontOf(S.target) + (delta > 0 ? 1 : -1)) % n + n) % n); return true;
+      },
+      key: function (key) {
+        var n = S.places.length;
+        if (!n) return false;
+        var f = frontOf(S.target);
+        if (key === 'ArrowRight' || key === 'ArrowDown') turnTo((f + 1) % n);
+        else if (key === 'ArrowLeft' || key === 'ArrowUp') turnTo((f - 1 + n) % n);
+        else if (key === 'Home') turnTo(0);
+        else if (key === 'End') turnTo(n - 1);
+        else return false;
+        return true;
+      },
+      front: function () { return frontOf(S.target); },
+    };
   }
-
-  /* ---------- Rings: sets of things you turn through. A ring's marks are the things; the mark that faces you is where you are;
-     each thing's span lights as it advances; the way the span moves says whether it is working, waiting on you, done or failed. ---------- */
   /* one measure, or two: the first is worn closest to the core */
-  function rgGauges(g) { return (Array.isArray(g) ? g : g ? [g] : []).filter(function (x) { return x && isFinite(+x.value); }).slice(0, 2); }
-  var Rings = React.forwardRef(function Rings(p, ref) {
-    var root = useRef(null), cv = useRef(null), coreEl = useRef(null), box = useBox(root), ER = useRef(null), PR = useRef(p), tick = useState(0);
+  function hoopGauges(g) { return (Array.isArray(g) ? g : g ? [g] : []).filter(function (x) { return x && isFinite(+x.value); }).slice(0, 2); }
+  var Hoop = React.forwardRef(function Hoop(p, ref) {
+    var lean = p.lean != null ? p.lean : HOOP_TILT, names = p.names !== false, reading = p.reading !== false;
+    var root = useRef(null), cv = useRef(null), painter = useRef(null), box = useBox(root), PR = useRef(p), bt = useRef(null);
     PR.current = p;
-    function eng() {
-      if (!ER.current) ER.current = { rings: [], cx: 0, cy: 0, Ro: 0, W: 0, H: 0, grabs: {}, nGrabs: 0, clock: 0, work: 0, driftK: 0, idleAt: 0, pal: null, hover: null, core: 0, started: false };
-      return ER.current;
-    }
-    function bump() { tick[1](function (x) { return x + 1; }); }
-    function sync(E) {
-      var defs = (PR.current.rings || []).slice(0, 5), n = Math.max(1, defs.length), set = RG_SETS[n], seen = {}, i, j;
-      for (i = 0; i < defs.length; i++) {
-        var d = defs[i] || {}, id = d.id != null ? String(d.id) : 'ring-' + i, kind = RG_KIND[d.kind] ? d.kind : set[i][0], K = RG_KIND[kind];
-        var items = d.items || [], N = Math.max(1, items.length), r = null, want = d.value != null ? rgFind(items, d.value) : -1;
-        for (j = 0; j < E.rings.length; j++) if (E.rings[j].id === id) r = E.rings[j];
-        if (!r) {
-          var k0 = want >= 0 ? want : Math.max(0, d.defaultValue != null ? rgFind(items, d.defaultValue) : 0), psi = RG_HALF + k0 * (TAU / N);
-          r = { id: id, psi: psi, vel: 0, target: psi, tau: RG_GLIDE, mode: 'rest', m: Math.round((psi - RG_HALF) / (TAU / N)), n: N, omega: K.omega, iota: (K.iota * DEG), rf: set[i][1],
-            life: E.started ? 0 : 1, act: 0, dim: 0, hover: false, focus: false, holder: null, flash: 0, lockFlash: 0, pawl: { x: 1, v: 0 }, plate: 0, plateUntil: 0, wheelUntil: 0, hist: [],
-            applied: d.value, reported: items[k0] ? items[k0].id : null, sel: k0 };
-          E.rings.push(r);
-        }
-        r.def = d; r.items = items; r.K = K; r.tone = d.tone === 'a' || d.tone === 'b' || d.tone === 'loop' || d.tone === 'halo' ? d.tone : K.tone; r.rfT = set[i][1]; r.leaving = false;
-        r.tilt = d.tilt != null && isFinite(d.tilt) ? clamp(+d.tilt, 0, 72) : K.iota;
-        if (r.n !== N) { r.n = N; r.m = Math.round((r.psi - RG_HALF) / (TAU / N)); if (r.mode !== 'held') { r.target = rgAlign(r, r.psi); r.mode = 'lock'; } }
-        if (d.value !== r.applied) { r.applied = d.value; if (want >= 0 && want !== rgIndex(r) && r.mode !== 'held') rgBring(r, want); }
-        seen[id] = 1;
-      }
-      for (j = 0; j < E.rings.length; j++) if (!seen[E.rings[j].id]) E.rings[j].leaving = true;
-      E.rings.sort(function (a, b) { return a.rfT - b.rfT; });
-    }
-    function clientPoint(E, r, j) {
-      var c = cv.current; if (!c) return null;
-      var rc = c.getBoundingClientRect(), q = rgPt(E, rgBasis(r), r.rf * E.Ro, rgMark(r, j));
-      return { x: rc.left + q[0], y: rc.top + q[1] };
-    }
-    function open(E, r, j) { var P0 = PR.current, it = r.items[rgMod(j, r.n)]; if (it && P0.onOpen) P0.onOpen(it, r.def, clientPoint(E, r, j)); }
-    React.useImperativeHandle(ref, function () {
-      return {
-        /* where a thing's mark is on screen right now, in client coordinates: what an Opening hangs from */
-        pointOf: function (ringId, itemId) {
-          var E = eng();
-          for (var i = 0; i < E.rings.length; i++) if (E.rings[i].id === String(ringId)) { var j = rgFind(E.rings[i].items, itemId); return j < 0 ? null : clientPoint(E, E.rings[i], j); }
-          return null;
-        },
-        /* the direction of a thing's mark from the core, in degrees, for the Core's `azimuth`: what it reads from or writes to */
-        azimuthOf: function (ringId, itemId) {
-          var pt = this.pointOf(ringId, itemId), E = eng(), el = cv.current;
-          if (!pt || !el) return null;
-          var rc = el.getBoundingClientRect();
-          return Math.atan2(rc.top + E.cy - pt.y, pt.x - rc.left - E.cx) / DEG;
-        },
-      };
-    });
-
-    useFrame(root, function (dt, now) {
-      var el = root.current, c = cv.current, W = box.current.w, H = box.current.h, P0 = PR.current;
-      if (!el || !c || !W || !H) return;
-      var E = eng(), i, r;
-      if (!E.pal) E.pal = new LivePalette(el);
-      E.pal.step(now, dt);
-      sync(E); E.started = true;
-      var mn = Math.min(W, H), rm = reducedMotion() ? 0.35 : 1;
-      E.W = W; E.H = H; E.cx = W / 2; E.cy = H / 2; E.Ro = Math.max(14, (mn / 2 - clamp(mn * 0.085, 5, 30)) / 1.08);
-      var cs = Math.round((2 * E.Ro) / 2.3);
-      if (coreEl.current && E.core !== cs) { E.core = cs; coreEl.current.style.width = cs + 'px'; coreEl.current.style.height = cs + 'px'; }
-
-      /* The rings drift when left alone, and hold still the moment you touch one or open something. */
-      var held = E.nGrabs > 0, busy = held || !!P0.hold, anyHeld = false, changed = false;
-      for (i = 0; i < E.rings.length; i++) { r = E.rings[i]; if (r.mode !== 'rest' || r.focus) busy = true; if (r.mode === 'held' || r.mode === 'wheel') anyHeld = true; }
-      if (busy) E.idleAt = now + 700;
-      E.driftK = held ? 0 : ease(E.driftK, P0.drift !== false && now > E.idleAt ? 1 : 0, dt, 0.45);
-      var rate = E.driftK * rm;
-      E.clock += dt * rate; E.work += dt * rm;
-      for (i = 0; i < E.rings.length; i++) {
-        r = E.rings[i];
-        if (rgAdvance(r, dt, now)) {
-          var it = r.items[rgIndex(r)];
-          r.sel = rgIndex(r); changed = true;
-          if (it && it.id !== r.reported) { r.reported = it.id; if (P0.onChange) P0.onChange(it, r.def); }
-        }
-        r.omega += r.K.drift * dt * rate;
-        r.iota = ease(r.iota, (r.tilt + r.K.wob * Math.sin(E.clock * 0.31)) * DEG * (r.tilt > 0 ? 1 : 0), dt, 0.18);
-        r.rf = ease(r.rf, r.rfT, dt, 0.16);
-        r.life = ease(r.life, r.leaving ? 0 : 1, dt, r.leaving ? 0.1 : 0.2);
-        var actT = r.mode === 'held' || r.mode === 'wheel' || r.focus ? 1 : r.mode !== 'rest' ? 0.7 : r.hover ? 0.4 : 0;
-        r.act = ease(r.act, actT, dt, actT > r.act ? 0.06 : 0.24);
-        var plateT = r.mode !== 'rest' || r.focus || now < r.plateUntil ? 1 : 0;
-        r.plate = ease(r.plate, plateT, dt, plateT > r.plate ? 0.05 : 0.2);
-        r.dim = ease(r.dim, anyHeld && actT < 0.7 ? 1 : 0, dt, 0.16);
-        r.flash *= Math.exp(-dt / 0.16); r.lockFlash *= Math.exp(-dt / 0.45);
-      }
-      for (i = E.rings.length - 1; i >= 0; i--) if (E.rings[i].leaving && E.rings[i].life < 0.02) E.rings.splice(i, 1);
-      if (changed) bump();
-
-      var dpr = dprNow(), ctx = c.getContext('2d'), P = E.pal.c;
-      fitCanvas(c, W, H, dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, W, H);
-      for (i = 0; i < E.rings.length; i++) rgDrawRing(ctx, E, E.rings[i], false, P);
-      for (i = 0; i < E.rings.length; i++) rgDrawRing(ctx, E, E.rings[i], true, P);
-      for (i = 0; i < E.rings.length; i++) rgDrawPointer(ctx, E, E.rings[i], P);
-      /* one measure, worn by the core: a hairline that fills clockwise, quiet until it is high */
-      var ggs = rgGauges(P0.gauge), g0 = Math.max(8, E.Ro * 0.27), gstep = Math.max(5, E.Ro * 0.047);
-      E.gaugeR = ggs.length ? g0 : 0; E.gaugeOut = ggs.length ? g0 + (ggs.length - 1) * gstep : 0;
-      for (var gi = 0; gi < ggs.length; gi++) {
-        var gg = ggs[gi], gv = clamp(+gg.value, 0, 1), gr = g0 + gi * gstep, high = gv >= (gg.warn == null ? 0.8 : +gg.warn), full = gv >= (gg.danger == null ? 1 : +gg.danger), gcol = full ? P.danger : high ? P.warn : P.muted, gh = E.overGauge === gi + 1 ? 1 : 0;
-        ctx.lineCap = 'butt';
-        ctx.beginPath(); ctx.arc(E.cx, E.cy, gr, 0, TAU); ctx.strokeStyle = rgba(P.muted, 0.16); ctx.lineWidth = 1; ctx.stroke();
-        if (gv > 0.002) { ctx.beginPath(); ctx.arc(E.cx, E.cy, gr, -RG_HALF, -RG_HALF + TAU * gv); ctx.strokeStyle = rgba(gcol, high || gh ? 0.95 : 0.6); ctx.lineWidth = high || gh ? 2 : 1.4; ctx.stroke(); }
-        if (gh) rgPlate(ctx, E, P, E.cx, E.cy - E.gaugeOut - 20, ((gg.label || 'Load') + ' \u00b7 ' + (gg.detail || Math.round(gv * 100) + '%')).toUpperCase(), '', 1, 0);
-      }
-      /* under a mouse, the mark you point at names itself; you turn to it or click it */
-      var hv = E.hover;
-      if (hv && hv.r.mode === 'rest' && !hv.r.leaving && rgMod(hv.j, hv.r.n) !== rgIndex(hv.r)) {
-        var hi = hv.r.items[rgMod(hv.j, hv.r.n)], hq = rgPt(E, rgBasis(hv.r), hv.r.rf * E.Ro * 1.02, rgMark(hv.r, hv.j));
-        if (hi && hi.label) rgPlate(ctx, E, P, hq[0], hq[1] - 20, '', hi.label, 1, 0);
-      }
-    });
-
-    /* ---------- hands ---------- */
-    function local(e) { var rc = cv.current.getBoundingClientRect(); return [e.clientX - rc.left, e.clientY - rc.top]; }
-    function bandFor(e) { var cs = getComputedStyle(root.current), t = e.pointerType === 'touch'; return parseFloat(cs.getPropertyValue(t ? '--size-grab-touch' : '--size-grab')) || (t ? 30 : 14); }
-    function setHover(E, r, j) {
-      for (var i = 0; i < E.rings.length; i++) E.rings[i].hover = E.rings[i] === r;
-      E.hover = r ? { r: r, j: j } : null;
-      if (cv.current) cv.current.style.cursor = E.nGrabs ? 'grabbing' : r ? 'grab' : (E.overCore && PR.current.onCore) || (E.overGauge && PR.current.onGauge) ? 'pointer' : '';
-    }
-    function onDown(e) {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      var E = eng(), xy = local(e), r = rgAt(E, xy[0], xy[1], bandFor(e));
-      if (!r) {
-        var dd = Math.hypot(xy[0] - E.cx, xy[1] - E.cy), gtol = e.pointerType === 'touch' ? 14 : 8, onG = !!PR.current.onGauge && E.gaugeR > 0 && dd > E.gaugeR - gtol && dd < E.gaugeOut + gtol;
-        E.coreDown = onG || dd < E.Ro / 2.3 ? { x: xy[0], y: xy[1], t: e.timeStamp, gauge: onG, gi: onG && E.gaugeOut > E.gaugeR && dd > (E.gaugeR + E.gaugeOut) / 2 ? 1 : 0 } : null;
-        return;
-      }
-      e.preventDefault();
-      try { cv.current.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-      var moving = r.mode !== 'rest';                          /* a touch on a spinning ring catches it */
-      r.mode = 'held'; r.holder = e.pointerId; r.vel = 0; r.hist = [[e.timeStamp, r.psi]];
-      E.grabs[e.pointerId] = { r: r, last: rgAngle(E, rgBasis(r), xy[0], xy[1]), x0: xy[0], y0: xy[1], t0: e.timeStamp, travel: 0, moving: moving, touch: e.pointerType === 'touch' };
-      E.nGrabs++;
-      setHover(E, e.pointerType === 'mouse' ? r : null, 0); E.hover = null;
-    }
-    function onMove(e) {
-      var E = eng(), xy = local(e), g = E.grabs[e.pointerId];
-      if (!g) {
-        if (e.pointerType !== 'mouse') return;
-        var hr = rgAt(E, xy[0], xy[1], 14);
-        var dc = Math.hypot(xy[0] - E.cx, xy[1] - E.cy);
-        E.overGauge = !hr && E.gaugeR > 0 && dc > E.gaugeR - 8 && dc < E.gaugeOut + 8 ? (E.gaugeOut > E.gaugeR && dc > (E.gaugeR + E.gaugeOut) / 2 ? 2 : 1) : 0;
-        E.overCore = !hr && !E.overGauge && dc < E.Ro / 2.3;
-        setHover(E, hr, hr ? rgItemAt(E, hr, xy[0], xy[1]) : 0);
-        return;
-      }
-      var r = g.r, a = rgAngle(E, rgBasis(r), xy[0], xy[1]), d = wrapPi(a - g.last);
-      g.last = a; r.psi += d; g.travel = Math.max(g.travel, Math.hypot(xy[0] - g.x0, xy[1] - g.y0));
-      r.hist.push([e.timeStamp, r.psi]);
-      while (r.hist.length > 2 && e.timeStamp - r.hist[0][0] > 110) r.hist.shift();
-    }
-    function onUp(e, cancelled) {
-      var E = eng(), g = E.grabs[e.pointerId];
-      if (!g) {
-        if (!cancelled && E.coreDown && e.timeStamp - E.coreDown.t < 500 && (PR.current.onCore || PR.current.onGauge)) { var cxy = local(e); if (Math.hypot(cxy[0] - E.coreDown.x, cxy[1] - E.coreDown.y) < 10) { if (E.coreDown.gauge && PR.current.onGauge) { var grc = cv.current.getBoundingClientRect(); PR.current.onGauge({ x: grc.left + E.cx, y: grc.top + E.cy - E.gaugeOut }, E.coreDown.gi); } else if (!E.coreDown.gauge) PR.current.onCore(); } }
-        E.coreDown = null; return;
-      }
-      delete E.grabs[e.pointerId]; E.nGrabs = Math.max(0, E.nGrabs - 1);
-      var r = g.r; r.holder = null;
-      try { cv.current.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-      if (cv.current) cv.current.style.cursor = '';
-      if (r.leaving) return;
-      if (!cancelled && g.travel < (g.touch ? 10 : 5) && e.timeStamp - g.t0 < 400) {     /* a tap, not a turn */
-        if (g.moving) { rgRelease(r, 0, performance.now()); return; }
-        var xy = local(e), j = rgItemAt(E, r, xy[0], xy[1]);
-        r.psi = r.hist[0][1];
-        /* tap a mark and it comes round to you; tap the one already facing you and it opens */
-        if (rgMod(j, r.n) === rgIndex(r)) { r.mode = 'rest'; r.plateUntil = performance.now() + 1400; open(E, r, j); } else rgBring(r, j);
-        return;
-      }
-      var v = 0, hs = r.hist;
-      if (hs.length >= 2) { var a = hs[0], b = hs[hs.length - 1], span = b[0] - a[0]; if (span > 12 && e.timeStamp - b[0] < 90) v = (b[1] - a[1]) / (span / 1000); }
-      rgRelease(r, clamp(v, -RG_VMAX, RG_VMAX), performance.now());
-    }
+    var wide = useState(0), shown = useState({ front: -1, hover: -1 });
+    /* the runs flattened to slots, in their order round the hoop */
+    var runs = p.runs || [];
+    var slots = useMemo(function () {
+      var out = [];
+      runs.forEach(function (run) {
+        (run.items || []).forEach(function (it) {
+          out.push({ id: it.id, item: it, run: run, group: run.id, groupName: run.label, state: it.state || 'idle', edge: clamp(+it.progress || 0, 0, 1), beads: it.agents || 0,
+            height: it.weight == null ? 1 : 0.62 + 0.38 * clamp(+it.weight, 0, 1) });
+        });
+      });
+      return out;
+    }, [runs]);
+    var slotsRef = useRef(slots);
+    slotsRef.current = slots;
     useEffect(function () {
       var c = cv.current;
       if (!c) return;
-      function onWheel(e) {
-        var E = eng(), xy = local(e), r = rgAt(E, xy[0], xy[1], 16);
-        if (!r) return;
-        e.preventDefault();
-        var px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 120 : e.deltaY;
-        r.psi -= clamp(px, -240, 240) * 0.0024; r.mode = 'wheel'; r.vel = 0; r.wheelUntil = performance.now() + 150;
-      }
+      if (!painter.current) painter.current = hoopPainter(c);
+      /* the wheel is the hoop's while the pointer is on it: a passive listener could not keep the page from scrolling under it */
+      var onWheel = function (e) { if (painter.current && painter.current.wheel(e.deltaY || e.deltaX, e.timeStamp)) e.preventDefault(); };
       c.addEventListener('wheel', onWheel, { passive: false });
       return function () { c.removeEventListener('wheel', onWheel); };
     }, []);
-    function onKey(e, id) {
-      var E = eng(), r = null, i;
-      for (i = 0; i < E.rings.length; i++) if (E.rings[i].id === id) r = E.rings[i];
-      if (!r) return;
-      var st = rgStep(r), base = r.mode === 'seek' || r.mode === 'lock' ? r.target : rgAlign(r, r.psi), d = 0;
-      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') d = 1;
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') d = -1;
-      else if (e.key === 'Home') { e.preventDefault(); rgJump(r, base + wrapPi(RG_HALF - base)); return; }
-      else if (e.key === 'End') { e.preventDefault(); rgJump(r, base + wrapPi(RG_HALF + (r.n - 1) * st - base)); return; }
-      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (r.mode === 'rest') open(E, r, rgIndex(r)); return; }
-      else return;
-      e.preventDefault(); rgJump(r, base + d * st);
-    }
-    function setFocus(id, on) { var E = eng(); for (var i = 0; i < E.rings.length; i++) if (E.rings[i].id === id) { E.rings[i].focus = on; if (!on) E.rings[i].plateUntil = performance.now() + 1400; } }
-
-    var E0 = eng(), defs = (p.rings || []).slice(0, 5);
-    return h('div', { ref: root, className: cx('ast-rings', p.className), style: p.style, role: 'group', 'aria-label': p.label || 'Instrument' },
-      h('div', { ref: coreEl, className: 'ast-rings-core' }, p.children),
-      h('canvas', {
-        ref: cv, className: 'ast-rings-canvas', 'aria-hidden': 'true',
-        onPointerDown: onDown, onPointerMove: onMove, onPointerUp: function (e) { onUp(e, false); }, onPointerCancel: function (e) { onUp(e, true); },
-        onLostPointerCapture: function (e) { onUp(e, true); }, onPointerLeave: function (e) { var E = eng(); if (e.pointerType === 'mouse' && !E.nGrabs) { E.overCore = false; E.overGauge = false; setHover(E, null, 0); } },
-        onContextMenu: function (e) { e.preventDefault(); },
-      }),
-      /* every ring is a slider: arrows turn it a mark at a time, Enter opens what faces you */
-      defs.map(function (d, i) {
-        var id = d.id != null ? String(d.id) : 'ring-' + i, items = d.items || [], r = null, j;
-        for (j = 0; j < E0.rings.length; j++) if (E0.rings[j].id === id) r = E0.rings[j];
-        var k = r ? clamp(r.sel, 0, Math.max(0, items.length - 1)) : Math.max(0, rgFind(items, d.value != null ? d.value : d.defaultValue)), it = items[k] || {};
-        return h('div', {
-          key: id, className: 'ast-sr ast-rings-slider', role: 'slider', tabIndex: 0, 'aria-label': d.label || 'Ring ' + (i + 1), 'aria-orientation': 'horizontal',
-          'aria-valuemin': 1, 'aria-valuemax': Math.max(1, items.length), 'aria-valuenow': k + 1,
-          'aria-valuetext': (it.label || 'Mark ' + (k + 1)) + ', ' + RG_WORD[rgState(it)] + (it.detail ? ', ' + it.detail : ''),
-          onFocus: function () { setFocus(id, true); }, onBlur: function () { setFocus(id, false); }, onKeyDown: function (e) { onKey(e, id); },
-        });
-      }),
-      rgGauges(p.gauge).map(function (g, gi) { return h('div', { key: 'gauge-' + gi, className: 'ast-sr', role: 'meter', tabIndex: p.onGauge ? 0 : undefined, 'aria-label': g.label || 'Load', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': Math.round(clamp(+g.value || 0, 0, 1) * 100), 'aria-valuetext': g.detail || undefined, onKeyDown: function (e) { if (p.onGauge && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); p.onGauge(null, gi); } } }); }),
-      p.onCore ? h('button', { type: 'button', className: 'ast-sr', onClick: p.onCore }, p.coreLabel || 'Call the companion') : null);
+    useEffect(function () { if (painter.current) painter.current.setSlots(slots); }, [slots]);
+    useEffect(function () { if (painter.current) painter.current.setNames(names); }, [names]);
+    var width = wide[0], height = hoopHeightFor(width, lean);
+    useFrame(root, function (dt, now) {
+      var P = painter.current;
+      if (!P || !root.current) return;
+      var w = Math.max(0, Math.floor(Math.min(box.current.w, hoopWidthFor(box.current.h - (reading ? HOOP_READING : 0), lean))));
+      if (w !== width) { wide[1](w); return; }
+      if (w <= 0) return;
+      P.setStill(reducedMotion());
+      var link = PR.current.link || null;
+      P.setLink(link && link.id != null ? link : null, (PR.current.coreSize || Math.round(w * HOOP_CORE)) * HOOP_BODY + 10 + hoopGauges(PR.current.gauge).length * 9);
+      var next = P.frame(dt, now, root.current);
+      var cur = shown[0];
+      if (next.front !== cur.front || next.hover !== cur.hover) {
+        shown[1](next);
+        if (next.front !== cur.front && cur.front !== -1 && slotsRef.current[next.front] && PR.current.onChange) PR.current.onChange(slotsRef.current[next.front].item, slotsRef.current[next.front].run);
+      }
+    });
+    useEffect(function () { if (painter.current && width > 0) painter.current.resize(width, height, Math.min(window.devicePixelRatio || 1, 2), lean); }, [width, height, lean]);
+    /* the thing that faces you: brought to the front once, each time it is given */
+    var value = p.value != null ? p.value : null;
+    useEffect(function () {
+      var want = value != null ? value : bt.current === null ? p.defaultValue : null;
+      if (want == null || !painter.current || width <= 0) return;
+      if (bt.current === want) return;
+      if (painter.current.bring(want)) bt.current = want;
+    }, [value, slots, width]);
+    function client(q) { var c = cv.current; if (!c || !q) return null; var r = c.getBoundingClientRect(); return { x: r.left + q[0], y: r.top + q[1] }; }
+    React.useImperativeHandle(ref, function () {
+      return {
+        pointOf: function (a, b) { return painter.current ? client(painter.current.pointOf(b != null ? b : a)) : null; },
+        azimuthOf: function (a, b) { return painter.current ? painter.current.azimuthOf(b != null ? b : a) : null; },
+      };
+    }, []);
+    function at(e) { var r = e.currentTarget.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+    function open(i) { var s = slotsRef.current[i]; if (s && PR.current.onOpen) PR.current.onOpen(s.item, s.run, client(painter.current.pointOf(s.id))); }
+    var read = slots[shown[0].hover] || slots[shown[0].front] || null, front = slots[shown[0].front] || null;
+    var gauges = hoopGauges(p.gauge), core = p.coreSize || Math.round(width * HOOP_CORE), body = core * HOOP_BODY, geo = hoopGeometry(width, height, lean), mid = { x: geo.cx, y: geo.cy - geo.band / 2 };
+    var ringR = function (i) { return body + 8 + i * 9 + 1.25; };
+    var outer = Math.max(Math.ceil(core / 2), gauges.length ? Math.ceil(ringR(gauges.length - 1) + 9) : 0);
+    return h('div', { ref: root, className: cx('ast-hoop', p.className), style: p.style, 'data-ast-keeps-opening': '' },
+      h('div', { className: 'ast-hoop-stage', style: { width: width, height: height } },
+        h('canvas', {
+          ref: cv, className: 'ast-hoop-canvas', role: 'slider', tabIndex: slots.length ? 0 : -1, 'aria-label': p.label || 'Things', 'aria-orientation': 'horizontal',
+          'aria-valuemin': 1, 'aria-valuemax': Math.max(1, slots.length), 'aria-valuenow': shown[0].front + 1,
+          'aria-valuetext': front ? [front.groupName, front.item.label, front.item.detail].filter(Boolean).join(', ') : undefined,
+          style: { width: width, height: height, cursor: shown[0].hover !== -1 ? 'pointer' : undefined },
+          onPointerDown: function (e) { if (painter.current && painter.current.down.apply(null, at(e))) e.currentTarget.setPointerCapture(e.pointerId); },
+          onPointerMove: function (e) { if (painter.current) painter.current.move.apply(null, at(e)); },
+          onPointerUp: function (e) {
+            var press = painter.current ? painter.current.up() : null;
+            if (press && press.open != null) open(press.open); else if (press && PR.current.hold) open(press.turned);
+            if (e.pointerType !== 'mouse' && painter.current) painter.current.leave();
+          },
+          onPointerCancel: function () { if (painter.current) { painter.current.up(); painter.current.leave(); } },
+          onPointerLeave: function () { if (painter.current) painter.current.leave(); },
+          onFocus: function (e) { if (painter.current) painter.current.setFocused(e.currentTarget.matches(':focus-visible')); },
+          onBlur: function () { if (painter.current) painter.current.setFocused(false); },
+          onKeyDown: function (e) {
+            if (!painter.current) return;
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(painter.current.front()); } else if (painter.current.key(e.key)) e.preventDefault();
+          },
+        }),
+        h('div', { className: 'ast-hoop-middle', style: { left: mid.x, top: mid.y, width: outer * 2, height: outer * 2 } },
+          gauges.length ? h('svg', { className: 'ast-hoop-gauges', width: outer * 2, height: outer * 2, viewBox: '0 0 ' + outer * 2 + ' ' + outer * 2, 'aria-hidden': 'true' },
+            gauges.map(function (g, gi) {
+              var v = clamp(+g.value || 0, 0, 1), level = v >= (g.danger != null ? g.danger : 1) ? 'danger' : v >= (g.warn != null ? g.warn : 0.8) ? 'warn' : 'quiet', rr = ringR(gi), len = TAU * rr;
+              return h('g', { key: gi, className: 'ast-hoop-gauge', 'data-level': level },
+                h('circle', { className: 'ast-hoop-gauge-track', cx: outer, cy: outer, r: rr }),
+                h('circle', { className: 'ast-hoop-gauge-lit', cx: outer, cy: outer, r: rr, transform: 'rotate(-90 ' + outer + ' ' + outer + ')', style: { strokeDasharray: v * len + ' ' + len } }),
+                v > 0 ? h('g', { className: 'ast-hoop-gauge-head', style: { transform: 'rotate(' + v * 360 + 'deg)', transformOrigin: outer + 'px ' + outer + 'px' } }, h('circle', { cx: outer, cy: outer - rr, r: 3 })) : null);
+            })) : null,
+          gauges.slice().reverse().map(function (g, k) {
+            var gi = gauges.length - 1 - k, d = Math.ceil((ringR(gi) + 9) * 2), words = [g.label, g.detail].filter(Boolean).join(' · ');
+            return h('button', { key: 'g' + gi, type: 'button', className: 'ast-hoop-gauge-press', 'aria-label': words, title: words, style: { width: d, height: d },
+              onClick: function (e) { if (PR.current.onGauge) PR.current.onGauge({ x: e.clientX, y: e.clientY }, gi); } }, h('span', { className: 'ast-hoop-gauge-plate', 'aria-hidden': 'true' }, words));
+          }),
+          /* the core drawn at its own size, its forms room to reach; its press is the body alone, so the measures round it keep theirs */
+          h('div', { className: 'ast-hoop-core-art', style: { width: core, height: core } }, p.children),
+          h('button', { type: 'button', className: 'ast-hoop-core', 'aria-label': p.coreLabel || 'The core', style: { width: Math.round(body * 2 + 6), height: Math.round(body * 2 + 6) }, onClick: function () { if (PR.current.onCore) PR.current.onCore(); } }))),
+      reading ? h('div', { className: 'ast-hoop-reading', 'aria-hidden': 'true', style: { width: width } },
+        read ? h(React.Fragment, null,
+          h('p', null, read.groupName ? read.groupName + ' › ' : '', h('span', { className: read.state === 'waiting' ? 'ast-hoop-owed' : 'ast-hoop-name' }, read.item.label)),
+          h('p', null, read.item.detail || '')) : null) : null);
   });
 
   /* ---------- Track: one thing's course, as a line you can read along. Its ticks are the steps; it is lit to where it has got;
@@ -1718,7 +1597,7 @@
     var first = -1, i;
     for (i = 0; i < steps.length; i++) if (steps[i].state !== 'done') { first = i; break; }
     var doneN = first < 0 ? n : first, liveState = first < 0 ? null : steps[first].state;
-    var sel = p.value != null ? rgFind(steps, p.value) : -1, shown = at >= 0 ? at : sel;
+    var sel = p.value != null ? findItem(steps, p.value) : -1, shown = at >= 0 ? at : sel;
     function open(idx, e) {
       if (!p.onOpen || !steps[idx]) return;
       var rc = root.current.getBoundingClientRect();
@@ -2293,7 +2172,7 @@
     KeyValueList: KeyValueList, Status: Status, Readout: Readout, BufferGauge: BufferGauge, ReadoutRow: ReadoutRow,
     Transcript: Transcript, Notice: Notice, Core: Core,
     SignalLoop: SignalLoop, Spinner: Spinner, Badge: Badge,
-    Scene: Scene, Arrival: Arrival, Rings: Rings, Track: Track, Opening: Opening, Reticle: Reticle, Footprint: Footprint, YourWords: YourWords, Prepared: Prepared,
+    Scene: Scene, Arrival: Arrival, Hoop: Hoop, Track: Track, Opening: Opening, Reticle: Reticle, Footprint: Footprint, YourWords: YourWords, Prepared: Prepared,
     Sheet: Sheet, Summon: Summon, Trace: Trace, Key: Key, Orbit: Orbit, Stream: Stream, Exchange: Exchange, Choice: Choice, Roster: Roster, Steps: Steps, Excerpt: Excerpt,
     ArcGauge: ArcGauge, Plate: Plate, Rule: Rule, Switch: Switch, Fader: Fader, Composer: Composer, Files: Files, Questions: Questions, Form: Form, ToolRow: ToolRow, Prose: Prose, Rail: Rail, Meter: Meter,
     createSignal: createSignal, demoSignal: demoSignal, noteName: noteName,
