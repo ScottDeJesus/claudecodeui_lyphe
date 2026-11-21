@@ -28,7 +28,7 @@ export const KIND_HANDLE = "[data-runner-code-mode]";
 
 // `KINDS["builders"]["says"]` in hooks/plan_runner/code_mode/switch.py, interface H's sentence word for word.
 export const SAYS =
-  "A builder or fix-pass on Claude works with two tools: one search, and one script that does the whole job with the soul's own tools inside it. A script's actions are not checked by the house's hooks yet. A soul with tools of its own (a browser, the connector) is not served yet. Dactyls are off for a launch Code Mode carries. Takes effect on the next launch.";
+  "A builder or fix-pass on Claude works with two tools: one search, and one script that does the whole job with the soul's own tools inside it. Each action of a script is put to the house's hooks first, as a tool call would be. A soul with tools of its own (a browser, the connector) is not served yet. Dactyls are off for a launch Code Mode carries. Takes effect on the next launch.";
 
 const json = (status, body) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
 
