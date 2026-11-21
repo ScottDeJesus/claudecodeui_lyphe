@@ -31,7 +31,8 @@
     "universe": "Universe",
     "schedules": "Schedules",
     "notes": "Notes",
-    "cerberus": "Cerberus"
+    "cerberus": "Cerberus",
+    "analytics": "Analytics"
   },
   "chatHead": {
     "chat": "Chat"
@@ -737,7 +738,7 @@
       "vitals": {
         "building": "Building",
         "asking": "Asking",
-        "queued": "Queued",
+        "queued": "Waiting to start",
         "lessons": "Lessons",
         "memories": "Memories",
         "everyBoard": "{{count}} · every board"
@@ -5131,6 +5132,192 @@
     "dock": {
       "label": "{{name}}’s draft",
       "empty": "When {{name}} drafts a brief for a session, it waits here for your Send."
+    }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "head": {
+      "sections": "Section",
+      "window": "How far back",
+      "days": "{{days}} days"
+    },
+    "sections": {
+      "codeMode": "Code Mode"
+    },
+    "frame": {
+      "reading": "Reading the numbers…",
+      "unreachable": "The numbers could not be read.",
+      "tryAgain": "Try again",
+      "takenToday": "Numbers taken today at {{time}}.",
+      "takenOn": "Numbers taken {{date}} at {{time}}.",
+      "newer": "Reading newer numbers…",
+      "refresh": "Refresh"
+    },
+    "codeMode": {
+      "unknown": "not known",
+      "allKinds": "All kinds",
+      "with": "With Code Mode",
+      "without": "Without",
+      "listSeparator": ", ",
+      "uncounted": "Not counted here: {{kinds}}.",
+      "historyStarts_one": "The history starts on {{date}}, so these numbers cover {{count}} day of the {{days}} asked for.",
+      "historyStarts_other": "The history starts on {{date}}, so these numbers cover {{count}} days of the {{days}} asked for.",
+      "empty": {
+        "title": "No launches in the last {{days}} days",
+        "message": "Nothing the house counts ended in this window. A longer one may hold some.",
+        "noHistoryTitle": "No history yet",
+        "noHistoryMessage": "It starts with the first launch that ends. Its numbers are here from then on."
+      },
+      "units": {
+        "count": "{{value}}",
+        "thousand": "{{value}}k",
+        "million": "{{value}}M",
+        "share": "{{value}}%",
+        "more": "+{{value}}%",
+        "fewer": "−{{value}}%",
+        "same": "±0%",
+        "seconds": "{{seconds}}s",
+        "minutes": "{{minutes}}m {{seconds}}s",
+        "hours": "{{hours}}h {{minutes}}m",
+        "pointsMore": "+{{value}} pts",
+        "pointsFewer": "−{{value}} pts",
+        "pointsSame": "±0 pts"
+      },
+      "compare": {
+        "title": "With and without Code Mode",
+        "lead": "Launches with Code Mode: {{with}}. Without: {{without}}. The median launch with it, across every kind:",
+        "leadOnlyWith": "Launches with Code Mode: {{with}}, and none without to measure them against. The median launch, across every kind:",
+        "leadOnlyWithout": "No launch ran with Code Mode in this window. Without: {{without}}.",
+        "headline": {
+          "ok": "Ended ok",
+          "turns": "Turns",
+          "tokens": "Tokens, in and out",
+          "time": "Time"
+        },
+        "noteAgainst": "{{without}} without · {{change}}",
+        "noteWithout": "{{without}} without",
+        "noteAlone": "nothing ran without",
+        "mode": "Figures shown",
+        "median": "Median",
+        "total": "Total",
+        "models": "Models",
+        "modelsTogether": "All models",
+        "modelsEach": "Each model",
+        "medianAbout": "The median launch of each row. Under a Code Mode figure: how far it is from the same figure without, as a share of that figure. Under Ended ok: in percentage points.",
+        "totalAbout": "Sums over each row’s launches. A total follows how many launches ran, so only the share that ended ok is compared, in percentage points.",
+        "tableLabel": "Launches with and without Code Mode, by kind and by model",
+        "with": "with Code Mode",
+        "without": "without",
+        "noModel": "No model named",
+        "ok": "{{ok}} · {{share}}",
+        "against": "against without",
+        "columns": {
+          "who": "Launches of",
+          "launches": "Launches",
+          "ok": "Ended ok",
+          "turns": "Turns",
+          "tokensIn": "Tokens in",
+          "tokensOut": "Tokens out",
+          "time": "Time"
+        }
+      },
+      "outcomes": {
+        "title": "How the scripts fared",
+        "scripts": "Scripts run",
+        "scriptsNote_one": "in {{count, number}} launch with Code Mode",
+        "scriptsNote_other": "in {{count, number}} launches with Code Mode",
+        "none": "No launch ran with Code Mode in the last {{days}} days, so there is no script to count.",
+        "about": "Refused and failed count the actions inside a script. The last three rows count the edits a script handed to the merger.",
+        "thrown": "Threw",
+        "resent": "Sent again",
+        "refused": "Refused",
+        "failed": "Failed",
+        "mergesAsked": "To merger",
+        "mergesMerged": "Merged",
+        "declined": "Declined",
+        "ofScripts": "{{share}} of scripts",
+        "thrownOfScripts": "{{share}} of scripts, {{timedOut}} timed out",
+        "byKind": "By kind",
+        "tableLabel": "Script outcomes by kind, for launches with Code Mode",
+        "columns": {
+          "kind": "Kind",
+          "scripts": "Scripts",
+          "thrown": "Threw",
+          "resent": "Sent again",
+          "refused": "Refused",
+          "failed": "Failed",
+          "mergesAsked": "To merger",
+          "mergesMerged": "Merged",
+          "declined": "Declined"
+        },
+        "timedOut": "{{timedOut}} timed out"
+      },
+      "causes": {
+        "title": "What went wrong",
+        "none": "Nothing failed in this window.",
+        "head_one": "{{count, number}} failure in all. Its row opens to the sentences it was said in.",
+        "head_other": "{{count, number}} failures in all, the commonest first. A row opens to the sentences it was said in.",
+        "inLaunches_one": "in {{count, number}} launch",
+        "inLaunches_other": "in {{count, number}} launches",
+        "endedScript_one": "{{count, number}} ended its script",
+        "endedScript_other": "{{count, number}} ended their scripts",
+        "where": "{{launches}} · {{ended}} · {{kinds}}",
+        "whereQuiet": "{{launches}} · {{kinds}}",
+        "times": "{{times}}×",
+        "otherWords_one": "and {{count, number}} more, worded another way",
+        "otherWords_other": "and {{count, number}} more, worded other ways",
+        "unlisted_one": "{{count, number}} more failure is of a rarer kind, not listed.",
+        "unlisted_other": "{{count, number}} more failures are of rarer kinds, not listed.",
+        "fault": {
+          "refused": "Refused",
+          "failed": "Failed",
+          "threw": "Threw",
+          "timeout": "Timed out",
+          "declined": "Declined"
+        },
+        "showRest_one": "Show {{count}} rarer kind of failure",
+        "showRest_other": "Show {{count}} rarer kinds of failure",
+        "showFirst": "Show only the commonest {{count}}"
+      },
+      "trend": {
+        "title": "Day by day",
+        "measure": "Measure",
+        "kind": "Kind",
+        "measures": {
+          "launches": "Launches",
+          "turns": "Turns",
+          "tokens": "Tokens",
+          "seconds": "Time",
+          "failures": "Failures"
+        },
+        "about": {
+          "launches": "Launches that ended each day.",
+          "turns": "Turns taken each day, summed over the day’s launches.",
+          "tokens": "Tokens in and out each day, in thousands.",
+          "seconds": "Time spent each day, in minutes.",
+          "failures": "Launches with Code Mode only: scripts that threw above the line, actions refused or failed below it."
+        },
+        "thrown": "Scripts that threw",
+        "refusedOrFailed": "Actions refused or failed",
+        "plot": "{{about}} {{kind}}, the last {{days}} days.",
+        "peak": {
+          "launches": "Tallest bar: {{peak}} launches in a day",
+          "turns": "Tallest bar: {{peak}} turns in a day",
+          "tokens": "Tallest bar: {{peak}} thousand tokens in a day",
+          "seconds": "Tallest bar: {{peak}} minutes in a day",
+          "failures": "Tallest bar: {{peak}} in a day"
+        },
+        "barTitle": "{{date}} · {{above}} {{aboveLabel}} · {{below}} {{belowLabel}}",
+        "quiet": "Nothing to draw for {{kind}} in the last {{days}} days.",
+        "byDay": "The days as a table",
+        "tableLabel": "{{measure}} per day: {{above}}, and {{below}}",
+        "quietLeftOut": "Days with nothing to count are left out.",
+        "columns": {
+          "day": "Day",
+          "thrown": "Threw",
+          "refusedOrFailed": "Refused or failed"
+        }
+      }
     }
   }
 }

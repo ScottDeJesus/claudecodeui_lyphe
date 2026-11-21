@@ -17,14 +17,14 @@ type BugBoardOpeningProps = {
 };
 
 /**
- * THE BOARD'S FIVE COUNTS, in one fixed order: what is building, what is asking you, what is queued, then the two backlogs every
+ * THE BOARD'S FIVE COUNTS, in one fixed order: what is building, what is asking you, what is waiting to start (To Do), then the two backlogs every
  * board shares (lessons and memories, said so beside their number). The hoop already shows the first three as slots; here they
  * are numbers, which the hoop never says.
  */
 const REGISTERS: Array<{ key: keyof KanbanVitals; wordsKey: string; words: string; estate: boolean }> = [
   { key: 'building', wordsKey: 'kanban.ring.vitals.building', words: 'Building', estate: false },
   { key: 'awaitingAnswer', wordsKey: 'kanban.ring.vitals.asking', words: 'Asking', estate: false },
-  { key: 'queued', wordsKey: 'kanban.ring.vitals.queued', words: 'Queued', estate: false },
+  { key: 'queued', wordsKey: 'kanban.ring.vitals.queued', words: 'Waiting to start', estate: false },
   { key: 'lessonsPendingEstate', wordsKey: 'kanban.ring.vitals.lessons', words: 'Lessons', estate: true },
   { key: 'memoryPendingEstate', wordsKey: 'kanban.ring.vitals.memories', words: 'Memories', estate: true },
 ];

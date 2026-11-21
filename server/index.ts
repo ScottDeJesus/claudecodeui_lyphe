@@ -80,6 +80,7 @@ import { createCompanionModule } from './modules/companion/index.js';
 import { createChatNamer } from './modules/chat-names/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
+import { createAnalyticsModule } from './modules/analytics/index.js';
 import { createAgentLaunchModule } from './modules/agent-launch/index.js';
 import { createJevModule } from './modules/jev/index.js';
 import { createAffectedAreasModule } from './modules/affected-areas/index.js';
@@ -405,6 +406,11 @@ app.use('/api/kanban-dispatch', authenticateToken, kanbanDispatch.router);
 // for `listen` or a shutdown to start or stop.
 const heal = createHealModule();
 app.use('/api/heal', authenticateToken, heal.router);
+
+// The Analytics area: one reader per section, each asking the module that owns its numbers. Inline for
+// heal's reason: no timer, no socket.
+const analytics = createAnalyticsModule();
+app.use('/api/analytics', authenticateToken, analytics.router);
 
 // The launch table — the model and effort every soul, the card sorter and the tweak builder launch at — and the doors that pin a
 // row or move a default (protected: a save regenerates the shims every session reads). Built inline

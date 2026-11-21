@@ -59,6 +59,7 @@ async function launchFor(input: {
   cwd: string;
   servers: Record<string, unknown>;
   compactionSeed: boolean;
+  model?: string;
 }): Promise<ChatCodeModeLaunch> {
   const id = input.appSessionId;
   if (!id) return off();
@@ -76,6 +77,8 @@ async function launchFor(input: {
 
   const argv = ['config', '--chat', id, '--cwd', input.cwd];
   if (born !== null) argv.push('--born', born ? 'on' : 'off');
+  // One argv word with =, so a model word can never be read as a flag of its own.
+  if (input.model) argv.push(`--model=${input.model}`);
 
   let stdout: string;
   try {

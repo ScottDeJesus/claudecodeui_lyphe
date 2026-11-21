@@ -15,6 +15,7 @@ import { KanbanPanel } from '@/modules/kanban';
 import { RoadmapTab } from '@/modules/roadmap';
 import { ApiPanel } from '@/modules/api-tab';
 import { CerberusPanel } from '@/modules/cerberus';
+import { AnalyticsPanel } from '@/modules/analytics';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
@@ -504,6 +505,13 @@ function WorkspaceMain({
           {activeTab === 'cerberus' && (
             <div className="h-full overflow-hidden">
               <CerberusPanel projectChoices={projectChoices} />
+            </div>
+          )}
+
+          {/* No gate: the house's numbers are the house's whichever project is open. */}
+          {activeTab === 'analytics' && (
+            <div className="h-full overflow-hidden">
+              <AnalyticsPanel />
             </div>
           )}
 

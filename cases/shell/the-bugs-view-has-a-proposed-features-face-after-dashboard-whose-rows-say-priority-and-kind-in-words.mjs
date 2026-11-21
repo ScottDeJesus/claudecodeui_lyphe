@@ -12,7 +12,7 @@
 // case then presses the face's own Try again, a read, to draw its rows. The board is lib/kanban_board.mjs's made-up
 // board, every board request answered by the page; nothing reaches the server.
 //
-// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/proposed/ProposalOpening.tsx, src/modules/kanban/utils/proposalRings.ts, src/modules/kanban/proposed/useProposals.ts, src/modules/i18n/locales/en/common.json
+// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/proposed/ProposalOpening.tsx, src/modules/kanban/utils/proposalHoop.ts, src/modules/kanban/proposed/useProposals.ts, src/modules/i18n/locales/en/common.json
 // writes: none
 
 import { withPage } from "../lib/app.mjs";

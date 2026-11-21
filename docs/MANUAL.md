@@ -5729,17 +5729,16 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
 ## MAN-589 — The panel
 section: kanban/008 The panel
 
-`src/modules/kanban/` composes the tab's pane, its header — which mounts `KanbanVitalsStrip`, the
-board's five counts, its design carried in its own docstring, wired through `useBoardVitals` off a
-publish/subscribe store the lane feed keeps rather than a prop the header would have to carry — the
-card drawer under
-`card-drawer/`, the module's hooks and four module-private utilities under `utils/`. The barrel exports
+`src/modules/kanban/` composes the tab's pane, its head (`BugHead.tsx`: the way back, BUGS and the board's picker), its instrument (`BugInstrument.tsx`: the cards as
+slots on the hoop round the board's core), its foot (`BugFoot.tsx`) and what the core opens (`BugBoardOpening.tsx`: the
+board's switch, its five counts wired through `useBoardVitals` off a publish/subscribe store the lane feed keeps, its
+repositories and its acts) — the card drawer under
+`card-drawer/`, the module's hooks and its module-private utilities under `utils/`. The barrel exports
 `KanbanPanel` and nothing else — a second export is how a policy that must be decided in one place
 starts being read in two.
 
 **A lane is a set of statuses.** Which statuses compose which lane is decided in exactly one file,
-`src/modules/kanban/utils/lanePolicy.ts`'s `kanbanLanes(autonomy)`, and read by the panel, the
-rail, the lanes hook, the lane feed, the board menus and the drag hook alike. With autonomy OFF it
+`src/modules/kanban/utils/lanePolicy.ts`'s `kanbanLanes(autonomy)`, and read by every module file that sorts cards into lanes alike (today: card-drawer/KanbanCardDrawer.tsx hooks/useKanbanDrag.ts hooks/useKanbanLaneFeed.ts hooks/useKanbanLanes.ts KanbanPanel.tsx utils/bugHoop.ts). With autonomy OFF it
 returns four lanes and To Do carries TWO statuses; with autonomy ON it returns five:
 
 | autonomy off | statuses | autonomy on | statuses |
@@ -5805,18 +5804,18 @@ never through this hook's own returned state; the shape is in the file's own doc
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
 
-## MAN-10002 — The panel — The vitals strip's five registers, in ONE round trip.
+## MAN-10002 — The panel — The board's five counts, in ONE round trip.
 section: kanban/008 The panel/002 The vitals strip's five registers, in ONE round trip.
 
-**The vitals strip's five registers, in ONE round trip.** `vitalsCounts`
-(`kanban-vitals.service.ts`) answers the header's strip from four scalar sub-SELECTs in one
+**The board's five counts, in ONE round trip.** `vitalsCounts`
+(`kanban-vitals.service.ts`) answers the board's counts (drawn by `BugBoardOpening.tsx`, what the board's core opens) from four scalar sub-SELECTs in one
 statement, every card count excluding archived cards:
 
 - `building` — cards in the Building lane (`status = 'active'`), where a card stays while its walk is out.
 - `awaitingAnswer` — cards with at least one question nobody has answered: the operator's turn, and
   the panel's own `needsAnswer`.
-- `queued` — cards in To Do (`status = 'todo'`): the To Do lane's own count, so the strip and the
-  lane never disagree.
+- `queued` — cards in To Do (`status = 'todo'`): the To Do lane's own count, so the count and the
+  To Do run never disagree.
 - `lessonsPendingEstate` — STAGED lessons awaiting a person's review. It reads the board's own lesson
   table and is NOT board-scoped: a lesson belongs to the estate and its card is provenance, so there
   is no board filter here to get wrong.
@@ -5829,7 +5828,7 @@ Every estate-wide key carries the word ESTATE in its name, so no caller can read
 the whole install as one board's own. The read is read-only — no transaction, no audit row, no frame —
 and a missing board is the board's ordinary 404, never zeros: "no such board" and "a board with
 nothing on it" are different answers. A fault is NOT caught, and that is the ruling rather than an
-omission: the strip draws an unknown reading as an em-dash, and the wire shape has no null to say
+omission: the Opening draws an unknown reading as an em-dash, and the wire shape has no null to say
 "unknown" with, so a refusal is the only honest way this read can say "I could not count".
 
 Every lane then pages through the same tail, which the kit owns: an 8px sentinel inside the lane
@@ -5849,7 +5848,9 @@ instead, in the shape `<title> moved to <lane>, position <n> of <total>`. Only t
 the lane the card left and the lane it landed in, and a toast leaves — and a thing that leaves
 cannot announce.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-vitals.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanVitalsStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
+**Where they are drawn.** `BugBoardOpening.tsx` lists them in one fixed order as label and value (`KeyValueList`): Building (`building`), Asking (`awaitingAnswer`), Waiting to start (`queued`, the To Do count — the operator's ruled words, never "Queued"; key `kanban.ring.vitals.queued`), then Lessons and Memories, each said "· every board" beside its number. The vitals strip that once drew them in the board header was deleted by the bug screen's redraw (689bdd2b); the case the-board-strips-to-do-count-reads-waiting-to-start keeps the To Do words.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-vitals.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/BugBoardOpening.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
 
 ## MAN-590 — The lessons lane
 section: kanban/009 The lessons lane

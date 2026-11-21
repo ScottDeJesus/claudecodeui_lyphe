@@ -1,9 +1,9 @@
-// The board's five counts, in one order: building now, asking (waiting on your answer), queued (To Do), then the two estate
+// The board's five counts, in one order: building now, asking (waiting on your answer), waiting to start (To Do, the vitals' `queued`), then the two estate
 // backlogs, lessons and memories, each said to belong to every board. Nothing among them speaks of approval or of cards to
 // claim: the Approve gate and the claim queue are gone from the board (kanban-bug-dispatcher, the board's screens). Since the
 // board's redraw to the design system (2026-11-20) the counts are no strip in a header: they are the board's own detail, read in
 // what its core opens (a key-value list, its label then its number), because the rings already show what is building, asking
-// and queued.
+// and waiting. The To Do count's words are the operator's ruling, "Waiting to start", never "Queued".
 //
 // The vitals are lib/kanban_board.mjs's, five different numbers (1 to 5 in that order), so a register drawn from the
 // wrong key says the wrong number. Read at 1440x900. Nothing reaches the board's server and nothing is written.
@@ -21,7 +21,7 @@ const WAIT_MS = 30000;
 const EXPECTED = [
   { number: VITALS.building, words: /build/i, name: "building" },
   { number: VITALS.awaitingAnswer, words: /ask/i, name: "asking" },
-  { number: VITALS.queued, words: /queue/i, name: "queued" },
+  { number: VITALS.queued, words: /waiting to start/i, name: "queued" },
   { number: VITALS.lessonsPendingEstate, words: /lesson/i, name: "lessons", estate: true },
   { number: VITALS.memoryPendingEstate, words: /memor/i, name: "memories", estate: true },
 ];

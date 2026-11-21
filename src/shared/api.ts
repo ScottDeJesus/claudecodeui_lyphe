@@ -1107,6 +1107,13 @@ export const api = {
       put(`/api/toolsets/sessions/${encodeURIComponent(sessionId)}/sets/${encodeURIComponent(set)}`, { on }, { timeoutMs: 45_000 }),
   },
 
+  // The Analytics area (server/modules/analytics): the sections the server holds a reader for (`AnalyticsSectionList`), and
+  // one section's answer over a window of days (`AnalyticsAnswer<T>`, src/shared/analytics-types.ts). Each is the Response;
+  // `useAnalyticsSection` narrows the envelope and hands `data` to the section's own narrow.
+  analytics: {
+    sections: () => get('/api/analytics'),
+    section: (id: string, days: number) => get(`/api/analytics/${encodeURIComponent(id)}${query({ days })}`),
+  },
   // The Cerberus lane (server/modules/cerberus/MANUAL.md): center's read model of the fleet, read
   // whole. Every read answers its wire shape BARE — not wrapped in `{ success, data }` — and a
   // refusal is the app's `{ success: false, error }` envelope. The `cerberus_changed` frame is only

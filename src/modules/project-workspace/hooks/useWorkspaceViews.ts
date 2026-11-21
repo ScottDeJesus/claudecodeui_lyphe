@@ -1,5 +1,6 @@
 import {
   Bug,
+  ChartLine,
   Clock,
   Coins,
   FolderTree,
@@ -67,6 +68,7 @@ const PLAN_VIEWS: BuiltInView[] = [
 const HOUSE_VIEWS: BuiltInView[] = [
   { id: 'universe', group: 'house', icon: Orbit, keywords: 'universe galaxy stars repos map graph' },
   { id: 'cerberus', group: 'house', icon: Radar, keywords: 'cerberus fleet health monitoring checks wardens nodes' },
+  { id: 'analytics', group: 'house', icon: ChartLine, keywords: 'analytics stats statistics numbers code mode trends' },
   { id: 'api', group: 'house', icon: Coins, keywords: 'api jev deepseek spend balance burn tokens consumers usage outings typesafe' },
 ];
 
