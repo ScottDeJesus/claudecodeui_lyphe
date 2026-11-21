@@ -14,10 +14,14 @@
 //   control: recorded off, re-ask off  → setMcpServers carries the set (proves the rig sees the call)
 //   on→off:  recorded on,  re-ask off  → setMcpServers is never called
 //   off→on:  recorded off, re-ask on   → setMcpServers carries the set (the CLI holds no `cm`)
+// A recorded profile holds the MCP map its CLI was really launched with: `cm` alone for Code Mode, else the
+// user-scope servers of ~/.claude.json the runtime loads. Any other map is a changed configuration, and the plain
+// message would replace the process (a fresh launch that re-asks the house) before the sync is ever judged.
 
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { register } from "node:module";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -35,6 +39,7 @@ const SDK_STUB = `
 export function query({ options }) {
   const calls = (globalThis.__caseSdk ??= []);
   const cwd = options.cwd;
+  (globalThis.__caseLaunches ??= []).push(cwd);
   const target = {
     setMcpServers: async (map) => { calls.push({ cwd, names: Object.keys(map) }); return { added: Object.keys(map), removed: [], errors: {} }; },
     [Symbol.asyncIterator]() { return { next: () => new Promise(() => {}), return: async () => ({ done: true }) }; },
@@ -53,6 +58,17 @@ export async function resolve(specifier, context, next) {
 `;
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The user-scope servers an off launch carries, read as the runtime's loadMcpConfig reads them: none (undefined)
+// for a missing, unreadable or empty map.
+const userScopeServers = async (): Promise<Record<string, unknown> | undefined> => {
+  try {
+    const servers = JSON.parse(await readFile(path.join(os.homedir(), ".claude.json"), "utf8"))?.mcpServers;
+    return servers && typeof servers === "object" && Object.keys(servers).length > 0 ? servers : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 runCase(async (t: { defer: (cleanup: () => unknown) => void }) => {
   const rig = await scratchDir(t, "readopt-sdk");
@@ -85,6 +101,7 @@ runCase(async (t: { defer: (cleanup: () => unknown) => void }) => {
   const context = { ...captured, getProviderModels: async () => [], resolveResumeModel: async () => null, resolveProviderSessionId: () => randomUUID() };
   const ws = { send() {}, userId: 1, setSessionId() {} };
   const calls = () => ((globalThis as any).__caseSdk ?? []) as Array<{ cwd: string; names: string[] }>;
+  const offServers = await userScopeServers();
 
   // One re-adoption: the host recorded `recordedOn`, the house now answers `askOn`. Returns the setMcpServers names
   // the process was sent after a plain message and after a switch's sync, and what the bridge was handed.
@@ -94,7 +111,7 @@ runCase(async (t: { defer: (cleanup: () => unknown) => void }) => {
     const id = randomUUID();
     ground.database.sessionsDb.createAppSession(id, "claude", repo, `readopt ${label}`);
     answers.set(id, askOn ? ON_LAUNCH : { on: false });
-    const recorded = { cwd: repo, mcpServers: recordedOn ? CM : {}, permissionMode: "default", model: "opus", allowedTools: recordedOn ? ["mcp__cm__search"] : [], disallowedTools: [] };
+    const recorded = { cwd: repo, mcpServers: recordedOn ? CM : offServers, permissionMode: "default", model: "opus", allowedTools: recordedOn ? ["mcp__cm__search"] : [], disallowedTools: [] };
     const profile = launchProfileOf(recorded, false, false, null, "", null, null, recordedOn);
     const keepalive = { hostId: `case-host-${label}`, turnCompleteSent: true, heldForBackgroundWork: false, profile, cliVersion: null, deferredTools: [], liveTasks: [], node: null };
     await Promise.race([claudeRuntime.run("", { sessionId: id, cwd: repo, keepalive }, ws, context), pause(8000)]);
@@ -102,19 +119,25 @@ runCase(async (t: { defer: (cleanup: () => unknown) => void }) => {
     void claudeRuntime.run("one more message", { sessionId: id, cwd: repo }, ws, context);
     await pause(1500);
     const afterJoin = calls().filter((call) => call.cwd === repo).flatMap((call) => call.names);
+    const launches = (((globalThis as any).__caseLaunches ?? []) as string[]).filter((cwd) => cwd === repo).length;
     const outcome = await claudeRuntime.syncToolsets(id);
     const afterSwitch = calls().filter((call) => call.cwd === repo).flatMap((call) => call.names);
-    return { afterJoin, afterSwitch, bridged: bridge.filter((push) => push.id === id).length, outcome };
+    return { label, launches, afterJoin, afterSwitch, bridged: bridge.filter((push) => push.id === id).length, outcome };
   };
+  // A plain message that replaced the process launched a second query: the sync would then judge a fresh launch,
+  // not the re-adopted process, so the run says nothing about the promise.
+  const replaced = (run: { label: string; launches: number }) =>
+    run.launches > 1 ? `the plain message replaced the re-adopted ${run.label} process (${run.launches} launches), so its sync judged a fresh launch` : null;
 
   const control = await readopt("control", false, false);
+  if (replaced(control)) return broken(replaced(control)!);
   if (!control.afterSwitch.includes(SET_SERVER)) {
     return broken(`the rig did not see setMcpServers on a re-adopted off process (sync answered ${JSON.stringify(control.outcome)}), so it cannot judge the others`);
   }
   const onOff = await readopt("on-off", true, false);
   const offOn = await readopt("off-on", false, true);
 
-  const wrong: string[] = [];
+  const wrong: string[] = [onOff, offOn].map(replaced).filter((why): why is string => why !== null);
   if (onOff.afterSwitch.length > 0) {
     wrong.push(`a process its host recorded in Code Mode, re-adopted while the house answered off, was sent setMcpServers ${JSON.stringify(onOff.afterSwitch)} (${onOff.afterJoin.length} of them by a plain message) beside its cm, and the bridge was told ${onOff.bridged} time(s)`);
   }
