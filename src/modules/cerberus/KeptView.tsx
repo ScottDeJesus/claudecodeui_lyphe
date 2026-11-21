@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { HeadLevel } from '@/shared/context/HeadBackContext';
 import type { CerberusView } from '@/shared/types';
 import { ViewBoundary } from '@/shared/ui';
 
@@ -22,13 +23,18 @@ type KeptViewProps = {
  * state). Nothing on the wrapper sets a display, so `hidden` takes it out of layout. The view's code is its own chunk,
  * loaded on its first show, and the surround keeps a chunk that fails to load from taking the rest of the tab with it.
  *
- * Used by the cerberus module's `CerberusPanel`, around the Tours, Bulletins and Uploads views.
+ * It is a level of the screen (`HeadLevel`): a page inside the view (a carrier, a tour) claims the screen head's way back only while the
+ * view is shown, and the head names the view after the screen ("Cerberus · Bulletins").
+ *
+ * Used by the cerberus module's `CerberusPanel`, around the Tours, Bulletins, Uploads and Scheduling views.
  */
 export function KeptView({ id, view, shownOnce, label, children }: KeptViewProps) {
   if (!shownOnce.has(id)) return null;
   return (
     <div role="tabpanel" aria-label={label} hidden={view !== id}>
-      <ViewBoundary view={label}>{children}</ViewBoundary>
+      <HeadLevel shown={view === id} name={label}>
+        <ViewBoundary view={label}>{children}</ViewBoundary>
+      </HeadLevel>
     </div>
   );
 }

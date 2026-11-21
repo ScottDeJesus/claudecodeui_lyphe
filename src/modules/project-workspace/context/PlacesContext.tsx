@@ -65,8 +65,10 @@ function walkedTo(trail: PlaceTrailStep[], step: PlaceTrailStep): PlaceTrailStep
 }
 
 type WheelState = {
-  /** The middle of the press it came out of (the menu, a core), or null when a key summoned it. */
-  from: { x: number; y: number } | null;
+  /** The middle and the width of the press it came out of (the menu, a core), or null when a key summoned it. */
+  from: { x: number; y: number; size: number } | null;
+  /** The press it came out of, which hides its face while the wheel is unfolded from it (`data-unfolded`); null for a key. */
+  opener: HTMLElement | null;
   /** The pointer still down from the press that opened it, or null: while it is down, letting go over a place goes there. */
   held: number | null;
   /** Where the focus stood as it came up, for it to go back to when the wheel is put away with nothing chosen. */
@@ -80,7 +82,8 @@ function wheelFrom(opener: HTMLElement | null, held: number | null): WheelState 
   const box = opener?.getBoundingClientRect() ?? null;
   const focused = document.activeElement;
   return {
-    from: box === null ? null : { x: box.left + box.width / 2, y: box.top + box.height / 2 },
+    from: box === null ? null : { x: box.left + box.width / 2, y: box.top + box.height / 2, size: box.width },
+    opener,
     held,
     returnTo: opener ?? (focused instanceof HTMLElement && focused !== document.body ? focused : null),
     leaving: false,
@@ -91,9 +94,13 @@ type PlacesValue = {
   /** Every place the navigation leads to, in the wheel's order: the inner ring's five, then the outer's six. */
   places: Place[];
   /**
-   * What waits elsewhere, gathered for the menu that brings the wheel up: `owed` while any place away from here owes a word, else
-   * `done` while one has finished work unseen, its words naming each such place; null while nothing waits. The app's own newer release
-   * stays on Settings in the wheel: it is news to read there, not a word owed on every page.
+   * The places away from here with something waiting that the menu shows: each is a bead on the menu's dial at its bearing
+   * (`PlacesDial`). The app's own newer release stays on Settings in the wheel: it is news to read there, not a word owed on every page.
+   */
+  waiting: Place[];
+  /**
+   * What waits elsewhere, gathered for the menu that brings the wheel up: `owed` while any place in `waiting` owes a word, else `done`
+   * while one has finished work unseen, its words naming each such place; null while nothing waits.
    */
   menuMark: PlaceMark | null;
   /** Brings the wheel up out of `opener`; with `heldPointer`, the pointer still down from that press, which a release over a place spends. */
@@ -138,8 +145,9 @@ export function usePlaces(): PlacesValue {
  * WHAT WAITS AT A PLACE IS MARKED ON IT (`Place.mark`), each figure the one its own screen already reads, so a mark and the screen it
  * leads to never tell two stories: other chats waiting on an answer (the home), Kaylee's draft (the station), the roadmap's asks or its
  * whole lane finished, the last chat's question or its reply landed unseen, the checks that need a person (Cerberus), the Inbox's count,
- * and Settings while the server must be restarted or an update is on offer (pressed then, it opens on the tab that says so). Gathered,
- * the marks of the places away from here mark the menu (`menuMark`).
+ * and Settings while the server must be restarted or an update is on offer (pressed then, it opens on the tab that says so). The marks
+ * of the places away from here stand on the menu's dial, each a bead at its place's bearing (`waiting`), and gathered they are the
+ * menu's description (`menuMark`).
  *
  * IT ALSO HOLDS THE NEW-PROJECT WIZARD (`newProject`): the old sidebar's plus was its only door, and no screen draws that sidebar
  * now. The wheel offers it under its places and the palette among its acts.
@@ -300,14 +308,17 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     ];
   }, [stationShowing, homeShowing, activeTab, lastChatId, lastChatTitle, sessionId, views, homeName, stationName, marks, settingsTab, t, goHome, goStation, goScreen, goChat, openSettings]);
 
+  const waiting = useMemo(
+    () => places.filter((place) => place.mark !== null && !place.here && !(place.id === 'settings' && settingsQuiet)),
+    [places, settingsQuiet],
+  );
   const menuMark = useMemo<PlaceMark | null>(() => {
-    const waiting = places.filter((place) => place.mark !== null && !place.here && !(place.id === 'settings' && settingsQuiet));
     if (waiting.length === 0) return null;
     return {
       kind: waiting.some((place) => place.mark?.kind === 'owed') ? 'owed' : 'done',
       words: waiting.map((place) => `${place.label}: ${place.mark?.words}`).join('. '),
     };
-  }, [places, settingsQuiet]);
+  }, [waiting]);
 
   // THE NEW-PROJECT WIZARD, the one door to making a folder a project now that no screen draws the old sidebar whose plus it was.
   // A made project is read into the lists as the sidebar's own did.
@@ -352,6 +363,15 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     wheelUpRef.current = wheel !== null && !wheel.leaving;
   }, [wheel]);
+
+  // THE PRESS IT UNFOLDED FROM shows no face while the wheel is up, so the wheel reads as that press grown (`places.css`); its face
+  // comes back as the wheel folds back into it, or at once when a place is chosen.
+  const unfoldedFrom = wheel !== null && !wheel.leaving ? wheel.opener : null;
+  useEffect(() => {
+    if (unfoldedFrom === null) return undefined;
+    unfoldedFrom.setAttribute('data-unfolded', '');
+    return () => unfoldedFrom.removeAttribute('data-unfolded');
+  }, [unfoldedFrom]);
 
   // THE BACKTICK summons it on any page (the wheel's own keys put it away), unless a key is being typed into a field or a dialog is up.
   useEffect(() => {
@@ -460,7 +480,10 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     setTrailFrom(null);
   }, [trailFrom]);
 
-  const value = useMemo<PlacesValue>(() => ({ places, menuMark, openWheel, newProject }), [places, menuMark, openWheel, newProject]);
+  const value = useMemo<PlacesValue>(
+    () => ({ places, waiting, menuMark, openWheel, newProject }),
+    [places, waiting, menuMark, openWheel, newProject],
+  );
 
   return (
     <PlacesContext.Provider value={value}>

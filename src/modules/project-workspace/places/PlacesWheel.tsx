@@ -71,6 +71,75 @@ function polar(cx: number, cy: number, r: number, a: number): [number, number] {
   return [cx + r * Math.sin(t), cy - r * Math.cos(t)];
 }
 
+/**
+ * The folded wheel's two rings, in its own 100-unit box: the radii the wheel's inner and outer places stand at, in the wheel's own
+ * proportion (their middles are 156 and 257 of its 300), with room outside the outer for a bead.
+ */
+const DIAL_INNER_R = 27;
+const DIAL_OUTER_R = 44;
+
+/** How far round its ring the place on screen is lit on the dial either side of its bearing, in degrees: about a sector's width. */
+const DIAL_HERE_HALF = { inner: 20, outer: 14 } as const;
+
+/**
+ * THE WHEEL, FOLDED: the menu's face (`PlacesMenu`), the wheel itself drawn small, so the press says three things before it is
+ * pressed. Its two rings, with a tick for every place at the bearing it has on the wheel; the place on screen lit along its ring; and
+ * what waits elsewhere, where it waits: a bead on the ring at its place's bearing, the accent's breathing for a word owed, the green for
+ * finished work not yet seen (`waiting`, the places the menu's description names). Kaylee's core in its middle, as in the wheel's.
+ * Pressed, the wheel grows out of it (`PlacesWheel`'s unfolding), so each tick is seen to become its place.
+ *
+ * The bearings are the desk wheel's whole circle at every width: on a phone the fan keeps the same places on the same sides.
+ * Decoration to a reader of the screen, who hears the press's name and description. Used by this module's `PlacesMenu`.
+ */
+export function PlacesDial({ places, waiting }: { places: Place[]; waiting: Place[] }) {
+  // The core's chrome, by an id of this dial's own: two dials on a page must not share one gradient's fate.
+  const chromeId = `places-dial-${useId().replace(/:/g, '')}`;
+  const radiusOf = (place: Place) => (place.ring === 'inner' ? DIAL_INNER_R : DIAL_OUTER_R);
+  const bearingOf = (place: Place) => (place.ring === 'inner' ? DESK_INNER : DESK_OUTER)[SLOT[place.id]];
+  const at = (r: number, a: number) => polar(50, 50, r, a).map((v) => v.toFixed(2)).join(' ');
+  const ticks = places.map((place) => `M${at(radiusOf(place) - 4, bearingOf(place))}L${at(radiusOf(place) + 4, bearingOf(place))}`).join('');
+  const here = places.find((place) => place.here) ?? null;
+  let hereArc: string | null = null;
+  if (here !== null) {
+    const r = radiusOf(here);
+    const half = DIAL_HERE_HALF[here.ring];
+    hereArc = `M${at(r, bearingOf(here) - half)}A${r} ${r} 0 0 1 ${at(r, bearingOf(here) + half)}`;
+  }
+
+  return (
+    <svg className="places-dial" viewBox="0 0 100 100" aria-hidden="true">
+      <defs>
+        <radialGradient id={chromeId} cx="38%" cy="32%" r="72%">
+          <stop offset="0%" style={{ stopColor: 'var(--chrome-highlight, #ffffff)' }} />
+          <stop offset="28%" style={{ stopColor: 'var(--chrome-light, #dce1e6)' }} />
+          <stop offset="62%" style={{ stopColor: 'var(--chrome-mid, #8c939b)' }} />
+          <stop offset="86%" style={{ stopColor: 'var(--chrome-dark, #3b4046)' }} />
+          <stop offset="100%" style={{ stopColor: 'var(--chrome-rim, #b9c1c9)' }} />
+        </radialGradient>
+      </defs>
+      <circle className="places-dial-ring" cx={50} cy={50} r={DIAL_OUTER_R} />
+      <circle className="places-dial-ring" cx={50} cy={50} r={DIAL_INNER_R} />
+      <path className="places-dial-ticks" d={ticks} />
+      {hereArc !== null && <path className="places-dial-here" d={hereArc} />}
+      <circle className="places-dial-core" cx={50} cy={50} r={11} fill={`url(#${chromeId})`} />
+      {waiting.map((place, index) => {
+        const [x, y] = polar(50, 50, radiusOf(place), bearingOf(place));
+        return (
+          <circle
+            key={place.id}
+            className="places-dial-bead"
+            data-mark={place.mark?.kind}
+            cx={x}
+            cy={y}
+            r={8}
+            style={{ '--i': index } as CSSProperties}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
 /** One ring's sector from bearing `a0` to `a1`, between radii `r0` and `r1`. */
 function sectorPath(cx: number, cy: number, r0: number, r1: number, a0: number, a1: number): string {
   const at = (r: number, a: number) => polar(cx, cy, r, a).map((v) => v.toFixed(2)).join(' ');
@@ -98,8 +167,8 @@ type PlacesWheelProps = {
   places: Place[];
   /** The acts, a row of presses under the wheel: the applications', then New project; none at the station. */
   acts: WheelAct[];
-  /** The middle of the press it came out of, for the hairline that joins it to the wheel; null when a key summoned it. */
-  from: { x: number; y: number } | null;
+  /** The middle and the width of the press it came out of, which it unfolds from and folds back into; null when a key summoned it. */
+  from: { x: number; y: number; size: number } | null;
   /** The pointer still down from the press that opened it: letting go over a place goes there; elsewhere, the wheel stays up. */
   held: number | null;
   /** Settling away after it was put away with nothing chosen: out of reach, pressing nothing. */
@@ -115,6 +184,10 @@ type PlacesWheelProps = {
  * and only while it is pointed at; the core reads toward it (her reading form, turned to its bearing). The place on screen is drawn
  * raised. What waits at a place is marked on its glyph (`PlaceMarkDot`: the accent's bead for a word owed, the green tick for work
  * finished unseen) and said after its name on the plate. Under the plate, away from the station, the applications' acts, glyphs too.
+ *
+ * IT UNFOLDS OUT OF THE PRESS THAT BROUGHT IT UP: from that press's middle at that press's size, on the lock spring, so the menu's dial
+ * (`PlacesDial`, the wheel folded) is seen to grow into it and a core to open into it; put away, it folds back into the press. A key's
+ * wheel arrives in the middle, sector by sector.
  *
  * Pressed, a place is gone to. Held (the press that brought it up still down), letting go over a place goes there, and anywhere else
  * leaves the wheel up. Keys: 1 to 5 the inner ring's places, the arrows round the places, Enter on one, Escape (or the backtick again)
@@ -225,14 +298,15 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
   const bearingOf = (place: Place) => ringOf(place).mids[SLOT[place.id]];
   const pointed = places.find((place) => place.id === over) ?? null;
 
-  // The hairline from the press it came out of to the rim, at a desk: the wheel is that press's.
-  let leader: { x1: number; y1: number; x2: number; y2: number } | null = null;
-  if (!fan && from !== null) {
-    const dx = from.x - cx;
-    const dy = from.y - cy;
-    const distance = Math.hypot(dx, dy);
-    if (distance > 300 * s + 30) leader = { x1: from.x - (dx / distance) * 24, y1: from.y - (dy / distance) * 24, x2: cx + (dx / distance) * 300 * s, y2: cy + (dy / distance) * 300 * s };
-  }
+  // OUT OF THE PRESS IT CAME FROM: the wheel unfolds from that press's middle at that press's size, and folds back into it when put
+  // away (`places.css`), so the menu's dial is seen to grow into it and a core to open into it. A key's wheel simply arrives.
+  const rim = fan ? 240 * s : 300 * s;
+  const unfold = from === null ? undefined : ({
+    '--unfold-x': `${from.x - cx}px`,
+    '--unfold-y': `${from.y - cy}px`,
+    '--unfold-s': Math.max(0.02, from.size / (2 * rim)),
+    transformOrigin: `${cx}px ${cy}px`,
+  } as CSSProperties);
 
   const pointAt = (event: ReactPointerEvent) => {
     // A mouse or a pen passing over a place points at it; leaving every place points at none.
@@ -256,15 +330,10 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
       {/* A press on the ground puts it away, as the press goes down: the click a finger's tap sends after it lifts lands on the
           ground too, and the tap that summoned the wheel must not be the one that puts it away. */}
       <div className="places-wheel-ground" onPointerDown={() => onClose(true)} />
+      <div className="places-wheel-body" data-unfold={unfold === undefined ? undefined : ''} style={unfold}>
       <svg className="places-wheel-rings" width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
         {!fan && <circle className="places-wheel-hair" cx={cx} cy={cy} r={300 * s} />}
         {!fan && <circle className="places-wheel-hair" cx={cx} cy={cy} r={92 * s} />}
-        {leader !== null && (
-          <g className="places-wheel-leader">
-            <circle cx={from?.x} cy={from?.y} r={24} />
-            <line x1={leader.x1} y1={leader.y1} x2={leader.x2} y2={leader.y2} />
-          </g>
-        )}
         {places.map((place, index) => {
           const ring = ringOf(place);
           const mid = bearingOf(place);
@@ -338,6 +407,7 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
           form={pointed !== null && !pointed.here ? 'reading' : undefined}
           bearing={pointed !== null && !pointed.here ? 90 - bearingOf(pointed) : undefined}
         />
+      </div>
       </div>
 
       {/* The name of the place pointed at, while it is pointed at, and what waits there: empty, the plate is absent. */}

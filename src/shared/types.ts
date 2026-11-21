@@ -4497,6 +4497,20 @@ export type PlaceTrailStep = {
   kind: 'page' | 'screen' | 'chat';
 };
 
+/**
+ * A page inside a screen claiming the screen's one way back while it stands (`shared/context/HeadBackContext`): the head's back arrow
+ * then steps up to where it says, named `label` ("All carriers"), and goes there by `onBack`; the head's title says `title` ("Allstate")
+ * under an eyebrow of the screen's name and `within`, the levels the page stands inside, outermost first ("Bulletins"). Claimed by the
+ * carrier-bulletins module's `CarrierPages` and `PageScreen` and the affected-areas module's `TourScreen` and `PanoScreen`; drawn by
+ * project-workspace's `ScreenHead`.
+ */
+export type HeadBackClaim = {
+  label: string;
+  onBack: () => void;
+  title?: string;
+  within?: string[];
+};
+
 //----------------- SOUNDS: the app's sound set (src/shared/sounds) ------------
 
 /**

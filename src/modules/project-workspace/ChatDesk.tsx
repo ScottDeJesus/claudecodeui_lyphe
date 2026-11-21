@@ -33,14 +33,13 @@ type ChatDeskProps = {
   side: number;
   /** The open chat, by id; null on a chat not yet begun. The hoop of chats round the core arrives turned to it. */
   sessionId: string | null;
-  /** The chat's head (`ChatHead`), the first line over the chat; null while another header stands in for it. */
-  head: ReactNode;
   /** The chat's pane. It keeps one place in the tree whether or not the column is drawn, so the chat is never remounted by a resize. */
   children: ReactNode;
 };
 
 /**
- * THE CHAT'S SCREEN, LAID OUT. On a narrow screen it is the head and the chat under it, one column, the chat's core beside its line.
+ * THE CHAT'S SCREEN UNDER ITS HEAD, LAID OUT (the head, `ChatHead`, is every screen's, over the whole of this). On a narrow screen it
+ * is the chat, one column, the chat's core beside its line.
  *
  * AT A DESK IT IS THE STATION'S ARRANGEMENT: a column at the start, and the chat beside it as a surface of its own, wider (its words
  * run to 1100 px). In the column, from the top: the roadmap as its small circle (`RoadmapCircle`: a press stands the whole stack up
@@ -56,7 +55,7 @@ type ChatDeskProps = {
  *
  * Used by `WorkspaceMain`, as the Chat view's pane.
  */
-export function ChatDesk({ side, sessionId, head, children }: ChatDeskProps) {
+export function ChatDesk({ side, sessionId, children }: ChatDeskProps) {
   const doors = useStationDoors();
   // The box the core is drawn into. State, not a ref: the core's portal is made when the box arrives and unmade when it leaves.
   const [corePlace, setCorePlace] = useState<HTMLDivElement | null>(null);
@@ -103,7 +102,6 @@ export function ChatDesk({ side, sessionId, head, children }: ChatDeskProps) {
           </aside>
         )}
         <div className="chat-desk__main">
-          {head}
           <div className="chat-desk__body">{children}</div>
         </div>
         {beside && <RoadmapCircle rest={{ cx: side / 2, cy: circleY, radius: CIRCLE_RADIUS }} />}

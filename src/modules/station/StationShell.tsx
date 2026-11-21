@@ -5,6 +5,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionActionCard, useCompanion } from '@/modules/companion';
+import { PlacesCorner } from '@/modules/project-workspace';
 import { RoadmapCircle, RoadmapStanding } from '@/modules/roadmap';
 import { useStation } from '@/modules/station/context/StationContext';
 import { useLivePending } from '@/modules/station/hooks/useLivePending';
@@ -57,6 +58,8 @@ type StationScenePieces = {
   action: ReactNode;
   /** The one box: the field, the plus that attaches, the talk press and send (`StationTalk`'s `box`). */
   talk: ReactNode;
+  /** The menu to every other place in every head's corner (`PlacesCorner` on the page); nothing on a fixture. */
+  corner?: ReactNode;
 };
 
 type StationShellViewProps = {
@@ -149,6 +152,7 @@ export function StationShellView({ arrangement, sideways, staged, scene }: Stati
             <div data-station-slot="talk">{scene.talk}</div>
           </div>
           {circle !== null && scene.circle(circle)}
+          {scene.corner}
         </div>
       </main>
     </div>
@@ -253,6 +257,7 @@ export function StationShell() {
         circle: (rest) => <RoadmapCircle rest={rest} />,
         action: <StationHeldAction />,
         talk: <StationTalk tier={tier} density="full" part="box" />,
+        corner: <PlacesCorner />,
       }}
     />
   );

@@ -358,9 +358,10 @@ function WorkspaceMain({
     <SessionPanelProvider sessionId={activeTab === 'chat' && !floating ? (selectedSession?.id ?? null) : null} followupsApart={chatSide > 0}>
     <div className="flex h-full flex-col">
       {/* EVERY VIEW STANDS ALONE, at every width: a head with the way back, the view's name and the menu to every other place, and no
-          old sidebar, rail or phone's strip round it. The chat's head is the first line of the chat's own pane (`ChatDesk` below), so at
-          a desk it stands over the chat and not over the column beside it; the Bugs view draws its own (`BugHead`, in its panel); every
-          other view wears the one head here (`ScreenHead`). The phone's strip stays only for the Chat view while its chat floats. */}
+          old sidebar, rail or phone's strip round it. Every head is drawn in one row (`HEAD_ROW`), the full width of the screen, so the
+          way back and the menu stand on the same spot on every page: the chat's (`ChatHead`, over its pane and the column beside it), the
+          Bugs view's own (`BugHead`, in its panel) and every other view's (`ScreenHead`). The phone's strip stays only for the Chat view
+          while its chat floats. */}
       {activeTab === 'chat' && floating && (
         <WorkspaceHeader
           selectedProject={selectedProject}
@@ -377,12 +378,10 @@ function WorkspaceMain({
       )}
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
-        <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
-          <ChatDesk
-            side={chatSide}
-            sessionId={selectedSession?.id ?? null}
-            head={floating ? null : <ChatHead selectedProject={selectedProject} selectedSession={selectedSession} newSessionLabel={t('mainContent.newSession')} />}
-          >
+        <div className={`h-full flex-col ${activeTab === 'chat' ? 'flex' : 'hidden'}`}>
+          {!floating && <ChatHead selectedProject={selectedProject} selectedSession={selectedSession} newSessionLabel={t('mainContent.newSession')} />}
+          <div className="min-h-0 flex-1">
+          <ChatDesk side={chatSide} sessionId={selectedSession?.id ?? null}>
           {selectedProject ? (
             <WorkspaceErrorBoundary showDetails>
               <CoreDrawingProvider value={drawChatCore}>
@@ -420,6 +419,7 @@ function WorkspaceMain({
             </WorkspaceErrorBoundary>
           ) : chooseProjectBody}
           </ChatDesk>
+          </div>
         </div>
 
         {shouldShowTasksTab && (selectedProject
@@ -518,7 +518,7 @@ function WorkspaceMain({
               <CoreDrawingProvider value={drawChatCore}>
                 <KanbanPanel
                   projectId={selectedProject?.projectId ?? null}
-                  menu={<PlacesMenu triggerClassName="relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']" />}
+                  menu={<PlacesMenu />}
                 />
               </CoreDrawingProvider>
             </div>

@@ -9,6 +9,7 @@ import { StateBadge } from '@/modules/carrier-bulletins/StateBadge';
 import { neighbours, PAGE_STATE_LOOK, pageStateOf, partOfPage } from '@/modules/carrier-bulletins/utils/bulletinModel';
 import { stampWords } from '@/modules/carrier-bulletins/utils/bulletinWords';
 import type { BulletinPage, OverviewRow, PageReading } from '@/shared/carrier-bulletins-types';
+import { useClaimHeadBack } from '@/shared/context/HeadBackContext';
 import type { AffectedAreasTrouble } from '@/shared/types';
 import { Button, IconWord } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
@@ -39,6 +40,9 @@ const COLUMNS = 'grid items-start gap-5 [@container(min-width:720px)]:grid-cols-
 /**
  * A PAGE: its image beside what Claude read on it.
  *
+ * The way back to its carrier and "Page 13 of 51" are the screen head's while it stands (`useClaimHeadBack`: its arrow steps up to the
+ * carrier, its title is the page, inside the carrier); drawn on its own, with no head to claim, it draws them itself, at its top.
+ *
  * Read top to bottom: the way back (the carrier's name), "Page 13 of 51", the part it sits in — the bulletin's own heading,
  * and on the page where a part begins the part that ends there — its state with where its answer came from ("Read 2h ago
  * on this file · claude-sonnet-5-5 · 1 call · 37.6K tokens", or "Carried from the Jun 3 file, read Oct 22" for a page
@@ -65,25 +69,31 @@ export function PageScreen({
   const carrier = row?.carrier ?? '';
   // Where the page's answer came from; null for a page with no answer (waiting, not read) and while the reading is out.
   const stamp = reading?.reading ?? null;
+  const pageTitle = row === null ? t('cerberus.bulletins.page.title', { page }) : t('cerberus.bulletins.page.titleOf', { page, count: row.pages });
+  const backLabel = carrier === '' ? t('cerberus.bulletins.carrier.back') : t('cerberus.bulletins.page.back', { carrier });
+  // One way back per screen: the head's arrow steps up to the carrier, and its title is this page, inside the carrier.
+  const inHead = useClaimHeadBack({ label: backLabel, onBack, title: pageTitle, within: carrier === '' ? undefined : [carrier] });
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-3 max-w-full finger:size-11 finger:px-0 max-md:h-11"
-            aria-label={carrier === '' ? t('cerberus.bulletins.carrier.back') : t('cerberus.bulletins.page.back', { carrier })}
-            onClick={onBack}
-            {...WAY_BACK}
-          >
-            <ChevronLeft aria-hidden="true" />
-            <span className="truncate finger:hidden">{carrier === '' ? t('cerberus.bulletins.carrier.back') : carrier}</span>
-          </Button>
-          <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground">
-            {row === null ? t('cerberus.bulletins.page.title', { page }) : t('cerberus.bulletins.page.titleOf', { page, count: row.pages })}
-          </h2>
+          {!inHead && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 max-w-full finger:size-11 finger:px-0 max-md:h-11"
+                aria-label={backLabel}
+                onClick={onBack}
+                {...WAY_BACK}
+              >
+                <ChevronLeft aria-hidden="true" />
+                <span className="truncate finger:hidden">{carrier === '' ? t('cerberus.bulletins.carrier.back') : carrier}</span>
+              </Button>
+              <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground">{pageTitle}</h2>
+            </>
+          )}
           {part.heading !== '' && (
             <p className="text-[13.5px] text-muted-foreground [overflow-wrap:anywhere]">
               <span className="font-medium text-foreground">{part.heading}</span>

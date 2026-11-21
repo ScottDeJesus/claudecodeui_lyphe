@@ -8,6 +8,7 @@ import { useProjectChatState } from '@/modules/project-workspace/context/Project
 import CompanionHost from '@/modules/project-workspace/CompanionHost';
 import { PlacesProvider } from '@/modules/project-workspace/context/PlacesContext';
 import { WorkspaceHomeLayer } from '@/modules/project-workspace/home/WorkspaceHomeLayer';
+import { HeadBackProvider } from '@/shared/context/HeadBackContext';
 import { PageAnchorsProvider } from '@/shared/context/PageAnchorsContext';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import WorkspaceFrame from '@/modules/project-workspace/WorkspaceFrame';
@@ -39,10 +40,13 @@ function ProjectWorkspaceShell({
             <CompanionHost navigate={navigate}>
               {/* The navigation, one for every page: the wheel of places, the trail a held back arrow opens, the palette's places. */}
               <PlacesProvider>
-                <WorkspaceFrame isMobile={isMobile} ws={ws} sendMessage={sendMessage} navigate={navigate} />
-                {stationLayer}
-                {/* The sessions home, the workspace's own second page: his chats by folder, drawn over the frame while the router stands at `/home`. */}
-                <WorkspaceHomeLayer />
+                {/* One way back per screen: a page inside a screen claims the screen head's back arrow (`ScreenHead`) while it stands. */}
+                <HeadBackProvider>
+                  <WorkspaceFrame isMobile={isMobile} ws={ws} sendMessage={sendMessage} navigate={navigate} />
+                  {stationLayer}
+                  {/* The sessions home, the workspace's own second page: his chats by folder, drawn over the frame while the router stands at `/home`. */}
+                  <WorkspaceHomeLayer />
+                </HeadBackProvider>
               </PlacesProvider>
             </CompanionHost>
             {/* The account switcher, one for the workspace: an account ring on any page, or the rail's account button, opens it. */}

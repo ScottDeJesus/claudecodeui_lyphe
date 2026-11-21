@@ -1,4 +1,4 @@
 export { default as ProjectWorkspaceRoute } from '@/modules/project-workspace/ProjectWorkspaceRoute';
-// PlacesMenu: the one menu to every other place, drawn by this module's home and chat head; exported for the station module's
-// `StationKaylee`, which stands it in the row by the companion's name so the station has the same way out.
-export { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
+// PlacesCorner: the one menu to every other place in every head's corner, on a page with no head; exported for the station module's
+// `StationShell`, so the station's way out stands where every page's does.
+export { PlacesCorner } from '@/modules/project-workspace/PlacesCorner';

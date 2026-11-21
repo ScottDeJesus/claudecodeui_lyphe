@@ -70,8 +70,10 @@
 [data-station-scene='rest'] [data-station-stage-cell] { width: 100%; max-width: 720px; margin-inline: auto; }
 [data-station-scene='rest'] [data-station-stage-cell]:has(> [data-station-stage='empty']) [data-station-stage-empty-message] { display: none; }
 [data-station-scene='rest'] [data-station-stage-cell]:has(> [data-station-stage='empty']):not(:has([data-station-shelf])) { display: none; }
+/* In two columns the panel's top stands under the menu's corner (`PlacesCorner`, every head's 60 px row), so the menu never sits on the
+ * panel's own head and its presses. In one column the companion's row is at the head, with the menu at its end. */
 [data-station-scene='staged'] [data-station-stage-cell] {
-  margin: 16px 16px 12px 0;
+  margin: 60px 16px 12px 0;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);

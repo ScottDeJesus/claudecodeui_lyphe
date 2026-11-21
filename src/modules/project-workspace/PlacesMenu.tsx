@@ -1,47 +1,42 @@
 import '@/modules/project-workspace/places/places.css';
 
-import { Menu as MenuIcon } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { usePlaces } from '@/modules/project-workspace/context/PlacesContext';
-import { PlaceMarkDot } from '@/modules/project-workspace/places/PlaceMarkDot';
-import { Button } from '@/shared/ui';
+import { PlacesDial } from '@/modules/project-workspace/places/PlacesWheel';
+import { HEAD_PRESS } from '@/shared/constants';
 import { cn } from '@/shared/utils';
 
-type PlacesMenuProps = {
-  /** Classes for the press, whose size is its page's to say (the home's corner, the chat's head, the row by the companion's name). */
-  triggerClassName?: string;
-};
-
 /**
- * THE ONE WAY TO EVERY OTHER PLACE, the same press on each page: the menu mark, which brings up the wheel of places (`PlacesWheel`,
- * through `PlacesProvider`). It comes up AS THE PRESS GOES DOWN, so the press that summoned it can slide on to a place and let go
- * there; let go anywhere else, it stays up to be pressed. A press by key (Enter, Space) brings it up too. Which place is here is the
- * provider's to know, not the page's.
+ * THE ONE WAY TO EVERY OTHER PLACE, the same press in the same corner of every page: the wheel of places folded small (`PlacesDial`),
+ * which brings the wheel up (`PlacesWheel`, through `PlacesProvider`) and is seen to grow into it. It comes up AS THE PRESS GOES DOWN,
+ * so the press that summoned it can slide on to a place and let go there; let go anywhere else, it stays up to be pressed. A press by
+ * key (Enter, Space) brings it up too. Which place is here is the provider's to know, not the page's.
  *
- * WHAT WAITS ELSEWHERE IS MARKED ON IT (the provider's `menuMark`): the accent's bead while a place away from here owes a word, else the
- * green tick while one has finished work unseen. A reader of the screen hears the places and their words as the press's description;
- * its name stays "Menu".
+ * It is an object, pressed as itself with no box round it, as a ring is; its size is the head's press (`HEAD_PRESS`): 36 px at a desk,
+ * drawn 28 px under a finger and caught at 44.
  *
- * Used by `home/WorkspaceHome` (its head's end), `ChatHead` (the end of the chat's head), `ScreenHead` (the end of every other screen's
- * head), `WorkspaceMain` (handed to the Bugs view, the end of its head) and, through this module's barrel, the station module's
- * `StationKaylee` (the last press in the row by the companion's name).
+ * WHAT WAITS ELSEWHERE IS DRAWN ON IT WHERE IT WAITS (the provider's `waiting`): a bead on the dial at that place's bearing, the
+ * accent's for a word owed, the green for finished work unseen. `data-mark` says the strongest of them (`menuMark`): `owed` while any
+ * place owes a word, else `done`. A reader of the screen hears the places and their words as the press's description; its name stays
+ * "Menu".
+ *
+ * Used by `ScreenHead` (the end of every screen's head), `ChatHead` (the end of the chat's head), `WorkspaceMain` (handed to the Bugs
+ * view, the end of its head), `PlacesCorner` (the station's corner) and `home/WorkspaceHome` (the home's head).
  */
-export function PlacesMenu({ triggerClassName }: PlacesMenuProps) {
+export function PlacesMenu() {
   const { t } = useTranslation();
-  const { menuMark, openWheel } = usePlaces();
+  const { places, waiting, menuMark, openWheel } = usePlaces();
   const markId = useId();
 
   return (
-    <Button
+    <button
       type="button"
       data-places-menu=""
       data-mark={menuMark?.kind}
-      variant="outline"
-      size="icon"
-      // `touch-none`: a finger sliding off the press is the wheel's, never a scroll of the page under it. `relative`: the mark's corner.
-      className={cn('relative touch-none', triggerClassName)}
+      // `touch-none`: a finger sliding off the press is the wheel's, never a scroll of the page under it.
+      className={cn('places-menu touch-none', HEAD_PRESS)}
       aria-label={t('places.menu')}
       aria-describedby={menuMark === null ? undefined : markId}
       title={t('places.menu')}
@@ -55,13 +50,8 @@ export function PlacesMenu({ triggerClassName }: PlacesMenuProps) {
         if (event.detail === 0) openWheel(event.currentTarget, null);
       }}
     >
-      <MenuIcon aria-hidden="true" />
-      {menuMark !== null && (
-        <>
-          <PlaceMarkDot kind={menuMark.kind} />
-          <span id={markId} hidden>{menuMark.words}</span>
-        </>
-      )}
-    </Button>
+      <PlacesDial places={places} waiting={waiting} />
+      {menuMark !== null && <span id={markId} hidden>{menuMark.words}</span>}
+    </button>
   );
 }
