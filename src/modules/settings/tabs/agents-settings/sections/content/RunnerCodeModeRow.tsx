@@ -4,6 +4,14 @@ import { useTranslation } from 'react-i18next';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import { Button, SettingRow } from '@/shared/ui';
 
+// FILL: state — everything from this line to the end of `FAKE_READING` is the fill's one block: the two types
+// become `useCodeMode()`'s own, and the fake reading its answer, under the same four names. The fake is one
+// `builders` entry, its sentence the verb's own (`KINDS["builders"]["says"]`), word for word.
+//
+// The hook forgets EVERY position together, as `useMainSessionDactylsSwitch`'s `forgetPosition` does, and never
+// one kind's: a lost write leaves each kind's `enabled` `null` (or the whole list `null`). The card's one sentence
+// for unknown speaks of all the switches, so a kind with no position beside a kind with one would make it false.
+
 /**
  * One Code Mode switch as `code-mode --status` names it: which launches it covers (`kind`), its name, the sentence
  * that says what on means, and the week's one-line report ("" when there is nothing to count). `enabled` is the
@@ -18,8 +26,6 @@ type CodeModeKind = { kind: string; label: string; says: string; enabled: boolea
  */
 type CodeModeReading = { kinds: CodeModeKind[] | null; unreadable: boolean; ready: boolean | null; why: string | null };
 
-// FILL: state — this fake reading becomes `useCodeMode()`'s, under the same four names. One `builders` entry, its
-// sentence the verb's own (`KINDS["builders"]["says"]`), word for word.
 const FAKE_READING: CodeModeReading = {
   kinds: [
     {
@@ -51,7 +57,8 @@ const FAKE_READING: CodeModeReading = {
  *
  * NO POSITION IS NOT OFF. A switch cannot draw a third side, so a kind whose position is unknown keeps its name
  * and its sentence and draws no switch, and the title row says so and holds the one act that can be honoured,
- * ask again. With no list at all the title row stands alone with the same sentence.
+ * ask again. With no list at all the title row stands alone with the same sentence, and so it does with an empty
+ * one: a verb that named no kind has not told the card where any switch stands.
  *
  * THE POSITION AND THE READINESS ARE TWO FACTS, as on the row above. A switch that is on while the box cannot
  * run Code Mode is armed, not broken: agents work as before until it can. So "Waiting" is said in the warn tone
@@ -77,12 +84,13 @@ export default function RunnerCodeModeRow() {
   const title = t('codeMode.title');
   const retry = t('buttons.retry');
 
-  // The whole box in one word, in the order the title row must speak. No list, or a kind with no position, is
-  // unknown before anything else: a readiness said over switches nobody can vouch for answers the wrong question.
+  // The whole box in one word, in the order the title row must speak. No list, an empty one, or a kind with no
+  // position, is unknown before anything else: a readiness said over switches nobody can vouch for answers the
+  // wrong question.
   const waiting = ready === false && why ? why : null;
   const state = kinds === null
     ? unreadable ? 'unknown' : 'loading'
-    : kinds.some((entry) => entry.enabled === null)
+    : kinds.length === 0 || kinds.some((entry) => entry.enabled === null)
       ? 'unknown'
       : waiting !== null
         ? 'waiting'
