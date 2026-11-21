@@ -738,8 +738,10 @@ async function buildPromptMessages(command, images, files, cwd, transcriptAppend
 }
 
 /**
- * Loads MCP server configurations from ~/.claude.json
- * @param {string} cwd - Current working directory for project-specific configs
+ * Loads the user-scope MCP servers from ~/.claude.json (its top-level `mcpServers`). A project's own
+ * servers are not read here: an ordinary chat's CLI loads its project's scopes itself, and a Code Mode
+ * chat's come from the house's `code-mode config` (`servers_for`).
+ * @param {string} cwd - not read; kept so the callers' shape does not change
  * @returns {Object|null} MCP servers object or null if none found
  */
 const MCP_CONFIG_UNREADABLE = Symbol('mcp config unreadable');
@@ -769,22 +771,13 @@ async function loadMcpConfig(cwd) {
       return MCP_CONFIG_UNREADABLE;
     }
 
-    // Extract MCP servers (merge global and project-specific)
+    // Extract the user-scope MCP servers
     let mcpServers = {};
 
     // Add global MCP servers
     if (claudeConfig.mcpServers && typeof claudeConfig.mcpServers === 'object') {
       mcpServers = { ...claudeConfig.mcpServers };
       // Global MCP servers loaded
-    }
-
-    // Add/override with project-specific MCP servers
-    if (claudeConfig.claudeProjects && cwd) {
-      const projectConfig = claudeConfig.claudeProjects[cwd];
-      if (projectConfig && projectConfig.mcpServers && typeof projectConfig.mcpServers === 'object') {
-        mcpServers = { ...mcpServers, ...projectConfig.mcpServers };
-        // Project MCP servers merged
-      }
     }
 
     // Return null if no servers found
