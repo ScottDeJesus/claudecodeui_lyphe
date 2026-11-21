@@ -5,9 +5,10 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import { RoadmapCircle } from '@/modules/roadmap';
 import { SessionFollowups } from '@/modules/session-panel';
-import { haloHeightFor, haloMiddle, SessionsHalo } from '@/modules/sidebar';
+import { SessionsHalo } from '@/modules/sidebar';
 import { ChatCorePlaceProvider } from '@/shared/context/ChatCorePlaceContext';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
+import { hoopHeightFor, hoopMiddle } from '@/shared/ui';
 
 /** Where the roadmap's circle rests over the side column: its middle at least this far down, and its radius. The station's own two numbers. */
 const CIRCLE_TOP = 66;
@@ -25,7 +26,7 @@ const CORE_RADIUS = 60;
  */
 const HOOP_LEAN = 0.72;
 
-/** The hoop's reading line, drawn under its circle inside its box (`SessionsHalo`'s `data-halo-reading`, 28 px tall): it lifts the circle, and the core in it, by half as much. */
+/** The hoop's reading line, drawn under its circle inside its box (the kit `Hoop`'s `data-hoop-reading`, 28 px tall): it lifts the circle, and the core in it, by half as much. */
 const HOOP_READING = 28;
 
 type ChatDeskProps = {
@@ -71,11 +72,11 @@ export function ChatDesk({ side, sessionId, children }: ChatDeskProps) {
   // The core's centre is the chat surface's middle: its 16 px of air above and 12 px below put that 2 px under the desk's.
   const circleY = Math.max(CIRCLE_TOP, deskHeight / 2 + 2 - CIRCLE_OVER_CORE);
   const beside = side > 0;
-  // The hoop's box holds the core this many px above its own middle (the circle's middle, `haloMiddle`, and the reading line under the
+  // The hoop's box holds the core this many px above its own middle (the circle's middle, `hoopMiddle`, and the reading line under the
   // circle); the column lowers the hoop by as much, so the core's centre, not the hoop's, is level with the chat's (`--core-lift`).
   const hoopWidth = side - 2 * HOOP_INSET;
-  const hoopHeight = haloHeightFor(hoopWidth, HOOP_LEAN);
-  const coreLift = beside ? HOOP_READING / 2 + hoopHeight / 2 - haloMiddle(hoopWidth, hoopHeight, HOOP_LEAN).y : 0;
+  const hoopHeight = hoopHeightFor(hoopWidth, HOOP_LEAN);
+  const coreLift = beside ? HOOP_READING / 2 + hoopHeight / 2 - hoopMiddle(hoopWidth, hoopHeight, HOOP_LEAN).y : 0;
 
   return (
     <ChatCorePlaceProvider value={beside ? corePlace : null}>

@@ -43,7 +43,7 @@
 .chat-desk__core .chat-desk__place > * { pointer-events: auto; }
 /* While the core's own rings are open round it, the hoop and its reading step out of their way. */
 .chat-desk__core [data-sessions-halo] > div > canvas,
-.chat-desk__core [data-halo-reading] { transition: opacity 180ms ease; }
+.chat-desk__core [data-hoop-reading] { transition: opacity 180ms ease; }
 .chat-desk__core:has([data-chat-core-dock='open']) [data-sessions-halo] > div > canvas,
-.chat-desk__core:has([data-chat-core-dock='open']) [data-halo-reading] { opacity: 0; pointer-events: none; }
+.chat-desk__core:has([data-chat-core-dock='open']) [data-hoop-reading] { opacity: 0; pointer-events: none; }
 .chat-desk__followups { grid-row: 3; min-height: 0; overflow-y: auto; padding: 8px 24px 16px; scrollbar-width: thin; }

@@ -1,6 +1,6 @@
 /*
- * The paint of the design system's own objects in the kit: Rings, Track, Opening and Rule (src/shared/ui), and of the parts
- * of an Opening a module draws with these classes directly: Steps, Trace, Choice and Files. Each rule is the design
+ * The paint of the design system's own objects in the kit: the Hoop and its InstrumentCore, Rings, Track, Opening and Rule
+ * (src/shared/ui), and of the parts of an Opening a module draws with these classes directly: Steps, Trace, Choice and Files. Each rule is the design
  * system's (design-system/astrolabe/components/bundle.css), read through the app's names for its tokens: the ground is
  * `--canvas`, a panel `--surface`, the quiet ink `--ink-mid`, the floating shadow `--shadow-overlay`, a panel's corner
  * `--radius-card`, positive `--pos-*`. Every selector here is `.ast-*` and its own; nothing leans on a sibling sheet.
@@ -8,6 +8,43 @@
 
 /* What assistive tech reads and the eye does not: a ring's slider, a gauge's meter, the core's press. */
 .ast-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------------- Hoop ---------------- */
+/* A set of things as slots on a band round a core (the kit's Hoop). Its canvas draws the band; the page only keeps a press on it
+   from selecting text or calling up the platform's own menu. */
+.ast-hoop { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.ast-hoop canvas { -webkit-tap-highlight-color: transparent; }
+
+/* ---------------- InstrumentCore ---------------- */
+/* The core in an instrument's middle: the body, its press, and round it one measure as a flat ring, filled clockwise from twelve
+   with a bead at its head, a press of its own. Grey while its reading is ordinary, yellow past its warn, red from its danger. */
+.ast-instrument-core { position: relative; display: grid; place-items: center; }
+.ast-instrument-core__ring { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.ast-instrument-core__track { fill: none; stroke: var(--ink-muted); stroke-opacity: 0.22; stroke-width: 2.5; }
+.ast-instrument-core__lit {
+  fill: none; stroke: var(--ink-muted); stroke-opacity: 0.85; stroke-width: 2.5; stroke-linecap: round;
+  transition: stroke-dasharray 600ms cubic-bezier(0.22, 1, 0.36, 1), stroke-width var(--duration-fade) ease, stroke-opacity var(--duration-fade) ease;
+}
+.ast-instrument-core__head { transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1); }
+.ast-instrument-core__head circle { fill: var(--ink-muted); }
+.ast-instrument-core[data-level="warn"] .ast-instrument-core__lit { stroke: var(--warn-dot); stroke-opacity: 1; }
+.ast-instrument-core[data-level="warn"] .ast-instrument-core__head circle { fill: var(--warn-dot); }
+.ast-instrument-core[data-level="danger"] .ast-instrument-core__lit { stroke: var(--danger-dot); stroke-opacity: 1; }
+.ast-instrument-core[data-level="danger"] .ast-instrument-core__head circle { fill: var(--danger-dot); }
+.ast-instrument-core:has(.ast-instrument-core__measure:hover, .ast-instrument-core__measure:focus-visible) .ast-instrument-core__lit { stroke-opacity: 1; stroke-width: 3.5; }
+.ast-instrument-core__measure { position: absolute; inset: 0; margin: 0; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.ast-instrument-core__measure:focus-visible { outline: none; }
+.ast-instrument-core__plate {
+  position: absolute; left: 50%; transform: translateX(-50%); padding: 3px 7px; white-space: nowrap; pointer-events: none;
+  font-family: var(--font-mono); font-size: 10px; line-height: 14px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink); background: var(--surface); border-radius: var(--radius-control); box-shadow: var(--shadow-overlay);
+  opacity: 0; transition: opacity var(--duration-fade) ease;
+}
+.ast-instrument-core__measure:hover .ast-instrument-core__plate,
+.ast-instrument-core__measure:focus-visible .ast-instrument-core__plate { opacity: 1; }
+.ast-instrument-core__body { position: relative; display: grid; place-items: center; margin: 0; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.ast-instrument-core__body:focus-visible { outline: 1px solid var(--focus); outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) { .ast-instrument-core__lit, .ast-instrument-core__head { transition: none; } }
 
 /* ---------------- Rings ---------------- */
 .ast-rings { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

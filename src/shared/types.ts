@@ -4217,29 +4217,65 @@ export type RoadmapDotState = 'shipped' | 'inFlight' | 'designing' | 'proposed' 
 export type RoadmapTreeSelection = { kind: 'roadmap' } | { kind: 'milestone' | 'epic' | 'feature'; name: string };
 
 // ---------------------------
-//----------------- SESSIONS HALO: what the halo and its painter share ------------
+//----------------- THE HOOP: the kit's set of things as slots on a band round a core, and what its painter and its users share ------------
 
 /**
- * One chat as a slot on the halo, the simple chat list drawn as a hoop round the companion's core: the chat's `id` and `title`, the
- * folder it stands in (`folder` its id and `folderName` its name, both null for a chat in none), where it stands (`asleep` with no
- * live session host, `idle` awake and still, `working` while its turn runs, `waiting` while it waits on the reader), whether a reply
- * is `unread`, and its `helpers`: one entry for each subagent still at work, the material of its model (`SubagentDot`). Laid out
- * by the sidebar module's `SessionsHalo` and drawn by its `haloPainter`.
+ * How a thing on the kit's hoop (`Hoop`) stands, drawn in the square on its slot's face: `asleep` the frame alone (a chat with no
+ * live host, a bug in the backlog, a silent machine, a proposal that ended), `idle` the square lit and still, `working` a ring of
+ * accent dashes turning in it, `waiting` the square filled in the accent and breathing (a word is owed), `done` the square green
+ * (finished, passing), `failed` the square in the danger ink, and `more` three dots: a run's further things, past what its run shows.
  */
-export type SessionsHaloSlot = {
+export type HoopSlotState = 'asleep' | 'idle' | 'working' | 'waiting' | 'done' | 'failed' | 'more';
+
+/**
+ * One thing on the kit's hoop, a slot on its band. `id` is its key, never shown. `group` is the run it stands in (a folder, a lane,
+ * a state; null for none) and `groupName` the run's name, written along the ground (null writes none): a run's things stand side by
+ * side. `title` and `words` are read out under the hoop while it faces you: its name, then how it stands in words. `state` is its
+ * square (`HoopSlotState`); `edge` how much of its top edge is lit, 0 to 1 (whole for a chat's reply unread, a bug's checklist done,
+ * a machine's checks passing); `beads` one bead along its foot for each helper at work, in its model's material (three at most are
+ * drawn); `height` how tall it stands, as a share of the band (1 when absent): a thing that matters more stands taller. Made by the
+ * sidebar module's `SessionsHalo`; drawn by the kit's `hoopPainter`.
+ */
+export type HoopSlot = {
   id: string;
+  group: string | null;
+  groupName: string | null;
   title: string;
-  folder: string | null;
-  folderName: string | null;
-  state: 'asleep' | 'idle' | 'working' | 'waiting';
-  unread: boolean;
-  helpers: readonly SubagentDot[];
+  words: string;
+  state: HoopSlotState;
+  edge: number;
+  beads: readonly SubagentDot[];
+  height?: number;
 };
+
+/**
+ * A dealing between what stands in a hoop's middle and one of its things: the thing by id, and the way the words go (`in`: read from
+ * it; `out`: written to it). The kit's `Hoop` draws it as a line from the core's edge to that slot, a bead travelling it.
+ */
+export type HoopLink = { id: string; way: 'in' | 'out' };
+
+/**
+ * What the kit's `Hoop` answers through its ref: where a thing's slot stands on the page right now (`pointOf`, the middle of its top
+ * edge; null for a thing not on the hoop), for an `Opening` to hang from; and its direction from the hoop's middle (`azimuthOf`,
+ * degrees counter-clockwise from three o'clock), for a core that reads from it or writes to it.
+ */
+export type HoopHandle = {
+  pointOf: (id: string) => AstrolabePoint | null;
+  azimuthOf: (id: string) => number | null;
+};
+
+/**
+ * The one measure an instrument's core wears (the kit's `InstrumentCore`): a flat ring round the body, filled clockwise from twelve
+ * (`value`, 0 to 1), named on a plate when it is pointed at (`label` · `detail`). It is grey until it passes `warn` (0.8 when absent),
+ * then yellow, then red from `danger` (1 when absent); a measure that is never a load, such as a share finished, passes thresholds it
+ * cannot reach.
+ */
+export type InstrumentMeasure = { value: number; label: string; detail?: string; warn?: number; danger?: number };
 
 /**
  * One subagent still at work, as the dot a chat draws for it: the material its model wears (`modelMaterialOf`: Opus the tube,
  * Haiku the wire, Sonnet the plasma, any other model Mercury), or null for an agent whose model is not known. Made by the sidebar
- * module's `subagentDots`; drawn by its `SessionTile` and its `haloPainter`.
+ * module's `subagentDots`; drawn by its `SessionTile` and by the kit's `hoopPainter` as a slot's beads.
  */
 export type SubagentDot = CompanionMaterial | null;
 
