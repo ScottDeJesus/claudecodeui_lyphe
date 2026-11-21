@@ -1,6 +1,6 @@
 import '@/modules/cerberus/cerberusScreen.css';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AffectedAreasView } from '@/modules/affected-areas';
@@ -24,15 +24,14 @@ import { CheckSheet } from '@/modules/cerberus/sheet/CheckSheet';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import { markLook, nodeMark } from '@/modules/cerberus/utils/cerberusStatus';
 import { fleetHeadline } from '@/modules/cerberus/utils/fleetWords';
-import { fleetRings, machineWord, moreMarkId, ringLabel, ringOfMoreMark } from '@/modules/cerberus/utils/fleetRings';
-import type { FleetRingId } from '@/modules/cerberus/utils/fleetRings';
+import { fleetHoop, groupLabel, groupOfMore, machineWord, moreSlotId } from '@/modules/cerberus/utils/fleetHoop';
+import type { FleetGroupId } from '@/modules/cerberus/utils/fleetHoop';
 import { SchedulingView } from '@/modules/scheduling-report';
 import { UploadsView } from '@/modules/upload-runs';
 import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
-import { useHostWindow } from '@/shared/context/HostWindowContext';
-import type { AstrolabePoint, AstrolabeRingGauge, AstrolabeRingsHandle, CerberusSheetTarget, CerberusView, FleetDoing, ProjectChoice } from '@/shared/types';
+import type { AstrolabePoint, CerberusSheetTarget, CerberusView, FleetDoing, HoopHandle, InstrumentMeasure, ProjectChoice } from '@/shared/types';
 import { Button, Opening, ScrollArea } from '@/shared/ui';
-import { cn, resizeObserverIn } from '@/shared/utils';
+import { cn } from '@/shared/utils';
 
 type CerberusPanelProps = {
   /**
@@ -43,32 +42,30 @@ type CerberusPanelProps = {
   projectChoices: ProjectChoice[];
 };
 
-/** The instrument's square at home, at most: the design system's home size. */
-const INSTRUMENT_HOME = 720;
-
 /** A face arriving: Verve's page entrance at the prototype's .45 s. It plays again each time a face is shown. */
 const VIEW_ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTimingFunction.enter)_both]';
 
 /** The gutter every block of a face keeps, from the panel's own width (`cqi`), as the prototype's do. */
 const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
 
-/** What hangs from the core or a ring rather than from a machine: the fleet itself, or a ring's further machines. */
-type OtherOpening = { kind: 'fleet' } | { kind: 'more'; ringId: FleetRingId };
+/** What hangs from the core or a run rather than from a machine: the fleet itself, or a run's further machines. */
+type OtherOpening = { kind: 'fleet' } | { kind: 'more'; groupId: FleetGroupId };
 
 /**
  * THE CERBERUS SCREEN: the fleet as an instrument, the other six faces behind the foot, and the sheet and the dialogs over them.
  *
- * THE FLEET IS THE INSTRUMENT (`CerberusInstrument`, `utils/fleetRings`): Cerberus's core in the middle of the scene and round it a
- * ring for each state a machine can be in, what needs you innermost, every machine a mark. The core's form is what the fleet is
- * doing (the listening dish while a check needs a person, writing toward a machine while a fix runs on it, thinking while a warden
- * updates), and its one measure is the share of checks passing; a press on the measure opens History. Nothing is written at rest.
+ * THE FLEET IS THE INSTRUMENT (`CerberusInstrument`, `utils/fleetHoop`): Cerberus's core in the middle of the scene and round it a
+ * hoop, every machine a slot on it, a run for each state a machine can be in, what needs you first. The core's form is what the fleet
+ * is doing (the listening dish while a check needs a person, writing toward a machine while a fix runs on it, thinking while a warden
+ * updates), and its one measure is the share of checks passing; a press on the measure opens History. Nothing is written on the
+ * hoop: the machine facing you is read out under it.
  *
  * WHAT OPENS, hung from where it was pressed (the kit's `Opening`), one at a time:
- * - A machine's mark: the machine (`NodeOpening`): what needs you on it with its fix, its services and their last 30 minutes, what
+ * - A machine's slot, at the front: the machine (`NodeOpening`): what needs you on it with its fix, its services and their last 30 minutes, what
  *   is muted on it, its warden and the projects that run there.
  * - The core: the fleet (`FleetOpening`), under its answer ("All quiet", "2 checks need you"): the summary, the live line, the
  *   wardens' update and Enroll a node, what is muted, and What happened.
- * - A ring's "more" mark, past its 23 marks: the rest of its machines, each a press that opens it.
+ * - A run's "more" slot, past its 23 slots: the rest of its machines, each a press that opens it.
  *
  * THE FOOT (`CerberusFoot`): the seven faces, Fleet · Catalog · History · Tours · Bulletins · Uploads · Scheduling, and on the fleet
  * the plus that enrolls a node. On any other face the face is the work, in its own scroller, and the instrument is docked at the
@@ -93,7 +90,6 @@ type OtherOpening = { kind: 'fleet' } | { kind: 'more'; ringId: FleetRingId };
  */
 export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   const { t } = useTranslation();
-  const hostWindow = useHostWindow();
   const { overview, unreachable, stale, refresh, wardens } = useCerberus();
 
   // How many of Try again's reads have finished: both banners are keyed by it, so a retry that fails again is mounted afresh.
@@ -111,7 +107,7 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   const [promoting, setPromoting] = useState<{ diagnosis: CerberusDiagnosisView; check: CerberusCheckView } | null>(null);
   const [enrolling, setEnrolling] = useState(false);
   const [updatingWardens, setUpdatingWardens] = useState(false);
-  // The machine whose Opening hangs from its mark, by id; and what else hangs from the instrument. One at a time.
+  // The machine whose Opening hangs from its slot, by id; and what else hangs from the instrument. One at a time.
   const [openNodeId, setOpenNodeId] = useState<string | null>(null);
   const [other, setOther] = useState<OtherOpening | null>(null);
 
@@ -144,10 +140,10 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
     setOther(next);
   };
 
-  // THE FLEET AS RINGS, worked out again on every read: worst first, the open machine facing on its ring.
+  // THE FLEET AS A HOOP, worked out again on every read: worst first.
   const items = useMemo(() => (overview === null ? [] : fleetItems(overview)), [overview]);
-  const rings = fleetRings(items, overview?.nodes ?? [], openNodeId, t);
-  const ringsRef = useRef<AstrolabeRingsHandle>(null);
+  const hoop = fleetHoop(items, overview?.nodes ?? [], t);
+  const hoopRef = useRef<HoopHandle>(null);
   const fixingNode = items.find((item) => item.status === 'fixing')?.id ?? null;
   const doing: FleetDoing = overview === null ? { kind: 'quiet' }
     : fixingNode !== null ? { kind: 'fixing', nodeId: fixingNode }
@@ -155,7 +151,7 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
         : items.some((item) => groupOf(item.status) === 'updating') ? { kind: 'updating' }
           : { kind: 'quiet' };
   // The core's one measure: the share of the fleet's checks passing. A share passing is never a load, so it never runs warm.
-  const gauge: AstrolabeRingGauge | null = overview === null || overview.counts.checks === 0 ? null : {
+  const measure: InstrumentMeasure | null = overview === null || overview.counts.checks === 0 ? null : {
     value: overview.counts.passing / overview.counts.checks,
     label: t('cerberus.status.ok'),
     detail: `${overview.counts.passing} ${t('cerberus.header.summary.of', { count: overview.counts.checks })}`,
@@ -163,55 +159,36 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
     danger: 2,
   };
 
-  // Where an Opening hangs: a machine's own mark, or its ring's "more" mark for one past the marks; the core; a ring's "more" mark.
-  const placesRef = useRef({ rings, openNodeId });
-  useEffect(() => {
-    placesRef.current = { rings, openNodeId };
-  });
-  const nodeAnchor = useCallback((): AstrolabePoint | null => {
-    const { rings: held, openNodeId: nodeId } = placesRef.current;
-    if (nodeId === null) return null;
-    const ringId = held.ringOf(nodeId);
-    if (ringId === null) return null;
-    const onMark = held.rings.find((ring) => ring.id === ringId)?.items.some((item) => item.id === nodeId) ?? false;
-    return ringsRef.current?.pointOf(ringId, onMark ? nodeId : moreMarkId(ringId)) ?? null;
-  }, []);
+  // The slot the open machine faces you on: its own, or its run's "more" slot for one past the slots; null for none.
+  const openGroup = openNodeId === null ? null : hoop.groupOf(openNodeId);
+  const openFacing = openNodeId === null ? null : hoop.slots.some((slot) => slot.id === openNodeId) ? openNodeId : openGroup === null ? null : moreSlotId(openGroup);
+  // Where an Opening hangs: a machine's own slot, or its run's "more" slot for one past the slots; the core; a run's "more" slot.
+  const nodeAnchor = (): AstrolabePoint | null => (openFacing === null ? null : hoopRef.current?.pointOf(openFacing) ?? null);
   const homeRef = useRef<HTMLDivElement>(null);
   const coreAnchor = useCallback((): AstrolabePoint | null => {
-    const box = homeRef.current?.querySelector('[data-ast-rings]')?.getBoundingClientRect();
+    const box = homeRef.current?.querySelector('[data-cerberus-instrument] [data-cerberus-core]')?.getBoundingClientRect();
     return box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null;
   }, []);
-  const moreAnchor = useCallback((ringId: string) => () => ringsRef.current?.pointOf(ringId, moreMarkId(ringId)) ?? null, []);
-  // The instrument's box: an Opening stands clear of it where the room allows, so the rings stay whole beside it.
-  const instrumentBox = useCallback(() => homeRef.current?.querySelector('[data-cerberus-instrument]')?.getBoundingClientRect() ?? null, []);
-
-  // The home's room, for the instrument's square: as large as the room allows, up to the design system's home size.
-  const [room, setRoom] = useState({ w: 0, h: 0 });
-  const hasFleet = overview !== null;
-  useEffect(() => {
-    const home = homeRef.current;
-    if (!home) return undefined;
-    const observer = resizeObserverIn(hostWindow, ([entry]) => setRoom({ w: Math.round(entry.contentRect.width), h: Math.round(entry.contentRect.height) }));
-    observer?.observe(home);
-    return () => observer?.disconnect();
-  }, [hostWindow, hasFleet]);
-  const square = Math.max(0, Math.min(room.w - 16, room.h - 16, INSTRUMENT_HOME));
+  const moreAnchor = useCallback((groupId: string) => () => hoopRef.current?.pointOf(moreSlotId(groupId)) ?? null, []);
+  // The hoop's box: an Opening stands clear of it where the room allows, so the hoop stays whole beside it.
+  const instrumentBox = useCallback(() => homeRef.current?.querySelector('[data-cerberus-instrument] [data-hoop]')?.getBoundingClientRect() ?? null, []);
 
   const instrument = (docked: boolean) => (
     <CerberusInstrument
-      ringsRef={ringsRef}
-      rings={rings.rings}
+      hoopRef={hoopRef}
+      slots={hoop.slots}
       doing={doing}
-      gauge={gauge}
+      measure={measure}
       docked={docked}
-      hold={openNodeId !== null || other !== null}
-      onOpen={(item) => {
-        const ringId = ringOfMoreMark(item.id);
-        if (ringId !== null) openOther({ kind: 'more', ringId: ringId as FleetRingId });
-        else openNode(item.id);
+      held={openNodeId !== null || other !== null}
+      current={openFacing}
+      onOpen={(slotId) => {
+        const groupId = groupOfMore(slotId);
+        if (groupId !== null) openOther({ kind: 'more', groupId });
+        else openNode(slotId);
       }}
       onCore={() => openOther({ kind: 'fleet' })}
-      onGauge={() => onView('history')}
+      onMeasure={() => onView('history')}
     />
   );
 
@@ -219,8 +196,8 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   const openNodeView = openNodeId === null ? null : overview?.nodes.find((node) => node.id === openNodeId) ?? null;
   const openMark = openItem === null ? null : nodeMark(openItem.status);
   const headline = overview === null ? null : fleetHeadline(t, overview);
-  const moreRingId = other?.kind === 'more' ? other.ringId : null;
-  const moreMachines = moreRingId === null ? [] : (rings.machinesOf[moreRingId] ?? []).filter((nodeId) => !rings.rings.find((ring) => ring.id === moreRingId)?.items.some((item) => item.id === nodeId));
+  const moreGroupId = other?.kind === 'more' ? other.groupId : null;
+  const moreMachines = moreGroupId === null ? [] : (hoop.machinesOf[moreGroupId] ?? []).filter((nodeId) => !hoop.slots.some((slot) => slot.id === nodeId));
 
   return (
     <div data-cerberus-panel="" data-cerberus-face={view} className="flex h-full min-h-0 flex-col bg-background text-foreground [container-type:inline-size]">
@@ -247,10 +224,8 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
               )}
               <div ref={homeRef} className="relative min-h-0 flex-1">
                 {view === 'fleet' && (
-                  <div role="tabpanel" aria-label={t('cerberus.fleet.tabs.fleet')} className="flex h-full items-center justify-center">
-                    <div data-ast-keeps-opening="" data-cerberus-instrument="" style={{ width: square, height: square }}>
-                      {square > 0 && instrument(false)}
-                    </div>
+                  <div role="tabpanel" aria-label={t('cerberus.fleet.tabs.fleet')} className="h-full">
+                    {instrument(false)}
                   </div>
                 )}
                 {/* The other faces scroll here; kept faces stay mounted, hidden, while the fleet is shown. */}
@@ -280,7 +255,7 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
                 </ScrollArea>
               </div>
 
-              {/* A machine, hung from its mark. */}
+              {/* A machine, hung from its slot. */}
               {view === 'fleet' && openItem !== null && openNodeView !== null && (
                 <Opening
                   open
@@ -288,7 +263,7 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
                   avoid={instrumentBox}
                   onClose={() => setOpenNodeId(null)}
                   backLabel={t('buttons.close')}
-                  source={ringLabel(t, rings.ringOf(openItem.id) ?? 'silent')}
+                  source={groupLabel(t, hoop.groupOf(openItem.id) ?? 'silent')}
                   title={openItem.id}
                   status={{ word: machineWord(t, openItem.status), tone: openMark === null ? 'neutral' : markLook(openMark).tone }}
                   width={460}
@@ -319,17 +294,17 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
                 </Opening>
               )}
 
-              {/* A ring's further machines, hung from its "more" mark: each a press that opens it. */}
-              {view === 'fleet' && moreRingId !== null && (
+              {/* A run's further machines, hung from its "more" slot: each a press that opens it. */}
+              {view === 'fleet' && moreGroupId !== null && (
                 <Opening
                   open
-                  anchor={moreAnchor(moreRingId)}
+                  anchor={moreAnchor(moreGroupId)}
                   avoid={instrumentBox}
                   onClose={() => setOther(null)}
                   backLabel={t('buttons.close')}
-                  source={ringLabel(t, moreRingId)}
+                  source={groupLabel(t, moreGroupId)}
                   title={t('cerberus.ring.more', { count: moreMachines.length, defaultValue: '{{count}} more' })}
-                  marks={{ 'data-cerberus-more-opening': moreRingId }}
+                  marks={{ 'data-cerberus-more-opening': moreGroupId }}
                 >
                   <ul className="-mx-2 flex flex-col">
                     {moreMachines.map((nodeId) => (

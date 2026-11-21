@@ -1,13 +1,10 @@
 /*
- * The paint of the design system's own objects in the kit: the Hoop and its InstrumentCore, Rings, Track, Opening and Rule
+ * The paint of the design system's own objects in the kit: the Hoop and its InstrumentCore, Track, Opening and Rule
  * (src/shared/ui), and of the parts of an Opening a module draws with these classes directly: Steps, Trace, Choice and Files. Each rule is the design
  * system's (design-system/astrolabe/components/bundle.css), read through the app's names for its tokens: the ground is
  * `--canvas`, a panel `--surface`, the quiet ink `--ink-mid`, the floating shadow `--shadow-overlay`, a panel's corner
  * `--radius-card`, positive `--pos-*`. Every selector here is `.ast-*` and its own; nothing leans on a sibling sheet.
  */
-
-/* What assistive tech reads and the eye does not: a ring's slider, a gauge's meter, the core's press. */
-.ast-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ---------------- Hoop ---------------- */
 /* A set of things as slots on a band round a core (the kit's Hoop). Its canvas draws the band; the page only keeps a press on it
@@ -45,13 +42,6 @@
 .ast-instrument-core__body { position: relative; display: grid; place-items: center; margin: 0; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
 .ast-instrument-core__body:focus-visible { outline: 1px solid var(--focus); outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) { .ast-instrument-core__lit, .ast-instrument-core__head { transition: none; } }
-
-/* ---------------- Rings ---------------- */
-.ast-rings { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-.ast-rings-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
-.ast-rings-core { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; pointer-events: none; }
-.ast-rings-core > * { width: 100%; height: 100%; }
-.ast-rings-slider:focus { outline: none; }
 
 /* ---------------- Track ---------------- */
 .ast-track { position: relative; height: 44px; min-width: 120px; }

@@ -1,5 +1,5 @@
 // The sentences Cerberus says about a node and a service: the one line under a machine's name, its
-// warden line, and the pill of a service row. They live in one file because a machine's mark, its
+// warden line, and the pill of a service row. They live in one file because a machine's slot, its
 // Opening and a service row each say them, and the fleet's Opening says the fleet's headline and a
 // mute's time left. Every word is a key in `en/common.json` under `cerberus`; a label, a node name and a
 // version are the data's own and go in as variables, never as keys. Like `activityEvents.ts`, it takes
@@ -87,7 +87,7 @@ export function serviceSentence(t: TFunction, service: CerberusServiceView, run:
 }
 
 /**
- * The one line under a node's name, in a collapsed card, a list row and the rings:
+ * The one line under a node's name, in a collapsed card, a list row and the hoop's reading:
  * - its warden has not said hello and nothing is assigned: "Waiting for the first heartbeat";
  * - nothing assigned: "Nothing assigned yet";
  * - a fix running on one of its services: "Fix running on its own" / "Fix running";

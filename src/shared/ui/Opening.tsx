@@ -54,7 +54,7 @@ type OpeningProps = {
 /**
  * THE DESIGN SYSTEM'S OPENING: what a deliberate click opened, hung from the mark it came out of. It is the one place where words,
  * lists and history live. It unfolds on the lock spring on whichever side of its mark has room, joined to the mark by an accent
- * hairline that follows the mark while the rings drift; with less than 560 px of room it is a sheet at the foot. One at a time.
+ * hairline that follows the mark while its hoop turns; with less than 560 px of room it is a sheet at the foot. One at a time.
  *
  * IT FOLDS BACK on its back arrow, on Escape and on a press anywhere else, except on a press inside anything it put up itself (a
  * select's list, a dialog it opened: they are its own in the React tree even when portalled), and on a press on the object it hangs
@@ -64,7 +64,9 @@ type OpeningProps = {
  *
  * It is drawn inside the place it belongs to, which must be positioned: it covers that place and measures its room there.
  *
- * Used by the kanban module's bug board, for a bug, the board and a lane's further bugs (`BugInstrument`).
+ * Used by the kanban module's bug board (`KanbanPanel`, `KanbanCardDrawer`, `ProposedFeatures`: a bug, a proposal, the board and a run's
+ * further things), the cerberus module's `CerberusPanel` (a machine, the fleet and a run's further machines) and project-workspace's
+ * `PlaceTrail`.
  */
 export function Opening({ open, anchor, onClose, backLabel, source, title, name, status, width, side, avoid, marks, children }: OpeningProps) {
   const rootRef = useRef<HTMLDivElement>(null);

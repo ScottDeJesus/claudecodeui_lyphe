@@ -1248,64 +1248,10 @@ export type AstrolabeInstrument = {
 
 // ---------------------------
 
-//----------------- ASTROLABE RINGS, TRACK AND OPENING ------------
+//----------------- ASTROLABE TRACK AND OPENING ------------
 
-/**
- * What one thing on a ring is doing, the design system's five span states: `working` crawls dashes ahead of a bead, `waiting` turns
- * its mark the accent with a gate held open (it waits on you), `done` rests fully lit, `failed` stops in the danger dot with a bar
- * across, and `idle` stays a hairline. Read by the kit's `Rings`.
- */
-export type AstrolabeRingState = 'idle' | 'working' | 'waiting' | 'done' | 'failed';
-
-/**
- * One thing on a ring (the kit's `Rings`): its key (`id`, never shown), its name (`label`, plated when it faces you) and a few words
- * of state (`detail`, plated above it); how far it has got (`progress`, 0 to 1: its span lights to there); what it is doing
- * (`state`); how many helpers ride behind its bead while it works (`agents`); and how much it weighs (`weight`, 0 to 1, a half
- * when absent): a heavier thing's mark stands taller off the ring, so what matters most reads at a glance without a word. `weight`
- * is the app's own layer on the design system's ring.
- */
-export type AstrolabeRingItem = {
-  id: string;
-  label: string;
-  detail?: string;
-  progress?: number;
-  state?: AstrolabeRingState;
-  agents?: number;
-  weight?: number;
-};
-
-/**
- * One ring of the kit's `Rings`, given inside out: its key, its name (`label`, the slider's name and the plate's first word), its
- * things in their order round it, and the thing that faces you (`value`; `defaultValue` for the first picture only). A ring is
- * one set of things: a lane of a board, the chats, the runs.
- */
-export type AstrolabeRing = {
-  id: string;
-  label: string;
-  items: AstrolabeRingItem[];
-  value?: string;
-  defaultValue?: string;
-};
-
-/**
- * A measure the kit's `Rings` wears round its core as a hairline that fills clockwise (`value`, 0 to 1), named on a plate when you
- * point at it (`label` · `detail`). It is quiet until it passes `warn` (0.8 when absent), then the warn dot, then the danger dot from
- * `danger` (1 when absent); a measure that is never a load, such as a share finished, passes thresholds it cannot reach.
- */
-export type AstrolabeRingGauge = { value: number; label: string; detail?: string; warn?: number; danger?: number };
-
-/** A point on the page, in client coordinates: where a mark of the kit's `Rings` or a step of its `Track` stands, for an `Opening` to hang from. */
+/** A point on the page, in client coordinates: where a slot of the kit's `Hoop` or a step of its `Track` stands, for an `Opening` to hang from. */
 export type AstrolabePoint = { x: number; y: number };
-
-/**
- * What the kit's `Rings` answers through its ref: where a thing's mark stands on the page right now (`pointOf`, null for a thing
- * not on a ring), for an `Opening` to hang from; and its direction from the core (`azimuthOf`, degrees counter-clockwise from three
- * o'clock), for a core that reads from it or writes to it.
- */
-export type AstrolabeRingsHandle = {
-  pointOf: (ringId: string, itemId: string) => AstrolabePoint | null;
-  azimuthOf: (ringId: string, itemId: string) => number | null;
-};
 
 /**
  * One step of the kit's `Track`, a thing's course: its key, its name, and where the course stands at it (`done` behind, `live` being
@@ -3236,14 +3182,14 @@ export type CerberusMark = CerberusStatus | 'fixing';
 
 /**
  * The group a node's word falls in: `needs` is failing, denied, fixing and warn; `updating` is updating,
- * paused and enrolling; every other word is its own group. Cerberus's instrument stands its rings on
- * these: Needs you, Updating, Passing (`ok`), and Silent for the rest.
+ * paused and enrolling; every other word is its own group. Cerberus's instrument stands the runs of its
+ * hoop on these: Needs you, Updating, Passing (`ok`), and Silent for the rest.
  */
 export type FleetGroup = 'needs' | 'unknown' | 'muted' | 'updating' | 'empty' | 'ok';
 
 /**
  * What the fleet is doing, as Cerberus's core says it by its form (`CerberusInstrument`): a fix running on a machine (`fixing`, the
- * core writes toward that machine's mark), a check needing a person (`needs`, the listening dish), a warden updating or a machine
+ * core writes toward that machine's slot), a check needing a person (`needs`, the listening dish), a warden updating or a machine
  * enrolling (`updating`, thinking), or nothing (`quiet`, the tide). Worked out by the cerberus module's `CerberusPanel`.
  */
 export type FleetDoing = { kind: 'fixing'; nodeId: string } | { kind: 'needs' } | { kind: 'updating' } | { kind: 'quiet' };
@@ -4234,7 +4180,8 @@ export type HoopSlotState = 'asleep' | 'idle' | 'working' | 'waiting' | 'done' |
  * square (`HoopSlotState`); `edge` how much of its top edge is lit, 0 to 1 (whole for a chat's reply unread, a bug's checklist done,
  * a machine's checks passing); `beads` one bead along its foot for each helper at work, in its model's material (three at most are
  * drawn); `height` how tall it stands, as a share of the band (1 when absent): a thing that matters more stands taller. Made by the
- * sidebar module's `SessionsHalo` and the kanban module's `bugHoop` and `proposalHoop`; drawn by the kit's `hoopPainter`.
+ * sidebar module's `SessionsHalo`, the kanban module's `bugHoop` and `proposalHoop` and the cerberus module's `fleetHoop`; drawn by
+ * the kit's `hoopPainter`.
  */
 export type HoopSlot = {
   id: string;
