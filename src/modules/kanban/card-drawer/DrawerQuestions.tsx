@@ -143,41 +143,14 @@ function QuestionRow({
                 </button>
               ))}
 
-              {/* Offered only when the asker allowed it. A free-text answer nobody asked for is a decision recorded in a
-                  vocabulary the run cannot read. */}
-              {question.otherOn && (
-                <button type="button" className="ast-choice-opt" aria-pressed={usingOther} onClick={() => setUsingOther((using) => !using)}>
-                  <span className="ast-choice-opt-mark" aria-hidden="true" />
-                  <span className="min-w-0 flex-1">{t('kanban.questions.other')}</span>
-                </button>
-              )}
+              {/* Always offered beside the options: when none of them is what the reader wants, their own words are the
+                  answer, and the run is handed them as "In his words". */}
+              <button type="button" className="ast-choice-opt" aria-pressed={usingOther} onClick={() => setUsingOther((using) => !using)}>
+                <span className="ast-choice-opt-mark" aria-hidden="true" />
+                <span className="min-w-0 flex-1">{t('kanban.questions.other')}</span>
+              </button>
             </div>
           )}
-
-          <div className={`flex flex-wrap gap-2${freeOnly ? ' hidden' : ''}`} role="group" aria-label={question.text}>
-            {question.options.map((option) => (
-              <Chip
-                key={option}
-                size="sm"
-                selected={selected.includes(option)}
-                onClick={() => choose(option)}
-              >
-                {option}
-              </Chip>
-            ))}
-
-            {/* Always offered beside the options: when none of them is what the reader wants, their
-                own words are the answer, and the run is handed them as "In his words". */}
-            {!freeOnly && (
-              <Chip
-                size="sm"
-                selected={usingOther}
-                onClick={() => setUsingOther((using) => !using)}
-              >
-                {t('kanban.questions.other')}
-              </Chip>
-            )}
-          </div>
 
           {usingOther && (
             <input
