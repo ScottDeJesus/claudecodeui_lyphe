@@ -1,10 +1,13 @@
+import { ArrowLeft } from 'lucide-react';
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
-import { FOCUSABLE_SELECTOR } from '@/shared/constants';
+import { FOCUSABLE_SELECTOR, HEAD_PRESS } from '@/shared/constants';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { buttonVariants } from '@/shared/ui/buttonVariants';
 import { OWNS_ESCAPE, modalInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
+import { cn } from '@/shared/utils';
 
 /** `top`'s default: the scrim takes the whole viewport, so nothing outside the panel can take a press or a focus. */
 const FULL_VIEWPORT_TOP = '0px';
@@ -140,22 +143,23 @@ export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(
         className={`vv-sheet__panel absolute inset-y-0 flex max-w-full flex-col ${side === 'left' ? 'left-0' : 'right-0'}`}
         style={{ width }}
       >
-        <div className="vv-sheet__head flex items-center justify-between gap-3">
-          {/* `min-w-0` lets the title shrink inside the flex head, and `.vv-sheet__title` breaks an
-              unbroken id anywhere: without both, a long `snake_case` title widens the head and pushes
-              the ✕ off the panel, which on a phone is the only way left to close it. */}
+        {/* The way out first, as on every page's head: the back arrow at the start, never a cross at the end. `min-w-0`
+            lets the title shrink inside the flex head, and `.vv-sheet__title` breaks an unbroken id anywhere, so a long
+            `snake_case` title wraps rather than widening the head. */}
+        <div className="vv-sheet__head flex items-center gap-3">
+          <button
+            type="button"
+            className={cn(buttonVariants({ variant: 'outline', size: 'icon' }), HEAD_PRESS)}
+            onClick={onClose}
+            aria-label={t('buttons.close')}
+            title={t('buttons.close')}
+          >
+            <ArrowLeft aria-hidden="true" />
+          </button>
           <h2 id={titleId} className="vv-sheet__title m-0 min-w-0">
             {title}
             {titleAccent ? <> <em className="vv-sheet__accent">{titleAccent}</em></> : null}
           </h2>
-          <button
-            type="button"
-            className="vv-sheet__close flex shrink-0 items-center justify-center"
-            onClick={onClose}
-            aria-label={t('buttons.close')}
-          >
-            ✕
-          </button>
         </div>
         <div data-flush={flush ? '' : undefined} className="vv-sheet__body min-h-0 flex-1 overflow-y-auto">{children}</div>
         {footer ? <div className="vv-sheet__foot flex justify-end gap-2.5">{footer}</div> : null}

@@ -1,32 +1,41 @@
-import type { SessionsHaloSlot, SubagentDot } from '@/shared/types';
+import type { HoopLink, HoopSlot, SubagentDot } from '@/shared/types';
 
-// THE HALO'S PAINTER: every chat of the simple list as one slot on a hoop that stands round the companion's core, seen from a little
-// above. A slot says its chat's state by how it stands, in three tracks up the band's face, the same marks a tile on the sessions board
-// draws: the top edge lit for a reply not read yet; the square in the middle dark for a chat asleep, lit and still for one awake, a
-// ring of dashes turning in it while its turn runs, and filled in the accent, breathing, while it waits on the reader; a bead on the
-// lower edge for each subagent still at work, in its model's colour. The chats of one folder stand together, a firmer wall and a little air between folders.
-// The hoop turns: the slot at the front, over the pointer, is the one that is read out and the one a press opens.
+// THE HOOP'S PAINTER: every thing of a set as one slot on a hoop that stands round a core, seen from a little above. A slot says how its
+// thing stands in three tracks up the band's face: its top edge lit (whole for a chat's reply not read yet, as far as a bug's checklist
+// has got); the square in the middle (dark for a thing asleep, lit and still for one awake, a ring of dashes turning in it while it is
+// worked, filled in the accent and breathing while it waits on the reader, green once finished, red when it failed, three dots for a
+// run's further things); a bead on the lower edge for each helper still at work, in its model's colour. A slot stands as tall as its
+// thing weighs. The slots of one run (a folder, a lane, a state) stand together, a firmer wall and a little air between runs, the run's
+// name along the ground beside it. The hoop turns: the slot at the front, over the pointer, is the one that is read out and the one a
+// press opens.
 //
-// Drawn on a canvas because every slot leans with the hoop as it turns; the component over it (`board/SessionsHalo`) owns the element,
-// its events and the words.
+// Drawn on a canvas because every slot leans with the hoop as it turns; the component over it (`Hoop`) owns the element, its events and
+// the words.
 
 type Rgb = readonly [number, number, number];
-type Colors = { ink: Rgb; tone: Rgb; muted: Rgb; accent: Rgb; tube: Rgb; wire: Rgb; plasma: Rgb };
+type Colors = { ink: Rgb; tone: Rgb; muted: Rgb; accent: Rgb; positive: Rgb; danger: Rgb; tube: Rgb; wire: Rgb; plasma: Rgb };
 
 const TAU = Math.PI * 2;
 /** How far the hoop leans toward the reader: its depth on screen over its width. */
 const TILT = 0.52;
-/** The air between two folders, in radians, and the most of a slot's own width its side walls keep clear. */
-const FOLDER_GAP = 0.09;
-/** The tracks up the band's face, 0 at its foot and 1 at its top: the square, the unread edge, the bead. */
+/** The tallest the band stands, in px: a hoop as wide as an instrument at home stands its slots as tall as this. */
+const BAND_MOST = 64;
+/** The air between two runs, in radians, and the most of a slot's own width its side walls keep clear. */
+const RUN_GAP = 0.09;
+/** The tracks up the band's face, 0 at its foot and 1 at its top: the square, the lit edge, the bead. */
 const SQUARE: readonly [number, number] = [0.24, 0.78];
-const UNREAD_FROM = 0.84;
+const EDGE_FROM = 0.84;
+/** The most the lit edge stands, in px, however tall the band. */
+const EDGE_MOST = 6;
 const BEAD_AT = 0.11;
 /** The most beads one slot shows, and how much of the slot's width they may spread across. */
 const MOST_BEADS = 3;
 const BEADS_SPREAD = 0.5;
 
-const FALLBACK: Colors = { ink: [255, 255, 255], tone: [238, 241, 244], muted: [149, 157, 166], accent: [242, 166, 90], tube: [255, 176, 102], wire: [95, 227, 255], plasma: [185, 162, 255] };
+const FALLBACK: Colors = {
+  ink: [255, 255, 255], tone: [238, 241, 244], muted: [149, 157, 166], accent: [242, 166, 90], positive: [111, 214, 171], danger: [255, 123, 107],
+  tube: [255, 176, 102], wire: [95, 227, 255], plasma: [185, 162, 255],
+};
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const lerp = (from: number, to: number, by: number) => from + (to - from) * by;
@@ -40,49 +49,68 @@ const rgba = (color: Rgb, alpha: number) => `rgba(${color[0]},${color[1]},${colo
 /** A slot's place on the hoop: its middle and its width, in radians, before the hoop's turn. */
 type Place = { at: number; width: number };
 
-/** A folder's run of slots, for its name: where it starts, where it ends, and the name (null for the chats in no folder). */
+/** A run of slots, for its name: where it starts, where it ends, and the name (null for things in no run). */
 type Run = { from: number; to: number; name: string | null };
 
 /** A press in progress: where it began, how far it has moved, and the hoop's turn when it began. */
 type Drag = { x: number; moved: number; rot: number; slot: number };
 
-/** A dealing between the core and one chat: the chat by id, and the way the words go (`in`: read from the chat; `out`: written to it). */
-export type HaloLink = { id: string; way: 'in' | 'out' };
-
-/** What a lifted press asks for: the chat at the front was pressed (open it), or nothing more than the turn the painter has already begun. */
-export type HaloPress = { open: number } | null;
+/**
+ * What a lifted press asks for: the slot at the front was pressed (open it), another slot was pressed and is turning to the front, or
+ * nothing more than the turn the painter has already begun.
+ */
+type HoopPress = { open: number } | { turned: number } | null;
 
 /**
  * The hoop in a box of `width` by `height`: its middle on the ground, its half-width and its band's height. Room is kept at the foot for
- * the pointer and a hair at the top so the far band's edge is whole. The painter stands the hoop by it, and `board/SessionsHalo` stands
- * the core by it too (`middleOf`), so the two never disagree. `lean` is how far the hoop is tipped toward the reader, as the share of
+ * the pointer and a hair at the top so the far band's edge is whole. The painter stands the hoop by it, and `Hoop` stands what is in its
+ * middle by it too (`hoopMiddle`), so the two never disagree. `lean` is how far the hoop is tipped toward the reader, as the share of
  * its width its depth takes (`TILT` unless the caller says): a hoop round a larger core leans less, so its opening is deeper.
  */
-export function haloGeometry(width: number, height: number, lean = TILT) {
-  const radius = Math.max(24, Math.min(width / 2 - 6, (height - 18) / (2 * lean + 0.18)));
-  const band = clamp(radius * 0.18, 12, 30);
+function hoopGeometry(width: number, height: number, lean = TILT) {
+  const radius = Math.max(14, Math.min(width / 2 - 6, (height - 18) / (2 * lean + 0.18)));
+  // The band keeps its share of the hoop as the hoop grows: a large hoop with a narrow band would read as a thin ring.
+  const band = clamp(radius * 0.18, 12, BAND_MOST);
   return { cx: width / 2, cy: 4 + band + radius * lean, radius, band };
 }
 
-/** Where the hoop's opening has its middle, for what stands in it: over the ground's middle by half the band, as the eye reads it. */
-export function haloMiddle(width: number, height: number, lean = TILT): { x: number; y: number } {
-  const { cx, cy, band } = haloGeometry(width, height, lean);
+/**
+ * Where the hoop's opening has its middle, for what stands in it: over the ground's middle by half the band, as the eye reads it.
+ *
+ * Used by the kit's `Hoop`, which stands its middle there, and by project-workspace's `ChatDesk`, which lifts the chat's core by it.
+ */
+export function hoopMiddle(width: number, height: number, lean = TILT): { x: number; y: number } {
+  const { cx, cy, band } = hoopGeometry(width, height, lean);
   return { x: cx, y: cy - band / 2 };
 }
 
-/** The box's height that holds a hoop as wide as `width` whole, pointer and all: what a caller that knows only the width asks for. */
-export function haloHeightFor(width: number, lean = TILT): number {
+/**
+ * The box's height that holds a hoop as wide as `width` whole, pointer and all: what a caller that knows only the width asks for.
+ *
+ * Used by the kit's `Hoop`, and by project-workspace's `ChatDesk`, the kanban module's `KanbanPanel` and the cerberus module's
+ * `CerberusPanel`, which size the box round their hoops by it.
+ */
+export function hoopHeightFor(width: number, lean = TILT): number {
   return Math.round(18 + (2 * lean + 0.18) * (width / 2 - 6));
 }
 
 /**
- * The halo's painter over one canvas. Every method is cheap to call per event; `frame` is the one that draws.
+ * The widest hoop whose box is at most `height` tall: `hoopHeightFor` turned round, for a caller that knows the room it has.
  *
- * Used by `board/SessionsHalo`, which owns the canvas element and its events.
+ * Used by the kanban module's `KanbanPanel` and the cerberus module's `CerberusPanel`, which fit their hoops to the scene's room.
  */
-export function createHaloPainter(canvas: HTMLCanvasElement) {
+export function hoopWidthFor(height: number, lean = TILT): number {
+  return Math.max(0, Math.floor(2 * ((height - 18) / (2 * lean + 0.18) + 6)));
+}
+
+/**
+ * The hoop's painter over one canvas. Every method is cheap to call per event; `frame` is the one that draws.
+ *
+ * Used by the kit's `Hoop`, which owns the canvas element and its events.
+ */
+export function createHoopPainter(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext('2d')!;
-  let slots: SessionsHaloSlot[] = [];
+  let slots: HoopSlot[] = [];
   let places: Place[] = [];
   let runs: Run[] = [];
   let width = 0;
@@ -92,10 +120,12 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
   let cx = 0;
   let cy = 0;
   let radius = 60;
-  // How far the hoop is tipped toward the reader (`haloGeometry`'s `lean`); the caller's, given with its size.
+  // How far the hoop is tipped toward the reader (`hoopGeometry`'s `lean`); the caller's, given with its size.
   let lean = TILT;
   let band = 18;
-  // Whether the folders' names are written round it (a hoop standing small writes none).
+  // The most of the hoop one slot takes, in radians: the whole hoop shared out among a few slots would make each a wall half round it.
+  let most = TAU;
+  // Whether the runs' names are written round it (a hoop standing small writes none).
   let names = true;
   let colors = FALLBACK;
   let font = 'ui-monospace, monospace';
@@ -113,11 +143,11 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
   let focused = false;
   // The slots as they were last drawn, for a press to land on.
   let paths: Array<Path2D | null> = [];
-  // The chat the core is dealing with now, and which way the words go; and how far from the middle the core's own edge is, in px.
-  let link: HaloLink | null = null;
+  // The slot the middle is dealing with now, and which way the words go; and how far from the middle the core's own edge is, in px.
+  let link: HoopLink | null = null;
   let hole = 0;
 
-  /** What a subagent's bead is filled with: its model's material, the bright ink for Mercury, the quiet ink for a model not known. */
+  /** What a helper's bead is filled with: its model's material, the bright ink for Mercury, the quiet ink for a model not known. */
   const beadColor = (bead: SubagentDot): Rgb => (
     bead === 'tube' ? colors.tube : bead === 'wire' ? colors.wire : bead === 'plasma' ? colors.plasma : bead === 'mercury' ? colors.ink : colors.muted
   );
@@ -145,24 +175,24 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
     return path;
   };
 
-  /** Each slot's share of the hoop: equal shares, the chats of a folder side by side, air between one folder and the next. */
+  /** Each slot's share of the hoop: equal shares (never more than `most`), a run's slots side by side, air between one run and the next. */
   const lay = () => {
     const count = slots.length;
     places = [];
     runs = [];
     if (count === 0) return;
-    let folders = 0;
+    let groups = 0;
     for (let index = 0; index < count; index += 1) {
-      if (index === 0 || slots[index].folder !== slots[index - 1].folder) folders += 1;
+      if (index === 0 || slots[index].group !== slots[index - 1].group) groups += 1;
     }
-    const gap = folders > 1 ? Math.min(FOLDER_GAP, TAU / count / 3) : 0;
-    const share = (TAU - folders * gap) / count;
+    const gap = groups > 1 ? Math.min(RUN_GAP, TAU / count / 3) : 0;
+    const share = Math.min(most, (TAU - groups * gap) / count);
     let at = 0;
     for (let index = 0; index < count; index += 1) {
-      const opens = index === 0 || slots[index].folder !== slots[index - 1].folder;
+      const opens = index === 0 || slots[index].group !== slots[index - 1].group;
       if (opens) {
         if (index > 0) at += gap;
-        runs.push({ from: at, to: at, name: slots[index].folderName });
+        runs.push({ from: at, to: at, name: slots[index].groupName });
       }
       places.push({ at: at + share / 2, width: share });
       at += share;
@@ -171,7 +201,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
   };
 
   const fit = () => {
-    ({ cx, cy, radius, band } = haloGeometry(width, height, lean));
+    ({ cx, cy, radius, band } = hoopGeometry(width, height, lean));
   };
 
   /** The slot nearest the front under a turn. */
@@ -199,9 +229,19 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
     return found;
   };
 
+  /** A slot's square, filled and outlined in one colour: steady, or breathing while it waits on the reader. */
+  const fillSquare = (square: Path2D, color: Rgb, fill: number, shade: number) => {
+    ctx.fillStyle = rgba(color, fill * lerp(0.7, 1, shade));
+    ctx.fill(square);
+    ctx.strokeStyle = rgba(color, lerp(0.7, 1, shade));
+    ctx.lineWidth = 1.25;
+    ctx.stroke(square);
+  };
+
   const drawSlot = (index: number, now: number) => {
     const slot = slots[index];
     const place = places[index];
+    const tall = clamp(slot.height ?? 1, 0.3, 1);
     const mid = place.at + rot;
     const edge = Math.min(0.02, place.width * 0.1);
     const low = mid - place.width / 2 + edge;
@@ -209,16 +249,26 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
     // The near half is seen from outside and full on; the far half from inside, quieter, and quieter still side on.
     const near = Math.cos(mid) > 0;
     const shade = lerp(0.45, 1, Math.abs(Math.cos(mid))) * (near ? 1 : 0.62);
-    const whole = piece(low, high, 0, 1);
+    const whole = piece(low, high, 0, tall);
     paths[index] = whole;
 
-    // Its frame: all a chat asleep shows.
+    // Its frame: all a thing asleep shows.
     ctx.lineWidth = 1;
     ctx.strokeStyle = rgba(colors.tone, 0.3 * shade);
     ctx.stroke(whole);
 
-    if (slot.state !== 'asleep') {
-      const square = piece(low, high, SQUARE[0], SQUARE[1]);
+    if (slot.state === 'more') {
+      // A run's further things: three dots across the middle of the face, the design system's `more` mark.
+      const size = clamp(band * tall * 0.07, 1.3, 2.4);
+      for (let dot = -1; dot <= 1; dot += 1) {
+        const [x, y] = point(mid + dot * (high - low) * 0.18, tall * (SQUARE[0] + SQUARE[1]) / 2);
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, TAU);
+        ctx.fillStyle = rgba(colors.muted, Math.min(1, shade + 0.2));
+        ctx.fill();
+      }
+    } else if (slot.state !== 'asleep') {
+      const square = piece(low, high, SQUARE[0] * tall, SQUARE[1] * tall);
       if (slot.state === 'waiting') {
         // Stopped on the reader: the square in the accent, breathing. Everything that waits breathes together.
         const breath = still ? 1 : clamp(0.5 + 2.2 * Math.sin((now / 1000) * TAU / 1.15), 0, 1);
@@ -227,6 +277,12 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
         ctx.strokeStyle = rgba(colors.accent, lerp(0.7, 1, shade));
         ctx.lineWidth = 1.25;
         ctx.stroke(square);
+      } else if (slot.state === 'done') {
+        // Finished: the square green, still.
+        fillSquare(square, colors.positive, 0.62, shade);
+      } else if (slot.state === 'failed') {
+        // Failed: the square in the danger ink, still.
+        fillSquare(square, colors.danger, 0.62, shade);
       } else {
         ctx.fillStyle = rgba(colors.tone, 0.2 * shade);
         ctx.fill(square);
@@ -236,10 +292,10 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
         if (slot.state === 'working') {
           // At work: twelve accent dashes round a hairline track, lying on the band's face, once round every 2.4 s.
           const span = high - low;
-          const reach = Math.min(band * (SQUARE[1] - SQUARE[0]) * 0.42, radius * span * 0.32);
+          const reach = Math.min(band * tall * (SQUARE[1] - SQUARE[0]) * 0.42, radius * span * 0.32);
           const across = reach / radius;
           const up = reach / band;
-          const middle = (SQUARE[0] + SQUARE[1]) / 2;
+          const middle = tall * (SQUARE[0] + SQUARE[1]) / 2;
           const on = (turn: number) => point(mid + across * Math.cos(turn), middle + up * Math.sin(turn));
           const from = still ? 0 : ((now / 1000) / 2.4) * TAU;
           const part = TAU / 12;
@@ -257,18 +313,26 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
         }
       }
     }
-    if (slot.unread) {
+    const lit = clamp(slot.edge, 0, 1);
+    if (lit > 0) {
+      // The top edge, lit from the slot's start as far as its share: whole for a reply unread, a checklist's share done. It keeps to
+      // a hairline's few px on a tall band, where its share of the band would make it a bar.
+      const from = Math.max(EDGE_FROM * tall, tall - EDGE_MOST / band);
+      if (lit < 1) {
+        ctx.fillStyle = rgba(colors.tone, 0.14 * shade);
+        ctx.fill(piece(low, high, from, tall));
+      }
       ctx.fillStyle = rgba(colors.ink, Math.min(1, shade + 0.25));
-      ctx.fill(piece(low, high, UNREAD_FROM, 1));
+      ctx.fill(piece(low, lerp(low, high, lit), from, tall));
     }
-    if (slot.helpers.length > 0) {
-      // One bead for each subagent, side by side along the foot of the slot and swaying together, each in its model's colour.
-      const beads = slot.helpers.slice(0, MOST_BEADS);
+    if (slot.beads.length > 0) {
+      // One bead for each helper, side by side along the foot of the slot and swaying together, each in its model's colour.
+      const beads = slot.beads.slice(0, MOST_BEADS);
       const sway = still ? 0 : Math.sin(now / 450 + index) * (high - low) * 0.12;
       const step = beads.length > 1 ? ((high - low) * BEADS_SPREAD) / (beads.length - 1) : 0;
       const size = clamp(band * 0.08, 1.6, 3);
       beads.forEach((bead, at) => {
-        const [x, y] = point(mid + sway + (at - (beads.length - 1) / 2) * step, BEAD_AT);
+        const [x, y] = point(mid + sway + (at - (beads.length - 1) / 2) * step, BEAD_AT * tall);
         ctx.beginPath();
         ctx.arc(x, y, size, 0, TAU);
         ctx.fillStyle = rgba(beadColor(bead), Math.min(1, shade + 0.3));
@@ -282,12 +346,12 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
     }
   };
 
-  /** A folder's name, lying along the ground beside its slots: outside the hoop on the near half, inside it on the far half, never upside down. */
+  /** A run's name, lying along the ground beside its slots: outside the hoop on the near half, inside it on the far half, never upside down. */
   const drawName = (run: Run) => {
     if (run.name === null) return;
     const mid = (run.from + run.to) / 2 + rot;
     const facing = Math.cos(mid);
-    // Side on, a name would be read edgeways: it waits until its folder has come round.
+    // Side on, a name would be read edgeways: it waits until its run has come round.
     if (Math.abs(facing) < 0.3) return;
     const near = facing > 0;
     const out = near ? 1 + 15 / radius : 1 - 15 / radius;
@@ -297,7 +361,10 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
     const room = radius * (run.to - run.from) * Math.abs(facing) - 6;
     const name = run.name.toUpperCase();
     ctx.font = `500 9px ${font}`;
-    if (ctx.measureText(name).width > room) return;
+    const wide = ctx.measureText(name).width;
+    if (wide > room) return;
+    // Standing at the front it would lie over the pointer, and the reading under the hoop already names the run there.
+    if (near && Math.abs(x - cx) < wide / 2 + 8) return;
     ctx.save();
     ctx.translate(x, y + (near ? 3 : 0));
     ctx.rotate(Math.atan2(by - ay, bx - ax) + (near ? 0 : Math.PI));
@@ -308,13 +375,13 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
     ctx.restore();
   };
 
-  /** The line between the core and the chat it is dealing with, and the bead that travels it the way the words go. */
+  /** The line between the middle and the slot it is dealing with, and the bead that travels it the way the words go. */
   const drawLink = (now: number) => {
     if (link === null) return;
     const dealt = link;
     const index = slots.findIndex((slot) => slot.id === dealt.id);
     if (index === -1) return;
-    const [sx, sy] = point(places[index].at + rot, 0.5);
+    const [sx, sy] = point(places[index].at + rot, 0.5 * clamp(slots[index].height ?? 1, 0.3, 1));
     const mx = cx;
     const my = cy - band / 2;
     const reach = Math.hypot(sx - mx, sy - my);
@@ -371,6 +438,8 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
         tone: token('--ink', FALLBACK.tone),
         muted: token('--ink-muted', FALLBACK.muted),
         accent: token('--accent', FALLBACK.accent),
+        positive: token('--pos-dot', FALLBACK.positive),
+        danger: token('--danger-dot', FALLBACK.danger),
         tube: token('--tube', FALLBACK.tube),
         wire: token('--wire', FALLBACK.wire),
         plasma: token('--plasma', FALLBACK.plasma),
@@ -388,21 +457,27 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
     setFocused(next: boolean) {
       focused = next;
     },
-    /** The chat the core is dealing with (null for none), and the core's own radius in px, where the line to it starts. */
-    setLink(next: HaloLink | null, coreRadius: number) {
+    /** The most of the hoop one slot may take, in radians: the whole hoop (`TAU`) lets a few slots share it out between them. */
+    setMost(next: number) {
+      if (next === most) return;
+      most = next;
+      lay();
+    },
+    /** The slot the middle is dealing with (null for none), and the core's own radius in px, where the line to it starts. */
+    setLink(next: HoopLink | null, coreRadius: number) {
       link = next;
       hole = coreRadius;
     },
 
-    /** The chats, in the list's order. The slot at the front stays at the front while its chat is still on the hoop. */
-    setSlots(next: SessionsHaloSlot[]) {
+    /** The slots, in their order. The slot at the front stays at the front while its thing is still on the hoop. */
+    setSlots(next: HoopSlot[]) {
       const kept = slots[frontOf(target)]?.id ?? null;
       slots = next;
       lay();
       paths = slots.map(() => null);
       hover = -1;
       const at = kept === null ? -1 : slots.findIndex((slot) => slot.id === kept);
-      // A hoop first given its chats, or one whose front chat has gone, opens on the first that waits on the reader, else the first.
+      // A hoop first given its slots, or one whose front thing has gone, opens on the first that waits on the reader, else the first.
       const front = at !== -1 ? at : Math.max(0, slots.findIndex((slot) => slot.state === 'waiting'));
       if (places.length > 0) {
         target = -places[front].at;
@@ -411,13 +486,28 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
       }
     },
 
-    /** Stands the chat `id` at the front at once, with no turn drawn. False while that chat is not on the hoop. */
+    /** Stands the slot `id` at the front at once, with no turn drawn. False while that slot is not on the hoop. */
     bring(id: string) {
       const at = slots.findIndex((slot) => slot.id === id);
       if (at === -1 || at >= places.length) return false;
       target = -places[at].at;
       rot = target;
       return true;
+    },
+
+    /** Where the slot `id` stands in the canvas now, at the middle of its top edge; null while it is not on the hoop. */
+    pointOf(id: string): [number, number] | null {
+      const at = slots.findIndex((slot) => slot.id === id);
+      if (at === -1 || at >= places.length) return null;
+      return point(places[at].at + rot, clamp(slots[at].height ?? 1, 0.3, 1));
+    },
+
+    /** The slot `id`'s direction from the hoop's middle, in degrees counter-clockwise from three o'clock; null while it is not on the hoop. */
+    azimuthOf(id: string): number | null {
+      const at = slots.findIndex((slot) => slot.id === id);
+      if (at === -1 || at >= places.length) return null;
+      const [x, y] = point(places[at].at + rot, 0.5 * clamp(slots[at].height ?? 1, 0.3, 1));
+      return (Math.atan2(cy - band / 2 - y, x - cx) * 180) / Math.PI;
     },
 
     /** Draws one picture and answers which slot is at the front and which is under the pointer (-1 for none). */
@@ -430,7 +520,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
       ctx.clearRect(0, 0, width, height);
       ctx.lineJoin = 'round';
 
-      // The ground the band stands on: a hairline, so a hoop with no chat on it is still a hoop.
+      // The ground the band stands on: a hairline, so a hoop with nothing on it is still a hoop.
       ctx.beginPath();
       ctx.ellipse(cx, cy, radius, radius * lean, 0, 0, TAU);
       ctx.strokeStyle = rgba(colors.tone, slots.length === 0 ? 0.3 : 0.14);
@@ -488,7 +578,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
       return hover !== -1;
     },
     /** The pointer lifted. A press that did not move turns its slot to the front, or, on the slot already there, asks for it to be opened. */
-    pointerUp(): HaloPress {
+    pointerUp(): HoopPress {
       const lifted = drag;
       drag = null;
       if (lifted === null) return null;
@@ -498,7 +588,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
       }
       if (lifted.slot === frontOf(target)) return { open: lifted.slot };
       turnTo(lifted.slot);
-      return null;
+      return { turned: lifted.slot };
     },
     pointerLeave() {
       pointer = null;
@@ -512,7 +602,7 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
       turnTo(((frontOf(target) + (delta > 0 ? 1 : -1)) % count + count) % count);
       return true;
     },
-    /** The arrows step the hoop; Home and End go to its first and last chat. True when the key was the hoop's. */
+    /** The arrows step the hoop; Home and End go to its first and last slot. True when the key was the hoop's. */
     key(key: string) {
       const count = places.length;
       if (count === 0) return false;

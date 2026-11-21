@@ -22,7 +22,7 @@ import { Button, EmptyState, Opening, Track } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
- * THE OPEN CARD: an Opening hung from the card's mark on the board's rings (the kit's `Opening`), and the only thing on this
+ * THE OPEN CARD: an Opening hung from the card's slot on the board's hoop (the kit's `Opening`), and the only thing on this
  * screen that ever reads a card's DETAIL.
  *
  * IT IS A SHELL AND NOTHING ELSE. No field lives in this file. It owns the frame, its head (where the card stands and what it is,
@@ -71,9 +71,9 @@ type KanbanCardDrawerProps = {
   /** Opens another card in this sheet: a link's press. */
   onOpenCard: (cardId: string) => void;
   onClose: () => void;
-  /** Where the card's mark stands now, for the Opening to hang from: the board's rings answer it each frame. */
+  /** Where the card's slot stands now, for the Opening to hang from: the board's hoop answers it each frame. */
   anchor: () => AstrolabePoint | null;
-  /** The board's instrument on the page: where the room allows, the card stands clear of it, so the rings stay whole. */
+  /** The board's instrument on the page: where the room allows, the card stands clear of it, so the hoop stays whole. */
   avoid: () => { left: number; right: number } | null;
   /** The board's lanes in their order: the card's course. */
   lanes: KanbanLaneSpec[];

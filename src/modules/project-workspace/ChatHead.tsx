@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
 import { SessionFollowupsSwitch, SessionPanelSwitch } from '@/modules/session-panel';
 import { openHome, openStation } from '@/shared/cloudcliDoors';
-import { HOLDS_TRAIL } from '@/shared/constants';
+import { HEAD_NAME, HEAD_PRESS, HEAD_ROW, HOLDS_TRAIL } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { Project, ProjectSession } from '@/shared/types';
 import { Button } from '@/shared/ui';
@@ -33,15 +33,11 @@ type ChatHeadProps = {
  * It stands in place of the sidebar, the rail and the phone's header strip while the Chat view is on screen, at every width: the sessions
  * home is the list of chats now, and the other views are reached from its menu. `pwa-header-safe` keeps it clear of a phone's status bar.
  *
- * ITS ROW IS AS WIDE AS THE CHAT UNDER IT, and centred as it is, so the way back stands over the talk's left edge: 868 px, or the whole
- * of the chat's surface at a desk (`--chat-column`, which `ChatDesk` sets there).
+ * IT IS EVERY SCREEN'S HEAD (`HEAD_ROW`): the full width of the screen, over the chat and, at a desk, over the column beside it too,
+ * so the way back and the menu stand on the same spot as on every other page. Under a finger it is one line: the words side by side,
+ * the title in the small size, the arrow and the menu drawn 28 px and still caught at 44 (`HEAD_PRESS`).
  *
- * UNDER A FINGER IT IS ONE LINE, HALF AS TALL (32 px where it was 60): the words stand side by side, the title in the small size, and the
- * back arrow is drawn 28 px. The arrow still catches a finger at 44 px: a transparent `::before` grows the catch 8 px past the drawn box
- * on every side, the touch law's own way to grow a press without moving its neighbours. The paddings are `!important` there because
- * `pwa-header-safe` sets the top padding in plain CSS, which a utility alone does not outrank.
- *
- * Drawn by `WorkspaceMain`, as the head `ChatDesk` stands over the chat's pane.
+ * Drawn by `WorkspaceMain`, over the chat's pane (`ChatDesk`).
  */
 export default function ChatHead({ selectedProject, selectedSession, newSessionLabel }: ChatHeadProps) {
   const { t } = useTranslation();
@@ -51,36 +47,36 @@ export default function ChatHead({ selectedProject, selectedSession, newSessionL
   const back = toStation ? t('station.title', { defaultValue: 'Kaylee Station' }) : t('home.title', { defaultValue: 'Home' });
 
   return (
-    <header data-chat-head="" className="pwa-header-safe flex-shrink-0 py-3 finger:!pb-0.5 finger:!pt-0.5">
-      {/* The row is as wide as the chat under it, and centred as it is: the head is the chat's first line. */}
-      <div className="mx-auto flex w-full max-w-[var(--chat-column,868px)] items-center gap-3 px-4 finger:gap-2 finger:px-3">
+    <header data-chat-head="" className={HEAD_ROW}>
       <Button
         data-chat-head-back=""
         {...WAY_BACK}
         {...HOLDS_TRAIL}
         variant="outline"
         size="icon"
-        className="relative size-9 shrink-0 finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']"
+        className={HEAD_PRESS}
         aria-label={back}
         title={back}
         onClick={() => (doors.cameFrom() === 'station' ? openStation(doors.navigate) : openHome(doors.navigate))}
       >
         <ArrowLeft aria-hidden="true" />
       </Button>
-      {/* `min-w-0` on the flex child is what lets `truncate` work: without it a long title pushes the row wider than a phone. */}
-      <div className="min-w-0 flex-1 finger:flex finger:items-baseline finger:gap-2">
-        <p className="truncate font-mono text-[10px] font-medium uppercase leading-[14px] tracking-[0.18em] text-muted-foreground finger:max-w-[40%] finger:shrink-0">
-          {[t('chatHead.chat', { defaultValue: 'Chat' }), selectedProject?.displayName].filter(Boolean).join(' · ')}
-        </p>
-        <h1 className="truncate text-xl font-normal leading-tight text-foreground finger:min-w-0 finger:text-sm" title={title}>{title}</h1>
+      {/* `min-w-0` on the flex child is what lets `truncate` work: without it a long title pushes the row wider than a phone. The
+          eyebrow and the title fill the press's height together at a desk (12 and 24 px). */}
+      <div className={HEAD_NAME}>
+        <div className="min-w-0 finger:flex finger:items-baseline finger:gap-2">
+          <p className="truncate font-mono text-[10px] font-medium uppercase leading-3 tracking-[0.18em] text-muted-foreground finger:max-w-[40%] finger:shrink-0">
+            {[t('chatHead.chat', { defaultValue: 'Chat' }), selectedProject?.displayName].filter(Boolean).join(' · ')}
+          </p>
+          <h1 className="truncate text-xl font-normal leading-6 text-foreground finger:min-w-0 finger:text-sm" title={title}>{title}</h1>
+        </div>
       </div>
       {/* The chat's next steps, shown and put away from here; with none this draws nothing. */}
       <SessionFollowupsSwitch />
       {/* The chat's panel is a place switched to from here; with no panel this draws nothing. */}
       <SessionPanelSwitch />
-      {/* The way to every other place, last in the head: the same menu the home and the station carry. */}
-      <PlacesMenu triggerClassName="relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']" />
-      </div>
+      {/* The way to every other place, last in the head: the same menu in the same corner as on every page. */}
+      <PlacesMenu />
     </header>
   );
 }

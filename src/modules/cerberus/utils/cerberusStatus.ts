@@ -114,7 +114,7 @@ export function markLook(mark: CerberusMark): MarkLook {
  * while `paused`, its warden mid-restart, keeps the dashed neutral of its checks. `enrolling` is a held
  * place, fed by nothing yet; whatever feeds it gives its word a mark.
  *
- * Read by the instrument's rings (`utils/fleetRings`: a machine's word), by a machine's Opening (its
+ * Read by the instrument's hoop (`utils/fleetHoop`: a machine's word), by a machine's Opening (its
  * status word's tone, and the ink of its line), so a machine reads the same wherever it is named.
  */
 export function nodeMark(status: FleetStatus): CerberusMark | null {

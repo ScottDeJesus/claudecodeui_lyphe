@@ -1,0 +1,50 @@
+<!-- @dsCard group="Objects" height=470 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hoop — preview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Geist+Mono:wght@100..900&amp;display=swap">
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Astrolabe, h = React.createElement;
+  var CHATS = [
+    { id: 'sched', label: 'Scheduling', detail: 'Working', state: 'working', agents: 2 },
+    { id: 'uploads', label: 'Uploads', detail: 'Idle' },
+    { id: 'pm', label: 'PM flow', detail: 'Needs you', state: 'waiting' },
+    { id: 'bugs', label: 'Bugfixes', detail: 'Asleep', state: 'asleep' },
+    { id: 'backend', label: 'Backend', detail: 'Reply unread', progress: 1 },
+  ];
+  var RUNS = [
+    { id: 'scheduling', label: 'restorly-scheduling', detail: '14 / 26', progress: 14 / 26, state: 'working', agents: 2, weight: 1 },
+    { id: 'sweeps', label: 'api-sweeps', detail: 'Done · 9 / 9', progress: 1, state: 'done', weight: 0.5 },
+    { id: 'pmflow', label: 'pm-flow', detail: 'Waiting for your start', state: 'waiting', weight: 0.5 },
+    { id: 'water', label: 'water-uploads', detail: 'Failed at 4 / 9', progress: 4 / 9, state: 'failed', weight: 1 },
+    { id: 'arrival', label: 'arrival-physics', detail: 'Not started', state: 'asleep', weight: 0 },
+  ];
+  var ROAD = ['Accounts', 'Jobs and visits', 'Technician profiles', 'Scheduling', 'Uploads', 'PM flow'].map(function (l, i) {
+    return { id: 'm' + (i + 1), label: l, detail: i < 3 ? 'Shipped' : i === 3 ? 'In progress' : 'Milestone ' + (i + 1), state: i < 3 ? 'done' : i === 3 ? 'working' : 'asleep', progress: i < 3 ? 1 : i === 3 ? 0.56 : 0 };
+  });
+  var RUNS_OF = [{ id: 'chats', label: 'Chats', items: CHATS }, { id: 'runs', label: 'Runs', items: RUNS }, { id: 'road', label: 'Roadmap', items: ROAD }];
+  var TONE = { working: ['Working', 'info'], waiting: ['Needs you', 'warn'], done: ['Done', 'positive'], failed: ['Failed', 'danger'] };
+  function Demo() {
+    var hoop = React.useRef(null), o = React.useState(null), open = o[0], t = open && open.item ? TONE[open.item.state] : null, g = React.useState(0.58), used = Math.round(g[0] * 200);
+    React.useEffect(function () { var id = setInterval(function () { g[1](function (v) { return v >= 0.9 ? 0.58 : +(v + 0.04).toFixed(2); }); }, 1800); return function () { clearInterval(id); }; }, []);
+    return h('div', { style: { position: 'relative', height: 470, display: 'grid', placeItems: 'center' } },
+      h('div', { style: { width: 560, height: 420 } },
+        h(A.Hoop, { ref: hoop, runs: RUNS_OF, defaultValue: 'pm', hold: !!open, label: 'Workspace', link: { id: 'scheduling', way: 'out' },
+          gauge: [{ value: g[0], label: 'Context', detail: used + 'k of 200k' }, { value: 0.63, label: 'This week', detail: '63%', warn: 0.75, danger: 0.9 }],
+          onGauge: function (pt) { o[1](function (cur) { return cur && cur.gauge ? null : { gauge: true, point: pt }; }); },
+          onOpen: function (item, run) { o[1](function (cur) { return cur && cur.item && cur.item.id === item.id ? null : { item: item, run: run }; }); } },
+          h(A.Core, { state: 'writing', signal: 'demo', azimuth: hoop.current ? hoop.current.azimuthOf('scheduling') : undefined }))),
+      h(A.Opening, { key: open && open.gauge ? 'gauge' : 'slot', open: !!open, anchor: function () { return !open ? null : open.gauge ? open.point : hoop.current ? hoop.current.pointOf(open.item.id) : null; }, onClose: function () { o[1](null); },
+        source: open ? (open.gauge ? 'Core' : open.run.label) : '', title: open ? (open.gauge ? 'Context' : open.item.label) : '', status: open && open.gauge ? (g[0] >= 0.8 ? 'Running high' : undefined) : t ? t[0] : undefined, tone: open && open.gauge ? 'warn' : t ? t[1] : undefined },
+        open && open.gauge ? h(A.KeyValueList, { items: [['Used', used + 'k'], ['Window', '200k'], ['Compacts at', '180k']] }) : null,
+        open && open.item ? h('p', { className: 'telemetry', style: { color: 'var(--ink-muted)', textTransform: 'uppercase' } }, open.item.detail + (open.item.agents ? ' · ' + open.item.agents + ' helpers' : '')) : null));
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

@@ -15,26 +15,26 @@ import { Banner, ConfirmDialog, EmptyState, Opening, SegmentedControl, Spinner }
  * THE BUGS VIEW'S PROPOSED FEATURES FACE: the work that is too big for a ticket, or that says the design itself is wrong, each
  * waiting for one of three answers: promote it to the roadmap, send it back as a ticket, dismiss it.
  *
- * THE PROPOSALS ARE THE INSTRUMENT'S SECOND SET. The board's core stays in the middle and the rings round it are the proposals
- * (`utils/proposalRings`, drawn by the panel): Open innermost, every mark the accent with its gate held open, because each is owed
- * your word; then what has ended, when all are asked for. A press on a mark opens that proposal, hung from it (`ProposalOpening`,
- * in the kit's Opening), read down to your call.
+ * THE PROPOSALS ARE THE INSTRUMENT'S SECOND SET. The board's core stays in the middle and the slots on the hoop round it are the
+ * proposals (`utils/proposalHoop`, drawn by the panel): Open first, every square the accent and breathing, because each is owed your
+ * word; then what has ended, when all are asked for. A press on the slot at the front opens that proposal, hung from it
+ * (`ProposalOpening`, in the kit's Opening), read down to your call.
  *
  * TWO CONTROLS, AND THEY STAY PUT. Which boards (this one, or all) and which proposals (the open ones, or all) stand at the head
  * of the face in every state, a spinner and a failure included. What they are set to is the panel's, so it survives a visit to
  * another face and a board switch.
  *
- * THE SERVER'S ORDER IS KEPT round each ring: high priority first, then the oldest. This face sorts nothing, so a priority changed
- * here moves its mark only when the answer that follows says so.
+ * THE SERVER'S ORDER IS KEPT in each run: high priority first, then the oldest. This face sorts nothing, so a priority changed
+ * here moves its slot only when the answer that follows says so.
  *
  * THREE STATES. Still reading: the ring, under the controls. The route did not answer: one sentence and Try again. Else the
- * instrument, whose rings are absent while nothing is proposed.
+ * instrument, whose hoop is bare while nothing is proposed.
  *
  * ONE QUESTION AT A TIME. A row of the open proposal's Choice asks its own question next, over the face: the epic to promote under,
  * a yes or no to send it back, the reason to dismiss it. They are drawn inside the Opening, so answering one never closes it. A
  * refusal of the dispatcher's is said inside the question it answers, and for a priority, which asks none, in the Opening.
  *
- * IT COMPOSES, IT DOES NOT BUILD: the reading is the panel's (`useProposals`), and so are the instrument and where a mark stands;
+ * IT COMPOSES, IT DOES NOT BUILD: the reading is the panel's (`useProposals`), and so are the instrument and where a slot stands;
  * the Opening's contents and each question are a file of their own, and every piece is the kit's.
  */
 
@@ -53,7 +53,7 @@ type ProposedFeaturesProps = {
   /** The open proposal, by id, or null; the panel holds it, so the instrument and the Opening can never disagree. */
   openId: number | null;
   onOpen: (id: number | null) => void;
-  /** Where the open proposal's mark stands now, for its Opening to hang from. */
+  /** Where the open proposal's slot stands now, for its Opening to hang from. */
   anchor: () => AstrolabePoint | null;
   /** The instrument's box: the Opening stands clear of it where the room allows. */
   avoid: () => { left: number; right: number } | null;
@@ -173,10 +173,10 @@ export function ProposedFeatures({ view, onView, reading, onRetry, onOpenCard, h
         />
       </div>
 
-      {/* A size container: the instrument at home takes the largest square it holds. */}
-      <div className="flex min-h-0 flex-1 items-center justify-center p-2" style={{ containerType: 'size' }}>{body()}</div>
+      {/* The room under the controls: the instrument at home stands its hoop as wide as it allows. */}
+      <div className="flex min-h-0 flex-1 items-center justify-center p-2">{body()}</div>
 
-      {/* The open proposal, hung from its mark. Its questions are drawn inside it, so a press in one never reads as a press outside. */}
+      {/* The open proposal, hung from its slot. Its questions are drawn inside it, so a press in one never reads as a press outside. */}
       <Opening
         open={opened !== undefined}
         anchor={anchor}

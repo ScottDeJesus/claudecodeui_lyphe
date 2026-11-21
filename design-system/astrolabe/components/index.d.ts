@@ -155,7 +155,7 @@ interface SignalCanvasProps { /** `'dispatching'` is accepted as `'writing'`. */
 export interface CoreProps extends SignalCanvasProps {
   /** Overrides the material class of the subtree it sits in. */
   material?: Material;
-  /** The direction of what it reads from or writes to, in degrees counter-clockwise from three o'clock: the mouth turns to it while reading, the tendril runs at it while writing. From Rings, use `azimuthOf`. */
+  /** The direction of what it reads from or writes to, in degrees counter-clockwise from three o'clock: the mouth turns to it while reading, the tendril runs at it while writing. From a Hoop, use `azimuthOf`. */
   azimuth?: number;
   /** 0 to 1: how hard it is driven. It stirs the surface, feeds the filament and widens the glow, in every form. Default 0. */
   drive?: number;
@@ -209,7 +209,7 @@ export interface ArrivalProps {
 export declare function Arrival(props: ArrivalProps): React.ReactElement | null;
 
 export interface SceneProps {
-  /** The instrument: Rings around a Core. Always present. With no `work` it has the center; with work it docks at the foot. */
+  /** The instrument: a Hoop round a Core. Always present. With no `work` it has the center; with work it docks at the foot. */
   instrument: React.ReactNode;
   /** What is being worked on: a chat, a document. Leave it out for the home screen. */
   work?: React.ReactNode;
@@ -228,80 +228,85 @@ export interface SceneProps {
 /** Home (`size-instrument-home`), docked (`size-instrument-rest`) and leaned in (`size-instrument-near`): one instrument at three sizes, moving on the lock spring. */
 export declare function Scene(props: SceneProps): React.ReactElement;
 
-export interface RingItem {
+export interface HoopItem {
   id: string | number;
-  /** Its name. Shown on a plate only while the ring is in use. */
+  /** Its name. Read out under the hoop while it faces you, or while you point at it. */
   label: string;
-  /** A few words or a number beside the ring's label on the plate: "14 / 26", "Waiting for your start". */
+  /** How it stands, in a few words or a number, read out under its name: "14 / 26", "Waiting for your start". */
   detail?: string;
-  /** 0 to 1: how much of its span is lit. */
+  /** 0 to 1: how much of its slot's top edge is lit. How far it has got. */
   progress?: number;
-  /** `working` crawls dashes ahead of a bead; `waiting` turns the mark accent and holds a gate open; `done` rests fully lit; `failed` stops in danger. Default `idle`: a hairline. */
-  state?: 'idle' | 'working' | 'waiting' | 'done' | 'failed';
-  /** Helpers at work on it: one small bead each rides behind the head of a working span, up to five. */
+  /** Its square: `idle` lit and still (the default); `asleep` the frame alone; `working` a ring of accent dashes turning in it; `waiting` the accent, breathing; `done` green; `failed` red; `more` three dots, for a run's further things. */
+  state?: 'idle' | 'asleep' | 'working' | 'waiting' | 'done' | 'failed' | 'more';
+  /** Helpers at work on it: a bead each along its foot, up to three. */
   agents?: number;
+  /** 0 to 1: how much it matters. A heavier thing stands taller. Absent, it stands the band's full height. */
+  weight?: number;
 }
-export interface RingsGauge {
+export interface HoopRun {
+  id: string;
+  /** What the run holds: "Chats", "Runs". Written along the ground beside it, and read out before a thing's name. */
+  label: string;
+  /** Its things, side by side round the hoop. */
+  items: HoopItem[];
+}
+export interface HoopGauge {
   /** 0 to 1. */
   value: number;
-  /** What it measures: "Context", "Budget". Default "Load". */
+  /** What it measures: "Context", "Fixed". */
   label?: string;
-  /** The reading in words, for the plate: "124k of 200k". Default: the percentage. */
+  /** The reading in words, for its plate: "124k of 200k". */
   detail?: string;
   /** From this value up it turns `warn-dot`. Default 0.8. */
   warn?: number;
   /** From this value up it turns `danger-dot`. Default 1: only when full. */
   danger?: number;
 }
-export interface Ring {
-  id: string;
-  /** What the ring holds: "Runs", "Chats". Names it for assistive tools and on the plate. */
-  label: string;
-  /** Two to twenty-four things, clockwise. */
-  items: RingItem[];
-  /** The id of the item that faces you. Change it and the ring turns to it. */
+export interface HoopProps {
+  /** The runs, in their order round the hoop. A run with nothing in it is left out. */
+  runs: HoopRun[];
+  /** The id of the thing that faces you. Change it and the hoop is brought to it. */
   value?: string | number;
   defaultValue?: string | number;
-  /** Override the colour it takes from its place: `b` inside, `a` in the middle, `loop` outside. */
-  tone?: 'a' | 'b' | 'loop' | 'halo';
-  /** Degrees it leans away from you, 0 (flat) to 72. Default: the rig's own for its place. */
-  tilt?: number;
-}
-export interface RingsProps {
-  /** Inside out, one to five. */
-  rings: Ring[];
-  /** Another item has locked in at the pointer. */
-  onChange?: (item: RingItem, ring: Ring) => void;
-  /** The item facing you was clicked, or Enter pressed: open it. `point` is its mark in client coordinates. */
-  onOpen?: (item: RingItem, ring: Ring, point: { x: number; y: number } | null) => void;
-  /** One quantity that fills, worn as a hairline round the core, or two: the first is worn closest. Quiet until it passes `warn`. */
-  gauge?: RingsGauge | RingsGauge[];
-  /** A press on the gauge (or Enter on it): open its detail. `point` is its top in client coordinates, null from the keyboard. */
-  /** A press on a measure: where it is (null from the keyboard), and which, 0 the inner and 1 the outer. */
+  /** Another thing has come to the front. */
+  onChange?: (item: HoopItem, run: HoopRun) => void;
+  /** The thing at the front was pressed, or Enter: open it. `point` is its slot in client coordinates. */
+  onOpen?: (item: HoopItem, run: HoopRun, point: { x: number; y: number } | null) => void;
+  /** While an Opening hangs from it: a press on another thing turns it round and opens it at once. */
+  hold?: boolean;
+  /** One quantity that fills, worn as a flat ring round the core, or two: the first is worn closest. Grey until it passes `warn`. */
+  gauge?: HoopGauge | HoopGauge[];
+  /** A press on a measure: where it was pressed, and which, 0 the inner and 1 the outer. */
   onGauge?: (point: { x: number; y: number } | null, index: number) => void;
   /** A press on the core. */
   onCore?: () => void;
-  /** Name of the core's button for assistive tools. Default "Call the companion". */
+  /** Name of the core's button for assistive tools. Default "The core". */
   coreLabel?: string;
-  /** Hold still: pass true while an Opening hangs from a mark. */
-  hold?: boolean;
-  /** Default true: the rings turn slowly when left alone, and stop the moment you touch one. */
-  drift?: boolean;
-  /** Accessible name of the whole instrument. */
+  /** The core's square in px, its forms room to reach. Default 28% of the hoop's width; its body is about half of it. */
+  coreSize?: number;
+  /** What the core is dealing with: a line runs from its edge to that thing's slot and a bead travels it, in (read) or out (written). */
+  link?: { id: string | number; way: 'in' | 'out' } | null;
+  /** How far it leans toward you: its depth over its width. Default 0.52; a hoop round a larger core leans less. */
+  lean?: number;
+  /** Default true: each run's name is written along the ground. A hoop standing small writes none. */
+  names?: boolean;
+  /** Default true: the thing that faces you is read out in two lines under the hoop. */
+  reading?: boolean;
+  /** Accessible name of the whole hoop. */
   label?: string;
   /** A Core, drawn in the middle. */
   children?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
 }
-export interface RingsHandle {
-  /** Where an item's mark is on screen now, in client coordinates: what an Opening hangs from. */
-  pointOf(ringId: string, itemId: string | number): { x: number; y: number } | null;
-  /** The direction of an item's mark from the core, in degrees counter-clockwise from three o'clock: pass it to the Core as `azimuth`. */
-  azimuthOf(ringId: string, itemId: string | number): number | null;
+export interface HoopHandle {
+  /** Where a thing's slot is on screen now, in client coordinates (the middle of its top edge): what an Opening hangs from. */
+  pointOf(itemId: string | number): { x: number; y: number } | null;
+  /** The direction of a thing's slot from the core, in degrees counter-clockwise from three o'clock: pass it to the Core as `azimuth`. */
+  azimuthOf(itemId: string | number): number | null;
 }
-/** It fills its container; give it a square. Pass a ref to get `pointOf` and `azimuthOf`. */
-export declare const Rings: React.ForwardRefExoticComponent<RingsProps & React.RefAttributes<RingsHandle>>;
+/** It fills its container and stands as wide as the room allows. Pass a ref to get `pointOf` and `azimuthOf`. */
+export declare const Hoop: React.ForwardRefExoticComponent<HoopProps & React.RefAttributes<HoopHandle>>;
 
 export interface TrackStep {
   id: string | number;
@@ -325,7 +330,7 @@ export declare function Track(props: TrackProps): React.ReactElement;
 
 export interface OpeningProps {
   open: boolean;
-  /** The mark it hangs from, in client coordinates, or a function that returns it each frame, such as `() => rings.pointOf(ring, item)`. */
+  /** The mark it hangs from, in client coordinates, or a function that returns it each frame, such as `() => hoop.current.pointOf(item.id)`. */
   anchor: { x: number; y: number } | null | (() => { x: number; y: number } | null);
   /** Escape, the Esc key cap, or a press anywhere else. */
   onClose?: () => void;

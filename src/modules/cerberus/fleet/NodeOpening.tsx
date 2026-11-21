@@ -46,7 +46,7 @@ function Heartbeat({ node }: { node: CerberusNodeView }) {
 }
 
 /**
- * A MACHINE, opened from its mark, under the Opening's title (its name) and word:
+ * A MACHINE, opened from its slot, under the Opening's title (its name) and word:
  *
  * 1. Its one line ("docstore — refused", in the tone's ink when it asks for a look), its description, its update while one is queued or
  *    running ("Updating · Restarting the warden", `UpdatingPill`), then its warden beside the heartbeat: "Warden 0.4.1 · silent since 17:41", "Cerberus · this server" for the hub, " · 2 sessions running here" after it.

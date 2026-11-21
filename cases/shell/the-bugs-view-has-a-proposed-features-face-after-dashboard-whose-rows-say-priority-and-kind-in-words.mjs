@@ -1,7 +1,7 @@
 // The Bugs view gains a third face, Proposed features, after Board and Dashboard (bug-hunters, seam 11, scaffolded in
 // phase 14). Pressed, it draws the proposals and neither the lanes nor the dashboard. Since the board's redraw to the design
-// system (2026-11-20) the proposals are the instrument's second set: marks on rings round the board's core, each opening from
-// its mark (lib/kanban_board.mjs's openProposal) into its Opening, which says its priority as a word (High, Medium, Low) and
+// system (2026-11-20) the proposals are the instrument's second set: slots on the hoop round the board's core, each opening from
+// its slot (lib/kanban_board.mjs's openProposal) into its Opening, which says its priority as a word (High, Medium, Low) and
 // its kind in words (Too big for a ticket, The design is wrong), never a colour alone. Under a finger every press is 44 px and
 // the face stacks inside 390 px (INV-10275); a press only a screen reader reaches (1 px, the core's) is not a finger's.
 // Switching faces and opening a proposal write nothing.
@@ -93,9 +93,9 @@ runCase(async (t) => {
   if (face.short.length > 0) return broken(`at 390 wide these presses on the face are under a finger's 44 px: ${face.short.slice(0, 6).join("; ")}`);
   if (face.off.length > 0) return broken(`at 390 wide the face runs off the screen: ${face.off.join("; ")}`);
 
-  // A proposal opens from its mark, into its Opening.
+  // A proposal opens from its slot, into its Opening.
   const opening = await openProposal(page, ANSWER.proposals[0].id).catch(() => null);
-  if (opening === null) return broken("no mark on the face opens the route's first proposal");
+  if (opening === null) return broken("no slot on the face opens the route's first proposal");
   await settle(page);
   if (!((await opening.textContent()) ?? "").includes(ANSWER.proposals[0].title)) return broken(`the proposal's Opening does not name "${ANSWER.proposals[0].title}"`);
   const opened = await readFace(page);
@@ -106,5 +106,5 @@ runCase(async (t) => {
 
   const writes = requests.filter((r) => r.method !== "GET");
   if (writes.length > 0) return broken(`switching to the face and opening a row wrote ${writes.map((w) => `${w.method} ${w.path}`).join(", ")}`);
-  return held("Board, Dashboard, Proposed features; the face draws no lanes and no dashboard; a proposal opens from its mark and says its priority and kind in words; every press 44 px and nothing off the screen at 390; nothing written");
+  return held("Board, Dashboard, Proposed features; the face draws no lanes and no dashboard; a proposal opens from its slot and says its priority and kind in words; every press 44 px and nothing off the screen at 390; nothing written");
 });

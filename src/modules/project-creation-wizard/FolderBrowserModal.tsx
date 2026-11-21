@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Eye, EyeOff, FolderOpen, FolderPlus, Loader2, Plus, X } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, FolderOpen, FolderPlus, Loader2, Plus } from 'lucide-react';
 
+import { HEAD_PRESS } from '@/shared/constants';
 import { Button, Input } from '@/shared/ui';
 import { browseFilesystemFolders, createFolderInFilesystem } from '@/modules/project-creation-wizard/utils/workspaceApi';
 import { getParentPath, joinFolderPath } from '@/modules/project-creation-wizard/utils/pathUtils';
@@ -101,8 +102,11 @@ export default function FolderBrowserModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
       <div className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-lg border border-border bg-card shadow-xl">
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 border-b border-border p-4">
+          <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={handleClose} aria-label={"Close"} title={"Close"}>
+            <ArrowLeft aria-hidden="true" />
+          </Button>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--info-soft)]">
               <FolderOpen className="h-4 w-4 text-[var(--info-ink)]" />
             </div>
@@ -131,12 +135,6 @@ export default function FolderBrowserModal({
               title="Create new folder"
             >
               <Plus className="h-5 w-5" />
-            </button>
-            <button
-              onClick={handleClose}
-              className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <X className="h-5 w-5" />
             </button>
           </div>
         </div>

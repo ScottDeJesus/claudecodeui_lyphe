@@ -11,6 +11,7 @@ import { StateBadge } from '@/modules/carrier-bulletins/StateBadge';
 import { carrierStanding, partGroups, STANDING_LOOK } from '@/modules/carrier-bulletins/utils/bulletinModel';
 import { fileWords, pageSplitWords, pullCommand, standingWords } from '@/modules/carrier-bulletins/utils/bulletinWords';
 import type { BulletinPage, OverviewRow } from '@/shared/carrier-bulletins-types';
+import { useClaimHeadBack } from '@/shared/context/HeadBackContext';
 import type { AffectedAreasTrouble } from '@/shared/types';
 import { Banner, Button, IconWord } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
@@ -64,6 +65,9 @@ function ReadingPages() {
 /**
  * A CARRIER: its current file, then its pages under the parts the bulletin prints.
  *
+ * The way back to all carriers and the carrier's name are the screen head's while it stands (`useClaimHeadBack`: its arrow steps up
+ * to All carriers, its title is the carrier); drawn on its own, with no head to claim, it draws them itself, at its top.
+ *
  * Read top to bottom: All carriers (the way back), the carrier's name, its file (bulletin number, the day it was stored),
  * its standing with how its pages split, and Refresh at the right; then what needs the operator, when anything does — the
  * waiting pages, with why the carrier cannot settle, the first one to open and the manual pull that reads them again; or a
@@ -91,14 +95,18 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
   // A reading that stopped before the file settled is the overview's Needs you; it is said here with what follows from it.
   const stopped = trouble === null && row !== null && carrierStanding(row) === 'stopped';
   const neverRead = !stopped && shown !== null && shown.length > 0 && shown.every((page) => page.state === 'unread');
+  // One way back per screen: the head's arrow steps up to all carriers and its title is this carrier, while a head is there to say so.
+  const inHead = useClaimHeadBack({ label: t('cerberus.bulletins.carrier.back'), onBack, title: row?.carrier });
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button variant="ghost" size="sm" className="-ml-3 finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.bulletins.carrier.back')} title={t('cerberus.bulletins.carrier.back')} onClick={onBack} {...WAY_BACK}>
-            <IconWord icon={ChevronLeft} word={t('cerberus.bulletins.carrier.back')} />
-          </Button>
+          {!inHead && (
+            <Button variant="ghost" size="sm" className="-ml-3 finger:size-11 finger:px-0 max-md:h-11" aria-label={t('cerberus.bulletins.carrier.back')} title={t('cerberus.bulletins.carrier.back')} onClick={onBack} {...WAY_BACK}>
+              <IconWord icon={ChevronLeft} word={t('cerberus.bulletins.carrier.back')} />
+            </Button>
+          )}
           {row === null ? (
             <div aria-hidden="true" className="flex w-full flex-col gap-2 pt-1">
               <div className="vv-skeleton h-6 w-2/5" />
@@ -106,7 +114,7 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
             </div>
           ) : (
             <>
-              <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{row.carrier}</h2>
+              {!inHead && <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{row.carrier}</h2>}
               <p className="text-[13.5px] text-muted-foreground">{fileWords(row, t)}</p>
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pt-1">
                 <StateBadge tone={STANDING_LOOK[carrierStanding(row)].tone} icon={STANDING_LOOK[carrierStanding(row)].icon} words={standingWords(row, t)} />

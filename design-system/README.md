@@ -10,7 +10,7 @@ This folder is the design language LypheCLI is drawn in, kept here so it can be 
 
 ## Where it comes from
 
-It is a copy of the Astrolabe design system on claude.ai, taken on 18 November 2026 (last changed there on 17 November 2026: "New marks: menu, settings."). The live one is at https://claude.ai/artifact/GdrU5MLGGe9CEW1eyW5Sxj and is the one to look at when you want to see the components drawn and moving. If the two disagree, the live one is newer; copy it here again.
+It is a copy of the Astrolabe design system on claude.ai, taken on 20 November 2026 (last changed there on 20 November 2026: "The Hoop replaces Rings as the instrument: sets you turn through are slots on a band round the core. The rings' engine and their grab, glide and jump tokens leave with them."). Components it no longer offers are kept under [astrolabe/archived](astrolabe/archived), as they were when they left. The live one is at https://claude.ai/artifact/GdrU5MLGGe9CEW1eyW5Sxj and is the one to look at when you want to see the components drawn and moving. If the two disagree, the live one is newer; copy it here again.
 
 The `preview.html` files are examples to read, not pages to open: each expects React 18, the tokens and the bundle to be loaded for it, which the design system's own gallery does.
 
@@ -26,9 +26,9 @@ The app does not load the bundle. It carries Astrolabe's values under its own na
 - [AtWork](astrolabe/components/AtWork/README.md) (a whole page): The instrument docked beside your work, on a loop.
 - [Core](astrolabe/components/Core/README.md): The companion's body: a raymarched ferrofluid that takes a different physical form for each thing it is doing.
 - [Home](astrolabe/components/Home/README.md) (a whole page): The home screen.
+- [Hoop](astrolabe/components/Hoop/README.md): Sets of things you turn through, as slots on a band that stands round the core: each slot's square says what it is doing, its top edge how far it has got.
 - [Orbit](astrolabe/components/Orbit/README.md): What is waiting, as beads on the core's orbit: each arrives on the lobe and leaves on the settle, and the orbit drifts while anything waits.
 - [Rail](astrolabe/components/Rail/README.md): A long run as a spine of marks, one for each turn: where you are in it, what is in it, and the way to any part of it.
-- [Rings](astrolabe/components/Rings/README.md): Sets of things you turn through, as rings around the core.
 - [SignalLoop](astrolabe/components/SignalLoop/README.md): The loop in small: an agent at work, wherever work is listed — a chat's row, a status line, a helper's entry.
 - [Spinner](astrolabe/components/Spinner/README.md): Something on its way — a read, a load, a turn being prepared: the instrument's thinking loop with its words.
 - [Track](astrolabe/components/Track/README.md): One thing's course as a line you read along: its steps, how far it has got and what it is doing, in one object.

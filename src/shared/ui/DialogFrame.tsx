@@ -1,6 +1,8 @@
+import { ArrowLeft } from 'lucide-react';
 import { useId, type AriaAttributes, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { buttonVariants } from '@/shared/ui/buttonVariants';
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
 import { cn } from '@/shared/utils';
 
@@ -16,9 +18,9 @@ type DialogFrameProps = {
    * a raw key in mono, upright, while the thing it names has no name of its own. Omitted, the title stands alone.
    */
   accent?: { words: string } | { key: string };
-  /** A write is out: the ✕ waits with the dialog's own buttons. */
+  /** A write is out: the way back waits with the dialog's own buttons. */
   busy?: boolean;
-  /** Escape, the backdrop and the ✕. The dialog decides whether that closes it. */
+  /** Escape, the backdrop and the back arrow. The dialog decides whether that closes it. */
   onDismiss: () => void;
   children: ReactNode;
 } & Omit<AriaAttributes, 'aria-labelledby'> & {
@@ -28,14 +30,15 @@ type DialogFrameProps = {
 
 /**
  * Verve's `Modal` (`_ds_bundle.js`, components/overlays/Modal.jsx), composed on the house `Dialog`: a panel 520 or
- * 600 wide, never wider than the screen less a margin, with the serif title and its accent word at the top and the
- * round ✕ in the top right corner. The panel scrolls as a whole on a screen too short for it, so a step never hides
- * its own buttons. Whatever `data-*` or `aria-*` the caller passes lands on the panel.
+ * 600 wide, never wider than the screen less a margin, with the way back and the serif title and its accent word at the
+ * top. THE WAY OUT IS THE BACK ARROW AT THE HEAD'S START, as on every page's head, never a cross at its end. The panel
+ * scrolls as a whole on a screen too short for it, so a step never hides its own buttons. Whatever `data-*` or `aria-*`
+ * the caller passes lands on the panel.
  *
  * Mounted only while its dialog is open, so the dialog opens clean every time and the house Dialog's own Escape,
- * backdrop, focus trap and first focus all hold. The ✕ comes LAST in the panel's order though it is drawn first: the
+ * backdrop, focus trap and first focus all hold. The arrow comes LAST in the panel's order though it is drawn first: the
  * first focus then lands on the dialog's first field or chip, not on the way out, and Escape still closes from
- * anywhere. The ✕ is 32 px on a desk and 44 px below md, Verve's touch minimum.
+ * anywhere. It is 36 px on a desk, as a head's is, and 44 px below md, Verve's touch minimum.
  *
  * Paint is `.vv-dialogframe*` in verve/panels.css; the panel's own width and scroll are layout, spelled here. A kit
  * piece rather than the cerberus module's own because Verve draws it (MAN-571), and every dialog it frames is a
@@ -55,8 +58,8 @@ export function DialogFrame({ size, title, accent, busy = false, onDismiss, chil
         className={cn('max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain p-0', WIDTH[size])}
       >
         <div className="vv-dialogframe">
-          {/* `DialogTitle` is `sr-only` until `not-sr-only` takes that back. `pr-12` keeps a long title clear of the ✕. */}
-          <DialogTitle id={titleId} className="vv-dialogframe__title not-sr-only mb-3 pr-12">
+          {/* `DialogTitle` is `sr-only` until `not-sr-only` takes that back. `pl-12` keeps the title clear of the back arrow. */}
+          <DialogTitle id={titleId} className="vv-dialogframe__title not-sr-only mb-3 pl-12">
             {title}
             {accent !== undefined && (
               <>
@@ -71,11 +74,12 @@ export function DialogFrame({ size, title, accent, busy = false, onDismiss, chil
           <button
             type="button"
             aria-label={t('buttons.close')}
+            title={t('buttons.close')}
             disabled={busy}
             onClick={onDismiss}
-            className="vv-dialogframe__close flex items-center justify-center"
+            className={cn(buttonVariants({ variant: 'outline', size: 'icon' }), 'vv-dialogframe__close')}
           >
-            ✕
+            <ArrowLeft aria-hidden="true" />
           </button>
         </div>
       </DialogContent>

@@ -122,22 +122,22 @@ export function kanbanLanes(autonomy: boolean): KanbanLaneSpec[] {
     : [backlog, todo, inProgress, done];
 }
 
-/** One ring of the bug board's instrument: its key, the i18n key of its name, and the lanes whose cards it carries, in their order. */
-export type KanbanRingSpec = { id: string; titleKey: string; laneIds: string[] };
+/** One run of the bug board's hoop: its key, the i18n key of its name, and the lanes whose cards stand in it, in their order. */
+export type KanbanGroupSpec = { id: string; titleKey: string; laneIds: string[] };
 
 /**
- * THE BOARD AS RINGS ROUND ITS CORE, inside out: what the board has in hand closest to the core, then what waits to be taken up,
- * then what is not ready, and finished work on the outermost ring, the largest, which holds the most. Work falls inward as it is
- * taken up and is put out to the rim when it is done.
+ * THE BOARD ROUND ITS HOOP, in the order the runs stand round it: what the board has in hand first, then what waits to be taken up,
+ * then what is not ready, then finished work, which holds the most. Each run's cards stand side by side with its name along the
+ * ground, the way a folder's chats stand on the halo.
  *
- * TO DO'S RING CARRIES THE OPEN QUESTIONS TOO, whatever the autonomy setting: on a ring a card that waits on an answer is already
- * its own sign (its mark turns the accent and holds a gate open), so a ring of its own would only say it twice. The lanes stay as
+ * TO DO'S RUN CARRIES THE OPEN QUESTIONS TOO, whatever the autonomy setting: on the hoop a card that waits on an answer is already
+ * its own sign (its square turns the accent and breathes), so a run of its own would only say it twice. The lanes stay as
  * `kanbanLanes` composes them, so a card can still be moved into Open questions from its own course.
  *
- * Read by the panel's instrument (`BugInstrument`) through `utils/bugRings`. A lane named here that the autonomy setting does not
+ * Read by the panel's instrument (`BugInstrument`) through `utils/bugHoop`. A lane named here that the autonomy setting does not
  * compose (Open questions with autonomy off, whose cards To Do already holds) is simply not read.
  */
-export function kanbanRings(): KanbanRingSpec[] {
+export function kanbanGroups(): KanbanGroupSpec[] {
   return [
     { id: 'active', titleKey: 'kanban.lanes.active', laneIds: ['active'] },
     { id: 'todo', titleKey: 'kanban.lanes.todo', laneIds: ['todo', 'questions'] },

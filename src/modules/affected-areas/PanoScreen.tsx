@@ -16,6 +16,7 @@ import { UnderstandingCard } from '@/modules/affected-areas/UnderstandingCard';
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
 import { areaWords, faceCounts, kindName, roomWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Face, PanoDetail, PanoEntry, Region, RoomEntry, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
+import { useClaimHeadBack } from '@/shared/context/HeadBackContext';
 import type { AffectedAreasTrouble, PanoPress, PanoShown, RegionLayer, RegionShape, SphereLook, TourReaderProgress } from '@/shared/types';
 import { Button, IconWord, Lightbox, RegionImage } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
@@ -79,6 +80,9 @@ const COLUMNS = 'grid items-start gap-5 [@container(min-width:720px)]:grid-cols-
 /**
  * A PANO: its room, the press, its six faces, and what is shown — 360°, or one face drawn with its regions beside their list.
  *
+ * The way back to its tour and the room's name are the screen head's while it stands (`useClaimHeadBack`: its arrow steps up to the
+ * tour, its title is the room, inside the tour); drawn on its own, with no head to claim, it draws them itself, at its top.
+ *
  * Read top to bottom: the way back (the tour's name), the room and when it was captured, with `ReadControl` beside
  * them once the pano has answered; the face strip, 360° and then Ahead · Right · Behind · Left · Ceiling · Floor, each
  * counting its areas; then the figure and its list. On 360° the figure is `PanoSphere` — the six views stitched into
@@ -141,6 +145,13 @@ export function PanoScreen({
     floor === null ? null : t('affectedAreas.pano.floor', { floor }),
     capturedAt === null ? null : t('affectedAreas.pano.captured', { when: formatShortDate(capturedAt) }),
   ].filter((part) => part !== null).join(' · ');
+  // One way back per screen: the head's arrow steps up to the tour, and its title is this room, inside the tour.
+  const inHead = useClaimHeadBack({
+    label: t('affectedAreas.pano.back', { tour: tourName }),
+    onBack,
+    title: entry === null && detail === null ? undefined : roomTitle,
+    within: tourName === '' ? undefined : [tourName],
+  });
   const counts = faceCounts(view);
   const caption = counts === undefined
     ? t('affectedAreas.pano.faceUnread')
@@ -184,10 +195,12 @@ export function PanoScreen({
     <div className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-1">
-          <Button variant="ghost" size="sm" className="-ml-3 max-w-full finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.pano.back', { tour: tourName })} onClick={onBack} {...WAY_BACK}>
-            <ChevronLeft aria-hidden="true" />
-            <span className="truncate finger:hidden">{tourName}</span>
-          </Button>
+          {!inHead && (
+            <Button variant="ghost" size="sm" className="-ml-3 max-w-full finger:size-11 finger:px-0 max-md:h-11" aria-label={t('affectedAreas.pano.back', { tour: tourName })} onClick={onBack} {...WAY_BACK}>
+              <ChevronLeft aria-hidden="true" />
+              <span className="truncate finger:hidden">{tourName}</span>
+            </Button>
+          )}
           {entry === null && detail === null ? (
             <div aria-hidden="true" className="flex w-full flex-col gap-2 pt-1">
               <div className="vv-skeleton h-6 w-2/5" />
@@ -195,7 +208,7 @@ export function PanoScreen({
             </div>
           ) : (
             <>
-              <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{roomTitle}</h2>
+              {!inHead && <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{roomTitle}</h2>}
               {meta !== '' && <p className="text-[12.5px] text-muted-foreground">{meta}</p>}
             </>
           )}

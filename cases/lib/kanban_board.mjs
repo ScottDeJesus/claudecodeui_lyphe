@@ -4,7 +4,7 @@
 //   import { openBoard, CARDS, openDrawer } from "../lib/kanban_board.mjs";
 //   const page = await withPage(t, { viewport });
 //   const { requests } = await openBoard(page);          // every /api/kanban* answer is this file's; the tab is the board
-//   const opening = await openDrawer(page, CARDS.bug.id); // the card's Opening, hung from its mark on its ring
+//   const opening = await openDrawer(page, CARDS.bug.id); // the card's Opening, hung from its slot on the board's hoop
 //
 // EVERY BOARD REQUEST IS ANSWERED HERE AND NOTHING REACHES THE SERVER: `/api/kanban/…` and `/api/kanban-dispatch/…`,
 // reads and writes alike. A read gets this file's board; a write gets `{}` and is counted in
@@ -101,13 +101,14 @@ function answer(url, method) {
   return {};
 }
 
-/** The board's rings at home: one slider per ring, each naming its cards by id, in order, in `data-ring-items`. The
- *  instrument docked at the foot (another face is the work) is a picture with no sliders, so these are the board's alone. */
+/** The board's hoop at home: one slider, naming its cards by id, in order round the hoop, in `data-ring-items` (and the run each
+ *  stands in, at the same place, in `data-ring-groups`). The instrument docked at the foot (another face is the work) is a
+ *  picture with no slider, so this is the board's alone. */
 const RING_SLIDERS = '[data-kanban-panel] [data-bug-instrument] [role="slider"]';
 
 /**
  * Route every board request to this file's board, open the Kanban view from the rail or the home's Menu, then wait for
- * the board's head and the ring holding its first card. Returns the board requests the page made, `{ method, path }`, oldest first.
+ * the board's head and the hoop holding its first card. Returns the board requests the page made, `{ method, path }`, oldest first.
  */
 export async function openBoard(page) {
   const requests = [];
@@ -134,18 +135,18 @@ export async function openBoard(page) {
 export const headerOf = (page) => page.locator("header", { has: page.getByRole("combobox", { name: "Board" }).or(page.getByRole("button", { name: "Board" })) }).first();
 
 /**
- * A card's place on the board since its redraw to the design system (2026-11-20): the slider of the ring that holds it, found by
- * the card's id among the ids its ring names. A card is a mark on a ring and has no element of its own; its words are read in its
- * Opening (`openDrawer`). Present only while the board is the face drawn.
+ * A card's place on the board since its redraw to the design system (2026-11-20, drawn as a hoop since): the slider of the hoop
+ * that holds it, found by the card's id among the ids it names. A card is a slot on the hoop and has no element of its own; its
+ * words are read in its Opening (`openDrawer`). Present only while the board is the face drawn.
  */
 export const faceOf = (page, id) => page.locator(`${RING_SLIDERS}[data-ring-items~="${id}"]`).first();
 
-/** The open card's Opening, by its id: what pressing a card opens, hung from its mark. */
+/** The open card's Opening, by its id: what pressing a card opens, hung from its slot. */
 export const openingOf = (page, id) => page.locator(`[data-bug-opening="${id}"]`).first();
 
 /**
- * Open a card the way a keyboard does: its ring's slider, Home, as many arrows as the card stands from the first, then Enter
- * (Enter opens the card a ring is coming round to). Waits for its Opening and answers it.
+ * Open a card the way a keyboard does: the hoop's slider, Home, as many arrows as the card stands from the first, then Enter
+ * (Enter opens the card the hoop is coming round to). Waits for its Opening and answers it.
  */
 export async function openDrawer(page, id) {
   const ring = faceOf(page, id);
@@ -162,10 +163,10 @@ export async function openDrawer(page, id) {
 }
 
 /**
- * Open one proposed feature as the Proposed features face does since the board's redraw to the design system (2026-11-20): the
- * proposals are marks on rings round the board's core, one ring for each state, and a mark opens from the keyboard (its ring's
- * slider, Home, the arrow to its place, Enter). Answers the proposal's Opening, `[data-proposal="<id>"]`, which holds its title,
- * its findings, its stopgaps, what became of it and, while it is open, the three presses of your call.
+ * Open one proposed feature as the Proposed features face does since the board's redraw to the design system (2026-11-20,
+ * drawn as a hoop since): the proposals are slots on the hoop round the board's core, a run for each state, and a slot opens
+ * from the keyboard (the hoop's slider, Home, the arrow to its place, Enter). Answers the proposal's Opening, `[data-proposal="<id>"]`,
+ * which holds its title, its findings, its stopgaps, what became of it and, while it is open, the three presses of your call.
  */
 export async function openProposal(page, id) {
   const mark = `proposal:${id}`;
@@ -182,12 +183,11 @@ export async function openProposal(page, id) {
 }
 
 /**
- * Open the board itself, as its core's press does: the core's own button for assistive tech ("Open the board"), pressed from the
- * keyboard (it is drawn under the rings' canvas, so a pointer reaches the core through the canvas). Waits for the board's Opening
- * and answers it: whether it runs itself, its counts, its repositories and its acts.
+ * Open the board itself, as its core's press does: the core's own button in the hoop's middle ("The board"), pressed from the
+ * keyboard. Waits for the board's Opening and answers it: whether it runs itself, its counts, its repositories and its acts.
  */
 export async function openBoardItself(page) {
-  const core = page.locator('[data-kanban-panel] [data-bug-instrument] [data-ast-rings] > button').first();
+  const core = page.locator('[data-kanban-panel] [data-bug-instrument] [data-bug-core]').first();
   await core.waitFor({ state: "attached", timeout: WAIT_MS });
   await core.focus();
   await page.keyboard.press("Enter");

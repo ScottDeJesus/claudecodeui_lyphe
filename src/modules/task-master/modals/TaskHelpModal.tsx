@@ -1,6 +1,7 @@
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { HEAD_PRESS } from '@/shared/constants';
 import { Button } from '@/shared/ui';
 
 type TaskHelpModalProps = {
@@ -25,15 +26,15 @@ export default function TaskHelpModal({ isOpen, onClose, onCreatePrd }: TaskHelp
       <div className="vv-dialog__backdrop absolute inset-0" onClick={onClose} aria-hidden />
 
       <div className="vv-dialog__panel relative max-h-[90vh] w-full max-w-3xl overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border p-5">
+        <div className="flex items-center gap-3 border-b border-border p-5">
+          <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={onClose} aria-label={t('createTask.close')} title={t('createTask.close')}>
+            <ArrowLeft aria-hidden="true" />
+          </Button>
           <div>
             <h2 className="text-xl font-semibold text-foreground">{t('helpGuide.title')}</h2>
             <p className="text-sm text-muted-foreground">{t('helpGuide.subtitle')}</p>
           </div>
 
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label={t('createTask.close')}>
-            <X />
-          </Button>
         </div>
 
         <div className="max-h-[calc(90vh-120px)] space-y-3 overflow-y-auto p-5">

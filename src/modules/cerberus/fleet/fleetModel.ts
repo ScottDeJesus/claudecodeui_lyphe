@@ -1,6 +1,6 @@
 // The fleet's pure half: the overview as one item per node, worst first, each with its one word and
 // the group that word falls in. No React, no clock, no DOM — a function of the overview, so the
-// instrument's rings (`utils/fleetRings`), a machine's Opening and the core's summary never disagree
+// instrument's hoop (`utils/fleetHoop`), a machine's Opening and the core's summary never disagree
 // about which node is worse. Ported from the prototype's `build` (`design/cerberus/cerberus-fleet.js`)
 // for the real read model: nothing synthetic, no "fleet size" knob.
 import type { CerberusNodeView, CerberusOverview, CerberusRunView, CerberusServiceView } from '@/shared/cerberus-types';
@@ -59,8 +59,8 @@ export function runOnService(running: CerberusRunView[], node: string, service: 
  * it is nothing to look at and nothing wrong — while its own row still says what it is.
  *
  * A node whose warden is restarting for an update (`link` `paused`) or has one queued or running
- * (`updating`) starts from that word instead of `ok`, so a node being updated stands on the Updating
- * ring even with nothing else to say — and even with no service, which would otherwise read `empty`.
+ * (`updating`) starts from that word instead of `ok`, so a node being updated stands in the Updating
+ * run even with nothing else to say — and even with no service, which would otherwise read `empty`.
  * Anything worse still wins: a failing check on a node that is updating still needs you.
  */
 function nodeStatusOf(node: CerberusNodeView, running: CerberusRunView[]): FleetStatus {
@@ -97,7 +97,7 @@ function toFleetItem(node: CerberusNodeView, running: CerberusRunView[]): FleetI
 }
 
 /**
- * Every node of the overview as an item, worst first: the order the instrument's rings draw in. The
+ * Every node of the overview as an item, worst first: the order the instrument's hoop stands them in. The
  * overview already puts the hub first among its nodes; this puts it first among its PEERS of the same
  * word, so a quiet fleet still opens on the server Cerberus runs on.
  */
@@ -111,8 +111,8 @@ export function fleetItems(overview: CerberusOverview): FleetItem[] {
 
 /**
  * The group a node's word falls in: `needs` is failing, denied, fixing and warn; `updating` is
- * updating, paused and enrolling; every other word is its own group. The instrument's rings stand on
- * these (`utils/fleetRings`), and a machine's Opening inks its line by them.
+ * updating, paused and enrolling; every other word is its own group. The instrument's hoop stands its runs
+ * on these (`utils/fleetHoop`), and a machine's Opening inks its line by them.
  */
 export function groupOf(status: FleetStatus): FleetGroup {
   switch (status) {

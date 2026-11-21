@@ -1,19 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Bot,
-  Clock3,
-  Download,
-  Expand,
-  ExternalLink,
-  Loader2,
-  MonitorPlay,
-  RefreshCw,
-  Settings,
-  Square,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { ArrowLeft, Bot, Clock3, Download, Expand, ExternalLink, Loader2, MonitorPlay, RefreshCw, Settings, Square, Trash2 } from 'lucide-react';
 
+import { HEAD_PRESS } from '@/shared/constants';
 import { cn } from '@/shared/utils';
 import { Badge, Button } from '@/shared/ui';
 import { api, readApiJson } from '@/shared/api';
@@ -523,12 +511,11 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
       {isFullscreen && selectedSession && (
         <div className="pwa-notch-safe fixed inset-0 z-50 bg-black/90 p-6 [--pwa-notch-safe-pad:1.5rem]">
           <div className="flex h-full flex-col rounded-md border border-white/10 bg-black">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm text-white/80">
-              <div className="min-w-0 truncate">{selectedSession.title || selectedSession.url || 'Browser session'}</div>
-              <Button variant="outline" size="sm" onClick={() => setIsFullscreen(false)}>
-                <X className="h-4 w-4" />
-                Close
+            <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3 text-sm text-white/80">
+              <Button variant="outline" size="icon" className={HEAD_PRESS} onClick={() => setIsFullscreen(false)} aria-label={"Close"} title={"Close"}>
+                <ArrowLeft aria-hidden="true" />
               </Button>
+              <div className="min-w-0 truncate">{selectedSession.title || selectedSession.url || 'Browser session'}</div>
             </div>
             {renderBrowserSurface(true)}
           </div>

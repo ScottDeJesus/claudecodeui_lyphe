@@ -8,7 +8,7 @@ import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
 import { RoadmapCircle } from '@/modules/roadmap';
 import { SessionsBoard } from '@/modules/sidebar';
 import { openStation } from '@/shared/cloudcliDoors';
-import { HOLDS_PLACES, ROADMAP_CIRCLE_AT_DESK, ROADMAP_CIRCLE_ON_PHONE } from '@/shared/constants';
+import { HEAD_ROW, HOLDS_PLACES, ROADMAP_CIRCLE_AT_DESK, ROADMAP_CIRCLE_ON_PHONE } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { Project, RecentConversationListItem, RoadmapStackRest } from '@/shared/types';
 
@@ -18,13 +18,12 @@ const CORE_SIZE_AT_DESK = 76;
 
 /**
  * Where the roadmap's circle rests at the head, in the home's own pixels, at a desk and on a phone: its middle on the line Kaylee's core stands on at the
- * foot, so the two are one above the other. The head is as tall as the circle needs, and the cog stands level with it across the page.
+ * foot, so the two are one above the other. The head is as tall as the circle needs; the menu stands in its corner, as on every page.
  */
 const CIRCLE_AT_DESK: RoadmapStackRest = ROADMAP_CIRCLE_AT_DESK;
 const CIRCLE_ON_PHONE: RoadmapStackRest = ROADMAP_CIRCLE_ON_PHONE;
 
-/** The menu's side, in px, and how far the head reaches below the circle's middle: its radius, half an arc's band and a little air. */
-const MENU_SIZE = 44;
+/** How far the head reaches below the circle's middle, in px: its radius, half an arc's band and a little air. */
 const HEAD_BELOW_CIRCLE = 13;
 
 type WorkspaceHomeProps = {
@@ -41,9 +40,9 @@ type WorkspaceHomeProps = {
  * - KAYLEE'S CORE, docked at the foot on the start side, live as it is everywhere and drawn as a chat's core is (`CompanionCore`): the
  *   body with her conversation's context and the account's week as two rings on it. A press on the core opens the station; a press
  *   on the outer ring's band opens the account switcher; a long press brings up the wheel of places, held (`HOLDS_PLACES`).
- * - THE MENU, at the head on the end side, is the one way to every other place (`PlacesMenu`): it brings up the wheel of places (the
- *   screens, the station, the last chat, Settings, and the applications' acts under it). It is the same press the chat's head and the
- *   station carry, so the way out of any page is in one place.
+ * - THE MENU, in the head's corner on the end side, is the one way to every other place (`PlacesMenu`): it brings up the wheel of places
+ *   (the screens, the station, the last chat, Settings, and the applications' acts under it). It is the same press, in the same row
+ *   (`HEAD_ROW`), that every screen's head and the station carry, so the way out of any page is on one spot.
  * - THE ROADMAP'S CIRCLE, at the head on the start side, over Kaylee's core: small until pressed, then the whole stack over the home (`RoadmapCircle`,
  *   which lies over the home's box and takes no press but the circle's while it is small).
  *
@@ -91,8 +90,9 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
       className="pwa-status-clear fixed inset-0 flex flex-col bg-background text-foreground"
       style={{ bottom: 'var(--keyboard-height, 0px)' }}
     >
-      <header className="flex flex-none items-start justify-end px-3 md:pr-11" style={{ height: circle.cy + circle.radius + HEAD_BELOW_CIRCLE, paddingTop: circle.cy - MENU_SIZE / 2 }}>
-        <PlacesMenu triggerClassName="size-11" />
+      {/* As tall as the roadmap's circle needs (it lies over this corner, `RoadmapCircle` below), the menu in every head's corner. */}
+      <header className={`${HEAD_ROW} justify-end`} style={{ height: circle.cy + circle.radius + HEAD_BELOW_CIRCLE }}>
+        <PlacesMenu />
       </header>
 
       <main className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-2 md:px-12">

@@ -1,21 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
-import { createHaloPainter, haloHeightFor, haloMiddle } from '@/modules/sidebar/utils/haloPainter';
 import { chatMarks, subagentDots } from '@/modules/sidebar/utils/simpleChatMarks';
-import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { useSessionHostLiveSet } from '@/shared/context/SessionHostLivenessContext';
 import { useAwaitingInputSessionIdSet, useBusySessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { useSubagentModelsBySession } from '@/shared/context/subagentModelsContext';
-import type { RecentConversationListItem, SessionsHaloSlot } from '@/shared/types';
-import { cn } from '@/shared/utils';
+import type { HoopSlot, HoopSlotState, RecentConversationListItem } from '@/shared/types';
+import { Hoop } from '@/shared/ui';
 
 type SessionsHaloProps = {
   /** False until the halo's page has been on screen once: until then no page of the feed is read and no socket subscription is held. */
   enabled: boolean;
-  /** The hoop's width, in px. It is as deep as it leans at that width (`haloHeightFor`); the words stand under it. */
+  /** The hoop's width, in px. It is as deep as it leans at that width (`hoopHeightFor`); the words stand under it. */
   width: number;
   /**
    * How far the hoop is tipped toward the reader, as the share of its width its depth takes; absent, the hoop's own lean. A hoop
@@ -43,26 +41,23 @@ type SessionsHaloProps = {
   children: ReactNode;
 };
 
-/** The reading's first line: mono, upper case, as the roadmap's stack writes its own. */
-const EYEBROW = 'font-mono text-[10px] font-medium uppercase leading-[14px] tracking-[0.14em] text-muted-foreground';
-
 /**
- * THE HALO: the simple chat list as a hoop round the companion's core, a slot for every chat, the chats of a folder side by side. It is the
- * sessions board (`SessionsBoard`) in one object: the same feed (`useSimpleChatList`, a copy of its rows kept on the same frames) and the same four
- * marks (`chatMarks`), each drawn in its own place on the slot (`utils/haloPainter`), so the whole of what is running, waiting, unread or asleep reads
- * at a glance without a list.
+ * THE HALO: the simple chat list as the kit's hoop (`Hoop`) round the companion's core, a slot for every chat, the chats of a folder side
+ * by side. It is the sessions board (`SessionsBoard`) in one object: the same feed (`useSimpleChatList`, a copy of its rows kept on the
+ * same frames) and the same four marks (`chatMarks`), each drawn in its own place on the slot, so the whole of what is running, waiting,
+ * unread or asleep reads at a glance without a list: the square (dark asleep, lit awake, dashes turning while its turn runs, the accent
+ * breathing while it waits on the reader), the top edge lit for a reply unread, a bead at the foot for each subagent at work.
  *
- * TURNING IT: a drag, the wheel, or the arrows while it has the keyboard. The slot at the front, over the pointer, is read out under the hoop: its
- * folder, its name, and its state in the board's own words. A press on any other slot brings that slot to the front. A PRESS ON THE SLOT AT THE FRONT,
- * or Enter, OPENS ITS CHAT (`onOpenChat`). On a touch screen that is the same two taps: the first shows what is chosen, the second goes to it.
+ * Turned and pressed as every hoop is: the slot at the front is read out under it (its folder, its name, its state in the board's own
+ * words), a press on another slot brings it round, and A PRESS ON THE SLOT AT THE FRONT, or Enter, OPENS ITS CHAT (`onOpenChat`).
  *
- * THE ORDER is the feed's: folders in the order the list draws them, each folder's chats in its own order, the chats in no folder last. It reads one
- * page of the feed, as the board does before "Load more"; a list longer than a page shows its first page.
+ * THE ORDER is the feed's: folders in the order the list draws them, each folder's chats in its own order, the chats in no folder last. It
+ * reads one page of the feed, as the board does before "Load more"; a list longer than a page shows its first page.
  *
- * THE CORE'S DEALINGS WITH A CHAT are drawn on it (`link`): while the companion reads a chat or writes to one, a line runs between the core and that
- * chat's slot, and a bead travels it the way the words go.
+ * THE CORE'S DEALINGS WITH A CHAT are drawn on it (`link`): while the companion reads a chat or writes to one, a line runs between the core
+ * and that chat's slot, and a bead travels it the way the words go.
  *
- * `data-sessions-halo` marks its root and reads how many chats it holds; `data-halo-front` the chat at the front, by id.
+ * `data-sessions-halo` marks its root and reads how many chats it holds; `data-hoop-front` the chat at the front, by id.
  *
  * IN A CHAT (`current`) it arrives turned to that chat, so the slot at the front is where the reader is and the rest are a turn away.
  *
@@ -70,19 +65,17 @@ const EYEBROW = 'font-mono text-[10px] font-medium uppercase leading-[14px] trac
  * for the chat's desk (project-workspace's `ChatDesk`), which stands the chat's own core there.
  */
 export function SessionsHalo({ enabled, width, lean, names, reading, link, coreRadius, current = null, onOpenChat, children }: SessionsHaloProps) {
-  const height = haloHeightFor(width, lean);
   const { t } = useTranslation(['sidebar', 'common']);
   const busySessionIds = useBusySessionIdSet();
   const awaitingInputSessionIds = useAwaitingInputSessionIdSet();
   const subagentRunningSessionIds = useSubagentRunningSessionIdSet();
   const subagentModels = useSubagentModelsBySession();
   const liveHostSessionIds = useSessionHostLiveSet();
-  const isPageHeld = useIsPageHeld();
   // The feed keeps the chat the hoop stands in in view; at the station no chat is open, so it is asked to keep none.
   const { items } = useSimpleChatList(current, enabled);
 
   const slots = useMemo(() => {
-    const slotOf = (chat: RecentConversationListItem, folder: string | null, folderName: string | null): SessionsHaloSlot => {
+    const slotOf = (chat: RecentConversationListItem, folder: string | null, folderName: string | null): HoopSlot => {
       const marks = chatMarks({
         unread: chat.unread,
         isSelected: false,
@@ -92,14 +85,23 @@ export function SessionsHalo({ enabled, width, lean, names, reading, link, coreR
       });
       // Only a Claude chat can have a session host, so only one can be asleep, and none is until the server's first census has arrived.
       const asleep = liveHostSessionIds !== null && chat.provider === 'claude' && !liveHostSessionIds.has(chat.sessionId);
+      const state: HoopSlotState = marks.awaitingInput ? 'waiting' : marks.running ? 'working' : asleep ? 'asleep' : 'idle';
+      const beads = subagentDots(marks.subagents, subagentModels.get(chat.sessionId));
+      // How it stands, in the board's own words: its state, then a reply unread and subagents at work.
+      const words = [
+        state === 'waiting' ? t('simpleList.awaitingInput') : state === 'working' ? t('simpleList.running') : state === 'idle' ? t('board.idle') : t('board.asleep'),
+        marks.unread ? t('simpleList.unread') : null,
+        beads.length > 0 ? t('simpleList.subagentsRunning') : null,
+      ].filter(Boolean).join(' · ');
       return {
         id: chat.sessionId,
+        group: folder,
+        groupName: folderName,
         title: chat.sessionTitle || t('simpleList.newChat'),
-        folder,
-        folderName,
-        state: marks.awaitingInput ? 'waiting' : marks.running ? 'working' : asleep ? 'asleep' : 'idle',
-        unread: marks.unread,
-        helpers: subagentDots(marks.subagents, subagentModels.get(chat.sessionId)),
+        words,
+        state,
+        edge: marks.unread ? 1 : 0,
+        beads,
       };
     };
     const inFolders = items.flatMap((item) => (item.kind === 'folder' ? item.folder.chats.map((chat) => slotOf(chat, item.folder.folderId, item.folder.name)) : []));
@@ -107,166 +109,21 @@ export function SessionsHalo({ enabled, width, lean, names, reading, link, coreR
     return [...inFolders, ...loose];
   }, [items, busySessionIds, awaitingInputSessionIds, subagentRunningSessionIds, subagentModels, liveHostSessionIds, t]);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const painterRef = useRef<ReturnType<typeof createHaloPainter> | null>(null);
-  // The latest slots and press, for the listeners set up once below.
-  const slotsRef = useRef(slots);
-  const onOpenRef = useRef(onOpenChat);
-  useEffect(() => {
-    slotsRef.current = slots;
-    onOpenRef.current = onOpenChat;
-  }, [slots, onOpenChat]);
-
-  // The chat at the front and the chat under the pointer, by place on the hoop. The painter decides both each frame; they are state only so the
-  // words and the cursor re-render when one actually changes.
-  const [shown, setShown] = useState({ front: -1, hover: -1 });
-
-  // The painter, the theme and the frame loop: set up once, for the life of the canvas.
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return undefined;
-    const painter = createHaloPainter(canvas);
-    painterRef.current = painter;
-    painter.setSlots(slotsRef.current);
-
-    const theme = () => painter.readTheme(canvas);
-    theme();
-    // The theme is a class and a few properties on the document's root: re-read the colours whenever it changes.
-    const themed = new MutationObserver(theme);
-    themed.observe(document.documentElement, { attributes: true });
-    const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const stillness = () => painter.setStill(calm.matches);
-    stillness();
-    calm.addEventListener('change', stillness);
-
-    let frame = 0;
-    const loop = (now: number) => {
-      // A page held under another is not seen, nor is a view folded away behind another: nothing is drawn until it is back.
-      if (!isPageHeld() && canvas.offsetParent !== null) {
-        const next = painter.frame(now);
-        setShown((held) => (held.front === next.front && held.hover === next.hover ? held : next));
-      }
-      frame = requestAnimationFrame(loop);
-    };
-    frame = requestAnimationFrame(loop);
-
-    // The wheel is the hoop's while the pointer is on it: a passive listener could not keep the page from scrolling under it.
-    const onWheel = (event: WheelEvent) => {
-      if (painter.wheel(event.deltaY || event.deltaX, event.timeStamp)) event.preventDefault();
-    };
-    canvas.addEventListener('wheel', onWheel, { passive: false });
-
-    return () => {
-      cancelAnimationFrame(frame);
-      themed.disconnect();
-      calm.removeEventListener('change', stillness);
-      canvas.removeEventListener('wheel', onWheel);
-      painterRef.current = null;
-    };
-  }, [isPageHeld]);
-
-  useEffect(() => {
-    painterRef.current?.setSlots(slots);
-  }, [slots]);
-  // The chat the hoop stands in, brought to the front once for each such chat: as soon as the feed has it, and never again after, so a
-  // turn the reader gave the hoop stays where they left it.
-  const broughtRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (current === null || broughtRef.current === current) return;
-    if (painterRef.current?.bring(current)) broughtRef.current = current;
-  }, [slots, current]);
-  useEffect(() => {
-    painterRef.current?.resize(width, height, Math.min(2, window.devicePixelRatio || 1), lean);
-  }, [width, height, lean]);
-  useEffect(() => {
-    painterRef.current?.setNames(names);
-  }, [names]);
-  const linkId = link?.id ?? null;
-  const linkWay = link?.way ?? 'in';
-  useEffect(() => {
-    painterRef.current?.setLink(linkId === null ? null : { id: linkId, way: linkWay }, coreRadius);
-  }, [linkId, linkWay, coreRadius]);
-  const middle = haloMiddle(width, height, lean);
-
-  const at = (event: { clientX: number; clientY: number; currentTarget: HTMLCanvasElement }): [number, number] => {
-    const box = event.currentTarget.getBoundingClientRect();
-    return [event.clientX - box.left, event.clientY - box.top];
-  };
-
-  // What is read out: the chat under the pointer while there is one (the far half is read by pointing at it), else the one at the front.
-  const read = slots[shown.hover] ?? slots[shown.front] ?? null;
-  const stateWords = read === null ? '' : [
-    read.state === 'waiting' ? t('simpleList.awaitingInput') : read.state === 'working' ? t('simpleList.running') : read.state === 'idle' ? t('board.idle') : t('board.asleep'),
-    read.unread ? t('simpleList.unread') : null,
-    read.helpers.length > 0 ? t('simpleList.subagentsRunning') : null,
-  ].filter(Boolean).join(' · ');
-  const front = slots[shown.front] ?? null;
-
   return (
-    <div data-sessions-halo={slots.length} data-halo-front={front?.id} className="flex min-w-0 flex-none flex-col items-center" style={{ width }}>
-      <div className="relative" style={{ width, height }}>
-        <canvas
-          ref={canvasRef}
-          // A slider over the chats: the arrows turn it, and its value is the chat at the front, in words.
-          role="slider"
-          tabIndex={slots.length === 0 ? -1 : 0}
-          aria-label={t('board.halo')}
-          aria-orientation="horizontal"
-          aria-valuemin={1}
-          aria-valuemax={Math.max(1, slots.length)}
-          aria-valuenow={shown.front + 1}
-          aria-valuetext={front === null ? undefined : [front.folderName, front.title, stateWords].filter(Boolean).join(', ')}
-          className={cn('absolute inset-0 block touch-none outline-none', shown.hover !== -1 && 'cursor-pointer')}
-          style={{ width, height }}
-          onPointerDown={(event) => {
-            if (painterRef.current?.pointerDown(...at(event))) event.currentTarget.setPointerCapture(event.pointerId);
-          }}
-          onPointerMove={(event) => { painterRef.current?.pointerMove(...at(event)); }}
-          onPointerUp={(event) => {
-            const press = painterRef.current?.pointerUp() ?? null;
-            const chat = press === null ? undefined : slotsRef.current[press.open];
-            if (chat !== undefined) onOpenRef.current(chat.id);
-            // A finger leaves nothing under it once it has lifted.
-            if (event.pointerType !== 'mouse') painterRef.current?.pointerLeave();
-          }}
-          onPointerCancel={() => { painterRef.current?.pointerUp(); painterRef.current?.pointerLeave(); }}
-          onPointerLeave={() => painterRef.current?.pointerLeave()}
-          onFocus={(event) => painterRef.current?.setFocused(event.currentTarget.matches(':focus-visible'))}
-          onBlur={() => painterRef.current?.setFocused(false)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              const chat = slotsRef.current[painterRef.current?.front() ?? -1];
-              if (chat === undefined) return;
-              event.preventDefault();
-              onOpenRef.current(chat.id);
-            } else if (painterRef.current?.key(event.key)) {
-              event.preventDefault();
-            }
-          }}
-        />
-        {/* The core, in the hoop's middle and over the canvas. The band passes clear of it, so each keeps its own presses. */}
-        <div
-          data-halo-middle=""
-          className="pointer-events-none absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center [&>*]:pointer-events-auto"
-          style={{ left: middle.x, top: middle.y }}
-        >
-          {children}
-        </div>
-      </div>
-      {reading && (
-        // Two lines, each on one line: where it is and what it is called, then how it stands. Drawn `aria-hidden`: the slider's value says the same.
-        <div data-halo-reading="" aria-hidden="true" className="flex h-[28px] w-full min-w-0 flex-col items-center text-center">
-          {read !== null && (
-            <>
-              <p className={cn(EYEBROW, 'max-w-full truncate')}>
-                {read.folderName !== null && `${read.folderName} › `}
-                <span className={read.state === 'waiting' ? 'text-accent-ink' : 'text-foreground'}>{read.title}</span>
-              </p>
-              <p className={cn(EYEBROW, 'max-w-full truncate')}>{stateWords}</p>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+    <Hoop
+      slots={slots}
+      width={width}
+      lean={lean}
+      names={names}
+      reading={reading}
+      label={t('board.halo')}
+      link={link}
+      coreRadius={coreRadius}
+      current={current}
+      onOpen={onOpenChat}
+      marks={{ 'data-sessions-halo': slots.length }}
+    >
+      {children}
+    </Hoop>
   );
 }

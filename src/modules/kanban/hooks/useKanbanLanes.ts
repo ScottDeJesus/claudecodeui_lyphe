@@ -31,8 +31,8 @@ export type KanbanLaneView = {
 export type KanbanLanes = {
   laneView: (spec: KanbanLaneSpec) => KanbanLaneView;
   /**
-   * The wire summaries one lane holds, in the server's order, read from THIS render's state: what the board's rings are drawn
-   * from (`utils/bugRings`). `cardIds` and `summaryOf` read the lanes through a ref brought up to date after a render, which a
+   * The wire summaries one lane holds, in the server's order, read from THIS render's state: what the board's hoop is drawn
+   * from (`utils/bugHoop`). `cardIds` and `summaryOf` read the lanes through a ref brought up to date after a render, which a
    * press or a drop may read but a render may not: the last lane to land would be a render behind.
    */
   laneSummaries: (spec: KanbanLaneSpec) => KanbanCardSummary[];

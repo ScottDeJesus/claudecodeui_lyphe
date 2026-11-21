@@ -1,4 +1,4 @@
-<!-- @dsCard page group="Objects" height=660 width=1200 subtitle="The instrument at home: everything on three rings" -->
+<!-- @dsCard page group="Objects" height=660 width=1200 subtitle="The instrument at home: everything on its hoop" -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -36,21 +36,21 @@
   }
   var TONE = { working: ['Working', 'info'], waiting: ['Needs you', 'warn'], done: ['Done', 'positive'], failed: ['Failed', 'danger'] };
   function Detail(p) {
-    var it = p.item, ring = p.ring;
-    if (ring.id === 'runs') return h(React.Fragment, null,
+    var it = p.item, group = p.group;
+    if (group.id === 'runs') return h(React.Fragment, null,
       h(A.Track, { steps: stepsOf(it), label: it.label }),
       h(A.KeyValueList, { items: [['Steps', it.detail], ['Route', 'Claude · round 3'], ['Helpers', it.agents ? String(it.agents) : '\u2014'], ['Spent', '2 h 24 m']] }),
       h('div', { style: { display: 'flex', gap: 8 } },
         it.state === 'waiting' || !it.state ? h(A.Button, { variant: 'primary', icon: 'play', onClick: function () { p.onStart(it); } }, 'Start')
           : it.state === 'working' ? h(React.Fragment, null, h(A.Button, null, 'Pause'), h(A.Button, null, 'Stop'))
           : it.state === 'failed' ? h(A.Button, { variant: 'primary', onClick: function () { p.onStart(it); } }, 'Retry') : null));
-    if (ring.id === 'chats') return it.state === 'waiting'
+    if (group.id === 'chats') return it.state === 'waiting'
       ? h(A.Choice, { question: 'Water uploads: path A or B?', options: [{ value: 'a', label: 'Path A', detail: 'Resize on the phone' }, { value: 'b', label: 'Path B', detail: 'Resize on the server' }], likely: 'a', by: 'Kaylee', value: p.picked, words: p.picked ? 'path A' : undefined, via: 'spoken', at: '09:41', onPick: p.onPick })
       : h('p', { className: 'field-text', style: { color: 'var(--ink-quiet)' } }, it.state === 'working' ? 'Building the ranking for technician skills.' : 'Nothing running. Last touched yesterday.');
     return h(A.KeyValueList, { items: [['Milestone', it.id.slice(1) + ' / 9'], ['State', it.detail], ['Runs', it.state === 'working' ? '1 live' : '\u2014']] });
   }
   function Demo() {
-    var rings = React.useRef(null), o = React.useState(null), open = o[0], rs = React.useState(RUNS), runs = rs[0];
+    var hoop = React.useRef(null), o = React.useState(null), open = o[0], rs = React.useState(RUNS), runs = rs[0];
     /* the working runs count up, and come to rest when they are done */
     React.useEffect(function () {
       var id = setInterval(function () {
@@ -63,17 +63,16 @@
       return function () { clearInterval(id); };
     }, []);
     function start(it) { rs[1](function (cur) { return cur.map(function (r) { return r.id === it.id ? Object.assign({}, r, { state: 'working', progress: r.state === 'failed' ? r.progress : 0, detail: 'Started' }) : r; }); }); }
-    var RINGS = [{ id: 'chats', label: 'Chats', items: CHATS, defaultValue: 'sched' }, { id: 'runs', label: 'Runs', items: runs, defaultValue: 'pmflow' }, { id: 'road', label: 'Roadmap', items: ROAD, defaultValue: 'm4' }];
-    var item = open ? (open.ring.id === 'runs' ? runs.filter(function (r) { return r.id === open.id; })[0] : open.item) : null, t = item ? TONE[item.state] : null;
+    var RUNS_OF = [{ id: 'chats', label: 'Chats', items: CHATS }, { id: 'runs', label: 'Runs', items: runs }, { id: 'road', label: 'Roadmap', items: ROAD }];
+    var item = open ? (open.group.id === 'runs' ? runs.filter(function (r) { return r.id === open.id; })[0] : open.item) : null, t = item ? TONE[item.state] : null;
     return h('div', { style: { height: 660 } }, h(A.Scene, {
-      instrument: h(A.Rings, { ref: rings, rings: RINGS, hold: !!open, label: 'Workspace', gauge: { value: 0.62, label: 'Context', detail: '124k of 200k' },
-        onChange: function () { o[1](null); },
-        onOpen: function (it, ring) { o[1](function (cur) { return cur && cur.id === it.id ? null : { id: it.id, item: it, ring: ring }; }); } },
+      instrument: h(A.Hoop, { ref: hoop, runs: RUNS_OF, defaultValue: 'pmflow', hold: !!open, label: 'Workspace', gauge: { value: 0.62, label: 'Context', detail: '124k of 200k' },
+        onOpen: function (it, group) { o[1](function (cur) { return cur && cur.id === it.id ? null : { id: it.id, item: it, group: group }; }); } },
         h(A.Core, { state: 'idle', signal: 'demo' })),
       controls: h(A.Composer, { value: '', placeholder: 'To Kaylee · say it or type it', label: 'Message Kaylee', style: { flex: '1 1 320px', maxWidth: 440 } }),
-      opening: h(A.Opening, { open: !!item, anchor: function () { return open && rings.current ? rings.current.pointOf(open.ring.id, open.id) : null; }, onClose: function () { o[1](null); },
-        source: open ? open.ring.label : '', title: item ? item.label : '', status: t ? t[0] : undefined, tone: t ? t[1] : undefined },
-        item ? h(Detail, { item: item, ring: open.ring, onStart: start }) : null),
+      opening: h(A.Opening, { open: !!item, anchor: function () { return open && hoop.current ? hoop.current.pointOf(open.id) : null; }, onClose: function () { o[1](null); },
+        source: open ? open.group.label : '', title: item ? item.label : '', status: t ? t[0] : undefined, tone: t ? t[1] : undefined },
+        item ? h(Detail, { item: item, group: open.group, onStart: start }) : null),
     }));
   }
   ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));

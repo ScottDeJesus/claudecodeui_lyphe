@@ -1,7 +1,7 @@
 import '@/modules/kanban/bugScreen.css';
 
 import { Bug, CloudOff } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -22,31 +22,32 @@ import { useKanbanWalks } from '@/modules/kanban/hooks/useKanbanWalks';
 import { useLinkedTitles } from '@/modules/kanban/hooks/useLinkedTitles';
 import { ProposedFeatures } from '@/modules/kanban/proposed/ProposedFeatures';
 import { useProposals } from '@/modules/kanban/proposed/useProposals';
-import { bugRings, bugStatusOf, moreId, ringOfMore } from '@/modules/kanban/utils/bugRings';
-import { proposalIdOf, proposalItemId, proposalMoreId, proposalRings } from '@/modules/kanban/utils/proposalRings';
-import { DONE_LANE_ID, kanbanLanes, kanbanRings, laneOfStatus, newCardLane } from '@/modules/kanban/utils/lanePolicy';
+import { bugHoop, bugStatusOf, groupOfMore, moreId } from '@/modules/kanban/utils/bugHoop';
+import { DONE_LANE_ID, kanbanGroups, kanbanLanes, laneOfStatus, newCardLane } from '@/modules/kanban/utils/lanePolicy';
+import { proposalHoop, proposalIdOf, proposalItemId, proposalMoreId } from '@/modules/kanban/utils/proposalHoop';
 import { stageRunning } from '@/modules/kanban/utils/walkModel';
-import type { AstrolabePoint, AstrolabeRing, AstrolabeRingGauge, AstrolabeRingItem, AstrolabeRingsHandle, BugDashboardView, ProposalsView } from '@/shared/types';
+import type { AstrolabePoint, BugDashboardView, HoopHandle, HoopSlot, InstrumentMeasure, ProposalsView } from '@/shared/types';
 import { Button, EmptyState, Opening, Spinner } from '@/shared/ui';
 
 /**
  * THE BUGS VIEW, drawn to the design system: a Scene. Its head is the way back, BUGS and the board's name, which is its picker
- * (`BugHead`). Its middle is the board as an instrument: the lanes as rings round the board's core, each card a mark that says
- * where it is, what it is doing, how far it has got and how much it matters, with no word on screen until you touch it
- * (`BugInstrument`, `utils/bugRings`). A press on a mark opens that card, hung from it (`KanbanCardDrawer`, in the kit's
- * Opening); a press on the core opens the board (`BugBoardOpening`); a press on its measure opens the board's numbers. Its foot
- * holds what is present: the switch between the three faces and the plus that makes a bug (`BugFoot`). The Proposed features are
- * the instrument's second set: the same core, and round it the proposals (`ProposedFeatures`, `utils/proposalRings`). The
- * Dashboard is the work when chosen: it takes the middle, and the instrument docks at the foot, still live.
+ * (`BugHead`). Its middle is the board as an instrument: the cards as slots on a hoop round the board's core, a lane's cards side
+ * by side, each slot saying where its card is, what it is doing, how far it has got and how much it matters, and the card facing
+ * you read out under the hoop (`BugInstrument`, `utils/bugHoop`). A press on the slot at the front opens that card, hung from it
+ * (`KanbanCardDrawer`, in the kit's Opening); a press on the core opens the board (`BugBoardOpening`); a press on its measure opens
+ * the board's numbers. Its foot holds what is present: the switch between the three faces and the plus that makes a bug
+ * (`BugFoot`). The Proposed features are the instrument's second set: the same core, and round it the proposals
+ * (`ProposedFeatures`, `utils/proposalHoop`). The Dashboard is the work when chosen: it takes the middle, and the instrument docks
+ * at the foot, still live.
  *
- * IT COMPOSES, IT DOES NOT BUILD. The rings are the kit's; the hooks below are the board's data; the two decisions the kit may
- * never know — which statuses compose which lane and which lanes compose which ring — live in `utils/lanePolicy`. What is left
+ * IT COMPOSES, IT DOES NOT BUILD. The hoop is the kit's; the hooks below are the board's data; the two decisions the kit may never
+ * know — which statuses compose which lane and which lanes compose which run of the hoop — live in `utils/lanePolicy`. What is left
  * here is the one thing none of them can see: the board as a whole.
  *
  * IT IS THE ONE OWNER OF BOARD STATE: the board hook is called HERE once, so this screen has a single `currentBoardId` — and it
- * is GLOBAL, never scoped to the open project. ONE LIVE REGION, owned by the board rather than a ring, because only the board sees
- * both the lane a card left and the one it landed in. ONE OPENING AT A TIME: a card's, a proposal's, the board's, or a ring's
- * further marks.
+ * is GLOBAL, never scoped to the open project. ONE LIVE REGION, owned by the board rather than a run, because only the board sees
+ * both the lane a card left and the one it landed in. ONE OPENING AT A TIME: a card's, a proposal's, the board's, or a run's
+ * further cards.
  *
  * THE FACE AND WHAT THE DASHBOARD AND THE PROPOSALS ARE ASKED are the panel's own, because they are per-SCREEN and not per-board:
  * all survive a board switch. None is remembered across visits.
@@ -61,11 +62,8 @@ type KanbanPanelProps = {
   menu: ReactNode;
 };
 
-/** The most the instrument grows to at home, in px (the design system's `size-instrument-home`). */
-const INSTRUMENT_HOME = 720;
-
-/** What the one Opening that is not a card's hangs from: the board's core, or a ring's further cards. */
-type OtherOpening = { kind: 'board' } | { kind: 'more'; ringId: string } | null;
+/** What the one Opening that is not a card's hangs from: the board's core, or a run's further cards. */
+type OtherOpening = { kind: 'board' } | { kind: 'more'; groupId: string } | null;
 
 /** Rendered by WorkspaceMain while the Kanban tab is active, and mounted nowhere else. */
 export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
@@ -101,14 +99,14 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
   const [dialog, setDialog] = useState<KanbanBoardDialogMode>(null);
   // Which of the view's three faces is drawn. The Board on every arrival: the other two are looks, the board is the work.
   const [face, setFace] = useState<BugFace>('board');
-  // The Opening that is not a card's, if one hangs: the board's, from its core, or a ring's further cards. A card's is the lanes
+  // The Opening that is not a card's, if one hangs: the board's, from its core, or a run's further cards. A card's is the lanes
   // hook's selection, so the board and its Opening can never disagree about which card is open.
   const [other, setOther] = useState<OtherOpening>(null);
   // Which boards and how far back the dashboard is asked for, kept here so a visit to the Board face does not reset it.
   const [dashboardView, setDashboardView] = useState<BugDashboardView>({ scope: 'board', days: 30 });
   // Which boards and which proposals the Proposed features face is asked for, kept here for the same reason.
   const [proposalsView, setProposalsView] = useState<ProposalsView>({ scope: 'board', state: 'open' });
-  // The open proposal, by id: the instrument keeps its mark facing and its Opening hangs from it.
+  // The open proposal, by id: the instrument turns its slot to the front and its Opening hangs from it.
   const [openProposalId, setOpenProposalId] = useState<number | null>(null);
 
   // The proposals' ONE read, here and not in the face: the tab's count and the face's rows are then the same answer.
@@ -131,7 +129,7 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
 
   const drag = useKanbanDrag({
     specs: lanes,
-    // The rings draw each lane in the server's order, so a move resolves against that order.
+    // The hoop stands each lane in the server's order, so a move resolves against that order.
     cardIds: (laneId) => board.cardIds(laneId),
     summaryOf: board.summaryOf,
     countOf: board.countOf,
@@ -188,18 +186,16 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
   const currentBoard = boards.find((candidate) => candidate.id === currentBoardId);
   const currentName = currentBoard?.name ?? '';
 
-  // THE BOARD AS RINGS, worked out again on every render from what the lanes hold (a hundred cards at most is nothing to count).
-  const ringSpecs = useMemo(() => kanbanRings(), []);
-  const rings = bugRings({ specs: lanes, ringSpecs, board, walkOf, selectedCardId: board.selectedCardId, t });
-  const ringsRef = useRef<AstrolabeRingsHandle>(null);
+  // THE BOARD AS A HOOP, worked out again on every render from what the lanes hold (a hundred cards at most is nothing to count).
+  const groupSpecs = useMemo(() => kanbanGroups(), []);
+  const hoop = bugHoop({ specs: lanes, groupSpecs, board, walkOf, t });
+  const hoopRef = useRef<HoopHandle>(null);
   // The card the dispatcher is building now: one in hand with a sitting still out on it. The core writes toward it.
-  const building = rings.rings[0]?.id === ringSpecs[0].id
-    ? (rings.cardsOf[ringSpecs[0].id] ?? []).find((cardId) => walkOf(cardId)?.stages.some(stageRunning)) ?? null
-    : null;
+  const building = (hoop.cardsOf[groupSpecs[0].id] ?? []).find((cardId) => walkOf(cardId)?.stages.some(stageRunning)) ?? null;
   // The core's one measure: how much of the board is fixed. A share finished is never a load, so it never runs warm.
   const total = lanes.reduce((sum, spec) => sum + (board.laneView(spec).count ?? 0), 0);
   const fixed = lanes.filter((spec) => spec.id === DONE_LANE_ID).reduce((sum, spec) => sum + (board.laneView(spec).count ?? 0), 0);
-  const gauge: AstrolabeRingGauge | null = total === 0 ? null : {
+  const measure: InstrumentMeasure | null = total === 0 ? null : {
     value: fixed / total,
     label: t('kanban.ring.fixed', { defaultValue: 'Fixed' }),
     detail: t('kanban.ring.fixedOf', { fixed, total, defaultValue: '{{fixed}} of {{total}}' }),
@@ -209,57 +205,29 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
 
   // The open card: its summary, its lane and its state, for its Opening's head and course.
   const openId = board.selectedCardId;
-  const openSummary = openId === null ? null : rings.summaryOf(openId) ?? board.summaryOf(openId);
+  const openSummary = openId === null ? null : hoop.summaryOf(openId) ?? board.summaryOf(openId);
   const openLane = openSummary === null ? null : laneOfStatus(lanes, openSummary.status);
   const openStatus = openSummary === null || openId === null ? null : bugStatusOf(openSummary, walkOf(openId), t);
-  // Where an Opening hangs: a card's own mark, or its ring's "more" mark for a card past the marks; the board's core.
-  const placesRef = useRef({ rings, openId });
-  useEffect(() => {
-    placesRef.current = { rings, openId };
-  });
-  const cardAnchor = useCallback((): AstrolabePoint | null => {
-    const { rings: held, openId: cardId } = placesRef.current;
-    if (cardId === null) return null;
-    const ringId = held.ringOf(cardId);
-    if (ringId === null) return null;
-    const ring = held.rings.find((candidate) => candidate.id === ringId);
-    const onMark = ring?.items.some((item) => item.id === cardId) ?? false;
-    return ringsRef.current?.pointOf(ringId, onMark ? cardId : moreId(ringId)) ?? null;
-  }, []);
+  // The slot a thing faces you on: its own, or its run's "more" slot for one past the slots; null for one the hoop does not hold.
+  const facingOf = (slots: HoopSlot[], slotId: string, groupId: string | null, more: (groupId: string) => string) => (
+    slots.some((slot) => slot.id === slotId) ? slotId : groupId === null ? null : more(groupId)
+  );
+  const openFacing = openId === null ? null : facingOf(hoop.slots, openId, hoop.groupOf(openId), moreId);
+  // Where an Opening hangs: a card's own slot, or its run's "more" slot for a card past the slots; the board's core.
+  const cardAnchor = (): AstrolabePoint | null => (openFacing === null ? null : hoopRef.current?.pointOf(openFacing) ?? null);
   const sceneRef = useRef<HTMLDivElement>(null);
   const coreAnchor = useCallback((): AstrolabePoint | null => {
-    const box = sceneRef.current?.querySelector('[data-ast-rings]')?.getBoundingClientRect();
+    const box = sceneRef.current?.querySelector('[data-bug-instrument] [data-bug-core]')?.getBoundingClientRect();
     return box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null;
   }, []);
-  const moreAnchor = useCallback((ringId: string) => () => ringsRef.current?.pointOf(ringId, moreId(ringId)) ?? null, []);
-  // The instrument's box: an Opening stands clear of it where the room allows, so the rings stay whole beside it.
-  const instrumentBox = useCallback(() => sceneRef.current?.querySelector('[data-bug-instrument]')?.getBoundingClientRect() ?? null, []);
+  const moreAnchor = useCallback((groupId: string) => () => hoopRef.current?.pointOf(moreId(groupId)) ?? null, []);
+  // The hoop's box: an Opening stands clear of it where the room allows, so the hoop stays whole beside it.
+  const instrumentBox = useCallback(() => sceneRef.current?.querySelector('[data-bug-instrument] [data-hoop]')?.getBoundingClientRect() ?? null, []);
 
-  // THE PROPOSALS AS RINGS, the instrument's second set, worked out again on every render from the panel's one read.
-  const proposalSet = proposalRings(proposals.reading.status === 'ready' ? proposals.reading.proposals : [], openProposalId, proposalsView.scope === 'all', t);
-  const proposalPlacesRef = useRef({ proposalSet, openProposalId });
-  useEffect(() => {
-    proposalPlacesRef.current = { proposalSet, openProposalId };
-  });
-  const proposalAnchor = useCallback((): AstrolabePoint | null => {
-    const { proposalSet: held, openProposalId: id } = proposalPlacesRef.current;
-    if (id === null) return null;
-    const ringId = held.ringOf(id);
-    if (ringId === null) return null;
-    const onMark = held.rings.find((ring) => ring.id === ringId)?.items.some((item) => item.id === proposalItemId(id)) ?? false;
-    return ringsRef.current?.pointOf(ringId, onMark ? proposalItemId(id) : proposalMoreId(ringId)) ?? null;
-  }, []);
-
-  // The scene's room, for the instrument's square at home: as large as the room allows, up to the design system's home size.
-  const [room, setRoom] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    const scene = sceneRef.current;
-    if (!scene || typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(([entry]) => setRoom({ w: Math.round(entry.contentRect.width), h: Math.round(entry.contentRect.height) }));
-    observer.observe(scene);
-    return () => observer.disconnect();
-  }, []);
-  const square = Math.max(0, Math.min(room.w - 16, room.h - 16, INSTRUMENT_HOME));
+  // THE PROPOSALS ON THE HOOP, the instrument's second set, worked out again on every render from the panel's one read.
+  const proposalSet = proposalHoop(proposals.reading.status === 'ready' ? proposals.reading.proposals : [], proposalsView.scope === 'all', t);
+  const proposalFacing = openProposalId === null ? null : facingOf(proposalSet.slots, proposalItemId(openProposalId), proposalSet.groupOf(openProposalId), proposalMoreId);
+  const proposalAnchor = (): AstrolabePoint | null => (proposalFacing === null ? null : hoopRef.current?.pointOf(proposalFacing) ?? null);
 
   // The card the plus just made, by id: its Opening names it first. Any other card opened is no longer fresh.
   const [freshId, setFreshId] = useState<string | null>(null);
@@ -287,27 +255,28 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
     if (card) openCard(card.id, true);
   };
 
-  /** The instrument: the board's lanes, or a second set the face hands it (the proposals), round the same core and measure. */
-  const instrument = (docked: boolean, set?: { rings: AstrolabeRing[]; label: string; hold: boolean; onOpen: (item: AstrolabeRingItem) => void }) => (
+  /** The instrument: the board's cards, or a second set the face hands it (the proposals), round the same core and measure. */
+  const instrument = (docked: boolean, set?: { slots: HoopSlot[]; label: string; held: boolean; current: string | null; onOpen: (slotId: string) => void }) => (
     <BugInstrument
-      ringsRef={ringsRef}
-      rings={set?.rings ?? rings.rings}
+      hoopRef={hoopRef}
+      slots={set?.slots ?? hoop.slots}
       label={set?.label}
       building={set === undefined ? building : null}
-      gauge={gauge}
+      measure={measure}
       docked={docked}
-      hold={(set?.hold ?? openId !== null) || other !== null}
-      onOpen={(item) => {
+      held={(set?.held ?? openId !== null) || other !== null}
+      current={set === undefined ? openFacing : set.current}
+      onOpen={(slotId) => {
         if (set !== undefined) {
-          set.onOpen(item);
+          set.onOpen(slotId);
           return;
         }
-        const ringId = ringOfMore(item.id);
-        if (ringId !== null) openOther({ kind: 'more', ringId });
-        else openCard(item.id);
+        const groupId = groupOfMore(slotId);
+        if (groupId !== null) openOther({ kind: 'more', groupId });
+        else openCard(slotId);
       }}
       onCore={() => openOther(other?.kind === 'board' ? null : { kind: 'board' })}
-      onGauge={() => setFace('dashboard')}
+      onMeasure={() => setFace('dashboard')}
     />
   );
 
@@ -372,39 +341,35 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
           anchor={proposalAnchor}
           avoid={instrumentBox}
           home={
-            // At home under the face's two controls, as large as the room under them allows (its box is a size container).
-            <div data-ast-keeps-opening="" data-bug-instrument="" style={{ width: 'min(100cqw, 100cqh, 720px)', height: 'min(100cqw, 100cqh, 720px)' }}>
-              {instrument(false, {
-                rings: proposalSet.rings,
-                label: t('kanban.proposed.listLabel'),
-                hold: openProposalId !== null,
-                onOpen: (item) => {
-                  const ringId = ringOfMore(item.id);
-                  const id = proposalIdOf(item.id);
-                  if (ringId !== null) openOther({ kind: 'more', ringId });
-                  else if (id !== null) openProposal(id);
-                },
-              })}
-            </div>
+            // At home under the face's two controls, as large as the room under them allows.
+            instrument(false, {
+              slots: proposalSet.slots,
+              label: t('kanban.proposed.listLabel'),
+              held: openProposalId !== null,
+              current: proposalFacing,
+              onOpen: (slotId) => {
+                const groupId = groupOfMore(slotId);
+                const id = proposalIdOf(slotId);
+                if (groupId !== null) openOther({ kind: 'more', groupId });
+                else if (id !== null) openProposal(id);
+              },
+            })
           }
         />
       );
     }
 
-    // At home: the instrument has the middle. Its wrapper keeps an Opening open while a mark is turned to or pressed.
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div data-ast-keeps-opening="" data-bug-instrument="" style={{ width: square, height: square }}>
-          {square > 0 && instrument(false)}
-        </div>
-      </div>
-    );
+    // At home: the instrument has the middle. Its hoop keeps an Opening open while a slot is turned to or pressed.
+    return <div className="h-full">{instrument(false)}</div>;
   };
 
-  const moreRing = other?.kind === 'more' ? (face === 'proposed' ? proposalSet.rings : rings.rings).find((ring) => ring.id === other.ringId) ?? null : null;
-  const moreCards = other?.kind === 'more' && face === 'board' ? (rings.cardsOf[other.ringId] ?? []).filter((cardId) => !moreRing?.items.some((item) => item.id === cardId)) : [];
+  // A run's further things, past its slots: the "more" slot they hang from, and the cards or proposals it stands for.
+  const shownSlots = face === 'proposed' ? proposalSet.slots : hoop.slots;
+  const moreSlot = other?.kind === 'more' ? shownSlots.find((slot) => slot.id === moreId(other.groupId)) ?? null : null;
+  const onHoop = (slotId: string) => shownSlots.some((slot) => slot.id === slotId);
+  const moreCards = other?.kind === 'more' && face === 'board' ? (hoop.cardsOf[other.groupId] ?? []).filter((cardId) => !onHoop(cardId)) : [];
   const moreProposals = other?.kind === 'more' && face === 'proposed'
-    ? (proposalSet.proposalsOf[other.ringId] ?? []).filter((proposal) => !moreRing?.items.some((item) => item.id === proposalItemId(proposal.id)))
+    ? (proposalSet.proposalsOf[other.groupId] ?? []).filter((proposal) => !onHoop(proposalItemId(proposal.id)))
     : [];
 
   return (
@@ -412,8 +377,8 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
       <BugHead
         boards={boards}
         currentBoardId={currentBoardId}
-        // Boards are GLOBAL: selecting one writes the one `current_board` setting, and the rings
-        // repaint from the id the server answers with. Never scoped to the open project.
+        // Boards are GLOBAL: selecting one writes the one `current_board` setting, and the hoop
+        // repaints from the id the server answers with. Never scoped to the open project.
         onSelectBoard={(boardId) => { void selectBoard(boardId); }}
         onNewBoard={() => setDialog('new')}
         menu={menu}
@@ -423,7 +388,7 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
       <div ref={sceneRef} className="relative min-h-0 flex-1">
         {body()}
 
-        {/* The open card, hung from its mark. Mounted while the board is, so its reading outlives a close and a reopen. */}
+        {/* The open card, hung from its slot. Mounted while the board is, so its reading outlives a close and a reopen. */}
         {face === 'board' && (
           <KanbanCardDrawer
             cardId={openId}
@@ -476,7 +441,7 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
                 if (currentBoardId) void updateBoard(currentBoardId, { autonomy: next });
               }}
               onDialog={(mode) => setDialog(mode)}
-              onClearDone={(rings.cardsOf[DONE_LANE_ID] ?? []).length === 0 ? undefined : () => {
+              onClearDone={(hoop.cardsOf[DONE_LANE_ID] ?? []).length === 0 ? undefined : () => {
                 setOther(null);
                 void writes.clearLane(board.cardIds(DONE_LANE_ID));
               }}
@@ -484,17 +449,17 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
           </Opening>
         )}
 
-        {/* A ring's further marks, hung from its "more" mark: each a press that opens it, and the lane's next page while there is one. */}
-        {face !== 'dashboard' && moreRing !== null && other?.kind === 'more' && (
+        {/* A run's further cards, hung from its "more" slot: each a press that opens it, and the lane's next page while there is one. */}
+        {face !== 'dashboard' && moreSlot !== null && other?.kind === 'more' && (
           <Opening
             open
-            anchor={moreAnchor(other.ringId)}
+            anchor={moreAnchor(other.groupId)}
             avoid={instrumentBox}
             onClose={() => setOther(null)}
             backLabel={t('kanban.drawer.close')}
-            source={moreRing.label}
+            source={moreSlot.groupName ?? ''}
             title={t('kanban.ring.further', { count: face === 'proposed' ? moreProposals.length : moreCards.length, defaultValue: '{{count}} more' })}
-            marks={{ 'data-bug-more-opening': other.ringId }}
+            marks={{ 'data-bug-more-opening': other.groupId }}
           >
             <ul className="-mx-2 flex flex-col">
               {moreCards.map((cardId) => (
@@ -504,7 +469,7 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
                     className="w-full truncate rounded-[2px] px-2 py-1.5 text-left text-sm text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--focus)]"
                     onClick={() => openCard(cardId)}
                   >
-                    {rings.summaryOf(cardId)?.title ?? cardId}
+                    {hoop.summaryOf(cardId)?.title ?? cardId}
                   </button>
                 </li>
               ))}
@@ -520,12 +485,12 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
                 </li>
               ))}
             </ul>
-            {face === 'board' && rings.unread[other.ringId] && (
+            {face === 'board' && hoop.unread[other.groupId] && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  for (const laneId of ringSpecs.find((spec) => spec.id === other.ringId)?.laneIds ?? []) {
+                  for (const laneId of groupSpecs.find((spec) => spec.id === other.groupId)?.laneIds ?? []) {
                     if (lanes.some((spec) => spec.id === laneId)) void board.loadMore(laneId);
                   }
                 }}
