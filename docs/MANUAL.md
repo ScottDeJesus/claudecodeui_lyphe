@@ -14304,10 +14304,10 @@ Kit parts only: `SettingRow`, `SettingsToggle`, `Button`. Icon `SquareCode`. No 
 
 ## Strings
 `codeMode` in `src/modules/i18n/locales/en/common.json`, after `agentLaunch`: `title`, `switchName` (`Code Mode: {{label}}`, the switch's accessible name only), `waiting`, `readinessUnread`, `unreadable`. `buttons.retry` and `status.loading` are shared keys.
-- `says` and `report` are the verb's data, never keys. The fake `says` equals `switch.KINDS["builders"]["says"]`.
+- `says` and `report` are the verb's data, never keys.
 
 ## Measured
 - 2026-11-20, the wired card: probe server (MAN-492) on :7897 with `CODE_MODE_FLAG_DIR` on a scratch folder, a Vite on :5199 (`CI=true SERVER_PORT=7897`) in front of it. GET, PUT builders on (flag file reads `on`), GET again, PUT `chats` and PUT `--status` (400 `UNKNOWN_CODE_MODE_KIND`, folder unchanged), PUT `enabled: "yes"` and a list body (400 `INVALID_CODE_MODE_STATE`); the real `~/.claude/state/code_mode/` never created. In the browser at 1440 and 390: card `ready`, handle `builders:on`; a press on the switch sent one PUT, removed the scratch flag and drew `builders:off`; no page error.
-- 2026-11-20: 9 states × 3 widths (1440, 390, 320 at 1.07 text scale) × light/dark, 54 pictures: no overflow, switch targets ≥44px on phones. At 320 scaled the kind rows sit 8px left of the title's sentences so the switch stays beside its name. Taken by `.verify/code-mode-card-scaffold-shots.mjs` (git-ignored), which swapped `FAKE_READING` in the browser's copy of the module; the wired card has no fake, so that script no longer runs against it.
+- 2026-11-20: 9 states × 3 widths (1440, 390, 320 at 1.07 text scale) × light/dark, 54 pictures: no overflow, switch targets ≥44px on phones. At 320 scaled the kind rows sit 8px left of the title's sentences so the switch stays beside its name.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/code-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerCodeModeRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCodeMode.ts
