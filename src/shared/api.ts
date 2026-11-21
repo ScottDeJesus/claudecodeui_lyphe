@@ -746,6 +746,13 @@ export const api = {
     saveMainSessionDactylsSwitch: (state: { enabled: boolean }) =>
       put('/api/settings/main-session-dactyls', state),
 
+    // The Code Mode switches — one flag file a kind, all moved by `code-mode set`. The GET answers the verb's
+    // status (`ready`, `why` and the `kinds` list with each `enabled`; all three null when the verb could not be
+    // asked); the PUT flips one kind and answers the status the verb printed after it, never what was sent.
+    codeMode: () => get('/api/settings/code-mode'),
+    saveCodeMode: (state: { kind: string; enabled: boolean }) =>
+      put('/api/settings/code-mode', state),
+
     // The heal reflex's MASTER switch — the reflex's whole launching, on one word. `off` stops it
     // launching from the next ending onwards while an ending still indexes, and the typed `/heal`
     // door is never gated by it; `on` is what the flag file being absent has always meant. Same

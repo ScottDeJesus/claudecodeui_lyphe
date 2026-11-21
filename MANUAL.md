@@ -3349,7 +3349,7 @@ The Tours view: a DocuSketch tour's affected areas drawn on a view's photo, or o
 |---|---|
 | phase | live: the Cerberus tab's fourth view, reading the lane; run whole against the live engine 2026-10-17 (`.verify/affected-areas-view.mjs`, `.verify/affected-areas-walk.mjs`); its 360° screen run 2026-10-22 (`.verify/affected-areas-sphere.mjs`: MAN-8956) |
 | mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view), inside a `KeptView` (MAN-8918): mounted on the first show of the Tours tab, `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano, `shown` and the sphere's look are lost then). why: the tour, pano, `shown` and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so the panel's `useKeptViews` keeps Tours's offset (written as Tours is left, restored as it returns) |
-| words | `affectedAreas.*` and `cerberus.tours.{tab,tabHint}` in `src/modules/i18n/locales/en/common.json` |
+| words | `affectedAreas.*` and `cerberus.tours.tab` in `src/modules/i18n/locales/en/common.json` |
 | shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `PanoShown` (`'sphere'` or a `Face`), `TourReaderProgress`, `AffectedAreasTrouble`, `PanoRoom` (a pano's `roomKey` and `floor`, against which a region's placement says "Counted in {room}"), `DayOneSection` (what `DayOneSketch` is handed, MAN-9038) in `src/shared/types.ts`; the sphere's `CubeFaces`, `SphereShape`, `SphereLook`, `SphereTrouble`: MAN-8943; the marks' `ToursScreenKey`, `RegionLayer`, `MarkWalk`, `MissedStage`: MAN-8582 |
 | shared constants | `AFFECTED_AREAS_LANE_FAULTS` (`no_secret`, `unreachable`, `unreadable`: the faults of the lane whatever was asked, each said in `affectedAreas.trouble.<fault>`) in `src/shared/constants.ts`; read by `LaneTrouble`, `ThresholdControl`, `MarkRefusal`. `MARK_NOTE_MAX` (500) beside it: MAN-8582 |
 
@@ -4084,7 +4084,7 @@ The Bulletins view: what Claude read of each carrier's SERVPRO program bulletin 
 | phase | live, reading the lane. Run whole against the live engine 2026-10-22 with `.verify/bulletins-view.mjs` (no model call, no write): 53 of 53 verdicts on the code before three later changes (the empty-scope labels, the strip's own scroller at 390 px, the no-ids check). Those three were measured apart (the strip: panel scroller 445 px in a 390 px box before, 390 in 390 after) or only compiled (the scope labels, the no-ids check); the run that would show them whole timed out in the harness's own page load at box load ~50. Also unrun: the probe's own page pick, member verdict and pages-list scroll leg (syntax-checked), and the overview with every carrier left out (no empty-state sentence under the banner). Re-run it when `/proc/loadavg` is under 12: it opens State Farm's page 13, else 22, else the read page with the most to draw (it prints which), and exits 2 only when no State Farm page holds a reading that states a requirement, which is the walk's to produce; the scroll the view keeps is measured on the carrier's 51-row pages list, so it needs no tall page |
 | mounted | `CerberusPanel` draws `<KeptView id="bulletins">` around the lazy `BulletinsView` (this module's barrel) after Tours, once center's overview has answered: mounted on its first show, `hidden` after, so the open carrier, page and scroll survive a visit to Fleet. Leaving the Cerberus workspace tab for Chat unmounts the panel and the view with it |
 | reads | four hooks in `hooks/`, each used by the view root alone: `useOverview`, `useBulletinPages`, `usePageReading` (each is `useLaneRead`, MAN-8917, over one `api.carrierBulletins` verb) and `usePageImage` |
-| words | `cerberus.bulletins.*` in `src/modules/i18n/locales/en/common.json`, including `cerberus.bulletins.tab` and `.tabHint` (the strip's two words); the surround's failure words are `viewBoundary.*` (MAN-8917) |
+| words | `cerberus.bulletins.*` in `src/modules/i18n/locales/en/common.json`, including `cerberus.bulletins.tab` (the strip's word); the surround's failure words are `viewBoundary.*` (MAN-8917) |
 | shared types | wire: `src/shared/carrier-bulletins-types.ts` (MAN-8865). Lane fault: `AffectedAreasTrouble` from `src/shared/types.ts` (one forwarder, `server/shared/shadow-connector-lane.ts`, serves both lanes) |
 | proof | 2026-10-22, 1280 and 390 px wide: State Farm's page 22 (the page the walk had read; page 13 when it has) drew its image beside its one requirement, the count on screen the count `GET /api/carrier-bulletins/bulletins/{id}/pages/22` holds; each key of the three live answers is a member of the wire mirror's type and every required member is live (`OverviewRow`, `BulletinPage`, `PageReading` and every nested type that had a live instance); no request but a GET; no request while Bulletins was hidden or untouched; zero console errors |
 
@@ -17294,7 +17294,7 @@ The Uploads view of the Cerberus tab: what happens when a person uses Restorly's
 `src/modules/i18n/locales/en/common.json`, under `cerberus`, after `bulletins`. English only; a login, customer, flow, step name, reason detail or tool summary is data, never a key (MAN-7870).
 | group | n | holds |
 |---|---|---|
-| `tab`, `tabHint`, `loading` | 3 | the strip's name and hint (read by the `VIEWS` row), the spinner label |
+| `tab`, `loading` | 2 | the strip's name (read by the `VIEWS` row), the spinner label |
 | `head` | 42 | headline states with their accents (a live dry run leads as "A test run is", never "An upload is"), scope and its clear press, summary, window switch, Refresh |
 | `pills` | 23 | the five pills and their titles (Live now reads "test run · working" for a dry run) |
 | `live` | 14 | the Live now card |
@@ -17326,7 +17326,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/
 Where the Uploads view meets the Cerberus tab, and the choices of its behaviour that a plain reading would not guess. The module: MAN-9891. Rules: INV-11822. The tab: MAN-7868.
 
 ## In the Cerberus tab
-- `uploads` is named in four places: `CerberusView` (`src/shared/types.ts`), `KEPT_VIEWS` (`src/modules/cerberus/hooks/useKeptViews.ts`), `VIEWS` (a row naming `cerberus.uploads.tab` and `cerberus.uploads.tabHint`) and a `KeptView` mount handed `shown={view === 'uploads'}` (`CerberusPanel.tsx`).
+- `uploads` is named in four places: `CerberusView` (`src/shared/types.ts`), `KEPT_VIEWS` (`src/modules/cerberus/hooks/useKeptViews.ts`), `VIEWS` (a row naming `cerberus.uploads.tab`) and a `KeptView` mount handed `shown={view === 'uploads'}` (`CerberusPanel.tsx`).
 - Kept mounted once shown, as Tours and Bulletins are (MAN-8918): its window, filters, open run and the scroll left survive a visit to Fleet. Unlike them it is also told by its feed while shown (MAN-9911).
 - No `FILL:` comment stands in `src/modules/cerberus`; MAN-7867 and MAN-7868 say so.
 

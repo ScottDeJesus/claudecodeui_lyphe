@@ -14258,3 +14258,39 @@ Returns `{config, unreadable, saving, texts, refusals, setNightly, typeField, le
 2026-11-19, from the screen at 1440×900 on :5183, `dispatcher hunt config --json` read after each: minutes 120→90→120 (200 each, the file followed); 900 → 409, `Not saved. Minutes must be a whole number from 15 to 600, not 900`, the field back to 120 and the file unchanged; Code's switch off (order `security,behaviour,ui,data`) and on (`…,code`); Security moved down and up; CloudCLI moved up and down. Screenshots at 1440×900 and 390×844.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/bugHuntersWire.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useBugHunters.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerBugHuntersSetting.tsx
+
+## MAN-10079 — Code Mode card — Settings → Agents: RunnerCodeModeRow scaffold, handles, strings
+
+`RunnerCodeModeRow.tsx` (Settings → Agents, drawn by `RunnerModelContent.tsx` directly under `RunnerMainSessionDactylsRow`) is the operator's card for Code Mode's per-kind switches (the verb and flags: MAN-10072). Code Mode: a launch works with two tools, one search and one script.
+
+## Status
+- 2026-11-20: SCAFFOLD, drawn live from `FAKE_READING` (one `builders` entry, off, box ready). The Builders switch does not move and writes nothing.
+- The fill replaces the block under `// FILL: state` (the two types and `FAKE_READING`) with `useCodeMode()`, and the lines `// FILL: onToggle`, `// FILL: onRetry`. Its only line outside a marker is its import.
+- Names the card reads: `kinds`, `unreadable`, `ready`, `why`; it calls `onToggle(kind, next)` and `onRetry()`.
+- `useCodeMode` forgets EVERY position together (`useMainSessionDactylsSwitch`'s `forgetPosition`): never one kind's `enabled` `null` beside a known one.
+
+## Composition
+Kit parts only: `SettingRow`, `SettingsToggle`, `Button`. Icon `SquareCode`. No component was added.
+
+| state (`data-runner-code-mode-card`) | drawn |
+|---|---|
+| `loading` | title row, `status.loading` |
+| `unknown` (`kinds` null or empty, or any kind `enabled === null`) | the `codeMode.unreadable` sentence + Retry; no switch |
+| `waiting` (`ready === false`, `why` non-empty) | warn-tone `data-runner-code-mode-waiting` line with ▲ in the title row; switches stay live |
+| `unread` (`ready === null`) | `data-runner-code-mode-unread` line, plain |
+| `ready` | title only; one row per kind |
+
+- A kind row: `label`, `says`, `report` (`data-runner-code-mode-report`, only when non-empty), the switch. Handle `data-runner-code-mode="<kind>:on|off|unknown"`.
+- A kind with `enabled === null` keeps its name and sentence, draws no switch.
+- Rows in the verb's order; the card holds no list of kinds.
+- The waiting `why` is NOT through `WholeWords`: it can end in a path that would overflow a phone.
+- The switch sits in a `<label>` 44px tall on touch (`finger:min-h-11`, the extra height given back so the track stays level with the name).
+
+## Strings
+`codeMode` in `src/modules/i18n/locales/en/common.json`, after `agentLaunch`: `title`, `switchName` (`Code Mode: {{label}}`, the switch's accessible name only), `waiting`, `readinessUnread`, `unreadable`. `buttons.retry` and `status.loading` are shared keys.
+- `says` and `report` are the verb's data, never keys. The fake `says` equals `switch.KINDS["builders"]["says"]`.
+
+## Measured
+- 2026-11-20: 9 states × 3 widths (1440, 390, 320 at 1.07 text scale) × light/dark, 54 pictures: no overflow, switch targets ≥44px on phones. At 320 scaled the kind rows sit 8px left of the title's sentences so the switch stays beside its name. `node .verify/code-mode-card-scaffold-shots.mjs` re-runs it (git-ignored; swaps the fake reading in the browser's copy of the module; shots in `.verify/shots/code-mode-card/<state>--<width>--<light|dark>.png`; no empty-list state).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerCodeModeRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/code-mode-card-scaffold-shots.mjs

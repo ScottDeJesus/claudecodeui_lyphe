@@ -3,43 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import { Button, SettingRow } from '@/shared/ui';
-
-// FILL: state — everything from this line to the end of `FAKE_READING` is the fill's one block: the two types
-// become `useCodeMode()`'s own, and the fake reading its answer, under the same four names. The fake is one
-// `builders` entry, its sentence the verb's own (`KINDS["builders"]["says"]`), word for word.
-//
-// The hook forgets EVERY position together, as `useMainSessionDactylsSwitch`'s `forgetPosition` does, and never
-// one kind's: a lost write leaves each kind's `enabled` `null` (or the whole list `null`). The card's one sentence
-// for unknown speaks of all the switches, so a kind with no position beside a kind with one would make it false.
-
-/**
- * One Code Mode switch as `code-mode --status` names it: which launches it covers (`kind`), its name, the sentence
- * that says what on means, and the week's one-line report ("" when there is nothing to count). `enabled` is the
- * flag's position, or `null` when the card holds the kind but not where its switch stands.
- */
-type CodeModeKind = { kind: string; label: string; says: string; enabled: boolean | null; report: string };
-
-/**
- * What the card draws from. `kinds` is the verb's list in the verb's order, or `null` while it has not been read;
- * `unreadable` tells a read that failed from one still on the wire. `ready` and `why` are the box's readiness (node,
- * the packages, the sandbox), each `null` when it could not be asked, which is neither ready nor not ready.
- */
-type CodeModeReading = { kinds: CodeModeKind[] | null; unreadable: boolean; ready: boolean | null; why: string | null };
-
-const FAKE_READING: CodeModeReading = {
-  kinds: [
-    {
-      kind: 'builders',
-      label: 'Builders',
-      says: 'A builder or fix-pass on Claude works with two tools: one search, and one script that does the whole job with the soul\'s own tools inside it. A script\'s actions are not checked by the house\'s hooks yet. A soul with tools of its own (a browser, the connector) is not served yet. Dactyls are off for a launch Code Mode carries. Takes effect on the next launch.',
-      enabled: false,
-      report: '',
-    },
-  ],
-  unreadable: false,
-  ready: true,
-  why: '',
-};
+import { useCodeMode } from '@/shared/hooks/useCodeMode';
 
 /**
  * CODE MODE: WHICH LAUNCHES WORK WITH TWO TOOLS, one search and one script, instead of their built-in ones. The
@@ -74,12 +38,9 @@ export default function RunnerCodeModeRow() {
   const { t } = useTranslation('common');
 
   // ── The wires: the read and its two acts. Everything below them is composition. ──
-  // FILL: state
-  const { kinds, unreadable, ready, why } = FAKE_READING;
-  // FILL: onToggle
-  const onToggle = (_kind: string, _next: boolean): void => {};
-  // FILL: onRetry
-  const onRetry = (): void => {};
+  const { kinds, unreadable, ready, why, setEnabled, refresh } = useCodeMode();
+  const onToggle = (kind: string, next: boolean): void => { void setEnabled(kind, next); };
+  const onRetry = (): void => { void refresh(); };
 
   const title = t('codeMode.title');
   const retry = t('buttons.retry');
