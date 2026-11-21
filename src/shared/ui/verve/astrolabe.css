@@ -63,16 +63,18 @@
 .ast-opening-head { display: flex; align-items: center; gap: 8px; min-height: 24px; }
 .ast-opening-source { flex: 1; min-width: 0; color: var(--ink-muted); font-family: var(--font-mono); font-size: 10px; line-height: 14px; letter-spacing: 0.24em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The Opening's way back is the same press as every head's, at its head's start: the outline square (the kit's outline Button's
- * edge and ink), 28 px on a plate this small, and caught at 44 under a finger. */
-.ast-opening-close { flex: none; width: 28px; height: 28px; display: grid; place-items: center; margin: 0; padding: 0; border: 1.5px solid var(--border-strong); border-radius: var(--radius-control); background: none; cursor: pointer; color: var(--ink); transition: border-color var(--duration-fade) ease; }
-.ast-opening-close:hover { border-color: var(--ink-mid); }
+ * edge and ink), drawn 28 px on a plate this small. Under a finger the press itself is 44 px, the square still drawn 28 px in its
+ * middle, and a negative margin keeps the head's line where it was. */
+.ast-opening-close { position: relative; flex: none; width: 28px; height: 28px; display: grid; place-items: center; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; color: var(--ink); }
+.ast-opening-close::after { content: ''; position: absolute; inset: 0; border: 1.5px solid var(--border-strong); border-radius: var(--radius-control); pointer-events: none; transition: border-color var(--duration-fade) ease; }
+.ast-opening-close:hover::after { border-color: var(--ink-mid); }
 .ast-opening-close:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
 .ast-opening-title { margin: 0; min-width: 0; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 400; }
 .ast-opening-body { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .ast-opening-body > p { margin: 0; }
 @media (pointer: coarse), (max-width: 767.98px) {
-  .ast-opening-close { position: relative; }
-  .ast-opening-close::before { content: ''; position: absolute; inset: -8px; }
+  .ast-opening-close { width: 44px; height: 44px; margin: -8px; }
+  .ast-opening-close::after { inset: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .ast-opening[data-ready="true"] .ast-opening-plate { animation: ast-fade-in var(--duration-fade) ease both; } }
 
