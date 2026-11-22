@@ -6,7 +6,7 @@ import type { LucideIcon } from 'lucide-react';
  *
  * Used by the Cerberus tab's worded buttons, in its own faces (the fleet's and a machine's openings, a need, a fix, the check sheet,
  * History, the catalog, the banner) and in the four views it borrows: the affected-areas, carrier-bulletins, upload-runs and
- * scheduling-report modules.
+ * scheduling-report modules; and by the kanban module's `KanbanPanel`, for Load more under a lane of the board as a list.
  */
 export function IconWord({ icon: Icon, word }: { icon: LucideIcon; word: string }) {
   return (

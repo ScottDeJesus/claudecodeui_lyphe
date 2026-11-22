@@ -15,7 +15,8 @@
     "copy": "Copy",
     "download": "Download",
     "upload": "Upload",
-    "browse": "Browse"
+    "browse": "Browse",
+    "listView": "List view"
   },
   "tabs": {
     "chat": "Chat",
@@ -2544,7 +2545,8 @@
       "silent": "Silent",
       "enrolling": "Enrolling",
       "services": "Services",
-      "more": "{{count}} more"
+      "more": "{{count}} more",
+      "passingOf": "{{passing}} of {{checks}}"
     },
     "header": {
       "eyebrow": "Fleet health",

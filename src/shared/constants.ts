@@ -33,6 +33,7 @@ import type { RoadmapEpicWord, RoadmapFeatureWord, RoadmapMilestoneWord } from '
 import type { StationFocusKind } from '@/shared/station-types';
 import type {
   AffectedAreasTrouble,
+  CompanionMaterial,
   FileStatusCode,
   LLMProvider,
   McpProvider,
@@ -866,4 +867,20 @@ export const HEAD_PRESS = "relative size-9 flex-none finger:size-7 finger:before
  * taller (the Bugs view's picker) without moving the presses, which stand at the row's top. Used with `HEAD_ROW`.
  */
 export const HEAD_NAME = 'flex min-h-9 min-w-0 flex-1 items-center finger:min-h-7';
+
+// ---------------------------
+
+//----------------- A HELPER'S DOT ------------
+
+/**
+ * What a subagent's dot is filled with in a drawing made of marks (SVG): its model's own material, Mercury the bright ink. An agent
+ * whose model is not known (a null `SubagentDot`) takes the quiet ink, which the caller supplies. Used by the sidebar module's
+ * `SessionTile` (a chat's dots under its plate) and the kit's `HoopList` (a thing's beads under its tile).
+ */
+export const SUBAGENT_DOT_FILL: Record<CompanionMaterial, string> = {
+  mercury: 'var(--ink-strong)',
+  tube: 'var(--tube)',
+  wire: 'var(--wire)',
+  plasma: 'var(--plasma)',
+};
 

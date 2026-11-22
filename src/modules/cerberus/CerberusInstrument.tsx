@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 
 import { useCoreDrawing } from '@/shared/context/CoreDrawingContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import type { FleetDoing, HoopHandle, HoopSlot, InstrumentMeasure } from '@/shared/types';
-import { Hoop, hoopWidthFor, InstrumentCore } from '@/shared/ui';
-import { resizeObserverIn } from '@/shared/utils';
+import type { FleetDoing, HoopHandle, HoopSlot, HoopView, InstrumentMeasure } from '@/shared/types';
+import { Hoop, HoopList, hoopWidthFor, InstrumentCore } from '@/shared/ui';
+import { cn, resizeObserverIn } from '@/shared/utils';
 
 /** How often the core's bearing follows the machine being fixed, in ms: the hoop turns, and the tendril follows the machine. */
 const BEARING_EVERY_MS = 700;
@@ -22,6 +22,13 @@ const HOOP_LEAN = 0.62;
 const CORE_SHARE = 0.17;
 /** The most of the hoop one machine takes, in radians: a fleet of a few machines stands them side by side, not each a wall half round it. */
 const SLOT_MOST = (Math.PI * 2) / 12;
+/** The core's body at the head of the list, in px: at a desk, and in a room narrower than an Opening can stand beside (a phone). */
+const LIST_CORE = 64;
+const LIST_CORE_NARROW = 48;
+/** The narrowest room an Opening stands beside its row in; under it, it is a sheet at the foot (the kit's `Opening`). */
+const LIST_WIDE_FROM = 560;
+/** What opens from a row at a desk, a machine's Opening, in px: the list leaves it its room on the right. */
+const OPENING_WIDTH = 460;
 
 type CerberusInstrumentProps = {
   /** The hoop's handle, for an Opening to hang from a machine's slot and for the core to find the machine being fixed. */
@@ -43,6 +50,8 @@ type CerberusInstrumentProps = {
   onCore?: () => void;
   /** The measure was pressed: the fleet's history. */
   onMeasure?: () => void;
+  /** How the fleet is shown at home: the hoop, or the same machines as a list under the core (`HoopList`). Docked, it is the hoop. */
+  view?: HoopView;
 };
 
 /**
@@ -56,9 +65,13 @@ type CerberusInstrumentProps = {
  * their machines (`onOpen`), its core opens the fleet (`onCore`). Docked at the foot beside another face it keeps running, small, and
  * takes no press of its own: the foot's own press is the way back to it.
  *
+ * AS A LIST (`view`, the head's switch): the same machines as rows under the same core, a run at a time, every machine on its row
+ * (`HoopList`); the core heads the list with its measure in words beside it, and keeps its presses. The hoop's handle is the list's
+ * then, so a machine's Opening hangs from its row as it hangs from its slot.
+ *
  * Drawn by the panel (`CerberusPanel`), at home in the scene's middle and docked at its foot.
  */
-export function CerberusInstrument({ hoopRef, slots, doing, measure, docked = false, held, current, onOpen, onCore, onMeasure }: CerberusInstrumentProps) {
+export function CerberusInstrument({ hoopRef, slots, doing, measure, docked = false, held, current, onOpen, onCore, onMeasure, view = 'hoop' }: CerberusInstrumentProps) {
   const { t } = useTranslation();
   const draw = useCoreDrawing();
   const hostWindow = useHostWindow();
@@ -94,10 +107,40 @@ export function CerberusInstrument({ hoopRef, slots, doing, measure, docked = fa
     ? Math.max(0, Math.min(room.w, hoopWidthFor(room.h, HOOP_LEAN)))
     : Math.max(0, Math.min(room.w - 2 * HOOP_AIR, HOOP_MOST, hoopWidthFor(room.h - 2 * HOOP_AIR - HOOP_READING, HOOP_LEAN)));
   const body = Math.max(12, Math.round(width * CORE_SHARE));
+  const asList = view === 'list' && !docked;
 
+  /** Cerberus's core at a body of `size` px: the same core, its presses and its measure, in the hoop's middle or at the list's head. */
+  const coreOf = (size: number) => (
+    <InstrumentCore
+      size={size}
+      label={t('cerberus.ring.core', { defaultValue: 'The fleet' })}
+      onPress={onCore}
+      measure={docked ? null : measure}
+      onMeasure={onMeasure}
+      decorative={docked}
+      marks={{ 'data-cerberus-core': '' }}
+    >
+      {draw?.({ material: 'mercury', state: form, drive: form === 'idle' ? 0 : 0.35, size, azimuth: bearing })
+        ?? <span aria-hidden="true" className="cerberus-core-still block size-1/2 rounded-full" />}
+    </InstrumentCore>
+  );
+
+  // One room for both forms, so the room measured stays this element whichever is shown.
   return (
-    <div ref={roomRef} {...(docked ? {} : { 'data-cerberus-instrument': '' })} className="flex size-full min-h-0 min-w-0 items-center justify-center">
-      {width > 0 && (
+    <div ref={roomRef} {...(docked ? {} : { 'data-cerberus-instrument': '' })} className={cn('flex size-full min-h-0 min-w-0', !asList && 'items-center justify-center')}>
+      {asList && (
+        <HoopList
+          ref={hoopRef}
+          slots={slots}
+          label={t('cerberus.ring.instrument', { defaultValue: 'The fleet' })}
+          current={current}
+          onOpen={(slotId) => onOpen?.(slotId)}
+          core={coreOf(room.w >= LIST_WIDE_FROM ? LIST_CORE : LIST_CORE_NARROW)}
+          reading={measure === null ? null : [measure.label, measure.detail].filter(Boolean).join(' · ')}
+          room={OPENING_WIDTH}
+        />
+      )}
+      {!asList && width > 0 && (
         <Hoop
           ref={hoopRef}
           slots={slots}
@@ -115,18 +158,7 @@ export function CerberusInstrument({ hoopRef, slots, doing, measure, docked = fa
           onOpen={onOpen}
           marks={docked ? undefined : { 'data-ast-keeps-opening': '' }}
         >
-          <InstrumentCore
-            size={body}
-            label={t('cerberus.ring.core', { defaultValue: 'The fleet' })}
-            onPress={onCore}
-            measure={docked ? null : measure}
-            onMeasure={onMeasure}
-            decorative={docked}
-            marks={{ 'data-cerberus-core': '' }}
-          >
-            {draw?.({ material: 'mercury', state: form, drive: form === 'idle' ? 0 : 0.35, size: body, azimuth: bearing })
-              ?? <span aria-hidden="true" className="cerberus-core-still block size-1/2 rounded-full" />}
-          </InstrumentCore>
+          {coreOf(body)}
         </Hoop>
       )}
     </div>
