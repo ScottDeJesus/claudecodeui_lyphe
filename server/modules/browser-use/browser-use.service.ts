@@ -15,6 +15,7 @@ import { loopbackApiOrigin } from '@/shared/utils.js';
 
 import { forgetBudget, installBudgetRoute, rememberBudget } from './browser-use-budget.js';
 import { getBrowserUseRuntime } from './browser-use-runtime.js';
+import { selfTailnetResolverArgs } from './browser-use-self-resolve.js';
 
 const require = createRequire(import.meta.url);
 const MAX_SESSIONS_PER_OWNER = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_MAX_SESSIONS_PER_OWNER || '3', 10);
@@ -536,7 +537,7 @@ export const browserUseService = {
     let page: any;
     const launchOptions = {
       headless: true,
-      args: ['--disable-dev-shm-usage'],
+      args: ['--disable-dev-shm-usage', ...selfTailnetResolverArgs()],
     };
     const contextOptions = {
       viewport: { width: 1440, height: 900 },
