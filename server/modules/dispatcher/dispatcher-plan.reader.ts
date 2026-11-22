@@ -2,6 +2,7 @@ import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage 
 
 import { cpuWaitSince, each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, planningPausedSince, stallSince, textSince } from './dispatcher-state.transport.js';
 import { askingSince } from './dispatcher-ask.reader.js';
+import { decidedSince, gapsSince, rulingSince } from './dispatcher-decided.reader.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -26,8 +27,8 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  */
 export type DocumentPlan = Omit<DispatcherPlan, 'session_app_id'>;
 
-/** The nine words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'hidden', 'complete'];
+/** The ten words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'hidden', 'complete', 'gaps'];
 
 /** The three words a phase's status may be (`phase_chain`'s own column). */
 export const PHASE_STATUSES: readonly DispatcherPhase['status'][] = ['not started', 'running', 'done'];
@@ -135,6 +136,8 @@ function phaseOf(raw: unknown): DispatcherPhase {
     // dispatcher's own word, never re-derived from `status` and `busy` here. Read tolerantly, so a
     // build older than the field draws what it always drew.
     stalled: stallSince(field(phase, 'stalled'), 'phase.stalled'),
+    // `asked` while the phase's walk waits on its designer's ruling, else null; an absent key reads null.
+    ruling: rulingSince(field(phase, 'ruling'), 'phase.ruling'),
     rounds: need(field(phase, 'rounds'), isCount, 'phase.rounds'),
     cost_usd: need(field(phase, 'cost_usd'), isCount, 'phase.cost_usd'),
     paid_vendor: textSince(field(phase, 'paid_vendor'), 'phase.paid_vendor'),
@@ -256,6 +259,10 @@ export function planOf(raw: unknown): DocumentPlan {
     // the dispatcher's own reading time and never stored. Read tolerantly, for a build older than the key.
     runtime_s: countSince(field(plan, 'runtime_s'), 'plan.runtime_s'),
     rounds: need(field(plan, 'rounds'), isCount, 'plan.rounds'),
+    // What the walks decided for the operator since the last load, and the gaps still being healed;
+    // an absent key reads `[]`, so the house and this lane may land in either order.
+    decided: decidedSince(field(plan, 'decided'), `plan.decided of ${name}`),
+    open_gaps: gapsSince(field(plan, 'open_gaps'), `plan.open_gaps of ${name}`),
     phases: each(field(plan, 'phases'), 'plan.phases', phaseOf),
     events: each(field(plan, 'events'), 'plan.events', eventOf),
   };

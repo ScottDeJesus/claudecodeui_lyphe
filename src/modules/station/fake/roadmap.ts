@@ -47,7 +47,7 @@ const NO_CASES: RoadmapCases = { total: 0, holding: 0, broken: 0, regressed: 0, 
 const WORD_OF_STEP: Record<RoadmapFeatureStep, RoadmapFeatureWord> = {
   idea: 'idea', proposed: 'proposed', shipped: 'shipped',
   designing: 'designing', questions: 'designing', cutting: 'designing', accept: 'designing', parked: 'designing',
-  building: 'in flight', waiting: 'in flight', queued: 'in flight', paused: 'in flight', stalled: 'in flight', starting: 'in flight',
+  building: 'in flight', waiting: 'in flight', queued: 'in flight', paused: 'in flight', stalled: 'in flight', starting: 'in flight', gaps: 'in flight',
 };
 
 /** One feature at `step`: its word the step's, and what it owes him an Accept's or a round's when the step is one. */

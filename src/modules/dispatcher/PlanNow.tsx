@@ -16,13 +16,17 @@ const NOW_LIMIT = 3;
  * A line is the phase's mark on the track, its position, its title on ONE line (truncated, the whole
  * title on hover and in the full list), and its assignee — who is out on it.
  *
+ * A phase whose walk waits on its designer's ruling (`ruling` is `asked`) says so in place of its
+ * assignee: the walk is not moving until he rules.
+ *
  * Used by `PlanFace`, under the track and its receipt.
  */
 export function PlanNow({ plan }: { plan: DispatcherPlan }) {
   const { t } = useTranslation();
   if (plan.status === 'complete') return null;
 
-  const running = plan.phases.filter((phase) => phase.status === 'running');
+  // A phase waiting on its designer's ruling is held mid-walk, so it keeps its line whatever its status column says.
+  const running = plan.phases.filter((phase) => phase.status === 'running' || phase.ruling === 'asked');
   const next = running.length === 0 ? plan.phases.find((phase) => phase.status === 'not started') ?? null : null;
   if (running.length === 0 && next === null) return null;
   const more = running.length - NOW_LIMIT;
@@ -75,9 +79,15 @@ function NowLine({ phase, lead }: { phase: DispatcherPhase; lead: string | null 
       <span className="min-w-0 flex-1 truncate text-sm text-foreground" title={phase.title}>{phase.title}</span>
       {/* The title is what is moving and the soul is secondary, so on a narrow card the soul's name
           gives way first: capped at a quarter of the line, and the one of the two that shrinks. */}
-      <span className="min-w-0 max-w-[25%] shrink truncate font-mono text-muted-foreground" title={phase.assignee}>
-        {phase.assignee}
-      </span>
+      {phase.ruling === 'asked' ? (
+        <Badge as="span" tone="warn" className="min-w-0 shrink truncate" data-now-ruling>
+          {t('dispatcher.now.ruling')}
+        </Badge>
+      ) : (
+        <span className="min-w-0 max-w-[25%] shrink truncate font-mono text-muted-foreground" title={phase.assignee}>
+          {phase.assignee}
+        </span>
+      )}
     </li>
   );
 }

@@ -1,8 +1,8 @@
-import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
-import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { FaceTrigger } from '@/modules/dispatcher/FaceTrigger';
+import { PlanDecided } from '@/modules/dispatcher/PlanDecided';
 import { PlanNow } from '@/modules/dispatcher/PlanNow';
 import { operatorWords } from '@/modules/dispatcher/operatorWords';
 import { currentPhaseKey, phaseWord } from '@/modules/dispatcher/phaseWord';
@@ -11,7 +11,7 @@ import { StatusFlow } from '@/modules/dispatcher/StatusFlow';
 import { clockOf, epochOf, phaseProgress, planStatusTone, scheduleClock } from '@/modules/dispatcher/dispatcherState';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useElapsed } from '@/shared/hooks/useElapsed';
-import { Badge, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/ui';
+import { Badge, Collapsible, CollapsibleContent } from '@/shared/ui';
 import type { DispatcherPlan, LaneFlowNode } from '@/shared/types';
 
 /**
@@ -83,6 +83,10 @@ export function PlanClock({ plan }: { plan: DispatcherPlan }) {
  * time, kind, phase, detail. It is where a relaunch or a held take-up is read in the dispatcher's
  * own words.
  *
+ * WHAT WAS DECIDED IN THE OPERATOR'S PLACE SITS ABOVE THE LOG (`PlanDecided`): the choices the
+ * builder, the designer or a rule took for him since he accepted, folded, and under them the gaps the
+ * feature finished with that are still being healed. A plan with neither draws nothing there.
+ *
  * Used by `PlanCard`, inside its card's body.
  */
 export function PlanFace({ plan }: { plan: DispatcherPlan }) {
@@ -153,6 +157,8 @@ export function PlanFace({ plan }: { plan: DispatcherPlan }) {
         </Collapsible>
       )}
 
+      <PlanDecided plan={plan} />
+
       <Collapsible className="min-w-0" data-dispatcher-events>
         <FaceTrigger>{t('dispatcher.events', { count: plan.events.length })}</FaceTrigger>
         <CollapsibleContent className="min-w-0">
@@ -166,15 +172,5 @@ export function PlanFace({ plan }: { plan: DispatcherPlan }) {
         </CollapsibleContent>
       </Collapsible>
     </div>
-  );
-}
-
-/** The face's two closed disclosures' trigger: its words, and a chevron that turns when it opens. */
-function FaceTrigger({ children }: { children: ReactNode }) {
-  return (
-    <CollapsibleTrigger className="group flex items-center gap-1 rounded-lg px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted finger:min-h-11">
-      <ChevronRight aria-hidden="true" className="size-3.5 flex-none group-data-[state=open]:rotate-90 motion-safe:transition-transform" />
-      {children}
-    </CollapsibleTrigger>
   );
 }

@@ -1645,6 +1645,7 @@
       "paused": "paused",
       "stalled": "stalled — its run ended",
       "starting": "starting",
+      "gaps": "finished with gaps — being healed",
       "shipped": "shipped {{date}}",
       "shippedUndated": "shipped"
     },
@@ -1969,7 +1970,8 @@
       "parked": "PARKED",
       "idle": "IDLE",
       "hidden": "HIDDEN",
-      "complete": "COMPLETE"
+      "complete": "COMPLETE",
+      "gaps": "FINISHED WITH GAPS"
     },
     "phase": {
       "running": "running",
@@ -2007,7 +2009,8 @@
     },
     "now": {
       "next": "Next",
-      "more": "+{{count}} more"
+      "more": "+{{count}} more",
+      "ruling": "waiting for the designer's ruling"
     },
     "rounds_one": "{{count}} round",
     "rounds": "{{count}} rounds",
