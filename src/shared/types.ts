@@ -4445,7 +4445,7 @@ export type StationNeedKind = Exclude<StationNeed['kind'], 'ask'> | StationAskKi
  * last chat (`chat`), the workspace's screens (`roadmap` is the `runner` view, `bugs` the `kanban` view, the others by their own ids)
  * and Settings, a door. The wheel draws each at a fixed bearing, so a place keeps its angle whatever else is there.
  */
-export type PlaceId = 'home' | 'station' | 'roadmap' | 'bugs' | 'chat' | 'rnd' | 'cerberus' | 'inbox' | 'api' | 'universe' | 'schedules' | 'settings';
+export type PlaceId = 'home' | 'station' | 'roadmap' | 'bugs' | 'chat' | 'rnd' | 'cerberus' | 'analytics' | 'inbox' | 'api' | 'universe' | 'schedules' | 'settings';
 
 /**
  * One place as the navigation lists it, resolved for the page on screen: its name (the chat's own title for `chat`), its glyph (which

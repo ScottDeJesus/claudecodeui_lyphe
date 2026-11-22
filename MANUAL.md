@@ -18168,7 +18168,7 @@ section: src/modules/analytics/ — the client frame: AnalyticsPanel, AnalyticsS
 | rail (`useWorkspaceViews.ts`) | `HOUSE_VIEWS` `{ id: 'analytics', group: 'house', icon: ChartLine, keywords: 'analytics stats statistics numbers code mode trends' }`, directly after Cerberus; ungated; label `tabs.analytics` = "Analytics" (en only: no other locale spells `tabs.schedules`) |
 | pane (`WorkspaceMain.tsx`) | `activeTab === 'analytics'` → `<div className="h-full overflow-hidden"><AnalyticsPanel /></div>`, after Cerberus, inside the file's `Suspense`, no gate |
 | palette | the plain view row "Go to Analytics" from `HOUSE_VIEWS` (not in `PLACE_VIEWS`, because it is not yet a place). The palette does not open from the landing page: a hand enters another view first |
-| wheel | NOT a place yet, pending a ruling: the outer ring's six bearings (`PlacesWheel.tsx` `SLOT`, `DESK_OUTER` covering 360°, `FAN_OUTER` filling the fan) are all held, so no `PlaceId`, `SCREEN_PLACES` row or `pick('analytics')` exists |
+| wheel | a place on the outer ring, slot 2 between Cerberus and Inbox (`PlacesWheel.tsx` `SLOT`; the ring holds eight, its bearings in MAN-10115): `PlaceId` `'analytics'`, its `SCREEN_PLACES` row and `pick('analytics')` in `PlacesContext.tsx`, wearing its view's ChartLine and `tabs.analytics` |
 | rail badge | none |
 | `CodeModeSection.tsx` | reads the real route through `useAnalyticsSection<CodeModeAnalytics>('code-mode', days, narrow)`; Refresh and Try again ask again |
 | the four parts | each toggle is held in the part's own state for the visit: Compare Median \| Total and All \| Each model; Causes a family's fold and Show all; Trend the measure, the kind and the day table's fold |
@@ -18201,7 +18201,7 @@ The R&D place: a panel of candidates (things the scout found) in four views, an 
 | `en/common.json` | the `rnd` block and `tabs.rnd`; English only, other languages fall back |
 
 ## on the wheel
-`'rnd'` is an `AppTab` and a `PlaceId`. `SCREEN_PLACES` and the places list (PlacesContext.tsx) put it first on the outer ring, before Cerberus; the rail's plans run carries it (FlaskConical, `tabs.rnd` "R&D"); it is in `VALID_TABS` and `PLACE_VIEWS`; `WorkspaceMain` renders `RndTab` ungated, in a Suspense, with the open project's path. PlacesWheel's outer ring holds seven: slots rnd 0, cerberus 1, inbox 2, api 3, universe 4, schedules 5, settings 6; bearings at the desk 0, 51.4, 102.9, 154.3, 205.7, 257.1, 308.6 (half 25.7), on the fan 0, 22.3, 44.6, 66.9, -66.9, -44.6, -22.3 (half 11.1).
+`'rnd'` is an `AppTab` and a `PlaceId`. `SCREEN_PLACES` and the places list (PlacesContext.tsx) put it first on the outer ring, before Cerberus; the rail's plans run carries it (FlaskConical, `tabs.rnd` "R&D"); it is in `VALID_TABS` and `PLACE_VIEWS`; `WorkspaceMain` renders `RndTab` ungated, in a Suspense, with the open project's path. PlacesWheel's outer ring holds eight: slots rnd 0, cerberus 1, analytics 2, inbox 3, api 4, universe 5, schedules 6, settings 7; bearings at the desk 0, 45, 90, 135, 180, 225, 270, 315 (half 22.5), on the fan 9.75, 29.25, 48.75, 68.25, -68.25, -48.75, -29.25, -9.75 (half 9.75).
 
 ## contracts the fill feeds
 - `busy`: `'scout'`, `'settings'` or a candidate's name.
