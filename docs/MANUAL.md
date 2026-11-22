@@ -10161,7 +10161,7 @@ Mount: `app.use('/api/agent-launch', authenticateToken, createAgentLaunchModule(
 | `PUT /api/agent-launch/defaults` | `{model?: string, effort?: {<model>: string\|null}, deepseek_effort?: string, dactyl_model?: string, dactyl_effort?: string, summarizer_model?: string, summarizer_effort?: string}`; at least one field | `defaults [--model M] [--effort <model>=<E\|none>]... [--deepseek-effort E] [--dactyl-model W] [--dactyl-effort E] [--summarizer-model W] [--summarizer-effort E]`; `null` → `none`; the dactyl's two and the summarizer's two cannot be cleared, and the CLI says so in a sentence |
 
 - A 200 body is the census the CLI printed, whole. A PUT answers the census read back AFTER the write, never the input (MAN-628).
-- `:name` matches `^(?:hunt\.)?[a-z][a-z0-9_]{0,63}$`: a soul's slug, `sorter`, `tweak`, or one of the five hunt rows `hunt.<kind>` (`security`, `behaviour`, `ui`, `data`, `code`). The census carries each hunt row (`kind: "hunt"`, its `soul`) and `choices.hunt_souls`. The routes check transport shape only; the vocabulary is Python's, so `PUT /rows/hermes` with `{"effort":"loud"}` answers 400 carrying the CLI's sentence.
+- `:name` matches `^(?:(?:hunt|rnd)\.)?[a-z][a-z0-9_]{0,63}$`: a soul's slug, `sorter`, `tweak`, one of the five hunt rows `hunt.<kind>` (`security`, `behaviour`, `ui`, `data`, `code`), or one of the two R&D rows `rnd.scout` and `rnd.spike`. The census carries each hunt row (`kind: "hunt"`, its `soul`) and `choices.hunt_souls`. The routes check transport shape only; the vocabulary is Python's, so `PUT /rows/hermes` with `{"effort":"loud"}` answers 400 carrying the CLI's sentence.
 
 | the CLI | reason | status | body |
 |---|---|---|---|

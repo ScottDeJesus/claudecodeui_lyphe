@@ -1,7 +1,8 @@
 // protects: src/modules/rnd/RndPanel.tsx, src/modules/rnd/RndFeed.tsx, src/modules/rnd/hooks/useRnd.ts, src/modules/rnd/index.ts, src/modules/project-workspace/places/PlacesWheel.tsx, src/modules/project-workspace/context/PlacesContext.tsx, src/modules/project-workspace/WorkspaceMain.tsx, server/modules/rnd/rnd.routes.ts
 // writes: none
 // The place joined to the relay, at phone width: Menu opens the wheel, R&D is turned to and picked, and the panel draws
-// Scout now and its four views counted from the standing GET /api/rnd answers (Verdicts is proved then adopted).
+// Scout now and its four views counted from the standing GET /api/rnd answers (Verdicts counts the proved alone, the yeses
+// waiting for Adopt; the adopted it lists are counted under their own rule — countOf, src/modules/rnd/rndWords.ts).
 import { api, withPage } from "../lib/app.mjs";
 import { broken, held, runCase } from "../lib/case.mjs";
 
@@ -39,7 +40,7 @@ runCase(async (t) => {
   const pic = await api("/api/rnd");
   if (pic.status !== 200 || !pic.json || !pic.json.standing) return broken("GET /api/rnd answered " + pic.status + ": " + String(pic.text || "").slice(0, 160));
   const s = pic.json.standing;
-  const want = [["Waiting", s.waiting], ["Spiking", s.spiking], ["Verdicts", s.proved + s.adopted], ["Rejected", s.rejected]];
+  const want = [["Waiting", s.waiting], ["Spiking", s.spiking], ["Verdicts", s.proved], ["Rejected", s.rejected]];
   const page = await withPage(t, { viewport: { width: 390, height: 844 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e.message).split("\n")[0]));

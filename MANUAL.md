@@ -359,7 +359,7 @@ Module internals of the `/api/agent-launch` relay. Its contract (routes, bodies,
 ## route checks — shape only
 | check | value |
 |---|---|
-| row name | `^(?:hunt\.)?[a-z][a-z0-9_]{0,63}$`; a shape, not a soul whitelist (`hunt.<kind>` names a hunt row) |
+| row name | `^(?:(?:hunt\|rnd)\.)?[a-z][a-z0-9_]{0,63}$`; a shape, not a soul whitelist (`hunt.<kind>` names a hunt row, `rnd.scout` / `rnd.spike` an R&D row) |
 | `soul` | a word (below), never `null`: a hunt's soul cannot be cleared; whether the row takes one is the CLI's to say |
 | word (`model`, `effort`, an `effort` map key, `deepseek_effort`, `dactyl_model`, `dactyl_effort`, `summarizer_model`, `summarizer_effort`) | `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`; a token fence, not the vocabulary — `-` first would read as a CLI flag; the dactyl's two and the summarizer's two have no `null` |
 | unknown body key | 400 |

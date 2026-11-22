@@ -19,6 +19,7 @@ const WHY = "No standing signal ties a query to its scan-to-return ratio here.";
 const QUESTION = "Does the ratio name one live query scanning 100 times what it returns?";
 const SOURCE_URL = "https://example.com/case/rnd-joined-line";
 const EVIDENCE = "Measured: the ranking named 2 queries over 100 to 1.";
+const GOAL = "Rank the live queries by rows scanned over rows returned.";
 
 function run(house, args, input) {
   const env = Object.assign({}, house.env);
@@ -82,14 +83,14 @@ runCase(async (t) => {
   fs.mkdirSync(dir, { recursive: true });
   const verdict = await run(house, ["rnd", "verdict", name, "yes", "--dir=" + dir, "--evidence", "-"], EVIDENCE + "\n");
   if (verdict.code !== 0 || verdict.out.indexOf("VERDICT candidate " + name + " — yes") === -1) return broken("rnd verdict " + name + " yes — " + said(verdict));
-  const adopted = await run(house, ["rnd", "adopt", name, "--arc", "case-epic", "--repo", house.repo]);
+  const adopted = await run(house, ["rnd", "adopt", name, "--arc", "case-epic", "--repo", house.repo, "--goal=" + GOAL]);
   const am = adopted.out.match(/^ADOPTED candidate (\S+) — idea (\S+) under /m);
-  if (adopted.code !== 0 || !am) return broken("rnd adopt " + name + " --arc case-epic did not print ADOPTED candidate … — idea <plan> under … — " + said(adopted));
+  if (adopted.code !== 0 || !am) return broken("rnd adopt " + name + " --arc case-epic --goal=<words> did not print ADOPTED candidate … — idea <plan> under … — " + said(adopted));
   const plan = am[2];
 
-  const plans = await rows(house, "SELECT p.name, p.state, p.title, a.name AS arc FROM plans p JOIN arcs a ON a.id = p.arc_id");
-  if (plans.length !== 1 || plans[0].name !== plan || plans[0].state !== "idea" || plans[0].arc !== "case-epic" || plans[0].title !== TITLE) {
-    wrong.push("the plans table holds " + JSON.stringify(plans) + ", not one idea " + plan + " titled as the candidate under case-epic");
+  const plans = await rows(house, "SELECT p.name, p.state, p.title, p.goal, a.name AS arc FROM plans p JOIN arcs a ON a.id = p.arc_id");
+  if (plans.length !== 1 || plans[0].name !== plan || plans[0].state !== "idea" || plans[0].arc !== "case-epic" || plans[0].title !== TITLE || String(plans[0].goal || "").trim() !== GOAL) {
+    wrong.push("the plans table holds " + JSON.stringify(plans) + ", not one idea " + plan + " titled as the candidate, goal his words, under case-epic");
   }
 
   const shown = json(await run(house, ["rnd", "show", "--json"]));
@@ -116,11 +117,11 @@ runCase(async (t) => {
   const brief = await designBrief(house, plan);
   if (brief.error) wrong.push(brief.error);
   else {
-    const want = ["From R&D: " + TITLE + " — " + SOURCE_URL, "What it is: " + WHAT, "Why it might help: " + WHY,
+    const want = [GOAL, "From R&D: " + TITLE + " — " + SOURCE_URL, "What it is: " + WHAT, "Why it might help: " + WHY,
       "Spike: " + QUESTION + " — yes, ", "Evidence: " + EVIDENCE, "Spike directory: " + dir];
     const missing = want.filter((line) => brief.text.indexOf(line) === -1);
     if (missing.length) wrong.push("the design brief " + brief.file + " lacks " + JSON.stringify(missing));
   }
   if (wrong.length) return broken(wrong.join("; "));
-  return held("filed " + name + ", spiked, proved and adopted as idea " + plan + " under case-epic; rnd show reads adopted/idea with standing adopted 1; roadmap show carries the idea, candidates 0/0/0/0 and the rnd show line; dispatcher design's brief carries the six R&D lines");
+  return held("filed " + name + ", spiked, proved and adopted as idea " + plan + " under case-epic; rnd show reads adopted/idea with standing adopted 1; roadmap show carries the idea, candidates 0/0/0/0 and the rnd show line; dispatcher design's brief carries his goal and the six R&D lines");
 });
