@@ -849,16 +849,19 @@ export const HOLDS_PLACES = { 'data-holds-places': '' } as const;
 
 /**
  * The row a page's head is drawn in: 12 px of air over a 36 px line at a desk, 4 px over a 28 px line under a finger, and 16 px (12
- * under a finger) in from each side, so the way back and the Menu stand on the same spot of every page. Its presses stand at its top
- * (`items-start`); what names the page sits between them (`HEAD_NAME`). The paddings are `!important` under a finger because
- * `pwa-header-safe` sets the top padding in plain CSS. Drawn by project-workspace's `ScreenHead` and `ChatHead`, the kanban module's
- * `BugHead`, and as the corner the sessions home (`WorkspaceHome`) and the station (`PlacesCorner`) keep the Menu in.
+ * under a finger) in from each side, so the way back and the Menu stand on the same spot of every page that fills the window. A page
+ * that is read draws the same row inside its frame instead (`ScreenHead`'s `framed`, `SCREEN_FRAME`), on the same spot of every such
+ * page. Its presses stand at its top (`items-start`); what names the page sits between them (`HEAD_NAME`). The paddings are
+ * `!important` under a finger because `pwa-header-safe` sets the top padding in plain CSS. Drawn by project-workspace's `ScreenHead`
+ * and `ChatHead`, the kanban module's `BugHead`, and as the corner the sessions home (`WorkspaceHome`) and the station
+ * (`PlacesCorner`) keep the Menu in.
  */
 export const HEAD_ROW = 'pwa-header-safe flex flex-none items-start gap-3 px-4 py-3 finger:gap-2 finger:px-3 finger:!pb-1 finger:!pt-1';
 
 /**
- * A press in a page's head, the way back or the Menu: 36 px at a desk; drawn 28 px under a finger and still caught at 44 there by a
- * transparent area grown 8 px past its box (the touch law's own way, which moves none of its neighbours). Used with `HEAD_ROW`.
+ * A press in a page's head, the way back or the Menu, or a mark-only press of the page's own drawn there (`HeadTools`: Cerberus's
+ * list switch, R&D's settings): 36 px at a desk; drawn 28 px under a finger and still caught at 44 there by a transparent area grown
+ * 8 px past its box (the touch law's own way, which moves none of its neighbours). Used with `HEAD_ROW`.
  */
 export const HEAD_PRESS = "relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']";
 
@@ -867,6 +870,25 @@ export const HEAD_PRESS = "relative size-9 flex-none finger:size-7 finger:before
  * taller (the Bugs view's picker) without moving the presses, which stand at the row's top. Used with `HEAD_ROW`.
  */
 export const HEAD_NAME = 'flex min-h-9 min-w-0 flex-1 items-center finger:min-h-7';
+
+/**
+ * A press with a word in a page's head, one of the page's own presses drawn there before the Menu (`HeadTools`): a press tall at a
+ * desk, its mark and its word; under a finger the head's square press (`HEAD_PRESS`: 28 px, caught at 44) with its mark alone, the
+ * word kept as its name in a `finger:sr-only` span. Used with the kit's Button at `size="sm"`, by the rnd module's `RndPanel` (Scout
+ * now) and the schedules module's `SchedulesPanel` (Refresh).
+ */
+export const HEAD_WORD_PRESS = "relative h-9 flex-none finger:size-7 finger:px-0 finger:before:absolute finger:before:-inset-2 finger:before:content-['']";
+
+/**
+ * THE FRAME OF A PAGE THAT IS READ: the one column a reading page's head and its blocks share, at most 80rem wide and in the middle
+ * of the window, the page's gutter inside it (16 px, 24 from `lg`). Its head stands over it (`ScreenHead`'s `framed`), so the way
+ * back stands over the page's first word and the Menu over its last press, and nothing is left at a corner of a wide window. Under
+ * 80rem it is the window. A scroller, or a rule meant to run from edge to edge, stays outside it and holds it, so the wheel scrolls
+ * anywhere on the page. Instruments that fill the window (the sky, the board, a terminal, the files) are not framed.
+ * Used by project-workspace's `ScreenHead` and by the pages `WorkspaceMain` frames: the rnd and schedules modules.
+ */
+export const SCREEN_FRAME = 'mx-auto w-full max-w-7xl px-4 lg:px-6';
+
 
 // ---------------------------
 

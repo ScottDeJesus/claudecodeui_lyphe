@@ -457,7 +457,6 @@
     "subtabsLabel": "API services"
   },
   "rnd": {
-    "title": "R&D",
     "mark": "{{count}} new or proved",
     "spikeNoProject": "Open a project first: a spike's chat opens in the project that is open.",
     "launchMissing": "The launch table has no rnd.scout or rnd.spike row yet.",

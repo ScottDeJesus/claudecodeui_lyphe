@@ -1,4 +1,4 @@
-import { CloudOff, Rss, Settings } from 'lucide-react';
+import { CloudOff, Rss, Settings, Telescope } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,11 +16,13 @@ import { useRndLaunch } from '@/modules/rnd/hooks/useRndLaunch';
 import { stampRndSeen } from '@/modules/rnd/hooks/useRndSeen';
 import { useRndWrites } from '@/modules/rnd/hooks/useRndWrites';
 import { sayWeekly } from '@/modules/rnd/weeklyWords';
+import { HEAD_PRESS, HEAD_WORD_PRESS, SCREEN_FRAME } from '@/shared/constants';
+import { HeadTools } from '@/shared/context/HeadToolsContext';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { RndCandidate } from '@/shared/rnd-types';
 import { Badge, Banner, Button, EmptyState, Rule, ScrollArea, SegmentedControl, SignalLoop, Spinner } from '@/shared/ui';
-import { formatRelativeTime } from '@/shared/utils';
+import { cn, formatRelativeTime } from '@/shared/utils';
 
 /** The question open over the open candidate. */
 type Asking = 'adopt' | 'reject';
@@ -30,9 +32,13 @@ type Asking = 'adopt' | 'reject';
  * stands: Waiting, Spiking, Verdicts and Rejected. Each view wears the number that waits on him. On Verdicts that is the yeses
  * not yet adopted; the adopted stand under them, parted by a rule with their own count, because they are done.
  *
- * THE HEAD IS THE SCOUT, QUIETLY: what it is doing or last did, when it next goes out by itself, Scout now and the settings.
- * While one is out the line wears the loop and Scout now waits; with no source to read it is held, and the empty view offers
- * the press that fixes it.
+ * THE HEAD IS THE SCOUT, QUIETLY: what it is doing or last did and when it next goes out by itself, in two lines over the views;
+ * Scout now and the settings stand in the screen's head, before the Menu (`HeadTools`), the place's only presses of its own. While
+ * one is out the line wears the loop and Scout now waits; with no source to read it is held, and the empty view offers the press
+ * that fixes it.
+ *
+ * IT IS READ IN THE PAGE'S FRAME (`SCREEN_FRAME`), under a head that keeps to it: at a wide desk the list stands at the frame's start,
+ * under the arrow, and the room beside it, to the frame's end, is where a row opens.
  *
  * THE VIEWS' SWITCH IS DRAWN ONCE, IN ONE OF TWO SPELLINGS. Four words and four count pills are wider than a phone, and a word cut
  * short is no label: under 640 px each count is said inside its word ("Waiting 6"), from there up it is the tray's own pill.
@@ -162,19 +168,29 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
 
   return (
     <div ref={roomRef} className="relative flex h-full min-h-0 flex-col" data-rnd-panel={failure === null ? 'ready' : 'stale'} data-rnd-view={view}>
-      <header className="flex-none px-4 pt-4 lg:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-foreground">{t('rnd.title')}</h2>
-          <div className="flex flex-none items-center gap-2">
-            <Button variant="outline" className="finger:h-11" busy={scout.out || busy === 'scout'} disabled={noSources} onClick={onScoutNow} data-rnd-act="scout">
-              {t('rnd.scout.now')}
-            </Button>
-            <Button variant="ghost" size="icon" className="finger:h-11 finger:w-11" aria-label={t('rnd.settingsOpen')} title={t('rnd.settingsOpen')} onClick={() => setSheetOpen(true)} data-rnd-settings="">
-              <Settings aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground" data-rnd-scout={scout.out ? 'out' : 'in'}>
+      {/* The place's own presses, in the screen's head before the Menu: Scout now (its word at a desk, its mark under a finger,
+          the word kept as its name) and the settings. */}
+      <HeadTools>
+        <Button
+          variant="outline"
+          size="sm"
+          className={HEAD_WORD_PRESS}
+          busy={scout.out || busy === 'scout'}
+          disabled={noSources}
+          onClick={onScoutNow}
+          title={t('rnd.scout.now')}
+          data-rnd-act="scout"
+        >
+          <Telescope aria-hidden="true" />
+          <span className="finger:sr-only">{t('rnd.scout.now')}</span>
+        </Button>
+        <Button variant="outline" size="icon" className={HEAD_PRESS} aria-label={t('rnd.settingsOpen')} title={t('rnd.settingsOpen')} onClick={() => setSheetOpen(true)} data-rnd-settings="">
+          <Settings aria-hidden="true" />
+        </Button>
+      </HeadTools>
+
+      <header className={cn(SCREEN_FRAME, 'flex-none pt-2 finger:pt-4')}>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground" data-rnd-scout={scout.out ? 'out' : 'in'}>
           {scout.out && <SignalLoop state="working" signal="secondary" />}
           {scout.trouble !== null && <Badge as="span" tone="warn">{scout.trouble}</Badge>}
           <span>{scout.line}</span>
@@ -183,7 +199,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
       </header>
 
       {(failure !== null || scoutRefusal !== null) && (
-        <div className="flex flex-none flex-col gap-2 px-4 pt-3 lg:px-6">
+        <div className={cn(SCREEN_FRAME, 'flex flex-none flex-col gap-2 pt-3')}>
           {failure !== null && (
             <Banner tone="warn" action={<Button variant="outline" size="sm" className="finger:h-11" onClick={onRetry}>{t('rnd.unreachable.retry')}</Button>}>
               {t('rnd.stale', { ago: formatRelativeTime(picture.generated_at), sentence: failure })}
@@ -193,7 +209,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
         </div>
       )}
 
-      <div className="flex-none px-4 pt-4 sm:hidden" data-rnd-views="narrow">
+      <div className={cn(SCREEN_FRAME, 'flex-none pt-4 sm:hidden')} data-rnd-views="narrow">
         <SegmentedControl
           label={t('rnd.views.label')}
           options={RND_VIEWS.map((value) => ({ value, label: t('rnd.views.counted', { view: t('rnd.views.' + value), n: countOf(picture, value) }) }))}
@@ -201,7 +217,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
           onChange={pickView}
         />
       </div>
-      <div className="hidden flex-none px-4 pt-4 sm:block lg:px-6" data-rnd-views="wide">
+      <div className={cn(SCREEN_FRAME, 'hidden flex-none pt-4 sm:block')} data-rnd-views="wide">
         <SegmentedControl
           label={t('rnd.views.label')}
           options={RND_VIEWS.map((value) => ({ value, label: t('rnd.views.' + value), count: countOf(picture, value) }))}
@@ -213,16 +229,20 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
       {rows.length === 0 ? (
         <div className="flex min-h-0 flex-1 items-center justify-center p-4">{empty}</div>
       ) : (
-        <ScrollArea className="min-h-0 flex-1 [container-type:inline-size]">
-          <div className="flex max-w-3xl flex-col px-1 pb-8 pt-2 lg:px-3 [@container(min-width:63rem)]:max-w-[min(48rem,calc(100%-33rem))]">
-            {lead.length > 0 && <ul aria-label={t('rnd.views.' + view)}>{lead.map(row)}</ul>}
-            {adopted.length > 0 && (
-              <>
-                {lead.length === 0 && <EmptyState size="sm" title={t('rnd.empty.noProved')} />}
-                <Rule id={adoptedId} className="px-3 pb-1 pt-6" end={adopted.length}>{t('rnd.word.adopted')}</Rule>
-                <ul aria-labelledby={adoptedId}>{adopted.map(row)}</ul>
-              </>
-            )}
+        <ScrollArea className="min-h-0 flex-1">
+          {/* The frame is the list's room: from 63rem of it the list keeps the plate's width free at the frame's end. The list
+              stands a row's inset out into the gutter, so a row's words start under the scout's line. */}
+          <div className={cn(SCREEN_FRAME, '[container-type:inline-size]')}>
+            <div className="-mx-3 flex max-w-3xl flex-col pb-8 pt-2 [@container(min-width:63rem)]:max-w-[min(48rem,calc(100%-33rem))]">
+              {lead.length > 0 && <ul aria-label={t('rnd.views.' + view)}>{lead.map(row)}</ul>}
+              {adopted.length > 0 && (
+                <>
+                  {lead.length === 0 && <EmptyState size="sm" title={t('rnd.empty.noProved')} />}
+                  <Rule id={adoptedId} className="px-3 pb-1 pt-6" end={adopted.length}>{t('rnd.word.adopted')}</Rule>
+                  <ul aria-labelledby={adoptedId}>{adopted.map(row)}</ul>
+                </>
+              )}
+            </div>
           </div>
         </ScrollArea>
       )}

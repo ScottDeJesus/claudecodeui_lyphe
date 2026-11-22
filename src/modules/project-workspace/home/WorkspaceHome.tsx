@@ -42,7 +42,8 @@ type WorkspaceHomeProps = {
  *   on the outer ring's band opens the account switcher; a long press brings up the wheel of places, held (`HOLDS_PLACES`).
  * - THE MENU, in the head's corner on the end side, is the one way to every other place (`PlacesMenu`): it brings up the wheel of places
  *   (the screens, the station, the last chat, Settings, and the applications' acts under it). It is the same press, in the same row
- *   (`HEAD_ROW`), that every screen's head and the station carry, so the way out of any page is on one spot.
+ *   (`HEAD_ROW`), that every screen's head and the station carry, so the way out of any page that fills the window is on one spot (a
+ *   page that is read keeps it at its frame's end).
  * - THE ROADMAP'S CIRCLE, at the head on the start side, over Kaylee's core: small until pressed, then the whole stack over the home (`RoadmapCircle`,
  *   which lies over the home's box and takes no press but the circle's while it is small).
  *

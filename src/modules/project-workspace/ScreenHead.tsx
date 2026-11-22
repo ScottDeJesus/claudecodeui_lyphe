@@ -3,23 +3,36 @@ import { useTranslation } from 'react-i18next';
 
 import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
 import { openHome, openStation } from '@/shared/cloudcliDoors';
-import { HEAD_NAME, HEAD_PRESS, HEAD_ROW, HOLDS_TRAIL } from '@/shared/constants';
+import { HEAD_NAME, HEAD_PRESS, HEAD_ROW, HOLDS_TRAIL, SCREEN_FRAME } from '@/shared/constants';
 import { useHeadBack } from '@/shared/context/HeadBackContext';
 import { HeadToolsPlace } from '@/shared/context/HeadToolsContext';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import { Button } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
+import { cn } from '@/shared/utils';
 
 type ScreenHeadProps = {
   /** The screen's name, as the wheel and the palette give it. */
   name: string;
+  /** A page that is read: the head stands over the page's frame (`SCREEN_FRAME`) instead of across the window. */
+  framed?: boolean;
 };
+
+/** A framed head is `HEAD_ROW` in two. This is its band, across the window: the row's air above and below, and no sides. */
+const FRAMED_BAND = 'pwa-header-safe flex-none py-3 finger:!pb-1 finger:!pt-1';
+/** And this its row, inside the page's frame: the row's presses and gaps, the frame's gutter for its sides. */
+const FRAMED_ROW = 'flex items-start gap-3 finger:gap-2 finger:px-3';
 
 /**
  * THE HEAD OF A SCREEN THAT HAS NONE OF ITS OWN, drawn as the chat's and the Bugs screen's are (`HEAD_ROW`): the way back at the
  * start, the screen's name, and the menu to every other place at the end. Nothing else of its own: what a screen shows and does is
  * the screen's, and a screen with a press for the head draws it into the head's place for one, just before the menu (`HeadTools`:
- * Cerberus's switch between its fleet's hoop and its list).
+ * Cerberus's switch between its fleet's hoop and its list, R&D's Scout now and its settings, the Schedules' Refresh).
+ *
+ * IT STANDS OVER WHAT IT HEADS. Over a page that is read (`framed`: R&D, Analytics, the Inbox and the rest `WorkspaceMain` names) it
+ * keeps to the page's frame, so at a wide desk the arrow stands over the page's first word and the Menu over its last press, never at
+ * the window's corners with the page between them. Over an instrument that fills the window (the sky, a terminal, the files) it runs
+ * the window's width, as the instrument does. Under 80rem the two are the same row.
  *
  * ONE WAY BACK PER SCREEN. The arrow goes to Kaylee Station when the screen was reached from there, else the sessions home; but while
  * a page inside the screen stands (a carrier's pages, a bulletin's page, a tour, a panorama) that page claims it (`useHeadBack`): the
@@ -33,7 +46,7 @@ type ScreenHeadProps = {
  * Drawn by `WorkspaceMain` over every view but the chat and the Bugs view, which carry heads of their own (`ChatHead`, the kanban
  * module's `BugHead`).
  */
-export function ScreenHead({ name }: ScreenHeadProps) {
+export function ScreenHead({ name, framed = false }: ScreenHeadProps) {
   const { t } = useTranslation();
   const doors = useStationDoors();
   const claim = useHeadBack();
@@ -42,8 +55,8 @@ export function ScreenHead({ name }: ScreenHeadProps) {
   const eyebrow = claim === null ? null : [name, ...(claim.within ?? [])].join(' · ');
   const title = claim?.title ?? name;
 
-  return (
-    <header data-screen-head="" className={HEAD_ROW}>
+  const row = (
+    <>
       <Button
         data-screen-head-back=""
         {...WAY_BACK}
@@ -75,6 +88,16 @@ export function ScreenHead({ name }: ScreenHeadProps) {
       </div>
       <HeadToolsPlace />
       <PlacesMenu />
+    </>
+  );
+
+  return framed ? (
+    <header data-screen-head="" data-screen-head-framed="" className={FRAMED_BAND}>
+      <div className={cn(SCREEN_FRAME, FRAMED_ROW)}>{row}</div>
+    </header>
+  ) : (
+    <header data-screen-head="" className={HEAD_ROW}>
+      {row}
     </header>
   );
 }

@@ -26,7 +26,8 @@ type BugHeadProps = {
  * picker (the old header's switcher, under the same name, with New board under its list), the two on one line. At the end the menu to
  * every other place, and before it, on the faces that show the instrument, the switch between its hoop and its list (`view`). Nothing
  * else: what the board is doing is its instrument's to say, and everything that sets the board up is behind its core. It is drawn in
- * every screen's head row (`HEAD_ROW`), so its arrow and its menu stand on the same spot as on every page.
+ * every screen's head row (`HEAD_ROW`), the window's width as the board is, so its arrow and its menu stand on the same spot as on every
+ * page that fills the window.
  *
  * It stands in place of the sidebar, the rail and the phone's strip while the Bugs view is on screen (`WorkspaceMain` and
  * `ProjectSidebarRegion` leave them out). Drawn by the panel (`KanbanPanel`).
