@@ -872,6 +872,20 @@ export const HEAD_PRESS = "relative size-9 flex-none finger:size-7 finger:before
 export const HEAD_NAME = 'flex min-h-9 min-w-0 flex-1 items-center finger:min-h-7';
 
 /**
+ * A framed head's band (`HEAD_ROW` in two, for a page that is read): the row's air above and below, across the window, and no sides.
+ * Its row stands inside it in the page's frame (`HEAD_FRAMED_ROW` with `SCREEN_FRAME`). Used by project-workspace's `ScreenHead` (its
+ * `framed`) and the kanban module's `BugHead`.
+ */
+export const HEAD_BAND = 'pwa-header-safe flex-none py-3 finger:!pb-1 finger:!pt-1';
+
+/**
+ * A framed head's row, inside its band (`HEAD_BAND`) and drawn with the page's frame (`SCREEN_FRAME`), which gives it its sides: the
+ * row's presses and gaps, and under a finger its 12 px in from each side. Used by project-workspace's `ScreenHead` and the kanban
+ * module's `BugHead`.
+ */
+export const HEAD_FRAMED_ROW = 'flex items-start gap-3 finger:gap-2 finger:px-3';
+
+/**
  * A press with a word in a page's head, one of the page's own presses drawn there before the Menu (`HeadTools`): a press tall at a
  * desk, its mark and its word; under a finger the head's square press (`HEAD_PRESS`: 28 px, caught at 44) with its mark alone, the
  * word kept as its name in a `finger:sr-only` span. Used with the kit's Button at `size="sm"`, by the rnd module's `RndPanel` (Scout
@@ -879,16 +893,29 @@ export const HEAD_NAME = 'flex min-h-9 min-w-0 flex-1 items-center finger:min-h-
  */
 export const HEAD_WORD_PRESS = "relative h-9 flex-none finger:size-7 finger:px-0 finger:before:absolute finger:before:-inset-2 finger:before:content-['']";
 
+// ---------------------------
+
+//----------------- THE FRAME OF A PAGE ------------
+
 /**
  * THE FRAME OF A PAGE THAT IS READ: the one column a reading page's head and its blocks share, at most 80rem wide and in the middle
  * of the window, the page's gutter inside it (16 px, 24 from `lg`). Its head stands over it (`ScreenHead`'s `framed`), so the way
  * back stands over the page's first word and the Menu over its last press, and nothing is left at a corner of a wide window. Under
  * 80rem it is the window. A scroller, or a rule meant to run from edge to edge, stays outside it and holds it, so the wheel scrolls
- * anywhere on the page. Instruments that fill the window (the sky, the board, a terminal, the files) are not framed.
- * Used by project-workspace's `ScreenHead` and by the pages `WorkspaceMain` frames: the rnd and schedules modules.
+ * anywhere on the page. Instruments that fill the window (the sky, a terminal, the files, the chat's desk) are not framed.
+ * Used by project-workspace's `ScreenHead` and by the pages `WorkspaceMain` frames: the rnd, analytics, schedules, api-tab, jev,
+ * deepseek-spend, inbox, memory-intake, heal, dispatcher (`WaitingAsks`), notes, roadmap, runner-tab and cerberus modules; and by the
+ * kanban module, whose Bugs view draws its own head (`BugHead`), its dashboard and its foot in it.
  */
 export const SCREEN_FRAME = 'mx-auto w-full max-w-7xl px-4 lg:px-6';
 
+/**
+ * THE INBOX'S MEASURE: the column a stack of short cards is read in (42rem), inside the page's frame (`SCREEN_FRAME`) at its start, so
+ * the cards start under the section's name and a card's line never runs the frame's whole width. One measure for the sections that are
+ * stacks, so flipping between them keeps the cards where the eye left them. Used by the memory-intake module's `MemoryIntakePanel` and
+ * `LessonReviewList` (the Inbox's Memory) and the dispatcher module's `WaitingAsks` (its Roadmap).
+ */
+export const INBOX_MEASURE = 'w-full max-w-2xl';
 
 // ---------------------------
 

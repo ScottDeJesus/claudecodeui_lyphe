@@ -11,8 +11,10 @@ import { HealRuleList } from '@/modules/heal/HealRuleList';
 import { HealSettingsDialog } from '@/modules/heal/HealSettingsDialog';
 import { useHeal } from '@/modules/heal/context/HealContext';
 import type { HealPillKey } from '@/modules/heal/healTypes';
+import { SCREEN_FRAME } from '@/shared/constants';
 import type { ProjectChoice } from '@/shared/types';
 import { Badge, Button, EmptyState, ScrollArea, Spinner, Tooltip } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /**
  * Where each pill carries the reader: the section its number counted, or — for the two pills that
@@ -88,28 +90,31 @@ export function HealPanel({ projectChoices }: { projectChoices: readonly Project
 
   return (
     <div className="flex h-full flex-col [container-type:inline-size]" data-heal-panel>
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
-          <HeartPulseIcon className="h-4 w-4" aria-hidden="true" />
-        </span>
-        <h2 className="text-sm font-medium">{t('heal.title', { defaultValue: 'Heal' })}</h2>
-        {/* The cog and nothing else: the verbs live in the toolbar under this line. Disabled until the
-            ledger answers, since the dialog draws the switches the summary read. */}
-        <div className="ml-auto">
-          <Tooltip content={settingsLabel} position="bottom">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              aria-label={settingsLabel}
-              aria-haspopup="dialog"
-              disabled={state.phase !== 'ready'}
-              onClick={() => setSettingsOpen(true)}
-              data-heal-settings-cog
-            >
-              <SettingsIcon aria-hidden="true" />
-            </Button>
-          </Tooltip>
+      {/* The rule runs the window's width; the section's name and its cog keep to the page's frame (`SCREEN_FRAME`). */}
+      <header className="shrink-0 border-b border-border">
+        <div className={cn(SCREEN_FRAME, 'flex h-12 items-center gap-2')}>
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
+            <HeartPulseIcon className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <h2 className="text-sm font-medium">{t('heal.title', { defaultValue: 'Heal' })}</h2>
+          {/* The cog and nothing else: the verbs live in the toolbar under this line. Disabled until the
+              ledger answers, since the dialog draws the switches the summary read. */}
+          <div className="-mr-2 ml-auto">
+            <Tooltip content={settingsLabel} position="bottom">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                aria-label={settingsLabel}
+                aria-haspopup="dialog"
+                disabled={state.phase !== 'ready'}
+                onClick={() => setSettingsOpen(true)}
+                data-heal-settings-cog
+              >
+                <SettingsIcon aria-hidden="true" />
+              </Button>
+            </Tooltip>
+          </div>
         </div>
       </header>
 
@@ -133,7 +138,10 @@ export function HealPanel({ projectChoices }: { projectChoices: readonly Project
           {/* One scroll on a narrow panel; on a wide one the grid fills it exactly and each column scrolls itself. */}
           <ScrollArea className="min-h-0 flex-1">
             <div
-              className="flex w-full min-w-0 flex-col gap-6 px-4 py-5 [@container(min-width:48rem)]:grid [@container(min-width:48rem)]:h-full [@container(min-width:48rem)]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] [@container(min-width:48rem)]:grid-rows-[auto_minmax(0,1fr)] [@container(min-width:48rem)]:gap-x-8 [@container(min-width:48rem)]:gap-y-5 [@container(min-width:48rem)]:px-6"
+              className={cn(
+                SCREEN_FRAME,
+                'flex min-w-0 flex-col gap-6 py-5 [@container(min-width:48rem)]:grid [@container(min-width:48rem)]:h-full [@container(min-width:48rem)]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] [@container(min-width:48rem)]:grid-rows-[auto_minmax(0,1fr)] [@container(min-width:48rem)]:gap-x-8 [@container(min-width:48rem)]:gap-y-5',
+              )}
               data-heal-body
             >
               <div className="[@container(min-width:48rem)]:col-span-2">

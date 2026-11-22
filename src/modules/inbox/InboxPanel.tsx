@@ -5,9 +5,11 @@ import { WaitingAsks } from '@/modules/dispatcher';
 import { HealPanel } from '@/modules/heal';
 import { useInboxWaiting } from '@/modules/inbox/hooks/useInboxWaiting';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
+import { SCREEN_FRAME } from '@/shared/constants';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import type { ProjectChoice } from '@/shared/types';
 import { Spinner, Tabs } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /** The Inbox's three sections in the operator's order — the strip draws them so, and the entry rule walks them so — each with the key of its word. */
 const SECTIONS = [
@@ -122,22 +124,25 @@ export default function InboxPanel({ projectChoices }: { projectChoices: readonl
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background" data-inbox-panel={section ?? 'deciding'}>
-      <div className="flex shrink-0 items-center border-b border-border px-3 py-2.5 md:px-4">
-        <Tabs
-          ariaLabel={t('inbox.sections.label')}
-          tabs={SECTIONS.map((entry) => ({
-            id: entry.id,
-            label: t(entry.wordKey),
-            // No pill at zero: an empty section is quiet, never a 0 to read past.
-            count: counts[entry.id] > 0 ? counts[entry.id] : undefined,
-            // The same count in words, for the reader the pill is hidden from; it is the same amber as the tone.
-            attention: counts[entry.id] > 0 ? t('inbox.sections.waiting', { count: counts[entry.id] }) : undefined,
-            tone: 'warn' as const,
-          }))}
-          active={section ?? ''}
-          onChange={pick}
-          equal={isMobile}
-        />
+      {/* The strip's rule runs the window's width; its tabs keep to the page's frame, under the head that does. */}
+      <div className="shrink-0 border-b border-border">
+        <div className={cn(SCREEN_FRAME, 'flex items-center py-2.5')}>
+          <Tabs
+            ariaLabel={t('inbox.sections.label')}
+            tabs={SECTIONS.map((entry) => ({
+              id: entry.id,
+              label: t(entry.wordKey),
+              // No pill at zero: an empty section is quiet, never a 0 to read past.
+              count: counts[entry.id] > 0 ? counts[entry.id] : undefined,
+              // The same count in words, for the reader the pill is hidden from; it is the same amber as the tone.
+              attention: counts[entry.id] > 0 ? t('inbox.sections.waiting', { count: counts[entry.id] }) : undefined,
+              tone: 'warn' as const,
+            }))}
+            active={section ?? ''}
+            onChange={pick}
+            equal={isMobile}
+          />
+        </div>
       </div>
 
       <div role="tabpanel" aria-label={shown === undefined ? undefined : t(shown.wordKey)} aria-busy={section === null} className="min-h-0 flex-1">

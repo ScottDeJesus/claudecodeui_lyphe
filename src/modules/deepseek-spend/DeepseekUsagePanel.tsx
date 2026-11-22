@@ -10,8 +10,10 @@ import { DeepseekSwitches } from '@/modules/deepseek-spend/DeepseekSwitches';
 import { DeepseekWhere } from '@/modules/deepseek-spend/DeepseekWhere';
 import { useDeepseekUsage } from '@/modules/deepseek-spend/useDeepseekUsage';
 import { JevSection } from '@/modules/jev';
+import { SCREEN_FRAME } from '@/shared/constants';
 import type { DeepseekRange } from '@/shared/types';
 import { Banner, Button, DeepSeekLogo, EmptyState, ScrollArea, Spinner, Tooltip } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /**
  * The DeepSeek view of the API tab: what the house spends on DeepSeek, who spends it, where it goes,
@@ -39,25 +41,28 @@ export function DeepseekUsagePanel() {
 
   return (
     <div className="flex h-full flex-col [container-type:inline-size]" data-deepseek-usage>
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10">
-          <DeepSeekLogo className="h-4 w-4" />
-        </span>
-        <h2 className="text-sm font-medium">{t('deepseekUsage.title')}</h2>
-        <div className="ml-auto">
-          <Tooltip content={refreshLabel} position="bottom">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              aria-label={refreshLabel}
-              disabled={loading}
-              onClick={onRefresh}
-              data-deepseek-refresh
-            >
-              <RefreshCwIcon aria-hidden="true" />
-            </Button>
-          </Tooltip>
+      {/* The rules run the window's width; what stands between them keeps to the page's frame (`SCREEN_FRAME`), under its head. */}
+      <header className="shrink-0 border-b border-border">
+        <div className={cn(SCREEN_FRAME, 'flex h-12 items-center gap-2')}>
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10">
+            <DeepSeekLogo className="h-4 w-4" />
+          </span>
+          <h2 className="text-sm font-medium">{t('deepseekUsage.title')}</h2>
+          <div className="-mr-2 ml-auto">
+            <Tooltip content={refreshLabel} position="bottom">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                aria-label={refreshLabel}
+                disabled={loading}
+                onClick={onRefresh}
+                data-deepseek-refresh
+              >
+                <RefreshCwIcon aria-hidden="true" />
+              </Button>
+            </Tooltip>
+          </div>
         </div>
       </header>
 
@@ -77,8 +82,9 @@ export function DeepseekUsagePanel() {
         </div>
       ) : (
         <ScrollArea className="min-h-0 flex-1">
-          {error && <Banner tone="warn">{error}</Banner>}
-          <div className="flex w-full min-w-0 flex-col gap-8 px-4 py-5 [@container(min-width:48rem)]:px-6" data-deepseek-body>
+          <div className={cn(SCREEN_FRAME, 'flex min-w-0 flex-col gap-8 py-5')} data-deepseek-body>
+            {/* A poll that failed after a good read: said over the last summary, in the frame with it. */}
+            {error && <Banner tone="warn">{error}</Banner>}
             {!data.ledger.present ? (
               <EmptyState title={t('deepseekUsage.empty.title')} message={t('deepseekUsage.empty.message')} />
             ) : (

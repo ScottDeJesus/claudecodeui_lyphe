@@ -77,10 +77,13 @@ const MAX_PREVIEW_READS = 64;
 const MAX_PREVIEW_CACHE_BYTES = 150 * 1024 * 1024;
 
 /**
- * The pages that are read, whose head keeps to the page's frame (`ScreenHead`'s `framed`) as their blocks do (`SCREEN_FRAME`): R&D's
- * list and the Schedules' table. The rest run the window's width.
+ * The pages that are read, whose head keeps to the page's frame (`ScreenHead`'s `framed`) as their blocks do (`SCREEN_FRAME`): lists,
+ * tables and dashboards. Roadmap is one for its In flight; its tree and its ring stand in the middle of the window under the same head.
+ * Cerberus is one for its six faces of words; its fleet's hoop stands in the middle too. Bugs is not listed because it draws its own head
+ * (`BugHead`), which keeps to the same frame. The rest fill the window: the sky, the files, the terminal, git, the browser, the tasks and
+ * a plugin's own pane.
  */
-const FRAMED_VIEWS: ReadonlySet<AppTab> = new Set<AppTab>(['rnd', 'schedules']);
+const FRAMED_VIEWS: ReadonlySet<AppTab> = new Set<AppTab>(['rnd', 'analytics', 'schedules', 'api', 'inbox', 'notes', 'runner', 'cerberus']);
 
 /**
  * A response's body, refused once it passes `cap` bytes. For a response with no `Content-Length` —

@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next';
 
 import type { KanbanBoard } from '@/shared/kanban-types';
 import { openHome, openStation } from '@/shared/cloudcliDoors';
-import { HEAD_NAME, HEAD_PRESS, HEAD_ROW, HOLDS_TRAIL } from '@/shared/constants';
+import { HEAD_BAND, HEAD_FRAMED_ROW, HEAD_NAME, HEAD_PRESS, HOLDS_TRAIL, SCREEN_FRAME } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import { Button, Select } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
+import { cn } from '@/shared/utils';
 
 type BugHeadProps = {
   boards: KanbanBoard[];
@@ -26,8 +27,9 @@ type BugHeadProps = {
  * picker (the old header's switcher, under the same name, with New board under its list), the two on one line. At the end the menu to
  * every other place, and before it, on the faces that show the instrument, the switch between its hoop and its list (`view`). Nothing
  * else: what the board is doing is its instrument's to say, and everything that sets the board up is behind its core. It is drawn in
- * every screen's head row (`HEAD_ROW`), the window's width as the board is, so its arrow and its menu stand on the same spot as on every
- * page that fills the window.
+ * every screen's head row, kept to the page's frame as Cerberus's is (`HEAD_BAND`, `HEAD_FRAMED_ROW`, `SCREEN_FRAME`): the board's hoop
+ * and its dashboard stand in the middle of the window, so at a wide desk its arrow and its menu stand over them, on the same spots as
+ * on every page that is read, never at the window's corners.
  *
  * It stands in place of the sidebar, the rail and the phone's strip while the Bugs view is on screen (`WorkspaceMain` and
  * `ProjectSidebarRegion` leave them out). Drawn by the panel (`KanbanPanel`).
@@ -39,38 +41,40 @@ export function BugHead({ boards, currentBoardId, onSelectBoard, onNewBoard, vie
   const back = toStation ? t('station.title', { defaultValue: 'Kaylee Station' }) : t('home.title', { defaultValue: 'Home' });
 
   return (
-    <header data-bug-head="" className={HEAD_ROW}>
-      <Button
-        data-bug-head-back=""
-        {...WAY_BACK}
-        {...HOLDS_TRAIL}
-        variant="outline"
-        size="icon"
-        className={HEAD_PRESS}
-        aria-label={back}
-        title={back}
-        onClick={() => (doors.cameFrom() === 'station' ? openStation(doors.navigate) : openHome(doors.navigate))}
-      >
-        <ArrowLeft aria-hidden="true" />
-      </Button>
-      <div className={`${HEAD_NAME} gap-2.5`}>
-        <p className="shrink-0 font-mono text-[10px] font-medium uppercase leading-[14px] tracking-[0.18em] text-muted-foreground">
-          {t('kanban.ring.eyebrow', { defaultValue: 'Bugs' })}
-        </p>
-        <div className="w-full min-w-0 max-w-64">
-          <Select
-            options={boards.map((board) => ({ value: board.id, label: board.name }))}
-            value={currentBoardId ?? ''}
-            onChange={onSelectBoard}
-            placeholder={t('kanban.board.noBoard')}
-            ariaLabel={t('kanban.board.switcher')}
-            size="sm"
-            action={{ label: t('kanban.board.newBoard'), onSelect: onNewBoard }}
-          />
+    <header data-bug-head="" className={HEAD_BAND}>
+      <div className={cn(SCREEN_FRAME, HEAD_FRAMED_ROW)}>
+        <Button
+          data-bug-head-back=""
+          {...WAY_BACK}
+          {...HOLDS_TRAIL}
+          variant="outline"
+          size="icon"
+          className={HEAD_PRESS}
+          aria-label={back}
+          title={back}
+          onClick={() => (doors.cameFrom() === 'station' ? openStation(doors.navigate) : openHome(doors.navigate))}
+        >
+          <ArrowLeft aria-hidden="true" />
+        </Button>
+        <div className={`${HEAD_NAME} gap-2.5`}>
+          <p className="shrink-0 font-mono text-[10px] font-medium uppercase leading-[14px] tracking-[0.18em] text-muted-foreground">
+            {t('kanban.ring.eyebrow', { defaultValue: 'Bugs' })}
+          </p>
+          <div className="w-full min-w-0 max-w-64">
+            <Select
+              options={boards.map((board) => ({ value: board.id, label: board.name }))}
+              value={currentBoardId ?? ''}
+              onChange={onSelectBoard}
+              placeholder={t('kanban.board.noBoard')}
+              ariaLabel={t('kanban.board.switcher')}
+              size="sm"
+              action={{ label: t('kanban.board.newBoard'), onSelect: onNewBoard }}
+            />
+          </div>
         </div>
+        {view}
+        {menu}
       </div>
-      {view}
-      {menu}
     </header>
   );
 }

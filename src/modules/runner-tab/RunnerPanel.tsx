@@ -19,7 +19,7 @@ import {
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import { useQueueLineSort } from '@/modules/runner-tab/hooks/useQueueLineSort';
-import { LANE_WALL_GRID } from '@/shared/constants';
+import { LANE_WALL_GRID, SCREEN_FRAME } from '@/shared/constants';
 import { Badge, Button, EmptyState, ScrollArea } from '@/shared/ui';
 import { useSortable } from '@/shared/ui/sortable/useSortable';
 import { cn } from '@/shared/utils';
@@ -208,43 +208,45 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
   return (
     // `tabIndex={-1}`: the last place a press that emptied the board hands the keyboard (`landFocusInHome`).
     <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col outline-none" data-runner-panel>
-      {/* The header spans the pane, inset as the wall under it is, so the icon stands over the
-          wall's left edge and `Dismiss done · N` over its right. Its first row is the title, the
-          count and `Dismiss done · N`; its second is the master controller on a
+      {/* The header's rule spans the pane; what stands on it keeps to the page's frame (`SCREEN_FRAME`), as the wall under
+          it does, so the icon stands over the wall's left edge and `Dismiss done · N` over its right. Its first row is the
+          title, the count and `Dismiss done · N`; its second is the master controller on a
           line of its own (`basis-full`), which is why `Dismiss done` comes BEFORE it in the markup — a
           full-width row pushes whatever follows it under, and the button belongs at the title's row
           end. The rows stand 12px apart (`gap-y-3`) so the 36px press never touches the controller's
           dropdowns under it. */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-3 border-b border-border px-4 py-3 lg:px-6">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
-          <ActivityIcon className="h-4 w-4" aria-hidden="true" />
-        </span>
-        <h2 className="text-sm font-medium">{t('runner.title')}</h2>
-        {/* No badge at zero: the EmptyState below already says "nothing", and a "0" over it would
-            say it a second time in a shape that reads like a count worth checking. */}
-        {count > 0 && <Badge tone="neutral">{count}</Badge>}
-        {/* Every drawn plan that is done, off the board in ONE write, with nothing added to
-            `Hidden`. Not drawn when none is, so the button never offers to dismiss nothing. No
-            dialog: it deletes nothing, and the dispatcher keeps every plan. `-my-1` lets the 36px
-            button sit in the row's 28px line, so the header keeps one height whether or not it is
-            drawn. */}
-        {done && (
-          <Button variant="secondary" size="sm" className="-my-1 ml-auto" onClick={() => dismissDone(done.dismiss)} data-dismiss-done>
-            {t('dispatcher.dismissDone', { count: done.count })}
-          </Button>
-        )}
-        {/* THE MASTER CONTROLLER, the header's second row: the Claude · DeepSeek house switch,
-            the board's one Start (only while a plan waits for it), Pause all and the running readout —
-            drawn only when the frame states a census. Whole controls wrap onto further lines when a
-            phone-wide header has no room. */}
-        <MasterController className="basis-full" />
+      <div className="border-b border-border">
+        <div className={cn(SCREEN_FRAME, 'flex flex-wrap items-center gap-x-2 gap-y-3 py-3')}>
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
+            <ActivityIcon className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <h2 className="text-sm font-medium">{t('runner.title')}</h2>
+          {/* No badge at zero: the EmptyState below already says "nothing", and a "0" over it would
+              say it a second time in a shape that reads like a count worth checking. */}
+          {count > 0 && <Badge tone="neutral">{count}</Badge>}
+          {/* Every drawn plan that is done, off the board in ONE write, with nothing added to
+              `Hidden`. Not drawn when none is, so the button never offers to dismiss nothing. No
+              dialog: it deletes nothing, and the dispatcher keeps every plan. `-my-1` lets the 36px
+              button sit in the row's 28px line, so the header keeps one height whether or not it is
+              drawn. */}
+          {done && (
+            <Button variant="secondary" size="sm" className="-my-1 ml-auto" onClick={() => dismissDone(done.dismiss)} data-dismiss-done>
+              {t('dispatcher.dismissDone', { count: done.count })}
+            </Button>
+          )}
+          {/* THE MASTER CONTROLLER, the header's second row: the Claude · DeepSeek house switch,
+              the board's one Start (only while a plan waits for it), Pause all and the running readout —
+              drawn only when the frame states a census. Whole controls wrap onto further lines when a
+              phone-wide header has no room. */}
+          <MasterController className="basis-full" />
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
-        {/* THE PANE: the full width, one inset for everything in it, top to bottom — the Planning card,
+        {/* THE PANE: the page's frame, one inset for everything in it, top to bottom — the Planning card,
             the arc decks one under another (each paging its own plans in its own strip), the plans of no
             arc in the wall's grid, and the way back from a Hide. */}
-        <div className="flex min-w-0 flex-col gap-6 px-4 py-5 lg:px-6">
+        <div className={cn(SCREEN_FRAME, 'flex min-w-0 flex-col gap-6 py-5')}>
           <div className="min-w-0 max-w-3xl">
             <PlanningCard />
           </div>

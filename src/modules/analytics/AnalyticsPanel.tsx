@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 
 import { ANALYTICS_SECTIONS } from '@/modules/analytics/sections/registry';
 import type { AnalyticsChoice } from '@/modules/analytics/types';
+import { SCREEN_FRAME } from '@/shared/constants';
 import { Rule, SegmentedControl, Spinner } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /**
  * THE ANALYTICS AREA'S PANE: the house's numbers, one section at a time.
@@ -51,7 +53,8 @@ export function AnalyticsPanel() {
 
   return (
     <section className="h-full overflow-y-auto" aria-labelledby={titleId} data-analytics-panel={chosen.id}>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 lg:p-6">
+      {/* The page's frame, the one its head keeps to: at a wide desk the dashboard is as wide as the head over it. */}
+      <div className={cn(SCREEN_FRAME, 'flex flex-col gap-4 pb-6 pt-2 finger:pt-4')}>
         <header className="flex flex-col gap-3">
           <Rule level={2} id={titleId}>
             {t('analytics.title')}

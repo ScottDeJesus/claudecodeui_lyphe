@@ -3,6 +3,7 @@ import { useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLessonReview, type LessonBody } from '@/modules/memory-intake/hooks/useLessonReview';
+import { INBOX_MEASURE } from '@/shared/constants';
 import type { KanbanLessonLean } from '@/shared/kanban-types';
 import { Badge, Button, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -42,9 +43,9 @@ export function LessonReviewList() {
   const onReject = (lessonId: string): void => { void review(lessonId, false); };
 
   return (
-    // The memory queue's own column — `max-w-2xl`, centred, `px-4` — so the two sections share one
-    // left edge. The rule above the heading is the whole separation between them.
-    <section aria-labelledby={headingId} className="mx-auto w-full max-w-2xl px-4 pb-6" data-lesson-review>
+    // The memory queue's own column (`INBOX_MEASURE`), in the frame its panel holds it in, so the two
+    // sections share one left edge. The rule above the heading is the whole separation between them.
+    <section aria-labelledby={headingId} className={cn(INBOX_MEASURE, 'pb-6')} data-lesson-review>
       <div className="flex items-center gap-2 border-t border-border pt-5">
         <LightbulbIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <h3 id={headingId} className="text-sm font-medium">
