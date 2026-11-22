@@ -19,6 +19,7 @@ The wire shapes live in `server/shared/analytics-types.ts` and its field-for-fie
 `src/shared/analytics-types.ts` (both listed in `.oxlintrc.json` beside `app-types.ts`): the envelope
 `AnalyticsSectionList` / `AnalyticsAnswer<T>`, and `CodeModeAnalytics` with its rows `CodeModeFigures`,
 `CodeModeGroup`, `CodeModeDay`, `CodeModeCause`, `CodeModeKind` — key for key as the verb prints them
+(`CodeModeFigures` ends `failed`, `declined`, `resent`, `saves_skipped`: automatic saves the house refused)
 (snake_case kept; "all" is null, never ""), and `faults` as `CodeModeFaultTotals` = `{ total, by_fault: { <fault>: count } }`.
 
 **Adding a section (server half).** (1) Write `sections/<id>.ts`: a reader `(days) => Promise<data>` that calls

@@ -66,7 +66,7 @@ type OpeningProps = {
  *
  * Used by the kanban module's bug board (`KanbanPanel`, `KanbanCardDrawer`, `ProposedFeatures`: a bug, a proposal, the board and a run's
  * further things), the cerberus module's `CerberusPanel` (a machine, the fleet and a run's further machines) and project-workspace's
- * `PlaceTrail`.
+ * `PlaceTrail`, and the rnd module's `CandidateOpening` (a candidate, hung from its row).
  */
 export function Opening({ open, anchor, onClose, backLabel, source, title, name, status, width, side, avoid, marks, children }: OpeningProps) {
   const rootRef = useRef<HTMLDivElement>(null);

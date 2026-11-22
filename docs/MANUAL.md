@@ -3453,7 +3453,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 ## MAN-9543 — The dispatcher lane — The store watch: what pokes the dispatcher and roadmap lanes
 section: dispatcher/000/008 The store watch. `dispatcher-store-watch.service.ts` pokes the dispatcher and roadmap lanes
 
-**The store watch.** `server/shared/dispatcher-store-watch.service.ts` (one instance, built in `server/index.ts` and handed to `createDispatcherModule` and `createRoadmapModule`) is what pokes the two dispatcher lanes (`PolledLane.poke`, MAN-534). It is a set of `fs.watch`es on DIRECTORIES (`directory-watch.service.ts`: a WAL checkpoint or an atomic `os.replace` kills a watch on a file with its inode), filtered to the names below, coalesced into ONE poke per lane per burst (`SETTLE_MS` 300 ms from the first event; a source that asks for longer never delays a quicker one), and re-armed by event when its directory is deleted or moved (the parent is watched for the name; an unarmable watch is said once and the lane's backstop keeps it honest).
+**The store watch.** `server/shared/dispatcher-store-watch.service.ts` (one instance, built in `server/index.ts` and handed to `createDispatcherModule` and `createRoadmapModule`) is what pokes the dispatcher lanes (`PolledLane.poke`, MAN-534): `status` and `roadmap` on the inputs below, and the third twin, `rnd` (`createRndModule`, MAN-10113), on `STORE_LANES` alone — a store write the board gate lets through and a re-armed watch. The R&D document reads no chain record, daemon lock, socket or flag, so none of those pokes it. It is a set of `fs.watch`es on DIRECTORIES (`directory-watch.service.ts`: a WAL checkpoint or an atomic `os.replace` kills a watch on a file with its inode), filtered to the names below, coalesced into ONE poke per lane per burst (`SETTLE_MS` 300 ms from the first event; a source that asks for longer never delays a quicker one), and re-armed by event when its directory is deleted or moved (the parent is watched for the name; an unarmable watch is said once and the lane's backstop keeps it honest).
 
 THE INPUTS, measured with strace over `dispatcher status --json` and `dispatcher roadmap show --json` — the list that says the screen reads what it read under a poll:
 
@@ -10195,10 +10195,11 @@ The Agent Chains panel's data path, its hook and the rules a change to either mu
 | piece | home |
 |---|---|
 | panel | `src/modules/agent-launch/AgentLaunchPanel.tsx`, re-exported lazily by `index.ts`, rendered only by `AgentChainsContent` (MAN-7427) |
+| barrel | `index.ts` exports two names: `AgentLaunchPanel` (lazy) and `AgentLaunchChoice`, the slot imported whole; `RndSettingsSheet` (`src/modules/rnd`) draws the scout's and the spike's model and effort slots with it |
 | panel props | `onClose?: () => void` (draws the header's close button) · `titleId?: string` (the id the `<h2>` carries, so the window is named by it) |
 | parts | `AgentLaunchNotices` (warnings, reach notice) · `AgentLaunchDefaults` (mounts `AgentLaunchDactylField` and `AgentLaunchSummarizerField`, twins: a model list and an effort list each) · `AgentLaunchRowItem` · `AgentLaunchLanes` · `AgentLaunchChoice` (a slot is a list, or `said` words with no list, as the tweak's effort) |
 | hook | `useAgentLaunch()` → `{ census, error, saving, refresh, saveRow, saveDefaults }` |
-| types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading. Row `kind` is `'soul' \| 'sorter' \| 'tweak' \| 'hunt'` (a hunt row carries `soul`); lane `'agent' \| 'dispatcher' \| 'chain' \| 'sorter' \| 'hunt'`; `choices.sorter_models` / `choices.tweak_models` are the two board-card model lists; `choices.hunt_souls` (optional: a table older than the hunts lacks it) is every soul that may wear a hunt |
+| types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading. Row `kind` is `'soul' \| 'sorter' \| 'tweak' \| 'hunt' \| 'rnd'` (a hunt row carries `soul`; an `rnd` row, `rnd.scout` and `rnd.spike`, carries model and effort only and is edited by the R&D settings sheet, MAN-10115, never listed here); lane `'agent' \| 'dispatcher' \| 'chain' \| 'sorter' \| 'hunt'`; `choices.sorter_models` / `choices.tweak_models` are the two board-card model lists; `choices.hunt_souls` (optional: a table older than the hunts lacks it) is every soul that may wear a hunt |
 
 ## hook contract
 - `census` is `null` until read; a failed call keeps the census already held.
@@ -12074,7 +12075,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/, /home/l
 
 ## MAN-7632 — The roadmap lane and the dispatcher lane — what the twins share, where they differ
 
-The roadmap lane (`server/modules/roadmap/`, MAN-7631) and the dispatcher lane (`server/modules/dispatcher/`, MAN-1498) are twins: two modules over one dispatcher, sharing code through `server/shared/`, importing nothing from each other.
+The roadmap lane (`server/modules/roadmap/`, MAN-7631) and the dispatcher lane (`server/modules/dispatcher/`, MAN-1498) are twins: two modules over one dispatcher, sharing code through `server/shared/`, importing nothing from each other. A THIRD TWIN, the R&D lane (`server/modules/rnd/`, MAN-10113), follows the "same on both" rows below except two: its `createPolledLane` has NO backstop (`backstopMs: null`), since its document moves only by store writes, and is poked by the store watch's `rnd` lane and its own writes; and its writes run over the bug hunters' relay (`runVerb`, `relayJson`, `relayLine` with `RND_REFUSAL_EXITS` [1, 2]: 200, 409 with the dispatcher's sentence, 502), not `statusForWrite`. Its frame is `rnd_state`, its read `rnd show --json` under `RND_MAX_BUFFER` (4 MiB).
 
 Same on both
 | what | how |
@@ -12882,7 +12883,7 @@ The Roadmap tab is the workspace view whose id is `runner`: label `Roadmap`, gly
 | fact | value |
 |---|---|
 | run | `plans` (`PLAN_VIEWS` in `src/modules/project-workspace/hooks/useWorkspaceViews.ts`), FIRST of it |
-| rail order | `chat` · `files git browser (shell tasks)` · `runner kanban schedules notes` · `universe cerberus api` · plugins · `inbox` (foot); the runs are `SCROLL_GROUPS` of `WorkspaceRail.tsx`, a hairline between two drawn runs |
+| rail order | `chat` · `files git browser (shell tasks)` · `runner kanban schedules rnd notes` · `universe cerberus api` · plugins · `inbox` (foot); the runs are `SCROLL_GROUPS` of `WorkspaceRail.tsx`, a hairline between two drawn runs |
 | id | `runner`, kept. why: `VALID_TABS` (`useProjectsState.ts`), `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), the server's `landingPathOf` and a stored `activeTab` all say `runner` |
 | label | `tabs.runner` = `Roadmap` (`en/common.json`); the ten other locales hold no `tabs.runner` and fall back to English |
 | glyph | `Route`; the glyph comment at the top of `useWorkspaceViews.ts` names it |

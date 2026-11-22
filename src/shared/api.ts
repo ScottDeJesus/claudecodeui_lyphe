@@ -1458,6 +1458,21 @@ export const api = {
       put('/api/agent-launch/defaults', change, { timeoutMs: AGENT_LAUNCH_WRITE_TIMEOUT_MS }),
   },
 
+  // The R&D place (src/modules/rnd): the picture, and one dispatcher rnd verb per write. A refusal is the dispatcher's own sentence
+  // in the body (stdout, or the relay's error), so the reader looks at the body whatever the status; the picture redraws from the
+  // rnd_state frame a landed write pokes.
+  rnd: {
+    picture: () => get('/api/rnd'),
+    settings: (body: { webSearch: boolean }) => put('/api/rnd/settings', body),
+    addSource: (body: { url: string; label?: string }) => post('/api/rnd/sources', body),
+    removeSource: (body: { url: string }) => del('/api/rnd/sources', body),
+    scout: () => post('/api/rnd/scout', {}),
+    adopt: (name: string, body: { arc: string; goal?: string; as?: string }) => post('/api/rnd/candidates/' + encodeURIComponent(name) + '/adopt', body),
+    reject: (name: string, body: { why: string }) => post('/api/rnd/candidates/' + encodeURIComponent(name) + '/reject', body),
+    reopen: (name: string) => post('/api/rnd/candidates/' + encodeURIComponent(name) + '/reopen', {}),
+    spike: (name: string, body: { projectPath: string }) => post('/api/rnd/candidates/' + encodeURIComponent(name) + '/spike', body),
+  },
+
   // The API tab's Jev view: one reader answer per window, and the one thing the view can CHANGE —
   // the replay cache. Both go through the server's door, which runs `scripts/jev`; nothing in the
   // browser reads the ledger, the account file or the cache for itself. The window and the feed

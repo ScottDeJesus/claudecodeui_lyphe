@@ -28,12 +28,20 @@ export type VerbFailure = { status: typeof STATUS_CONFLICT | typeof STATUS_BAD_G
 /** The dispatcher's stdout on success, or the failure the route answers with. */
 export type VerbOutcome = { ok: true; stdout: string } | ({ ok: false } & VerbFailure);
 
-/** Runs one dispatcher verb and sorts its exit into success, the operator's refusal, or a fault to report. */
-export async function runVerb(commands: CommandDependencies, argv: readonly string[]): Promise<VerbOutcome> {
+/**
+ * Runs one dispatcher verb and sorts its exit into success, the operator's refusal, or a fault to report. `refusalExits` are
+ * the exits on which the verb's first stdout line is its refusal: the hunt verbs refuse on 2 alone; the roadmap-form verbs
+ * (`rnd`) also answer a name they do not hold on 1.
+ */
+export async function runVerb(
+  commands: CommandDependencies,
+  argv: readonly string[],
+  refusalExits: readonly number[] = [EXIT_REFUSED],
+): Promise<VerbOutcome> {
   const { exit, stdout, stderr } = await runDispatcherCommand(commands, argv);
   if (exit === EXIT_OK) return { ok: true, stdout };
   const refusal = firstLine(stdout);
-  if (exit === EXIT_REFUSED && refusal !== '') return { ok: false, status: STATUS_CONFLICT, error: refusal };
+  if (exit !== null && refusalExits.includes(exit) && refusal !== '') return { ok: false, status: STATUS_CONFLICT, error: refusal };
   const how = exit === null ? 'did not answer' : `exited ${exit}`;
   const detail = lastLine(stderr) || firstLine(stdout) || 'printed nothing it could read';
   const error = `dispatcher ${argv.slice(0, VERB_WORDS).join(' ')} ${how}: ${detail}`;
@@ -72,8 +80,9 @@ export async function relayLine(
   commands: CommandDependencies,
   argv: readonly string[],
   response: Response,
+  refusalExits?: readonly number[],
 ): Promise<void> {
-  const outcome = await runVerb(commands, argv);
+  const outcome = await runVerb(commands, argv, refusalExits);
   if (!outcome.ok) {
     sendFailure(response, outcome);
     return;
@@ -95,8 +104,9 @@ export async function relayJson(
   commands: CommandDependencies,
   argv: readonly string[],
   response: Response,
+  refusalExits?: readonly number[],
 ): Promise<void> {
-  const outcome = await runVerb(commands, argv);
+  const outcome = await runVerb(commands, argv, refusalExits);
   if (!outcome.ok) {
     sendFailure(response, outcome);
     return;

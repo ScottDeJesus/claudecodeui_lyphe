@@ -39,7 +39,7 @@ const FIRST_FAMILIES = 8;
 /** One family: the row, and under it its commonest sentences. */
 function CauseFamily({ cause, kinds, startsOpen }: { cause: CodeModeCause; kinds: string; startsOpen: boolean }) {
   const { t } = useTranslation('common');
-  // FILL: onFamilyToggle — open or closed, held here for the visit.
+  // Open or closed, held here for the visit.
   const [open, setOpen] = useState(startsOpen);
   const rest = restOf(cause.count, cause.top);
   const launches = t('analytics.codeMode.causes.inLaunches', { count: cause.launches });
@@ -88,7 +88,7 @@ export function CodeModeCauses({ causes, faults, kinds }: CodeModeCausesProps) {
   const labelOf = (kind: string) => kinds.find((entry) => entry.kind === kind)?.label ?? kind;
   const unlisted = restOf(faults.total, causes);
   const listId = useId();
-  // FILL: onShowAll — the first families only, or every one; the first on arrival, held here for the visit.
+  // The first families only, or every one; the first on arrival, held here for the visit.
   const [allShown, setAllShown] = useState(false);
   const shown = allShown ? causes : causes.slice(0, FIRST_FAMILIES);
 

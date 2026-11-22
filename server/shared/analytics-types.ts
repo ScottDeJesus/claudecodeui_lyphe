@@ -46,6 +46,8 @@ export type CodeModeFigures = {
   failed: number;
   declined: number;
   resent: number;
+  /** Automatic saves the house refused, which no longer stop a script's other work. */
+  saves_skipped: number;
 };
 
 /**

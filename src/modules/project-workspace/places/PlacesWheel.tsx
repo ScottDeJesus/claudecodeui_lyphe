@@ -17,9 +17,9 @@ const FAN_UNDER_PX = 560;
 
 /**
  * Where each place stands on its ring: its slot, the same every time, so the hand learns the angle. The inner ring's five from the
- * top round clockwise, the outer's six likewise.
+ * top round clockwise, the outer's seven likewise.
  */
-const SLOT: Record<PlaceId, number> = { home: 0, station: 1, roadmap: 2, bugs: 3, chat: 4, cerberus: 0, inbox: 1, api: 2, universe: 3, schedules: 4, settings: 5 };
+const SLOT: Record<PlaceId, number> = { home: 0, station: 1, roadmap: 2, bugs: 3, chat: 4, rnd: 0, cerberus: 1, inbox: 2, api: 3, universe: 4, schedules: 5, settings: 6 };
 
 /**
  * The bearings of the slots, in degrees clockwise from the top. At a desk the whole circle; on a phone the same places at the same
@@ -27,9 +27,9 @@ const SLOT: Record<PlaceId, number> = { home: 0, station: 1, roadmap: 2, bugs: 3
  * its left; the outer ring likewise).
  */
 const DESK_INNER = [0, 72, 144, 216, 288];
-const DESK_OUTER = [30, 90, 150, 210, 270, 330];
+const DESK_OUTER = [0, 51.4, 102.9, 154.3, 205.7, 257.1, 308.6];
 const FAN_INNER = [0, 31.2, 62.4, -62.4, -31.2];
-const FAN_OUTER = [13, 39, 65, -65, -39, -13];
+const FAN_OUTER = [0, 22.3, 44.6, 66.9, -66.9, -44.6, -22.3];
 
 /** The air between two sectors, in degrees. */
 const GAP = 1.2;
@@ -51,7 +51,7 @@ function dialFor(width: number, height: number, withActs: boolean): Dial {
     return {
       fan: true, cx: width / 2, cy, s, core, actsY, plateY: withActs ? actsY - 34 : cy - 240 * s - 34,
       inner: { r0: 72 * s, r1: 176 * s, at: 126 * s, half: 15.6, mids: FAN_INNER },
-      outer: { r0: 186 * s, r1: 240 * s, at: 213 * s, half: 13, mids: FAN_OUTER },
+      outer: { r0: 186 * s, r1: 240 * s, at: 213 * s, half: 11.1, mids: FAN_OUTER },
     };
   }
   // The wheel: 600 px across its rim at full size, the plate and the acts under it, the three centred in the window together.
@@ -61,7 +61,7 @@ function dialFor(width: number, height: number, withActs: boolean): Dial {
   return {
     fan: false, cx: width / 2, cy, s, core: 150 * s, plateY, actsY: plateY + 38,
     inner: { r0: 98 * s, r1: 214 * s, at: 156 * s, half: 36, mids: DESK_INNER },
-    outer: { r0: 226 * s, r1: 288 * s, at: 257 * s, half: 30, mids: DESK_OUTER },
+    outer: { r0: 226 * s, r1: 288 * s, at: 257 * s, half: 25.7, mids: DESK_OUTER },
   };
 }
 

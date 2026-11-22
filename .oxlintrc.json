@@ -157,6 +157,7 @@
           "src/shared/toolset-types.ts",
           "src/shared/claude-update-types.ts",
           "src/shared/roadmap-types.ts",
+          "src/shared/rnd-types.ts",
           "src/shared/cerberus-types.ts",
           "src/shared/companion-types.ts",
           "src/shared/station-types.ts",

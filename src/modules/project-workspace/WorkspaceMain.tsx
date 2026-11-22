@@ -19,6 +19,7 @@ import { AnalyticsPanel } from '@/modules/analytics';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
+import { RndTab } from '@/modules/rnd';
 import { NotesPanel } from '@/modules/notes';
 import type { AppTab, CompanionPresence, FileOpenRequest, FilesRoot, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
@@ -545,6 +546,16 @@ function WorkspaceMain({
           {activeTab === 'schedules' && (
             <div className="h-full overflow-hidden">
               <SchedulesPanel />
+            </div>
+          )}
+
+          {/* No gate either: what the scout found is the house's, not the open project's. The project only names where a
+              spike's chat opens. Lazy, so the place loads on its first open. */}
+          {activeTab === 'rnd' && (
+            <div className="h-full overflow-hidden">
+              <Suspense fallback={null}>
+                <RndTab projectPath={selectedProject?.fullPath || selectedProject?.path || null} />
+              </Suspense>
             </div>
           )}
 

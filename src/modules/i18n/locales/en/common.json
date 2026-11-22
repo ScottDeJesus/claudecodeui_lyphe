@@ -19,6 +19,7 @@
   },
   "tabs": {
     "chat": "Chat",
+    "rnd": "R&D",
     "shell": "Shell",
     "files": "Files",
     "git": "Git",
@@ -453,6 +454,157 @@
       "deepseek": "DeepSeek"
     },
     "subtabsLabel": "API services"
+  },
+  "rnd": {
+    "title": "R&D",
+    "mark": "{{count}} new or proved",
+    "spikeNoProject": "Open a project first: a spike's chat opens in the project that is open.",
+    "launchMissing": "The launch table has no rnd.scout or rnd.spike row yet.",
+    "weeklyOn": "{{day}}s at {{time}}",
+    "dailyAt": "every day at {{time}}",
+    "noMilestone": "No milestone",
+    "loading": "Reading what the scout has filed…",
+    "unreachable": {
+      "title": "R&D is not answering",
+      "retry": "Try again"
+    },
+    "stale": "Last read {{ago}}, and it may have moved since. {{sentence}}",
+    "settingsOpen": "R&D settings",
+    "scout": {
+      "now": "Scout now",
+      "out": "A scout is out · started {{ago}}",
+      "lastFiled": "Last scout {{ago}} · {{filed}} filed",
+      "lastNothing": "Last scout {{ago}} · nothing new",
+      "lastTrouble": "Last scout {{ago}} ended without an answer",
+      "never": "No scout has gone out yet",
+      "noSources": "No sources yet, so a scout has nothing to read",
+      "weekly": "Goes out by itself: {{when}}",
+      "noWeekly": "No weekly scout is scheduled; one goes out only when you press Scout now",
+      "outcome": {
+        "failed": "Failed",
+        "lost": "Lost"
+      }
+    },
+    "views": {
+      "label": "Candidates by where they stand",
+      "counted": "{{view}} {{n}}",
+      "waiting": "Waiting",
+      "spiking": "Spiking",
+      "verdicts": "Verdicts",
+      "rejected": "Rejected"
+    },
+    "word": {
+      "waiting": "Waiting",
+      "spiking": "Spiking",
+      "proved": "Proved",
+      "adopted": "Adopted",
+      "rejected": "Rejected"
+    },
+    "row": {
+      "meta": "{{host}} · {{age}}",
+      "spiking": "{{host}} · spike started {{age}}"
+    },
+    "empty": {
+      "noSources": {
+        "title": "No sources yet",
+        "message": "Give the scout a page to read each week: a changelog, a blog, a release feed.",
+        "action": "Add a source"
+      },
+      "noProved": "No yes is waiting for your Adopt",
+      "waiting": {
+        "title": "Nothing is waiting",
+        "message": "What the scout files lands here, each with a question a spike can settle."
+      },
+      "spiking": {
+        "title": "No spike is out",
+        "message": "Press Spike on a waiting candidate to try it in a chat."
+      },
+      "verdicts": {
+        "title": "No verdicts yet",
+        "message": "A spike that answers yes lands here, ready to adopt onto the roadmap."
+      },
+      "rejected": {
+        "title": "Nothing rejected",
+        "message": "What you reject, and what a spike answers no to, is kept here with its reason, so the scout does not file it again."
+      }
+    },
+    "opening": {
+      "back": "Back to the candidates",
+      "filed": "filed {{ago}}",
+      "spikeStarted": "Spike started",
+      "what": "What it is",
+      "why": "Why it might help",
+      "question": "The spike’s question",
+      "source": "Source",
+      "verdict": "Verdict",
+      "verdictValue": "{{word}} · {{ago}}",
+      "verdictWord": {
+        "yes": "Yes",
+        "no": "No",
+        "unsettled": "Unsettled"
+      },
+      "evidence": "Evidence",
+      "dir": "Spike directory",
+      "rejectedBecause": "Rejected because",
+      "became": "Became",
+      "becameValue": "{{plan}} · {{word}} · under {{epic}}",
+      "adoptedNote": "It is the roadmap’s now; there is nothing more to do here."
+    },
+    "act": {
+      "spike": "Spike",
+      "spikeAgain": "Spike again",
+      "openChat": "Open chat",
+      "adopt": "Adopt",
+      "reject": "Reject",
+      "reopen": "Bring back"
+    },
+    "adopt": {
+      "title": "Adopt",
+      "accent": "as an idea",
+      "about": "“{{title}}” becomes an idea on the roadmap, under the epic you choose. Its question, its verdict and its evidence go with it.",
+      "epic": "Epic",
+      "epicPlaceholder": "Choose an epic…",
+      "noEpics": "The roadmap has no epic to adopt under. Add one on the Roadmap, then come back.",
+      "goal": "Goal",
+      "goalHelper": "Optional. In your own words, what this should do for us.",
+      "cancel": "Cancel",
+      "confirm": "Adopt"
+    },
+    "reject": {
+      "title": "Reject",
+      "accent": "this candidate",
+      "about": "“{{title}}” moves to Rejected with your reason. The scout reads it, so the same thing is not filed again. Bring back undoes it.",
+      "why": "Why",
+      "whyHelper": "Required. One sentence the next scout can read.",
+      "whyPlaceholder": "We already do this with…",
+      "cancel": "Cancel",
+      "confirm": "Reject"
+    },
+    "settings": {
+      "title": "R&D",
+      "accent": "settings",
+      "sources": "Sources",
+      "noSources": "No sources yet",
+      "remove": "Remove",
+      "removeLabel": "Remove {{source}}",
+      "removed": "Removed {{source}}. The candidates it gave are kept.",
+      "undo": "Undo",
+      "add": "Add",
+      "addLabel": "Add a source",
+      "addHelper": "The address of a page the scout reads each week. Changes here are saved as you make them.",
+      "addPlaceholder": "https://…",
+      "launch": "Scout and spike",
+      "launchLoading": "Reading the launch table…",
+      "scout": "Scout",
+      "scoutAbout": "The weekly reader. It reads the sources and files candidates; it changes nothing.",
+      "spike": "Spike",
+      "spikeAbout": "The chat that tries one candidate and answers yes or no.",
+      "modelLabel": "{{who}} model",
+      "effortLabel": "{{who}} effort",
+      "web": "Web search",
+      "webOn": "On. The scout and a spike may search the web.",
+      "webOff": "Off. They read the sources and named public downloads only."
+    }
   },
   "agentLaunch": {
     "title": "Agent Chains",
@@ -5181,7 +5333,10 @@
         "hours": "{{hours}}h {{minutes}}m",
         "pointsMore": "+{{value}} pts",
         "pointsFewer": "−{{value}} pts",
-        "pointsSame": "±0 pts"
+        "pointsSame": "±0 pts",
+        "shareUnder": "under {{value}}%",
+        "days": "{{days}}d {{hours}}h",
+        "billion": "{{value}}B"
       },
       "compare": {
         "title": "With and without Code Mode",

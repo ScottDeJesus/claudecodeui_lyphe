@@ -88,9 +88,9 @@ function Figure({ words, change, against }: { words: string; change: { words: st
 export function CodeModeCompare({ kinds, groups, rollups }: CodeModeCompareProps) {
   const { t } = useTranslation('common');
   const headingId = useId();
-  // FILL: onModeChange — Median or Total, held here for the visit.
+  // Median or Total, held here for the visit.
   const [mode, setMode] = useState<Mode>('median');
-  // FILL: onModelsChange — every model together, or each model's pair under its kind's; together on arrival, held here for the visit.
+  // Every model together, or each model's pair under its kind's; together on arrival, held here for the visit.
   const [models, setModels] = useState<Models>('together');
   const totals = mode === 'total';
 

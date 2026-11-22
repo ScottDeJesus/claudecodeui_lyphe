@@ -15,6 +15,7 @@ import { LiveBusProvider } from '@/modules/live-bus';
 import { DispatcherFeed } from '@/modules/dispatcher';
 import { SoulLaunchFeed } from '@/modules/dispatch-souls';
 import { RoadmapFeed } from '@/modules/roadmap';
+import { RndFeed } from '@/modules/rnd';
 import { UniverseFeed } from '@/modules/universe';
 import { SessionHostLivenessProvider } from '@/shared/context/SessionHostLivenessContext';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
@@ -67,6 +68,8 @@ export default function App() {
                     {/* The roadmap's lane: the picture the Roadmap tab draws one roadmap of, kept by a
                         feed in its own module. */}
                     <RoadmapFeed>
+                    {/* The R&D lane: what the scout filed, for the R&D place and the wheel's mark. */}
+                    <RndFeed>
                     {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
                     <MemoryIntakeProvider>
                       {/* The notes: the account's cards, read once for every home that draws them.
@@ -102,6 +105,7 @@ export default function App() {
                       </HealProvider>
                       </NotesProvider>
                     </MemoryIntakeProvider>
+                    </RndFeed>
                     </RoadmapFeed>
                     </UniverseFeed>
                     </SoulLaunchFeed>

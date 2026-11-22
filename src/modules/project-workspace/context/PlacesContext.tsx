@@ -18,6 +18,7 @@ import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspac
 import { PlaceTrail } from '@/modules/project-workspace/places/PlaceTrail';
 import { PlacesWheel } from '@/modules/project-workspace/places/PlacesWheel';
 import { StationGlyph } from '@/modules/project-workspace/places/StationGlyph';
+import { useRndMark } from '@/modules/rnd';
 import { openHome, openStation } from '@/shared/cloudcliDoors';
 import { useAwaitingInputSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { createStableContext } from '@/shared/context/stableContext';
@@ -30,6 +31,7 @@ import { getSessionTitle } from '@/shared/utils';
 const SCREEN_PLACES: ReadonlyArray<{ id: PlaceId; tab: AppTab; ring: Place['ring'] }> = [
   { id: 'roadmap', tab: 'runner', ring: 'inner' },
   { id: 'bugs', tab: 'kanban', ring: 'inner' },
+  { id: 'rnd', tab: 'rnd', ring: 'outer' },
   { id: 'cerberus', tab: 'cerberus', ring: 'outer' },
   { id: 'inbox', tab: 'inbox', ring: 'outer' },
   { id: 'api', tab: 'api', ring: 'outer' },
@@ -144,7 +146,7 @@ export function usePlaces(): PlacesValue {
  *
  * WHAT WAITS AT A PLACE IS MARKED ON IT (`Place.mark`), each figure the one its own screen already reads, so a mark and the screen it
  * leads to never tell two stories: other chats waiting on an answer (the home), Kaylee's draft (the station), the roadmap's asks or its
- * whole lane finished, the last chat's question or its reply landed unseen, the checks that need a person (Cerberus), the Inbox's count,
+ * whole lane finished, the last chat's question or its reply landed unseen, the checks that need a person (Cerberus), the Inbox's count, R&D's yeses and what it filed since he last stood there,
  * and Settings while the server must be restarted or an update is on offer (pressed then, it opens on the tab that says so). The marks
  * of the places away from here stand on the menu's dial, each a bead at its place's bearing (`waiting`), and gathered they are the
  * menu's description (`menuMark`).
@@ -207,6 +209,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
   const { picture } = useCompanion();
   const claudeUpdate = useClaudeUpdateLine();
   const appVersion = useVersionCheck('siteboon', 'claudecodeui');
+  const rndMark = useRndMark();
 
   const chatAsking = lastChatId !== null && awaitingInput.has(lastChatId);
   // The chat's unread reply is the open conversation's; the last chat is that one when it is the one the workspace has open.
@@ -246,9 +249,10 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     else if (chatReplied) at.chat = { kind: 'done', words: t('rail.badge.chat') };
     if (cerberusNeeds > 0) at.cerberus = { kind: 'owed', words: t('rail.badge.cerberus', { count: cerberusNeeds }) };
     if (inboxWaiting > 0) at.inbox = { kind: 'owed', words: t('rail.badge.inbox', { count: inboxWaiting }) };
+    if (rndMark !== null) at.rnd = rndMark;
     if (settingsWords !== null) at.settings = { kind: 'owed', words: settingsWords };
     return at;
-  }, [othersAsking, draftWords, roadmapWaiting, roadmapTone, chatAsking, chatReplied, cerberusNeeds, inboxWaiting, settingsWords, t]);
+  }, [othersAsking, draftWords, roadmapWaiting, roadmapTone, chatAsking, chatReplied, cerberusNeeds, inboxWaiting, rndMark, settingsWords, t]);
 
   const goHome = useCallback(() => openHome(doors.navigate), [doors]);
   const goStation = useCallback(() => {
@@ -296,6 +300,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         mark: marks.chat ?? null,
         go: () => goChat(lastChatId),
       }]),
+      ...pick('rnd'),
       ...pick('cerberus'),
       ...pick('inbox'),
       ...pick('api'),

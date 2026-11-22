@@ -47,11 +47,11 @@ export function CodeModeTrend({ series, kinds, firstDay, today, days }: CodeMode
   const { t } = useTranslation('common');
   const headingId = useId();
   const tableId = useId();
-  // FILL: onMeasureChange — which measure the plot draws, held here for the visit.
+  // Which measure the plot draws, held here for the visit.
   const [measure, setMeasure] = useState<TrendMeasure>('launches');
-  // FILL: onKindChange — which kind the plot draws, every kind on arrival, held here for the visit.
+  // Which kind the plot draws, every kind on arrival, held here for the visit.
   const [kind, setKind] = useState(ALL_KINDS);
-  // FILL: onTableToggle — whether the day-by-day table is open. Closed on every mount: the plot is the answer.
+  // Whether the day-by-day table is open. Closed on every mount: the plot is the answer.
   const [tableOpen, setTableOpen] = useState(false);
 
   const say = (words: Worded) => t(words.key, words.values);

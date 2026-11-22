@@ -13,7 +13,8 @@ type KeyValueListProps = {
  * values in the rest, each one line, cut with an ellipsis. It is words and numbers, so it lives in what a click opened, never on a
  * screen by default.
  *
- * Used by the kanban module's board Opening (`BugBoardOpening`), for the board's counts.
+ * Used by the kanban module's board Opening (`BugBoardOpening`), for the board's counts, and by the rnd module's open candidate
+ * (`CandidateOpening`), for its facts.
  */
 export function KeyValueList({ items, className }: KeyValueListProps) {
   return (

@@ -104,10 +104,13 @@ export type AgentLaunchShim = {
  * (one of `choices.hunt_souls`, always set), and an optional model: `model_pinned` false is a hunt riding the model the table gives
  * that soul, and `null` clears the pin. Its `effort` is read and never sent, by the tweak's own rule: the table's default for the
  * model, or, with `effort_pinned` true, its soul's own effort pin.
+ *
+ * AN R&D ROW (`kind: 'rnd'`, `rnd.scout` and `rnd.spike`, no shim) is the model and effort the scout and a spike launch at. Both
+ * words are optional pins; the R&D place's settings sheet edits them (`src/modules/rnd/hooks/useRndLaunch.ts`), not this panel.
  */
 export type AgentLaunchRow = {
   name: string;
-  kind: 'soul' | 'sorter' | 'tweak' | 'hunt';
+  kind: 'soul' | 'sorter' | 'tweak' | 'hunt' | 'rnd';
   /** A hunt row's wearer. Only a hunt row carries it. */
   soul?: string;
   description: string;

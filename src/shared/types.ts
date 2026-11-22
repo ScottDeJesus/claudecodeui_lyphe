@@ -66,7 +66,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'inbox' | 'runner' | 'api' | 'cerberus' | 'analytics' | 'kanban' | 'universe' | 'schedules' | 'notes' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'inbox' | 'runner' | 'api' | 'cerberus' | 'analytics' | 'kanban' | 'universe' | 'schedules' | 'rnd' | 'notes' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -4437,7 +4437,7 @@ export type StationNeedKind = Exclude<StationNeed['kind'], 'ask'> | StationAskKi
  * last chat (`chat`), the workspace's screens (`roadmap` is the `runner` view, `bugs` the `kanban` view, the others by their own ids)
  * and Settings, a door. The wheel draws each at a fixed bearing, so a place keeps its angle whatever else is there.
  */
-export type PlaceId = 'home' | 'station' | 'roadmap' | 'bugs' | 'chat' | 'cerberus' | 'inbox' | 'api' | 'universe' | 'schedules' | 'settings';
+export type PlaceId = 'home' | 'station' | 'roadmap' | 'bugs' | 'chat' | 'rnd' | 'cerberus' | 'inbox' | 'api' | 'universe' | 'schedules' | 'settings';
 
 /**
  * One place as the navigation lists it, resolved for the page on screen: its name (the chat's own title for `chat`), its glyph (which

@@ -1,15 +1,15 @@
 import { useTranslation } from 'react-i18next';
 
-import type { CodeModeAnalytics } from '@/shared/analytics-types';
+import type { CodeModeAnalytics, CodeModeCause, CodeModeDay, CodeModeFaultTotals, CodeModeGroup, CodeModeKind } from '@/shared/analytics-types';
 import { Banner, EmptyState } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 import { AnalyticsSectionFrame } from '@/modules/analytics/AnalyticsSectionFrame';
+import { useAnalyticsSection } from '@/modules/analytics/hooks/useAnalyticsSection';
 import { CodeModeCauses } from '@/modules/analytics/sections/code-mode/CodeModeCauses';
 import { CodeModeCompare } from '@/modules/analytics/sections/code-mode/CodeModeCompare';
 import { CodeModeOutcomes } from '@/modules/analytics/sections/code-mode/CodeModeOutcomes';
 import { CodeModeTrend } from '@/modules/analytics/sections/code-mode/CodeModeTrend';
 import { daysCovered } from '@/modules/analytics/sections/code-mode/codeModeFigures';
-import { fakeSectionRead } from '@/modules/analytics/sections/code-mode/fakeRead';
 
 /**
  * CODE MODE, the Analytics area's first section: is a launch better off with Code Mode than without it.
@@ -30,9 +30,7 @@ import { fakeSectionRead } from '@/modules/analytics/sections/code-mode/fakeRead
  * The kinds' labels are the verb's and are drawn as they came: no list of kinds lives in this folder.
  */
 export function CodeModeSection({ days }: { days: number }) {
-  // FILL: answer — the section's one read: `useAnalyticsSection<CodeModeAnalytics>('code-mode', days, narrow)` in place of the fake
-  // read (`fakeRead.ts` and `codeModeFake.ts` go with it). `narrow` is this file's to write.
-  const { reading, refresh } = fakeSectionRead(days);
+  const { reading, refresh } = useAnalyticsSection<CodeModeAnalytics>('code-mode', days, narrow);
 
   return (
     <AnalyticsSectionFrame reading={reading} refresh={refresh} takenAt={(answer) => answer.generated_at}>
@@ -81,4 +79,37 @@ function CodeModeAnswer({ answer }: { answer: CodeModeAnalytics }) {
       )}
     </>
   );
+}
+
+/**
+ * The answer as the route carried it, checked key by key at the top: a key missing or of another type is no answer.
+ * The rows are carried as the verb printed them: the server's reader narrowed the same keys, and the verb is the one
+ * writer of their shape.
+ */
+function narrow(data: unknown): CodeModeAnalytics | null {
+  if (!isRecord(data)) return null;
+  const { days, generated_at, today, first_day, kinds, uncounted, groups, rollups, series, faults, causes } = data;
+  if (typeof days !== 'number' || typeof generated_at !== 'number' || typeof today !== 'string') return null;
+  const firstDay = typeof first_day === 'string' ? first_day : null;
+  if (first_day !== null && firstDay === null) return null;
+  if (!isList<CodeModeKind>(kinds) || !isList<CodeModeKind>(uncounted)) return null;
+  if (!isList<CodeModeGroup>(groups) || !isList<CodeModeGroup>(rollups) || !isList<CodeModeDay>(series)) return null;
+  if (!isList<CodeModeCause>(causes) || !isFaultTotals(faults)) return null;
+  return { days, generated_at, today, first_day: firstDay, kinds, uncounted, groups, rollups, series, faults, causes };
+}
+
+/** A JSON object: not null, not an array. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** A list, its rows taken as the verb printed them (see `narrow`). */
+function isList<Row>(value: unknown): value is Row[] {
+  return Array.isArray(value);
+}
+
+function isFaultTotals(value: unknown): value is CodeModeFaultTotals {
+  if (!isRecord(value)) return false;
+  const { total, by_fault: byFault } = value;
+  return typeof total === 'number' && isRecord(byFault);
 }

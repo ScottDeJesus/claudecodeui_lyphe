@@ -3,6 +3,7 @@ import {
   ChartLine,
   Clock,
   Coins,
+  FlaskConical,
   FolderTree,
   GitBranch,
   Globe,
@@ -60,6 +61,7 @@ const PLAN_VIEWS: BuiltInView[] = [
   { id: 'runner', group: 'plans', icon: Route, keywords: 'roadmap milestone epic feature task goal path in flight runner feature epic task run live plan phases' },
   { id: 'kanban', group: 'plans', icon: Bug, keywords: 'bugs bug board kanban lanes cards backlog' },
   { id: 'schedules', group: 'plans', icon: Clock, keywords: 'schedules cron jobs registry scheduled prompts sync' },
+  { id: 'rnd', group: 'plans', icon: FlaskConical, keywords: 'r&d rnd research scout spike candidates ideas sources adopt' },
   { id: 'notes', group: 'plans', icon: StickyNote, keywords: 'notes note cards jot write memo' },
 ];
 

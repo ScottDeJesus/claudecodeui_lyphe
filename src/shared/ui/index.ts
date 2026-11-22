@@ -83,7 +83,7 @@ import '@/shared/ui/verve/data.css';
 // at 220 lines; MANUAL rule 6).
 import '@/shared/ui/verve/readings.css';
 // astrolabe.css holds the paint of the design system's own objects, the Hoop's core, Track, Opening and Rule, and of Steps, Trace,
-// Choice and Files (`.ast-*`, every selector its own, every rule reading only tokens), so its place is as free as readings.css's.
+// Choice, Files, KeyValueList and Excerpt (`.ast-*`, every selector its own, every rule reading only tokens), so its place is as free as readings.css's.
 import '@/shared/ui/verve/astrolabe.css';
 
 export { ActionMenu } from '@/shared/ui/ActionMenu';
@@ -132,6 +132,9 @@ export { DockableFab } from '@/shared/ui/DockableFab';
 export type { DockableFabPosition } from '@/shared/ui/DockableFab';
 export { ResizeGrip } from '@/shared/ui/ResizeGrip';
 export { EmptyState } from '@/shared/ui/EmptyState';
+// Astrolabe's Excerpt in its still form: lines of text as they were written, numbered in the gutter, between two hairlines.
+// The rnd module's open candidate shows a spike's evidence with it.
+export { Excerpt } from '@/shared/ui/Excerpt';
 export { Field } from '@/shared/ui/Field';
 // Verve's §10 Media gallery: square photo tiles, each with its tag, the final tile collapsing the overflow into
 // "+N", the grey tile where a photo is missing. The affected-areas module draws a tour's panos with it.
