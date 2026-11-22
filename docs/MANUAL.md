@@ -14317,3 +14317,42 @@ Kit parts only: `SettingRow`, `SettingsToggle`, `Button`. Icon `SquareCode`. No 
 - 2026-11-20: 9 states × 3 widths (1440, 390, 320 at 1.07 text scale) × light/dark, 54 pictures: no overflow, switch targets ≥44px on phones. At 320 scaled the kind rows sit 8px left of the title's sentences so the switch stays beside its name.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/code-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerCodeModeRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCodeMode.ts
+
+## MAN-10121 — PlanDecided — the Decided-for-you list and open gaps on a plan face
+
+`PlanDecided({ plan })` (`src/modules/dispatcher/PlanDecided.tsx`) draws what was decided in the operator's place on one plan, and the gaps it finished with that are still being healed. Mounted by `PlanFace` above the events fold. Types `DispatcherDecided`, `DispatcherDecidedBy`, `DispatcherGap` come from `src/shared/types.ts` (MAN-1495).
+
+## Data
+| Read | From | Absent key |
+|---|---|---|
+| rows | `plan.decided ?? NO_DECIDED` | empty list; an older dispatcher build draws nothing, never throws |
+| gaps | `plan.open_gaps ?? NO_GAPS` | empty list |
+
+Both lists come from the dispatcher's document (`hooks/dispatcher`); no plan carries rows until the Python reader produces them (2026-11-22: live GET answers `decided: []`, `open_gaps: []`).
+
+## States
+| Rows | Gaps | Draws |
+|---|---|---|
+| none | none | nothing (`return null`) |
+| some | none | one fold "Decided for you" with its count, in `FaceTrigger` |
+| some | some | the fold; the gaps stand under its trigger when folded, after the rows when open; the open trigger says how many gaps are below |
+| none | some | the gaps alone |
+- The fold starts OPEN when a row is newer than this plan's last look, closed otherwise; a newer row wears "new".
+- Rows mount only while the fold is open. Newest first, `ROW_LIMIT = 5` drawn; "Show N earlier" raises the count to all rows.
+- Colour says a state, never who: the three deciders (`builder`, `designer`, `rule`) share the neutral badge. "new" is info; a high gap is warn; any other rank is neutral; nothing is red.
+
+## Last look
+- Key `dispatcher.decided.lastLook:<plan name>` in `localStorage`, one a plan, read once when the card is drawn (`lastLookOf`).
+- Storage blocked (`DOMException`) or a non-number value: `NEVER_LOOKED = 0`, every row is new.
+- Opening or closing the fold stores the stamp of the newest row (the row's `at`, never the browser clock; `rememberLook`), then sets the fold. A refused write is `console.warn`ed.
+- A non-`DOMException` error is rethrown.
+
+## Gap ticket button
+- `copyTicket(ticket)` puts the number on the clipboard and returns whether it landed (no `navigator.clipboard` or a refused write: false, cause in the console).
+- The press shows one `aria-live="polite"` line under the gaps list (`data-gap-ticket-copied`): `ticketCopied` or `ticketNotCopied`. No toast: the card imports none.
+- No way yet to open a ticket from outside the bug board (bug 195).
+
+## Words
+All through `t()` under `dispatcher.decided.*` in `en/common.json`: `title`, `fresh`, `freshCount`, `by.{builder,designer,rule}`, `wholeFeature`, `what`, `choice`, `why`, `undo`, `earlier`, `gaps`, `gapsBelow` (+ `gapsBelow_one`), `priority.{high,medium,low}`, `ticket`, `ticketCopied`, `ticketNotCopied`. Every string reaches the DOM as a text node: titles, choices, reasons and gap titles are free text souls wrote.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanDecided.tsx
