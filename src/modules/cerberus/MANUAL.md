@@ -96,7 +96,7 @@ Where a plan plugs into the tab (the fixes plan's places are filled and live: MA
 | `utils/activityEvents.ts` `toTimelineEvent` | a `case` per new `CerberusActivity` kind (`fix`, `catalog`, `warden` and `diagnosis` are live), a builder, words under `cerberus.activity`; an unknown kind draws neutral and is never thrown on (MAN-7872) |
 | `utils/cerberusStatus.ts` `nodeMark` | `enrolling` returns `null` (no mark) while nothing feeds it; whatever feeds it gives it a mark. `fixing` is fed and draws `FLEET_FIXING_LOOK` through `markLook`, and so does `updating` (a node with an update queued or running) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NeedsYouCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingsNodePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckFixes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/DiagnosisPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/SelectedCheck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/activityEvents.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/fleetWords.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckFixes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/DiagnosisPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/SelectedCheck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/activityEvents.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/fleetWords.ts
 
 ## MAN-7869 — Cerberus — the six `animate-cerberus-*` motions in `tailwind.config.js` and who draws each
 
@@ -741,7 +741,7 @@ Takes `t` and `now` from the caller, so a sentence is a function of what it is h
 - The card's action row is `NeedFix` (the run strip on a line of its own, then Run “<fix>”), then Diagnose (outline): `DiagnoseButton` while `need.diagnosis` is null, whose press opens the sheet on the check, where the steps arrive; "Diagnosing…" while the need's diagnosis runs and "See diagnosis" once it ended, both opening the sheet; then Mute. `NeedCard` takes the whole `need`, and `useLeavingNeeds` keeps the whole need of a card that is leaving, so it keeps its strip while it fades.
 - The quiet line ends with `cerberus.fix.quiet` ("Fixes set to auto-run will run on their own and show up below."), after a space, while any catalog entry is set to run on its own (`catalog.some(entry => entry.auto)`). `NeedFix`: MAN-7906.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetStatusBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetToolbar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NeedsYouCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/fleetWords.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/fleetWords.ts
 
 ## MAN-7880 — Cerberus — the Fleet view: `FleetView`, `NodeCard`, `ServiceRow`, `FleetGrid`, `FleetList`, `WhatHappenedCard`
 
@@ -776,7 +776,7 @@ Leaves draw what they are handed and read nothing: they call `onOpenCell`, `onMu
 - `shown.length === 0`: dashed sentence, `fleet.noneInGroup` for a blank search, else `fleet.noMatch`.
 - Ages use `overview.now`, never a running clock: heartbeats are not re-read between reads, so a clock that ran on would age a node still reporting.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetGrid.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeProjects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingsNodePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/WhatHappenedCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeProjects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-7881 — The Cerberus screen's words — the cerberus block of en/common.json — Alternatives the caller picks
 
@@ -941,7 +941,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useEn
 - The 30 cells are a pointer's shortcut and take no tab stop (30 stops per service would bury the keyboard). The keyboard opens the sheet from the name and picks minutes in the sheet's own strip.
 - Why `cell.at` and not a fixed second: a minute's word is the worst over the whole minute, so its last second reads the word that came after a run's last minute and its first second misses a run's first. The read model hands each minute the moment its word was reached (`CerberusCell.at`, MAN-7809); `ServiceRow` and the sheet's strip both pass it as `lookupAt`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetGrid.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/WhatHappenedCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useLeavingNeeds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useLeavingNeeds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-7886 — Cerberus — the Fleet view: `FleetView`, `NodeCard`, `ServiceRow`, `FleetGrid` — `FleetRings`
 
@@ -969,7 +969,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/Fleet
 - Entrance: `motion-safe:animate-shape-rise`, delay inline `min(index, 24) * 18` ms (INV-7053).
 - Heartbeat dot: positive and breathing while `link === 'reporting'` and not restarting, else still neutral; named (`role="img"`) only on a collapsed tile.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetGrid.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingsNodePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/WhatHappenedCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-7887 — Cerberus — the Fleet view: `FleetView`, `NodeCard`, `ServiceRow`, `FleetGrid` — `ServiceRow`
 
@@ -977,7 +977,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/Fleet
 - The newest minute breathes (`animate-cerberus-breathe`), or rings while failing (`animate-cerberus-ring-warn`), under `motion-safe`.
 - `grid` face sits on the card's surface; `list` face on the canvas, indented and a little tighter.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetGrid.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/WhatHappenedCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-7888 — Cerberus — the History view: `HistoryView`, `LookupCard`, `EventsCard` — `useActivityFeed` — `hooks/useActivityFeed.ts`
 
@@ -1070,7 +1070,7 @@ The Cerberus tab's root and header, live: the root reads the one overview throug
 
 `index.ts` exports `CerberusPanel` as a `lazy` import (its own chunk, loaded on the tab's first open); `WorkspaceMain` renders it with its `projectChoices`, which it only does once the workspace's projects have been read.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
 
 ## MAN-8914 — Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader` — `CerberusPanel` layout
 section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`/001 `CerberusPanel` layout
@@ -1101,7 +1101,7 @@ section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`
 - History polls every 30 s, so it mounts only while shown.
 - A view shown plays `vv-pagein` again.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
 
 ## MAN-8915 — Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader` — Reads and state
 section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`/002 Reads and state
@@ -1132,7 +1132,7 @@ The view's place on the rail, its badge, its pane and its palette row: MAN-7866.
 - The provider's own 30 s reads never change `attempt`: a fleet that stays out of reach is not announced every 30 s.
 - Open (follow-up, shared code): Try again shows nothing while its read is out; the sheet's and History's look-up retries do not re-mount the banner (`useCheckDetail` would need a `retry` that clears the failure during the read).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
 
 ## MAN-8916 — Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader` — `CerberusHeader`
 section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`/003 `CerberusHeader`
@@ -1147,7 +1147,7 @@ section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`
 - The button row, before Enroll a node (MAN-7934): Enroll's own Button (outline, `sm`), opening the Update wardens dialog. Its words: `updates.button.updating` ("Updating wardens · 2 of 3": `batchPlace(wardens.running)`, the first update not ended, counting from 1, of the batch's size) while a batch runs, else `updates.button.update` with `latest.version` while a node can take it (`canTake`: `behind` and a version — one that never said hello is on no link to offer the release on, so the header never offers what the dialog would answer "Update 0 nodes"), else `updates.button.upToDate`. Drawn only once `GET /wardens` has answered with a release: with none there is nothing to offer. The headline reads "One fix *running*" (`fix.headline` + `headlineAccent`, the accent in the info tone) when `counts.needsYou` is 1 and that need's run is going (`result` null).
 - Buttons `h-8 max-md:h-11`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
 
 ## MAN-7892 — Cerberus — the tab's dialogs: `MuteDialog`, `EnrollDialog`, `EnrollInstall` — `MuteDialog`
 

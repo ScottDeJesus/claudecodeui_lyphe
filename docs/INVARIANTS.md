@@ -236,7 +236,7 @@ expect: `exit 1` and two `[FAIL] 1920-…-gutter: …the pin dropped that write 
 measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding L1, LOW
 probe-key: 468d81300e74aad24711ab83df7acd7fd3cf051b
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/queue-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/queue-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
 ## INV-8867 — The kit Menu stays inside the window's width and a finger outside dismisses it on lift
 

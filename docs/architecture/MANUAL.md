@@ -4106,7 +4106,7 @@ the "show N more" button raises the limit by four times that. Separately,
 included", because the backend truncates long timelines for transport; that line appears
 only once nothing is left to expand locally.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedSubagents.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/subagentSummary.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedSubagents.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/subagentSummary.ts
 
 ## MAN-6221 — Subagents — Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
 section: 06-tool-view/012 Subagents/001 Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
@@ -4146,7 +4146,7 @@ alone carries no time.
 | any row carrying `usage` + `usageMessageId` | The container's live token reading: `contextTokens` from the newest row, one request per distinct id. Never the reply count — a live row's usage is the snapshot taken when the row was cut, a few tokens into the reply (measured: 69 live against 3,298 on the transcript for one run) |
 | anything else | Nothing |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-6222 — Subagents — What an agent has spent.
 section: 06-tool-view/012 Subagents/002 What an agent has spent.
@@ -4177,7 +4177,7 @@ resumed agent notifies under the `SendMessage` call that resumed it. `readSubage
 prints it (`36K tokens · 3.3K out`; a live reading has no `out`), on the pinned row's second
 line and the agent card's header.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-6223 — Subagents — A chat's pinned rows come from the whole history.
 section: 06-tool-view/012 Subagents/003 A chat's pinned rows come from the whole history.
@@ -4209,7 +4209,7 @@ containers plus any listed agent the loaded rows do not hold, projecting those t
 live rows that concern agents (their own streamed rows and finish rows) so they fold live exactly
 like a loaded container.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-6224 — Subagents — A pin is not always an `Agent` tool call.
 section: 06-tool-view/012 Subagents/004 A pin is not always an `Agent` tool call.
@@ -4267,7 +4267,7 @@ and the reader's act is the same either way. The list is read through a module-s
 so every copy of the rows — the strip and the gutter widget alike, whichever has the claim above —
 drops a dismissed row in the same frame; a `storage` listener folds in another tab's dismissal too.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-6225 — Subagents — Clear completed is the widget's alone (`subagents/SubagentWidgetClearCompleted.tsx`), and it is worn
 section: 06-tool-view/012 Subagents/005 Clear completed is the widget's alone (`subagents/SubagentWidgetClearCompleted.tsx`), and it is worn
@@ -4293,7 +4293,7 @@ ONE storage write and ONE publish for the whole list, where dismissing eight row
 repaint every copy of them eight times. The strip keeps only the per-row X — it holds a window of
 rows and has no room for chrome, and the widget is where a reader goes to tidy up.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-6226 — Subagents — Click to read, live.
 section: 06-tool-view/012 Subagents/006 Click to read, live.
@@ -4323,7 +4323,7 @@ at once would be a thousand tool renderers the moment the row opens. The entries
 drawing the panel uses: `tools/SubagentNote.tsx` for prose and reasoning, `ToolRenderer` in
 `mode="input"` for everything else.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-6227 — Subagents — How history reads an agent's end.
 section: 06-tool-view/012 Subagents/007 How history reads an agent's end.
@@ -4338,7 +4338,7 @@ there is one, overrides all of these. A BACKGROUNDED agent's finish time is that
 when no notification gives one; a foreground agent's is its own `tool_result` row's stamp in the
 parent, which is the better source and the one used.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-6228 — Subagents — The same rule, one strip away.
 section: 06-tool-view/012 Subagents/008 The same rule, one strip away.
@@ -4406,7 +4406,7 @@ lists wins** — a mid-run refresh can attach a partial server timeline while ne
 keep streaming. The projection cache's second key, `subagentActivitySource`, holds the
 newest row folded into that container, so a growing timeline invalidates the cached card.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-405 — Errors
 section: 06-tool-view/013 Errors
@@ -4826,7 +4826,7 @@ section: 07-live-widgets/002 The pieces
 | `.verify/probe-widget-scrollbars.mjs` | The scrollbar probe: a widget's scroll panel and document paint the host's thin scrollbar (computed paint and gutter held against a host `.scrollbar-thin`, shots in `.verify/shots/widget-scrollbars/`), and `--before` serves the pre-change `buildWidgetDocument.ts` for the other half of the pair |
 | `.verify/phase-29.mjs` | The end-to-end probe, and the only one in this repo that needs ArchPulse up: a real block embedded, edited from inside the frame, that edit read back in ArchPulse's own studio, plus the theme flip on a LIVING frame, the height, and the not-found card |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/embeds/collectEmbedTargets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/embeds/embedSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/embeds/EmbedWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/GutterWidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Markdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/code/EmbedFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/code/index.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/markdownStreaming.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/StreamingMarkdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/hooks/useLiveTopic.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/buildWidgetDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/classifyWidgetBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/DocSpaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/docspaceOrigin.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/EmbedUrlFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/embedUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetBridge.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/readVerveTokens.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/widgetBridgeScript.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetErrorCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-29.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-widget-scrollbars.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Markdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/code/EmbedFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/code/index.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/markdownStreaming.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/StreamingMarkdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/hooks/useLiveTopic.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/buildWidgetDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/classifyWidgetBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/DocSpaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/docspaceOrigin.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/EmbedUrlFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/embedUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetBridge.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/readVerveTokens.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/widgetBridgeScript.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetErrorCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-29.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-widget-scrollbars.mjs
 
 ## MAN-414 — The fence
 section: 07-live-widgets/003 The fence
@@ -5386,7 +5386,7 @@ A retraction is the one thing that ends fullscreen without the reader: a fence t
 the streaming half unmounts `WidgetFrame` entirely, and the card comes back as a card. That is the
 same restart the widget itself suffers there, and curing it is `StreamingMarkdown`'s shape to change.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/GutterWidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
 
 ## MAN-423 — The live bus
 section: 07-live-widgets/012 The live bus
@@ -6957,46 +6957,6 @@ how the pieces fit together.
 - `server/modules/websocket/MANUAL.md (README)` — the gateway's service map.
 - `server/modules/providers/MANUAL.md (README)` — the provider abstraction.
 - `src/modules/chat/tools/MANUAL.md (README)` — the tool config registry, from the module's side.
-
-## MAN-7526 — Chat gutters — widget ids, default places, adding a widget
-
-## Gutter widgets — ids and default places
-
-`GutterWidgetId` (`src/shared/types.ts`) = `'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes' | 'followups' | 'accounts'`. The ids are the DOM's `data-widget` and the keys of the stored record. Eight widgets: left `runner`, `roadmap`, `subagents`; right `followups`, `accounts`, `memory`, `embed`, `notes`. Any of them drags to either side at any rank.
-
-| id | default side | order | open | table entry in `ChatGutterLayout` |
-|---|---|---|---|---|
-| `runner` | left | 0 | no | badge `useDispatcherPlans().count`, `countTone: 'warn'` while `waiting > 0` (MAN-7540) |
-| `roadmap` | left | 1 | yes | badge `designing + in_flight` of `useRoadmap().selected.standing`, each read `?? 0`; `countTone: 'warn'` while `waiting_on_you > 0`; `Body: RoadmapWidgetBody` (MAN-7668); `FullscreenBody: RoadmapWidgetFullscreenBody` (the tab itself, drawn in place of `Body` while the card is full screen, MAN-7668); `flush: true`; title `gutters.roadmap.title` |
-| `subagents` | left | 2 | yes | `HeaderAction: SubagentWidgetClearCompleted` |
-| `followups` | right | 0 | yes | badge `followups.openCount` (the open items of the open chat across both groups), `Body: FollowupsWidgetBody`; not `flush`, no header action; title `gutters.followups.title`, icon `ListChecksIcon`; the open chat's own list, filled by the chat (MAN-9003, MAN-9004) |
-| `accounts` | right | 0, directly behind `followups` (key order breaks the tie) | yes | badge none (`count: 0`); `Body: AccountsWidgetBody`; not `flush`, no header action; title `gutters.accounts.title`, icon `UsersRoundIcon`; the account panel's own body — the usage meters, both balances, every account's weekly figure, a tap on a row to switch — read from `AccountsProvider` (MAN-460, MAN-463) |
-| `memory` | right | 1 | no | |
-| `embed` | right | 2 | no | `flush: true` |
-| `notes` | right | 3 | no | badge `notes?.length ?? 0`, `Body: NotesWidgetBody`; not `flush`, no header action (MAN-7518) |
-
-Defaults live in `DEFAULT_PLACEMENTS` (`src/modules/chat-gutters/hooks/useGutterPlacements.ts`).
-- `roadmap`, `followups` and `accounts` open themselves: the operator asked for the roadmap beside Runs, for the chat's next steps to fill in by themselves, and for an account usage widget, and a widget he asked for is seen without hunting.
-- `accounts` is the SECOND key of `DEFAULT_PLACEMENTS` and shares `followups`' rank, so it sorts directly behind it and ahead of anything else on that rank. `parsePlacements` seats a stored arrangement's missing `accounts` on whatever side and rank `followups` holds there, rather than at a fixed rank: measured on the operator's own, most chats' arrangements predate Next steps and hold `memory` at the top of the right side, where a fixed rank 1 would have landed it under `memory`, and a reader who dragged Next steps below another widget keeps Accounts behind it.
-- `followups` is the FIRST key of `DEFAULT_PLACEMENTS` on purpose: ties break in key order, so a stored arrangement that predates it (it gains it at order 0 on the right) draws it ahead of the widget holding that rank, and nothing the reader placed changes order relative to the rest.
-- `ChatGutterLayout` takes `RoadmapWidgetBody` and `useRoadmap` from the roadmap barrel (MAN-7635); the body's own row is MAN-7668.
-- The `roadmap` badge reads sit outside every widget's boundary, so the `?? 0` falls are load-bearing: a picture without `standing` costs the badge its number; a throw would take the whole chat to the workspace error panel.
-- A stored arrangement without `roadmap` gains it at its default through `parsePlacements`; ranks are then made dense per side and ties break on `GUTTER_WIDGET_ORDER`, so a stored `subagents` at order 1 draws after it.
-
-## Gutter widgets — adding one
-
-1. Add the id to `GutterWidgetId`.
-2. Give it a place in `DEFAULT_PLACEMENTS` (`Record<GutterWidgetId, …>`; a missing key fails typecheck). `GUTTER_WIDGET_ORDER` is read off that record's keys.
-3. Add its entry to the `widgets` table in `ChatGutterLayout` (`Record<GutterWidgetId, …>`; also compiler-checked): `title`, `count`, `icon`, `Body`, optional `countTone` (a `Tone`, default `info`), `flush`, `HeaderAction`, `FullscreenBody` (a body drawn in place of `Body` and only while the card has the whole viewport; absent, `Body` is drawn at both sizes and is never remounted by the switch; present, `<Boundary>` is keyed `fullscreen` / `column`, so a crash in one body never leaves the boundary tripped over the other).
-4. Add `gutters.<id>.title` to every locale's `common.json`.
-
-- No stored placement is migrated. `parsePlacements` is seeded from `DEFAULT_PLACEMENTS`, so a stored arrangement without the new id gains it at its default; stored values are never rewritten.
-- `GutterWidgetFrame`, `GutterColumn` and the server's preference merge are id-generic: no edit.
-- `count` is the badge and `countTone` its colour; a widget counting something other than a list length changes its own table line.
-- `accounts` keeps its state out of the layout: the panel is also drawn by the rail's popover (the phone's only way in), so `AccountsProvider` (`ProjectWorkspaceShell`, above the rail and the main region) holds the one set of pollers and `AccountsWidgetBody` only reads it. The body mounts only while the widget is unfolded, so unfolding starts no poller and refreshes the readings once.
-- A body is handed the chat's `sessionId` and nothing else. A widget whose badge needs the same data as its body reads it once in `ChatGutterLayout` (a hook, outside every widget's boundary) and hands it to the body through a context the layout provides around the two gutter columns: `followups` does (`useFollowups(wide ? sessionId : null)`, `FollowupsContext`), so the badge and the rows are one reading, and no request is made while the gutters are not drawn (phone, a narrow window, a floating chat).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/hooks/useGutterPlacements.ts
 
 ## MAN-8046 — sessionCompactionsDb — a compacted transcript's record, the seed it stores, and the swap
 

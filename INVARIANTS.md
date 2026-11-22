@@ -364,23 +364,6 @@ probe-key: 081f20c7642fd50a5f29f72f8e615e48aea6120e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
 
-## INV-6057 — radial at 100px on a narrow phone — five items near the screen's centre put a label on another item's disc
-
-`RADIAL_RADIUS_PX` (100) and `RADIAL_STEP_DEG` (34°) were measured over 1440×900 and 390×844 only. Narrower phones are unmeasured, and five items with the FAB near the screen's centre fail there.
-
-| viewport | five items, FAB positions that put a label on another item's disc or the FAB's catch (2026-09-30) |
-| --- | --- |
-| 336×746 (the operator's 360×800 phone read as a 1.072 zoom; inferred, not read off the device) | 90 of 51,744 at a 2px step; x 150–186, y 354–392 |
-| 320×568 | 182 in a 29×29 window round the centre; x 134–186, y 254–314 |
-| 360×800 | 10; x 174–186, y 396–404 |
-
-- Two items: clean everywhere swept.
-- Cause: near the centre "faces the viewport's centre" has no open side, the arc lands sideways, and about 68px is left between the FAB and the wall for a label.
-- A larger radius clears it and brings the reach back up (170px cut every word instead, 2026-09-30).
-- Before changing `RADIAL_RADIUS_PX` or `RADIAL_STEP_DEG`, re-measure at 336×746 and 320×568 as well as the two measured viewports. Sweep tooling is not saved in `.verify/`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts
-
 ## INV-6062 — probe — three pre-existing values were rewritten: `simpleList.stopBody` in ja, zh-CN, zh-TW. [LOW]
 
 three pre-existing values were rewritten: `simpleList.stopBody` in ja, zh-CN, zh-TW. [LOW]
@@ -3621,7 +3604,7 @@ expect: the second line reads {"roadmap":"lyphecli","ringInsidePane":true,...} o
 measured 2026-10-06 by chain chain-roadmap-tree-view--face-20261006-153849-ee8f, finding L1, LOW
 probe-key: 2413c5094f06dd144ffdab5d71ab4ac2b173ae2a
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useTreeRoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTreeFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/UnplacedBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useTreeRoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTreeFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/UnplacedBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
 
 ## INV-7071 — probe — LOW — The column fit's picker row carries `data-roadmap-header`, so two exist whenever the gutter and the Roadmap tab are both mounted
 
@@ -3657,35 +3640,7 @@ expect: the line ends in 1 once only one fit draws the attribute; it ends in 2 w
 measured 2026-10-06 by chain chain-roadmap-tree-view--face-20261006-153849-ee8f, finding L2, LOW
 probe-key: fecf7a9434d39a6d28e522549ac0a6949544a170
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useTreeRoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTreeFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/UnplacedBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
-
-## INV-7072 — probe — LOW: a node the filter leaves out stays selected and its panel returns when the filter clears; Iris's comment says the filter "closes it"
-
-LOW: a node the filter leaves out stays selected and its panel returns when the filter clears; Iris's comment says the filter "closes it"
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/cerberus--tab--rings-fill/probes/p1-ghost-selection.sh
-expect: the line `filter All again …` prints `"pressed":["syn-4"]` (defect stands); `"pressed":[]` once the selection is cleared with the filter, or the comment says it waits and returns
-```
-
-measured 2026-10-06 by chain chain-cerberus--tab--rings-fill-20261006-171705-2df9, finding L1, LOW
-probe-key: 7948c50366329bf844d8e591393928626ff75063
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetRings.tsx
-
-## INV-7073 — probe — LOW: `fakeRingsLayout` has no reader left but is still exported, with a docblock that says FleetRings draws it
-
-LOW: `fakeRingsLayout` has no reader left but is still exported, with a docblock that says FleetRings draws it
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/cerberus--tab--rings-fill/probes/p2-dead-fake-rings.sh
-expect: `readers: 0` with the `export const fakeRingsLayout` line and the "draws until its fill lays them out" docblock line both still printing (defect stands); `export gone` / `docblock gone` once purged
-```
-
-measured 2026-10-06 by chain chain-cerberus--tab--rings-fill-20261006-171705-2df9, finding L2, LOW
-probe-key: 8e7bb65012a45c14a01e1d17c8000cacec22fb1f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetRings.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useTreeRoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTreeFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/UnplacedBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
 
 ## INV-7074 — probe — MEDIUM — eleven live probe rows still pin a reproducer that dies on a piece this build removed; one is a live HIGH
 
@@ -11281,7 +11236,7 @@ echo "[probe exit $?]"
 measured 2026-10-26 by chain chain-accounts-usage-widget-20261026-092630-176a, finding L1, LOW
 probe-key: 11d5846ce056e1447764b4aa47aad64bb84ed743
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
 
 ## INV-9674 — probe — LOW — the refusal banner is one slot shared by two homes: it stands in the always-visible widget with nothing to end it, and opening and closing the popover wipes it
 
@@ -11326,7 +11281,7 @@ echo "[probe exit $?]"
 measured 2026-10-26 by chain chain-accounts-usage-widget-20261026-092630-176a, finding L3, LOW
 probe-key: 9c8a1c6bc101ac055a0aa75d8cec40160032b15d
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
 
 ## INV-9717 — probe — MEDIUM — `UsageRings` trusts `reading.windows` and `percent`: a reply without them takes the whole app down on every page, and a window with no figure draws a green ring reading "NaN% used"
 
@@ -14164,7 +14119,7 @@ bash "$D/p.sh"
 measured 2026-10-27 by chain chain-kaylee--avatar--target-20261027-185010-b274, finding L2, LOW
 probe-key: dff5f681cd1ce1a0eb4df2e8ca7872d27d7bc470
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs
 
 ## INV-9989 — probe — The speaking probe's header says the whole-viewport shot is "of the same moment" as the kept clip; it is not, and the phone `-page.png` shows a closed mouth
 
@@ -15956,7 +15911,7 @@ bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh"; rmdir "$D";; 
 measured 2026-10-28 by chain chain-kaylee--eyes--docs-20261028-180050-140e, finding M2, MEDIUM
 probe-key: c39fe6bb83994f5a9b45e6a7eeb6b40e5e4eed5d
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useBackToWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useShowApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useActionLapse.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useWithdraw.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useBackToWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useShowApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useActionLapse.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useWithdraw.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## INV-10102 — probe — MAN-9174: "`open` and `close_followup` have none and quote the line bare" holds for a refusal only
 
@@ -16207,7 +16162,7 @@ Behaviour: MAN-9191 (the door, the chain), MAN-9192 (the three tools), MAN-9193 
 | Run a showing that writes against the live door (port 8006) or the live server | a fake operator quote in his bank | no fake quote in the live store; `kaylee-memory-scratch.sh` refuses it |
 | Call her conversation "her memory" in a sentence, a system line, a comment or a row | a reader takes it for the bank | "her memory" names the bank alone; her conversation is her conversation (`Her conversation could not be resumed; she starts fresh`) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-chain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-announce.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-chain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-announce.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts
 
 ## INV-10165 — probe — LOW — the report's flag that the live Kaylee "has the new words only after the server next restarts" is wrong
 
@@ -16517,7 +16472,7 @@ Detail: MAN-9223 (portrait), MAN-9238 (engine), MAN-9434 (her head; its rules IN
 | There is no second face: with no atlas the disc shows its own ground, and her initial (`Avatar`) while `faceId` is null. A face is drawn from the manifest's frames and from nothing else | one face, one source |
 | A probe that makes Kaylee answer sets her model to `haiku` first, on account 1, and the page's voice switch off unless it tests speech; account 2's face is only read | the Gemini budget and the operator's own account |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSize.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceAtlas.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceHead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceMouth.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/portraitHead.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts
 
 ## INV-10264 — probe — MEDIUM — MAN-9132 keeps a sentence that the same row's formulas and MAN-9130 contradict
 
@@ -16541,7 +16496,7 @@ cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
 measured 2026-10-30 by chain chain-kaylee--face--docs-20261029-235529-9ca0, finding M2, MEDIUM
 probe-key: 642bc6d1acbc416b0f310f49933f69cc1c84f23d
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-presence-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-speaking.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/read-only-page.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-presence-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-speaking.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/read-only-page.mjs
 
 ## INV-10266 — probe — LOW — MAN-9234 and INV-10256 say the script deletes nothing and replaces one file; it replaces two
 
@@ -16676,7 +16631,7 @@ Every component of Kaylee Station keeps one law for a finger and one for a point
 ## Proof
 `.verify/kaylee-station-shots.mjs` `touch` check at 390×844: the shell's own presses, every region's, every press on the rail's three stages and every press of her cards (`NoteStage`, `WalkStage`, `StageShelf`) must be ≥ 44 px (MAN-9229, MAN-9295, MAN-9296, MAN-9297). Compact's own presses are among the shell's: the switch's segments, the count of what needs him and the bar's Compact label (`lib/station-compact.mjs`, MAN-9336, draws from 768 px up); the phone's arrangement (`lib/station-phone.mjs`, MAN-9373) at 390×844, 360×780, 390×664 and 844×390 (on its side, where every region's and the stage's presses are 44 px under `finger:` and the kit's `.vv-select--sm` as well), its own presses among the shell's: the bar's four sections, the round talk control, the count, her menu's trigger and the action's line; in a mouse window, however short (1280×600 with the switch on), a field or a dock button focused folds nothing and moves nothing: the folds wait on a touch screen as well as a short column. `.verify/kaylee-station-density.mjs` (MAN-9328) draws every region at compact density at 600×900 and 390×844 and measures every press, "Her controls" open included; its box's Send is measured after one typed letter. A disabled press (her box's Send while the field is empty) is measured with its `pointer-events` lifted for the measure: the kit's `disabled:pointer-events-none` hides it from `elementFromPoint` under a mouse (not under touch), which read its 32 px box at 600 px and never its 44 px catch. `.verify/station-doors.mjs` check 7: every button, link, tab and field in the shell is a 44 px catch on the phone (MAN-9253). `.verify/kaylee-station-rail-live.mjs`, live at 390×844 with touch: every row and fold head of the left rail is ≥ 44 px (the folds exactly 44) and a pressed session's stage stands up with its line whole (leg E: its known edge is in MAN-9306). `.verify/station-round-touch.mjs` (MAN-9304), at 390×844 and 844×390 with touch: every press of a design round on the stage, its `Other…` field open, is 44 px.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionCardChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskAnswers.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/cardBodies.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/ChatStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/CheckStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/FollowupsStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NoteStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/PageStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RailRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RoadmapRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SessionRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StageShelf.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageStates.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationConversation.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationTalk.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WalkStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhereThingsStand.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionCardChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskAnswers.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/cardBodies.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/ChatStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/CheckStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/FollowupsStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NoteStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/PageStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StageShelf.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageStates.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationConversation.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationTalk.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WalkStage.tsx
 
 ## INV-10276 — probe — The saved speech audio can be found only by the session that made it, and a failed live run loses it
 
@@ -17056,7 +17011,7 @@ node "$D/p.mjs"
 measured 2026-10-30 by chain chain-kaylee-station--since-you-last-looked--provider-20261030-031433-72f4, finding L1, LOW
 probe-key: 919f0320d2aed3bc12a0d8fc4aa30b5441c590fe
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationLandedContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-landed-provider.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-landed-provider.mjs
 
 ## INV-10299 — probe — . LOW — the builder's proof does not always put the account's stamp back
 
@@ -17070,7 +17025,7 @@ cd /home/lyphe/.claude/claudecodeui_lyphe && node .verify/station-landed-provide
 measured 2026-10-30 by chain chain-kaylee-station--since-you-last-looked--provider-20261030-031433-72f4, finding L7, LOW
 probe-key: c344e412b02b65aeb9119765693b6b2131f13b5b
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationLandedContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-landed-provider.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-landed-provider.mjs
 
 ## INV-10305 — probe — LOW: two of the rewritten rows still say the header imports `FILES_NAMED` and `baseName`, and two still name `useFaceInputs` as the hook that takes `size`
 
@@ -17095,7 +17050,7 @@ bash "$D/p.sh"
 measured 2026-10-30 by chain chain-kaylee-station--center--extract-20261030-023657-bbe0, finding L1, LOW
 probe-key: a9163a39136d11e65cc0d8b3c8afcfaa85e04c48
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## INV-10306 — probe — LOW: two comments in code name the old home
 
@@ -17115,7 +17070,7 @@ bash "$D/p.sh"
 measured 2026-10-30 by chain chain-kaylee-station--center--extract-20261030-023657-bbe0, finding L2, LOW
 probe-key: d4af649ec6cf5e7146db6575daaecaf1d9142a8a
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## INV-10311 — probe — MEDIUM — a tap on a rail row leaves its Tooltip up over the stage the press just opened (touch, 1024×768; at 390×844 it stays on the row)
 
@@ -17430,7 +17385,7 @@ cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
 measured 2026-10-30 by chain chain-kaylee-station--since-you-last-looked--whole-20261030-061159-8216, finding L1, LOW
 probe-key: 72aeb86d405c7c6f82358e22ca4c7ff3a7acc6d4
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-strip-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-strip-whole.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-strip-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-strip-whole.mjs
 
 ## INV-10322 — probe — (LOW) — 28 stale shots of an earlier numbering sit beside the 32 the final script writes, and the same step has two numbers
 
@@ -17446,7 +17401,7 @@ echo "named by an earlier numbering: $(ls station-strip-whole-*.png | grep -c -E
 measured 2026-10-30 by chain chain-kaylee-station--since-you-last-looked--whole-20261030-061159-8216, finding L2, LOW
 probe-key: fb684cffbb18d3d44d2ca44ccf2c92f022346858
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-strip-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-strip-whole.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-strip-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-strip-whole.mjs
 
 ## INV-10323 — The hold on the pressing key ends only at THAT key's release (or a window blur), so a held Enter's auto-repeat never reaches a round's first option while another key comes up
 
@@ -17499,7 +17454,7 @@ case "$D" in /tmp/athena-p7.*) rm -rf "$D" ;; esac
 measured 2026-10-30 by chain chain-kaylee-station--what-needs-you--live-20261030-053122-b863, finding L1, LOW
 probe-key: 5f86ec65e45cddec727078b4f2864faf5a21e14e
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/station-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationNeedsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/needs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useLandOnStageControl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/station-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-check-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/station-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationNeedsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/needs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/station-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-check-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-live.mjs
 
 ## INV-10325 — probe — . Two overlapping runs collide on one fixed rule path, and the loser reports a rail failure
 
@@ -17570,25 +17525,6 @@ measured 2026-10-30 by chain chain-kaylee-station--where-things-stand--whole-202
 probe-key: c7b6ba81617a0502cebb66bed34cf9c7c67ebb22
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-whole-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-rail-whole.mjs
-
-## INV-10328 — src/modules/station — the memory corner: edits that break it: it opens only by his press, it reads and never writes, his words are a line's `quote` alone, nothing is said only on hover
-
-Behaviour: MAN-9312 (the corner, its states, its presses), MAN-9293 (the read), MAN-9308 (the bank's read and the hint). The touch law: INV-10275. What a body's words may not do: INV-10122.
-
-| Edit | Breaks | Why |
-|---|---|---|
-| Open the corner from anything but his press on its line: an effect, a `companion_memory` frame, a new memory, a reconnect, a reload, a tier change, a default of `true` for `cornerOpen`, or a second writer of `cornerOpen` | the corner expands under him while he reads the rail | his words, the station arc's goal 6: "Never auto-expanded." |
-| Store `openLine`, or hand it to the pref | a reload opens his words | the open line is the wrapper's `useState`; a reload folds it |
-| Send the corner or its hook anything to her memory but `GET /api/companion/memory/lines`: a verb, a retry loop, a poll, a timer | a page writes or hammers her bank | ruling 4: only she writes, through her own door; events, never a watchdog |
-| Draw anything but a line's `quote` as his words, or its moment from anything but `saidAt` | her context stands as a quote of his | INV-10122 |
-| Say "said" or "typed" from anything but a line's `via`, or give a typed line the word "said" (or "You said") | a line he typed is labelled as spoken | the channel is the verb of the body's first quote line (`He typed (…)`), read once by `quotesOf`; the corner guesses nothing |
-| Carry his words, the count or the sentence in a `Tooltip`, a `title` or a hover-only mark | a finger loses them | INV-10275: nothing is said only on hover |
-| Show an unreadable bank in colour alone, or its count as a number | the state speaks in colour only; "0" tells empty for a bank that cannot be read | MAN-578: the count is "—" with the sentence beside it |
-| Make the corner's line, a memory's line, Try again or the page link under 44 px below 768 px | a finger misses it | INV-10275 |
-| Let two reads overlap, or drop the hint that arrives while one is out | the older answer lands last; a memory kept during a read is missed | one read in flight, one queued (MAN-9293) |
-| Build the page link in the corner | a second answer about DocSpace's origin | `docSpacePageUrl` is the one builder (MAN-485) |
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useMemoryLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/MemoryCorner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/MemoryLine.tsx
 
 ## INV-10329 — probe — the inline-card leg presses `.first()` of a name that two cards already share (cause measured; effect unverified)
 
@@ -17751,7 +17687,7 @@ case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
 measured 2026-10-30 by chain chain-kaylee-station--memory-corner--docs-20261030-080930-ab65, finding L3, LOW
 probe-key: 55c6ac418089427da906da460709a9cad651e7e7
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-chain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-announce.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-bank-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-bank-standin.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-chain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-announce.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-bank-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-bank-standin.mjs
 
 ## INV-10337 — probe — (LOW). MAN-9308's "Prove it" does not say `kaylee-memory-lines.mjs` spends a Gemini transcription
 
@@ -17771,7 +17707,7 @@ case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
 measured 2026-10-30 by chain chain-kaylee-station--memory-corner--docs-20261030-080930-ab65, finding L5, LOW
 probe-key: 01b8b000da2a064064e750273000f5aca584b321
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-announce.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-corner-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-lines.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-announce.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-corner-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-lines.mjs
 
 ## INV-10338 — probe — (LOW). MAN-485's readers sentence lost a comma and now reads as one parenthetical
 
@@ -18440,7 +18376,7 @@ grep -rnE "(min|max)-\[[0-9.]+(rem|em|vw|vh|ch|%)\]" src index.html
 # the two places tailwind.config.js `content` reads. expect: prints nothing; a line printed is an arbitrary breakpoint in a unit the screens are not, and refuses every one after it
 ```
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx, /home/lyphe/.claude/claudecodeui_lyphe/tailwind.config.js
+governs: /home/lyphe/.claude/claudecodeui_lyphe/tailwind.config.js
 
 ## INV-10385 — probe — MEDIUM — MAN-9178 (the Proof row of `kaylee-eyes-hands.mjs` / `kaylee-eyes-whole.mjs`) was not rewritten, and describes the two drivers as they were before this build
 
@@ -18949,7 +18885,7 @@ bash "$D/p.sh"
 measured 2026-10-30 by chain chain-kaylee-station--compact--compact-fill-20261030-153446-d625, finding L4, LOW
 probe-key: 3b171f189c3d4184292345dc25c6e6648258f09d
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationSection.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-compact-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-compact-live.mjs
 
 ## INV-10431 — her ears' worker: env.localModelPath is a root-relative path — an absolute URL builds a pipeline with no tokenizer and no processor, and its first call throws
 
@@ -19705,7 +19641,7 @@ echo "[probe exit $?]"
 measured 2026-10-31 by chain chain-kaylee-station--judgment--one-device-20261030-233737-0ffb, finding M1, MEDIUM
 probe-key: 3a62851b9da05ab1e79c194118ecd23bbaad32b3
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
 
 ## INV-10514 — probe — a touch window 768 px or wider swaps its whole arrangement under the keyboard's own shrink, and her box loses the focus (INHERITED from HEAD, now carried to the doors by B3; not introduced by this diff)
 
@@ -19745,7 +19681,7 @@ echo "[probe exit $?]"
 measured 2026-10-31 by chain chain-kaylee-station--judgment--one-device-20261030-233737-0ffb, finding M2, MEDIUM
 probe-key: a1f3d0b71e8e3f52cc2d49fe2bbe76bc60831e96
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
 
 ## INV-10516 — probe — compact's fold no longer needs a focused field, so a visual-viewport gap with no keys (an iOS pinch-zoom, as the hook's own doc says) folds the strip's line and the switch in a short compact column
 
@@ -19782,7 +19718,7 @@ echo "[probe exit $?]"
 measured 2026-10-31 by chain chain-kaylee-station--judgment--one-device-20261030-233737-0ffb, finding L2, LOW
 probe-key: c55eaabfab9c89b9a3d12470417e84edb0d5616c
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
 
 ## INV-10517 — probe — `kaylee-station-rail-live.mjs`'s phone leg throws in its helper before any claim runs
 
@@ -19808,7 +19744,7 @@ bash "$D/p.sh"; cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; e
 measured 2026-10-31 by chain chain-kaylee-station--judgment--deletions-20261030-233741-543b, finding M1, MEDIUM
 probe-key: eb5c0ed39da5a883b91d376f48692620d4e0f1b4
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageStates.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageStates.tsx
 
 ## INV-10518 — probe — "READ-ONLY" is true of presses and false of the page's own mount: every page POSTs `/api/companion/floor` and `/api/auth/refresh`
 
@@ -20057,7 +19993,7 @@ echo "[probe exit $?]"
 measured 2026-10-31 by chain chain-kaylee-memory-typed-lines-20261031-060528-f21d, finding L1, LOW
 probe-key: 0e8e383bd4c792e05bf5cf42b03bd091c4329fd9
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-typed.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-typed.mjs
 
 ## INV-10527 — probe — LOW — a typed line over 2,000 characters reaches her as a raw validation error, and her words never name the cap
 
@@ -20097,7 +20033,7 @@ echo "[probe exit $?]"
 measured 2026-10-31 by chain chain-kaylee-memory-typed-lines-20261031-060528-f21d, finding L2, LOW
 probe-key: 944e6fd1e198bead1d12f8c940e3566eb6e9a1f4
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-typed.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-typed.mjs
 
 ## INV-10528 — probe seed — a station probe that reads her conversation or her head's face disc seeds CHAT_VIEW_RECORD
 
@@ -20316,7 +20252,7 @@ echo "[probe exit $?]"
 measured 2026-10-31 by chain chain-kaylee-portrait-sharp-20261031-070043-6b3a, finding M1, MEDIUM
 probe-key: b56127897b8041c4cd667e2eb5223a4b28b5da95
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCanvasBackingSide.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSize.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDevicePixelRatio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceAtlas.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-portrait-sharp-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-portrait-sharp-live.mjs
 
 ## INV-10542 — probe — LOW — the reason the active disc stops at 120 px is stated in 256 px frames, and the change made that reason false
 
@@ -20332,7 +20268,7 @@ echo "[probe exit $?]"
 measured 2026-10-31 by chain chain-kaylee-portrait-sharp-20261031-070043-6b3a, finding L1, LOW
 probe-key: 0ed4fbe1fa2ad0bd3e68505f14f27ead078f9cd5
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCanvasBackingSide.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSize.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDevicePixelRatio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceAtlas.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-portrait-sharp-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-portrait-sharp-live.mjs
 
 ## INV-10548 — probe — replay check 2 (every piece of her 7.3 s sentence announced within 1.5 s of its last sample): NOT CLOSED, and now shown to be a coin flip
 
@@ -20391,7 +20327,7 @@ Server: MAN-9413 (pieces, follower), MAN-9412 (Rhubarb), MAN-9414 (proof). Page:
 | No switch turns the exact mouth on or off: a binary that is there is used, one that is not leaves the level mouth | nothing ships dark |
 | `PIECE_RULES`, `RHUBARB_ARGUMENTS` and `MAX_RUNS` are named constants in their files | each is measured (MAN-9413, MAN-9412); one place changes it |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/install-rhubarb.sh, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-cues.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-follow.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-pieces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/rhubarb.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceMouth.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/install-rhubarb.sh, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-cues.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-follow.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-pieces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/rhubarb.ts
 
 ## INV-10559 — probe — `src/modules/companion/CompanionAttachmentStrip.tsx:117` — when no sentence follows his line, the pin covers what her portrait shows: her turn that broke, or her answer after Stop
 
@@ -20949,28 +20885,6 @@ probe-key: b1b4efb3130646ca23092ff85f3c20c13e0a79ba
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-breath-page.mjs
 
-## INV-10600 — src/modules/companion — her head while she speaks: the rules later edits keep
-
-Detail: MAN-9434 (the head), MAN-9435 (its proof), INV-10257 (the portrait's rules).
-
-| rule | why |
-|---|---|
-| Her head is two CSS variables on the two layers, `--kaylee-bob` and `--kaylee-roll`. The engine answers the numbers (`FaceDraw.head`) and touches no node; `portraitHead.ts` writes them, only when the string changes | the engine is pure code; sixty writes a second must cost no render |
-| It moves in the picture's plane only and picks no frame: it opens no mouth and turns no head | her speaking frames face forward; no frame has an open mouth on a turned head |
-| The bob and roll are the individual `translate` and `rotate` of the layer, inside `@media (prefers-reduced-motion: no-preference)`, and `will-change` names `transform, translate, rotate` | they compose with the lean's `transform`, so its easing never smears a beat |
-| The sum is held to ±0.9% bob and ±1.8° roll. Raise a bound only with the rim arithmetic of MAN-9223 §"Layers" redone and measured painted | the bob's 0.95% of the disc and the breath's 0.64% leave 1.73% of the 3.32% rim slack; a clip's lift of 1.59% and the breath leave 1.09% for a painted edge |
-| A clip's keyframes rest on the bob at their rest stops (`translate: 0 var(--kaylee-bob, 0%)`) and lift from it at their lift stops (absolute), never adding the lift to the bob | added to the bob, a clip's lift would leave 0.14% of the rim slack (1.09% after the clip and the breath, less the bob's 0.95%): 0.16 px at 115 px against a painted edge's 0.7 px |
-| The hair shows the head `--kaylee-lag` behind the face by a history of the engine's answers, never by a CSS delay or transition on the variables | a transition on the layer's `translate` or `rotate` would smear a beat |
-| The history is pruned by age: every step drops the samples older than the one the hair shows. `TRAIL_LENGTH` is a safety bound and never its length | a count cap alone fell short of the lag above 167 Hz |
-| Both variables leave both layers only once the engine's head is null and the hair's sample is null; the loop asks for animation frames until then | the hair finishes the motion it began late: gone 90 ms after the head's 300 ms settle |
-| `lagMs` (`--kaylee-lag`) is read once per loop, never per frame | a computed-style read after each frame's writes forces a restyle each frame |
-| Her voice's level is the head's only input: a page that plays no voice draws no head, and a non-finite level reads as silence | NaN would sit in the envelope until she rests |
-| The head draws from its own generator (`seed ^ HEAD_SEED_SALT`), never the engine's | the blink and glance draws keep their order |
-| Under reduced motion the head is always null, no variable is written, and none stays on a layer | no movement under reduced motion |
-| The strength floor is `HALF_OPEN_AT`, exported by `faceMouth.ts`; the head never carries a second 0.035 | the one owner of a constant |
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceHead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceMouth.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/portraitHead.ts
-
 ## INV-10601 — probe — MEDIUM — the replay's state check cannot fail, so "ends at any other state" is unguarded
 
 MEDIUM — the replay's state check cannot fail, so "ends at any other state" is unguarded
@@ -21000,7 +20914,7 @@ bash "$D/p.sh"; case "$D" in /tmp/athena-fence.*) rm -rf "$D" ;; esac
 measured 2026-11-01 by chain chain-animate-kaylee--eyes-and-brows--brows-20261031-235854-0e0a, finding M1, MEDIUM
 probe-key: 0c1099c6380a1973c0d2f130cf6b4a2aef7b4485
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBrows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceNames.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-brows.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-brows.ts
 
 ## INV-10602 — probe — LOW — nothing in the replay guards the lift's clear when the next sentence starts
 
@@ -21041,7 +20955,7 @@ bash "$D/p.sh"; case "$D" in /tmp/athena-fence.*) rm -rf "$D" ;; esac
 measured 2026-11-01 by chain chain-animate-kaylee--eyes-and-brows--brows-20261031-235854-0e0a, finding L1, LOW
 probe-key: 56ce0248a28a502b4cb8bd2eddbe90acaa0f1680
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBrows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceNames.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-brows.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-brows.ts
 
 ## INV-10607 — probe — LOW — the probe and its row never say it takes about 5½ minutes
 
@@ -21057,7 +20971,7 @@ docstore get MAN-9440 --text | grep -n -i -E "minutes|run time|takes about|in th
 measured 2026-11-01 by chain chain-animate-kaylee--eyes-and-brows--page-20261101-010730-d04a, finding L3, LOW
 probe-key: 9a6e0e5197ae300c1c076403941a03b1530fc165
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBlink.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-brows-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-full.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-reduced.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-stage.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/kaylee-eyes-brows-page/last-run.txt
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-brows-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-full.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-reduced.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-stage.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/kaylee-eyes-brows-page/last-run.txt
 
 ## INV-10608 — probe — MEDIUM — the head probe, the deliverable's own proof, fails on a correct portrait about 2 runs in 7 at the box's ordinary load
 
@@ -21349,7 +21263,7 @@ cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
 measured 2026-11-01 by chain chain-animate-kaylee--judgment--docs-20261101-060804-2d4c, finding L1, LOW
 probe-key: cd77d20146feb6e1360a81cc719aea7ac12851c7
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
 
 ## INV-10619 — probe — LOW — no row says when the engine asks no carry, or that the cut's blink waits for a still step; two guards the blink-fade phase added to the engine
 
@@ -21371,7 +21285,7 @@ cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
 measured 2026-11-01 by chain chain-animate-kaylee--judgment--docs-20261101-060804-2d4c, finding L2, LOW
 probe-key: c808120c4d8fda10c79a4e6965316045ceeffa65
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBlink.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-blinks.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-kit.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-blinks.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-kit.ts
 
 ## INV-10620 — probe — LOW — stale probe row INV-10617: the defect it names is cured, its fence prints a line in both states, and it still reads as a standing defect
 
@@ -23829,7 +23743,7 @@ echo "[probe exit $?]"
 measured 2026-11-07 by chain chain-five-hour-cloudcli-20261107-061051-7645, finding L1, LOW
 probe-key: d34489bd9e1faaaea65c51258bfdd4b68dfb2817
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-pace.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-store-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRing.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/hooks/useGutterPlacements.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-pace.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-store-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRing.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
 
 ## INV-11288 — probe — LOW — "the two usage windows" still stands on the sentence next to the builder's edit
 
@@ -23844,7 +23758,7 @@ echo "[probe exit $?]"
 measured 2026-11-07 by chain chain-five-hour-cloudcli-20261107-061051-7645, finding L2, LOW
 probe-key: 9a6469ed029e3fc91286e66b6a582168e46face4
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-pace.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-store-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRing.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/hooks/useGutterPlacements.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-pace.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-store-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRing.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
 
 ## INV-11289 — probe — LOW — two pinned probe rows can no longer print their cured state: INV-10425 and INV-10427 expect `windows=2`, the parser now returns one
 
@@ -23859,7 +23773,7 @@ echo "[probe exit $?]"
 measured 2026-11-07 by chain chain-five-hour-cloudcli-20261107-061051-7645, finding L3, LOW
 probe-key: aa1e51b581ad4e1ccde6600610778bf14a2eb05c
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-pace.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-store-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRing.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/hooks/useGutterPlacements.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-pace.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-store-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRing.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
 
 ## INV-11297 — The Planning card — what an editor of its files must not break
 
@@ -23898,7 +23812,7 @@ echo "[probe exit $?]"
 measured 2026-11-07 by chain chain-planning-card-leftovers-20261107-103915-f48d, finding M1, MEDIUM
 probe-key: eef46382aadcdbd60f415c29d36c9c24e8b803ed
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/GutterWidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
 
 ## INV-11354 — probe — LOW — "two identical panels on one layer" stands in `ChatGutterLayout.tsx` and in MAN-422 after the two layers were split; the report says those statements were corrected
 
@@ -23921,7 +23835,7 @@ echo "[probe exit $?]"
 measured 2026-11-07 by chain chain-planning-card-leftovers-20261107-103915-f48d, finding L1, LOW
 probe-key: dbf5b03bdf2bc168bc285a11813d911e8408d9bf
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/GutterWidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
 
 ## INV-11355 — probe — LOW — the proof script's header promises more than its code does
 
@@ -23944,7 +23858,7 @@ echo "[probe exit $?]"
 measured 2026-11-07 by chain chain-planning-card-leftovers-20261107-103915-f48d, finding L2, LOW
 probe-key: 8d5a32380ef782861cefcbe7b39d10c2beb42cba
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/GutterWidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
 
 ## INV-11365 — the memory door's approve writes the operator's real shelves from os.homedir() — a scratch DATABASE_PATH moves the queue, never the shelves
 

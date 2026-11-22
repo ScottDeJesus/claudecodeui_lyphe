@@ -825,7 +825,7 @@ The chat's state hooks bind timers, frames, listeners and observers to `useHostW
 - Both exit 1 with the failed checks listed. The move probe sends no model turn and writes no app data.
 - `.verify/lib/scratch-chat.mjs` is the shared helper for a probe that sends a real turn: `createScratchChat(session, projectPath?)` (default `PROBE_PROJECT`, `.verify/lib/probe-project.mjs`; a probe that needs a node-assigned project names a scratch project, and only `cerberus-eis-proof.mjs` may name the real `/opt/eis-app`, MAN-7924), `openScratchChatOnHaiku(session, id)` (opens `/session/<id>`; when the rail's Chat button (`nav[aria-label="Views"] button[aria-label="Chat"]`) is not `aria-current`, opens the drawer (`openDrawer` from `lib/layout-nav.mjs`, a phone's rail sits in it) and presses the button; picks Haiku in the composer's `MODEL_CHIP`; throws if the chip does not read Haiku, so no turn is sent), `sendTurn(page, text)`, `deleteScratchChat(session, id)`; constants `MODEL_CHIP`, `SCROLLER`, `COMPOSER`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useEscapeToAbortSession.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamFlushTimer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMicRecorder.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-move.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamFlushTimer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMicRecorder.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-move.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs
 
 ## MAN-7464 — chat-host — the live chat's one node, its provider and its slot
 
@@ -974,7 +974,7 @@ Every unit has `hostWindow` in the dependency list of each effect that binds to 
 - `postTheme`'s opener-document read: the window probe stays green if it reads the window's document. A pin needs a theme flip with a widget in the window, which writes the account's theme preference and needs a restore.
 - `chat-host` has no provider yet (MAN-7464): every window scenario runs in the probe's fixture.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/CommandMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerPermissionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ScheduleMessagePopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useComposerMenuAnchor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatExportMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/MessageCopyControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/chatExport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/DocSpaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/readVerveTokens.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/CommandMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerPermissionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ScheduleMessagePopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useComposerMenuAnchor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatExportMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/MessageCopyControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/chatExport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/DocSpaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/readVerveTokens.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs
 
 ## MAN-7467 — chat-host chrome — ChatHostPanel, ChatHostHeader, ChatHostPlaceholder and the fixture that photographs them
 
@@ -1098,7 +1098,7 @@ The switcher's radial: the acts that can run drawn on an arc around the FAB, eac
 | `utils/radialLabels.ts` | `estimateLabelWidth(label, shortcut, textClip = Infinity)`, `planRadialLabels(points, labels, viewport, centre)` → `RadialLabelPlan` (`{ sides, textClip }`), `labelTranslate(side, point)`, type `RadialLabelSide` (`right` \| `left` \| `above` \| `below`) |
 | `AppSwitcherFab.tsx` | mounts the radial as a sibling of `DockableFab`, never its parent: the FAB is one node for life, and a radial inside it would unmount it and the drag's pointer capture. Owns `radialOpenedBy: 'pointer' \| 'keyboard' \| null` (the input that opened it), `acts = useSwitcherActions(chatDoor)` less its `disabled` acts, `drawnActs` (those acts as last drawn while open; the close fades from them, so Close app, which takes the application down in the press that closes the radial, leaves the fading arc as it was), `points = radialLayout(fabRect, viewport, drawn count)` and `origin` from the rect the kit reports, and `open = radialOpenedBy !== null && !chatDoor.floating` |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
 
 ## MAN-9126 — app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that — Open and close
 section: app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that photographs them/001 Open and close
@@ -1112,7 +1112,7 @@ section: app-switcher radial — AppSwitcherRadial, radialLabels and the fixture
 7. Item `onClick`: `if (!open) return;`, then `act.run()`, `onClose()`; a keyboard click (`event.detail === 0`) gives the FAB its focus back. why `!open`: items stay hit-testable through the close fade (`visibility` waits `FADE_MS`), and a second click ran Reload and Open in a new tab twice. why FAB focus: the item is about to hide, and the drawer's close restores focus to what held it when it opened.
 8. Keyboard: items found with `querySelectorAll('[role="menuitem"]')` on the container ref, no per-item refs. ArrowDown/ArrowRight forward, ArrowUp/ArrowLeft back, over the drawn items, wrapping; from focus off an item, forward starts at the first and back at the last. Enter and Space are the focused item's click; a repeat of either (`event.repeat`) is ignored. why: a held Enter on the first item toggled Chat over and over.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
 
 ## MAN-9127 — app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that — `AppSwitcherRadial` rules
 section: app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that photographs them/002 `AppSwitcherRadial` rules
@@ -1135,7 +1135,7 @@ section: app-switcher radial — AppSwitcherRadial, radialLabels and the fixture
 5. Whole words first; then `CLIPPED_TEXT_STEPS_PX = [64, 48]` in order. Stops at cost 0. A cut is kept only if it covers STRICTLY less than the plan before it. A cut word is `truncate` with `maxWidth: textClip`; the chip is never cut and the button's name stays the whole word.
 6. `labelTranslate` returns a CSS `transform` whose `clamp()` holds the pill `LABEL_EDGE_PX` inside the viewport walls; no measurement, no resize listener.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
 
 ## MAN-9128 — app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that — Words
 section: app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that photographs them/003 Words
@@ -1150,7 +1150,7 @@ Open:
 - Docked top-left with five items the corner arc reaches about 167px; open arcs reach 100px, two items always 100px. About 4% of the phone's FAB positions cut a word short. Narrower phones, five items near the screen's centre: INV-6057.
 - `.verify/` is gitignored; force-add to commit.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
 
 ## MAN-7478 — chat-host floating — ChatHostFloating, useFloatingPanel, the anchor store, useChatDoor, useChatHotkey and the proof that floats the chat
 
@@ -1209,7 +1209,7 @@ Open:
 - The stored panel width can be fractional.
 - `.verify/` is gitignored; force-add to commit.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostFloating.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePanelViewport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/anchorStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatHotkey.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostFloating.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePanelViewport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/anchorStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatHotkey.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
 
 ## MAN-7479 — chat-host window — the picture-in-picture host: its request, its mirror, its column and its pagehide
 
@@ -5276,7 +5276,7 @@ section: src/modules/companion — Kaylee's panel, rail door and Settings sectio
 
 - `CompanionActionCard` (the action waiting for his word, `picture.pending`): in the dock above the draft, keyed by `pending.id`, a `role="region"` named by its head. Its second home is the head of the station's right rail, "What needs you" (`WhatNeedsYouView`, MAN-9281, through the module's barrel), above the items: the same card, keyed by `pending.id`, with `name` and a `onWithdraw` of `() => cancelAction(<the pending id>)`. The card's own rules hold there (the head, the wells, his lines whole, the foot, the ×, the lapse deadline); the dock's do not, since the rail has no log, notes or draft: the room taken from the log down to its floor, the dock's scroll, and `empty:hidden` on a lapsed card alone. A lapsed card leaves the rail's items where they were (MAN-9281). The rail's scroller is a size container (`[container-type:size]`), as the panel's dock is, so the `cqh` caps below are shares of the rail, in a column and in compact's Needs you section alike (MAN-9329). The head "Waiting for your word" in the warn tone with the Roadmap's amber pulse; the action as a sentence (`companion.action.verb.*`: the verb, then the target's `spoken` in its weight) over the target's kind and house names (a run's whole id, a page's id and block; her memory, "Your memory, N things kept": `companion.action.kind.memory_one` / `_other`; `targetFacts` also has a `check` branch, `Check · <node> · <key>`, that the card never draws: a check is what her open records and no pending action holds one), wrapping to two lines (`line-clamp-2`; the `title` holds the whole line); the prompt, or a follow-up's words, through `QuestionText` (as the Roadmap draws the census) in a well capped at 30cqh, 12cqh beside his lines; his carried lines quoted, each with its 24-hour time, under each question's label, in a well of their own. HIS LINES ARE THE LAST TO GIVE WAY: they travel word for word, so their well has no cap, no scroll and no tab stop and they stand whole at any length; while the card stands the dock has no cap, so the room comes first from the log (down to its 3.5rem floor), then from the notes and the draft's field, and past that the dock scrolls as one region with the sticky foot in sight. The prompt gives way instead: 12cqh beside his lines, and in a round (`answer`) the questions with their options fold behind "The questions, with their options" (kit `Collapsible`, `CardFoldBody`: inert while folded; 24cqh opened), since each question heads his answers to it; a labelled group with no lines is a question he left unanswered, said as "No answer — it goes as “(no answer)”" with ▲ (the hands send one group per question of the round). Groups are keyed by their place. The foot (`data-companion-action-foot`) in the tone's wash, "Lapses at HH:MM" (the clock her prepare answer says it in) and, under it, a refused Withdraw's sentence, is sticky to the dock's bottom edge (`-bottom-1`, a ring of `--surface` masking what passes under it), so in a dock too short for the card (a phone's keyboard up, a phone on its side) its lapse and a refused Withdraw stay in sight. The card gives him no phrase to say, and no mic stands on it: she reads the action back in her own words and judges from the conversation whether he agreed; the talk button is the composer's and the station's (MAN-9324). The Withdraw × (`aria-label` "Withdraw") is drawn only given `onWithdraw` (optional on the view and the card; the live `CompanionPanel` passes `() => cancelAction(<the pending id>)`, so the × withdraws the action on screen and none is passed while there is none); its hint stands to its left. It is 28 px to look at, with a 40 px catch under a mouse and a 44 px catch under a finger (a transparent `::before`, `finger:before:-inset-2`; INV-10275), as its fold of the questions is `finger:min-h-11`. A press (`hooks/useWithdraw.ts`) calls `onWithdraw()` once: the × is busy while it is out, and a refusal is said inside the foot (`companion.action.withdrawRefused` with the server's sentence, else — no sentence, or no answer — `withdrawRefusedPlain`); withdrawn, the provider clears that action from the picture (only while it still holds it) and the card goes with it. It stands whole (`shrink-0`). THE LAPSE IS A DEADLINE, NOT A CLOCK (`hooks/useActionLapse.ts`, `useActionLapse(expiresAt: string | null): boolean`): one `window.setTimeout` to `pending.expiresAt`, set when the card mounts and cleared when it unmounts or the deadline changes (the panel keys the card by `pending.id`, so a new action is a new card); from that moment the card draws nothing, and an action already past its time never draws. A stamp that is not a time sets no timer and never lapses; `null` is no action at all. Three readers share it: the card, `CompanionActionLine` (below), and, through the barrel, `useNeedsCount` (MAN-9346), which stays mounted across actions and counts a lapsed one out. The server closes the row itself at the next prepare, take or cancel. A lapsed card alone in the dock closes it (`empty:hidden`). Every word is a `t()` with its English default (`companion.action.*`). Fixtures: `FAKE_PANEL.action*`; `actionRound` is a three-question round at the length he really speaks (his spoken lines average 96 characters), its third question unanswered.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useActionLapse.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useWithdraw.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useActionLapse.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useWithdraw.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9395 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — `CompanionActionLine` (`CompanionActionLine.tsx`; props `pending: CompanionPendingAction`
 section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/003 `CompanionActionLine` (`CompanionActionLine.tsx`; props `pending: CompanionPendingAction`
@@ -7788,7 +7788,7 @@ Rim arithmetic: MAN-9223 §"Layers". The head's variables: MAN-9434. Proof: MAN-
 - Shots: `.verify/shots/kaylee-avatar-{motion,reduced}-{light,dark}.png`.
 - 2026-11-01, the 158-frame face: 38 PASS, 0 FAIL, light and dark; `once`: 4 requests (the manifest and the 256 px tier's `sheet-256-0.webp`, `-1` and `-2`).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
 
 ## MAN-9125 — src/modules/companion — her disc and her rail cell: CompanionFabView, CompanionDockView, the layer, the glide and hop, her phone corner, stacking and the fixture
 
@@ -7829,7 +7829,7 @@ Live: `WorkspaceFrame` renders `CompanionFab` after `AppSwitcherFab`; `Workspace
 | `data-tracking` | she has landed at the look drawn |
 | `data-resizing` | the disc's size changed in the last 400 ms (`useSizeEasing`): its width, height, left and top ease (MAN-9224) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-chrome.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-phone.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-chrome.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-phone.mjs
 
 ## MAN-9224 — src/modules/companion — her disc and her rail cell: CompanionFabView — Motion (`CompanionFab.css`)
 section: src/modules/companion — her disc and her rail cell: CompanionFabView, CompanionDockView, the layer, the glide and hop, her phone corner, stacking and the fixture/001 Motion (`CompanionFab.css`)
@@ -7858,7 +7858,7 @@ section: src/modules/companion — her disc and her rail cell: CompanionFabView,
 - Measured at 390×844 on a chat: she hides ~4 characters of one line of his text ("ay f"), beside the 4 the applications button hides ("m th"); that line is a short message's only line, or the line before the one he types. Keyboard up on Android (390×508): she at y 396 on the field, the applications button at y 472.
 - Rejected spots: directly above the applications button (the conversation's newest lines and the thumb's scroll lane; `touch-action: none` makes a scroll that starts on a catch drag the disc); high in that column (Files chips, Git tabs: a press meant for them opens her panel).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-chrome.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-phone.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-chrome.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-phone.mjs
 
 ## MAN-9225 — src/modules/companion — her disc and her rail cell: CompanionFabView — `CompanionDockView({ seated, away, open, name, onPress, onRect })`
 section: src/modules/companion — her disc and her rail cell: CompanionFabView, CompanionDockView, the layer, the glide and hop, her phone corner, stacking and the fixture/002 `CompanionDockView({ seated, away, open, name, onPress, onRect })`
@@ -7878,7 +7878,7 @@ section: src/modules/companion — her disc and her rail cell: CompanionFabView,
 - `registerDock` believes a rect only through `dockableRect` (`src/shared/utils.ts`, shared with app-switcher). why: a phone's hidden rail keeps a layout box and would place her off screen.
 - Outside her module: with the keyboard up on Android the applications button's stored point is clamped onto the left half of Send (app-switcher's placement rule).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-chrome.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-phone.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-chrome.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-phone.mjs
 
 ## MAN-9226 — src/modules/companion — her disc and her rail cell: CompanionFabView — Proof — `.verify/kaylee-fab-chrome.mjs`
 section: src/modules/companion — her disc and her rail cell: CompanionFabView, CompanionDockView, the layer, the glide and hop, her phone corner, stacking and the fixture/003 Proof — `.verify/kaylee-fab-chrome.mjs`
@@ -7894,7 +7894,7 @@ node .verify/kaylee-fab-chrome.mjs
 - The pointer: `.vv-fab:active` paints the disc at 0.92 about its centre, and `DockableFab` measures the press by the box's PLACED size (`placedRect`), so a dragged disc sits under the pointer at any size; the pointer checks allow 0.5 px (`POINTER_PX`) and the rests are read exactly against the point the kit stored.
 - 2026-10-30: ALL PASS, 64 of 64 checks, exit 0, 2 min 19 s, with the disc and the cell mounted live beside the fixtures.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-chrome.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-phone.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-chrome.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-phone.mjs
 
 ## MAN-9129 — src/modules/companion — her disc and her cell on the page: the provider's fab state, `companion-fab`, the button's label and look, the face's bindings
 
@@ -7950,7 +7950,7 @@ What the live `CompanionFab` and `CompanionDock` read from `useCompanion()` and 
 ## The mouth
 - The portrait's loop reads `voice.level()`, `voice.progress()` and `voice.mouth(turnId, index)` while `presence` is `speaking` (MAN-9223); `CompanionAvatar` runs no loop of its own. `level` is 0..1 already (the player clamps it). Measured peaks of a spoken sentence: 0.38–0.42 (2026-10-27). Where `mouth` holds an announced piece at the audio's place the mouth is that shape's, and elsewhere the level's (MAN-9239).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionFab.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionFabStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/presenceWords.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionFab.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionFabStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/presenceWords.ts
 
 ## MAN-9130 — src/modules/companion — Proof — .verify/kaylee-fab-motion.mjs, kaylee-fab-presence-frames.mjs, kaylee-fab-speaking.mjs (her button on the live page) and lib/kaylee-fab-live.mjs
 
@@ -8119,7 +8119,7 @@ Three looks, tried in this order; the first that applies is the only one tried.
 - `node .verify/kaylee-avatar-target.mjs [--strict]` (live client `:5183`; `--strict` mounts under `React.StrictMode`): `lib/avatar-target-kit.mjs` registers four anchors and steps a scripted presence; prints key, rect and what is attached at each step. No model call. 2026-10-27: ALL PASS, 32 checks: row, tree, rail fallback, covered, clipped, 0×0, below the fold, under the button, the 1.5 s hold, the send look's 5501 ms, nothing attached at home, nothing left after unmount.
 - On the live page with a real turn (Haiku): MAN-9130.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs
 
 ## MAN-9142 — server/modules/companion — the house: the readers only a module instance holds, handed in by the entrypoint (`house.ts`)
 
@@ -9686,68 +9686,6 @@ why: the text of the fresh-start handover is the house summarizer's account of t
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-oneshot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-handover.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-real.mjs
 
-## MAN-9220 — src/modules/companion — her face card: CompanionFaceSettingsView, the looks she wears, the switch, the band, the remove question and the contact-sheet lightbox
-
-`CompanionFaceSettingsView` (`src/modules/companion/CompanionFaceSettings.tsx`) is Settings > Voice > Companion's "Her face" card: the look she wears, the switch between the looks that are made, and the photo he makes a look from. The page's wiring: `CompanionFaceSettings({ name, face })` over `useCompanionFaceSettings(face)`. The section that places it: MAN-9062 §Parts. The slot, the container and the hook: MAN-9437. Proof: MAN-9221.
-
-## `CompanionFaceSettingsView` — props
-| prop | shape | contract |
-|---|---|---|
-| `face` | `CompanionFace` (`src/shared/companion-types.ts`) | `id` the face drawn now (the pick's, else the first look's that has a face: the house default's whenever it has one; `null` = none made at all), `avatar` the key of the look `id` is the face of (the one he picked while it has a face, else the first that has one), `avatars` the looks, each `{ key, label, faceId, bake }`: the house's in the server's order, then `own` (his photo) while he has one. `faceId === null` = not made; `bake` = its making |
-| `portrait` | `ReactNode` | her idle portrait filling the 96px square (`size-24`); the square does not clip, `CompanionAvatar` owns its round mask |
-| `uploading` | `boolean` | Upload a photo busy: glyph `Loader2`, a second press refused, focus kept |
-| `refusal` | `string \| null` | a refused upload's sentence (the server's, MAN-9236 §Refusals), drawn in place of the helper |
-| `pickRefusal` | `string \| null` | a refused pick's sentence (a 400: no look of that name, or one not made yet), drawn under the buttons above the helper |
-| `contactUrl` | `string \| null` | the contact sheet's object URL while the lightbox is open |
-| `framesOpening` | `boolean` | See every frame busy while its sheet is fetched, as Upload |
-| `onUpload(file)` | `File` | one JPEG, PNG or WebP |
-| `onPick(key)` | `(avatar: string) => void` | a look's `key` chosen on the switch |
-| `onRemove()` | `() => void` | called from the confirm alone |
-| `onSeeFrames()` / `onCloseFrames()` | `() => void` | the sheet is asked for / the lightbox closed (Escape, ✕, backdrop) |
-
-## The look drawn — root `[data-companion-face=<key>|none]`
-- Worn look: the look whose `faceId === face.id`, the pick's before another that shares the face (his upload of a house photo); else the pick while `face.id === null`. Root `data-companion-face` is its `key` (`original`, `office`, `own`), `none` while `face.id === null`.
-- Line `[data-companion-face-line]` (`role=status`): the worn look's `label` ("Dark hair", "Brown hair", "Your photo"); `face.id === null`: "{{label}} isn't made yet." (`none`); no look listed: "Her face isn't made yet." (`noneAtAll`).
-- Portrait: the worn look's face alone. A pick is instant and reversible, so no other look's face is decoded.
-- Layout by the card's own width (`[container-type:inline-size]`): from 30rem the portrait stands left of title, line and controls; narrower, portrait and words are row one, controls take the width under them. Every button is `[@media(pointer:coarse)]:min-h-11` (44px).
-
-## The switch — `[data-companion-face-switch]`
-- The kit's `SegmentedControl` (MAN-8580) named "Her face": options are the looks with a `faceId`, in the server's order; `value` is `face.avatar`. Drawn while two or more looks are made (`LOOKS_TO_SWITCH`). A look not made is a band row, never an option.
-- `onChange` calls `onPick(key)` only when `key !== face.avatar`: the look she wears sends nothing.
-
-## Controls, helper, refusals
-- Upload a photo (hidden file input, one JPEG, PNG or WebP); See every frame while `face.id !== null`; Remove your photo (`[data-companion-face-remove]`, ghost) while an `own` look is among `avatars` (made, being made or failed).
-- Under the buttons: `pickRefusal` (`[data-companion-face-pick-refusal]`), then the helper `[data-companion-face-help=help|refused]`, `aria-describedby` of Upload: "A JPEG, PNG or WebP where her face is clear, facing forward and not cut off." (no pixel figure; the server owns it). `refusal` replaces the helper. Both refusals: `role=alert`, `data-tone=warn`, `▲` `aria-hidden`, `WholeWords`.
-
-## The band — `[data-companion-face-making]`, `border-t`
-One row per look with a `bake`, server order, `[data-companion-face-row=<key>][data-companion-face-bake=queued|baking|failed]`. A look made again is an option and a row.
-| `bake.state` | row |
-|---|---|
-| `baking` | `Meter`: "Making {{label}}", "{{done}} of {{total}} frames"; "Her current face stays until it is ready." only while `face.id !== null` and the look is `own` or the pick (`face.avatar`) |
-| `queued` | muted `Clock` line "{{label}} waits for another face to finish." |
-| `failed` | warn `Banner`: "{{label}} wasn't made." (medium weight) leading the server's sentence in `WholeWords` (a hyphen never breaks `scripts/install-comfyui.sh`) |
-- One `sr-only` `role=status` `aria-atomic=false` region (`[data-companion-face-announce]`) holds one `<p>` per row: the row's words, a failure with its sentence, never a frame count. A row is said when it arrives or its state changes; the band is not live, so a card opened mid-bake announces nothing. The line is polite too, so a pick's change of look is said.
-- A control that leaves while focused (Remove once his photo is gone, the switch once fewer than two looks are made) hands the focus that fell to the page to Upload a photo (`followed` ref: only a change moves focus).
-
-## The question — `ConfirmDialog`, `wrapperClassName="z-[10000]"`
-- Remove your photo opens it: title "Remove your photo?", message "The face made from it is removed." plus " She goes back to {{label}}." while `face.avatar === 'own'` (`label` = the first look that is not `own`). Actions: Cancel (`outline`) first, then "Remove your photo" (destructive) = `onRemove()`.
-- Cancel, Escape and the backdrop put it away and send nothing; focus returns to Remove. A question left open when no `own` look remains is reset while rendering.
-- The view has no `removing` prop; a failed remove is the hook's toast (the memory card's pattern, `useCompanionMemorySettings`).
-
-## See every frame — `Lightbox`
-- Offered while `face.id !== null`. `contactUrl` renders the kit `Lightbox` (MAN-7426; top layer, above Settings) named "Every frame of her face" around an `<img data-companion-face-contact>`. Escape closes the lightbox alone; focus returns to See every frame.
-
-## Strings
-- `voiceSettings.companion.face.*` (`en/settings.json`, `t()` with English `defaultValue`s): `title`, `none`, `noneAtAll`, `upload`, `help`, `frames`, `framesLabel`, `remove`, `removeTitle`, `removeMessage`, `removeBack`, `removeConfirm`, `cancel`, `making`, `progress`, `stays`, `queued`, `failed`, and the hook's own `uploadFailed`, `pickFailed` ("That look couldn't be picked. Try again."), `removeFailed` ("Your photo wasn't removed"), `framesFailed`. `{{label}}` is a look's `label`. English only so far.
-- `SettingsCard`, `SettingRow`, `Meter`, `Banner`, `ConfirmDialog`, `Lightbox`, `SegmentedControl`, `WholeWords` come from `@/shared/ui`.
-
-## Open (not decided here)
-- `ConfirmDialog` gives its message no `aria-describedby`; 16 sites in 15 files share it. A fix is a kit change needing its own showing.
-- A look that finishes making is not announced: its row leaves and the line does not change. Words for it are the operator's call (proposed "{{label}} is ready.").
-- The server's `stopped` sentence says to upload the photo again, wrong advice for a house look.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFaceSettings.tsx
-
 ## MAN-9221 — src/modules/companion — Proof — .verify/kaylee-face-card.mjs (her face card on fixtures, and the live section with the card)
 
 Proves the face card (MAN-9220) on fixtures, and the live section with the card the section mounts. The card pressed through on the live page (a pick across four surfaces, an upload, the meter, remove, a photo with no face): `.verify/kaylee-face-card-walk.mjs`, MAN-9445.
@@ -9796,7 +9734,7 @@ The portrait through one live turn, and Settings' card beside it: MAN-9254.
 - `failed`: `.kaylee-portrait[data-state='failed'] canvas { animation: none }`: no breath, no sway.
 - Every movement rule sits inside `@media (prefers-reduced-motion: no-preference)`. The lean stands under reduced motion; its easing does not. The portrait fades in (`kaylee-portrait-in`, `--dur-move`) only with motion.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceAtlas.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useReducedMotion.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts
 
 ## MAN-9403 — src/modules/companion CompanionPortrait — her photographed face as a player: the — Stamps — written straight onto the root, only when they change
 section: src/modules/companion CompanionPortrait — her photographed face as a player: the two canvases, the loop, the stamps, useFaceAtlas, useFaceSentences, useFaceLook, useReducedMotion/001 Stamps — written straight onto the root, only when they change
@@ -9823,7 +9761,7 @@ section: src/modules/companion CompanionPortrait — her photographed face as a 
 | else | none |
 - Reduced motion: speaking holds the mood's half-open "ah"; no frame is asked for.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceAtlas.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useReducedMotion.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts
 
 ## MAN-9404 — src/modules/companion CompanionPortrait — her photographed face as a player: the — `useFaceAtlas(faceId: string | null, drawnPx: number): FaceAtlas | null` — `hooks/useFaceAtlas.ts`
 section: src/modules/companion CompanionPortrait — her photographed face as a player: the two canvases, the loop, the stamps, useFaceAtlas, useFaceSentences, useFaceLook, useReducedMotion/002 `useFaceAtlas(faceId: string | null, drawnPx: number): FaceAtlas | null` — `hooks/useFaceAtlas.ts`
@@ -9837,7 +9775,7 @@ section: src/modules/companion CompanionPortrait — her photographed face as a 
 - A non-ok answer or a manifest that fails `isManifest` rejects: `console.warn('[Companion] Her face <id> could not be loaded; the disc keeps her ground:', …)`, nothing cached, the next asker retries, nothing retries by itself.
 - `isManifest` checks `version === 1`, `frameSize` a number, `frames` and `sheets` arrays, `largerTiers` absent or an array of `{ frameSize: number, sheets: array }`, `blinks` absent or an object holding `listening`, `gaze` and `poses` objects (a number, null, `{}` or an array is refused), `brows` absent or an object (a number or null is refused; `{}` and an array pass, and the engine draws no undefined frame from them), `moods` (with `moods.neutral`), `gaze`, `poses`, `states` and `clips` objects. why: a missing field read in render takes the whole app down. The numbers inside the tables are the server's and are not checked.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceAtlas.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useReducedMotion.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts
 
 ## MAN-9405 — src/modules/companion CompanionPortrait — her photographed face as a player: the — `useFaceSentences({ picture, voice, clientId })` → `CompanionFaceSentences`, and `useFaceLook({ anch
 section: src/modules/companion CompanionPortrait — her photographed face as a player: the two canvases, the loop, the stamps, useFaceAtlas, useFaceSentences, useFaceLook, useReducedMotion/003 `useFaceSentences({ picture, voice, clientId })` → `CompanionFaceSentences`, and `useFaceLook({ anch
@@ -9860,7 +9798,7 @@ section: src/modules/companion CompanionPortrait — her photographed face as a 
 ## `useReducedMotion(): boolean` — `hooks/useReducedMotion.ts`
 - `useSyncExternalStore` over one `matchMedia('(prefers-reduced-motion: reduce)')` made once per page. The one reader of the query in this module (`CompanionFab`, `CompanionPortrait`); the stylesheet's media blocks ask the same setting.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCanvasBackingSide.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDevicePixelRatio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceAtlas.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useReducedMotion.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts
 
 ## MAN-9228 — src/modules/station — StationStageView and StationStage: the one thing in focus, its head, Back and ✕
 
@@ -10454,7 +10392,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/fa
 - A blink and a fade of a change of her face never overlap: a state's, a mood's, an ease's, the warm spell's and the brows' lift and ease back. The step that begins one cuts a blink in play and fades from the open-eyed frame under it (`blinker.openUnder`, read before anything cuts the blink: MAN-9428), and no blink starts on it. The rule, its fades and its deadlines: MAN-9432.
 - Time is deadlines, never a poll: a blink, a glance, a search step, a warm spell, the mood's hold, the brows' hold, a crossfade's end, a clip's next frame and a turn's next level are each a `nextAt`; while her head is not at rest the next frame is (`now + 1`).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
 
 ## MAN-9431 — src/modules/companion — her face engine: createFaceEngine, FaceInput and — States — what each draws
 section: src/modules/companion — her face engine: createFaceEngine, FaceInput and FaceDraw, the states table, the crossfades, blink, glance, turn and tilt, reduced motion/001 States — what each draws
@@ -10477,7 +10415,7 @@ section: src/modules/companion — her face engine: createFaceEngine, FaceInput 
 - She blinks in every state but `failed`, over the look the states table names (MAN-9428); `cut` makes one blink from 250 ms in, on a step that begins no fade and with none running.
 - Her brows lift at the end of a question (MAN-9429): when the sentence that was sounding stops sounding and its text ends in a question mark, a face made with `brows` shows `brows[mood]` (that mood's closed face, her brows lifted), fading in over 140 ms, until her next sentence starts sounding or 1200 ms pass, then easing back over 300 ms. It lives through the step from `speaking` to rest and ends at any other state; it takes no blink and no glance; a head turned toward a held look replaces it. A page that plays no voice, and a face made before `brows`, shows none. The frame priority is clip, brows, blink, then the look's own frame.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
 
 ## MAN-9432 — src/modules/companion — her face engine: createFaceEngine, FaceInput and — Crossfades and time
 section: src/modules/companion — her face engine: createFaceEngine, FaceInput and FaceDraw, the states table, the crossfades, blink, glance, turn and tilt, reduced motion/002 Crossfades and time
@@ -10501,7 +10439,7 @@ section: src/modules/companion — her face engine: createFaceEngine, FaceInput 
 
 The engine's frames on the live page through one turn with her real voice (a mood switching at its sentence, the giggle clip, the 2.5 s hold, neutral returning): MAN-9254.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
 
 ## MAN-9433 — src/modules/companion — her face engine: createFaceEngine, FaceInput and — Proof — `TSX_TSCONFIG_PATH=tsconfig.json node --import tsx .verify/kaylee-face-replay.ts`
 section: src/modules/companion — her face engine: createFaceEngine, FaceInput and FaceDraw, the states table, the crossfades, blink, glance, turn and tilt, reduced motion/003 Proof — `TSX_TSCONFIG_PATH=tsconfig.json node --import tsx .verify/kaylee-face-replay.ts`
@@ -10516,102 +10454,7 @@ section: src/modules/companion — her face engine: createFaceEngine, FaceInput 
 - 2026-11-01: exit 0; all seven 115-frame runs end `0 draws changed before the nextAt they were promised` (997, 997, 1386, 1872, 841, 710 and 710 steps). Saved sentence: 439 speaking steps, 0 off the `voice`-then-`exact` rule; `shapeAt` agrees with a walk of every cue on 439 of 439; exact steps 348 the cue's mouth, 8 a blink, 0 anything else; 72 exact fade steps read 40.0 ms. Reduced motion: 439 speaking steps, 0 not `a1` held, 0 with a `mouthBy`.
 - 2026-11-01, the same run: the 149-frame runs (MAN-9428, MAN-9430) each end `0 draws changed before the nextAt they were promised`; the 158-frame brow runs (MAN-9429) end `0 checks FAILED`; her head's run ends `ALL PASS`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
-
-## MAN-9239 — src/modules/companion — her mouth, her sounds and her mood: chooseMouth, shapeAt, MOUTH_OF_SHAPE, mouthOpenness, vowelAt, soundAt, the clip each sound plays, the mood words and the mood hold
-
-Her mouth is the baked mouth of the TIMED SHAPE her server found in her own audio (the exact mouth) wherever an announced piece holds the audio's place, and else the LEVEL mouth: the voice's level says how far it opens, the sentence's text at the share the audio has reached says which vowel it shapes. Gemini's speech sends audio only; the server finds the shapes piece by piece as the audio arrives and announces them as `companion_mouth` frames (MAN-9413). Pure code in `src/modules/companion/utils/`: `faceMouth.ts`, `faceMoodMap.ts`, `faceMoodHold.ts`, `faceClips.ts`, `faceClipPlayer.ts`. The engine that calls them: MAN-9238. Where the level, the place and the pieces come from: `pcmPlayer.level()` and `progress()` (MAN-9112) and the pieces' store (MAN-9113), handed through `voice` (MAN-9223). Rules: INV-10557.
-
-## The exact mouth — `chooseMouth(level, playing, voice, now)`, `shapeAt(pieces, position)`, `MOUTH_OF_SHAPE`
-- `shapeAt(pieces, position)` → `CompanionMouthShape | null`: the last cue at or before `position` seconds into the sentence, in the piece that holds it (`from` up to, not including, `to`). Null when no announced piece holds it.
-- `MOUTH_OF_SHAPE`: the six basic shapes are six of her seven mouths, and rest is her closed mouth; `e2`, the wide grin, stays the level mouth's.
-| shape | A | B | C | D | E | F | X |
-|---|---|---|---|---|---|---|---|
-| mouth | `closed` | `e1` | `a1` | `a2` | `o2` | `o1` | `closed` |
-- What Rhubarb means by each (MAN-9241): A lips pressed (m, b, p; its stand-in for f, v), B teeth just parted (most consonants, "ee"), C open ("eh", the a of bat; its stand-in for l), D wide open ("ah"), E slightly rounded ("off", "bird"), F puckered ("you", "show", "way"), X rest.
-- `chooseMouth` → `MouthChoice { by: 'exact' | 'voice', key, fadeMs, closed, voice }`: the mouth of one step while she speaks.
-| when | `by` | `key` | `fadeMs` |
-|---|---|---|---|
-| `shapeAt(playing.mouth, playing.elapsed)` names a shape | `exact` | `MOUTH_OF_SHAPE[shape]` | 40 (`EXACT_MOUTH_FADE_MS`) |
-| otherwise | `voice` | the level mouth below, from the level and the vowel | 60 (`MOUTH_FADE_MS`) |
-- `closed` says whether the mouth drawn is closed (X and A are), so a blink still waits for a closed mouth, whichever drove it. `voice` is the level mouth carried to the next step: it is read on every step, so its dwell and hysteresis are current the moment it takes over.
-- why 40 ms: Rhubarb's shortest cues run 40 to 70 ms; a longer fade would never show one whole, and 40 ms still hides the swap of one photo frame for another.
-- `FacePlaying.mouth: readonly CompanionMouthPiece[]` (`faceMoodHold.ts`): the pieces announced for the sentence sounding, `[]` for none yet. A piece landing mid-sentence is the same sentence (`sameSentence` compares words, mood and sounds, never `mouth`), so the mood hold and the sounds' clips are not restarted.
-- The level mouth draws where no announced piece holds the audio's place: a sentence's start until its first piece lands (that piece's length, Rhubarb's run time and the audio's arrival: +1.14 s and +2.0 s in the live run of 2026-10-31, longer under load, MAN-9419), the gap between two pieces, a piece Rhubarb could not answer, no Rhubarb installed, a frame dropped as malformed. Under reduced motion no mouth is chosen: she holds the mood's `a1`.
-
-## The level mouth — `mouthOpenness(level, previous, now)` → `{ openness: 'closed' | 'half' | 'full', since }`
-| level (the player's RMS, 0..1) | openness |
-|---|---|
-| under 0.035 | `closed` |
-| 0.035 up to 0.12 | `half` (frame `1`) |
-| 0.12 and over | `full` (frame `2`) |
-- The 0.035 is `HALF_OPEN_AT`, exported: `faceHead.ts` reads it as the floor of her voice's strength (MAN-9434).
-- Opens upward at the threshold, closes or narrows only 0.01 below it (0.025 and 0.11): a level resting on a threshold never flickers.
-- A mouth shown holds at least 50 ms before it changes. Returns `previous` itself when nothing changes. `MOUTH_CLOSED` has `since` −∞, so the first change is never held.
-- Frame = `moods[mood].mouths[<vowel><1|2>]`, or `closed`. This mouth fills in wherever the exact mouth has no shape.
-- Measured peaks of a spoken sentence: 0.38–0.42 (2026-10-27).
-
-## The vowel — `vowelAt(text, sounds, elapsed, duration)` → `'a' | 'e' | 'o'` (the level mouth's; the line's place still places the sounds either way)
-| letters | vowel |
-|---|---|
-| a, á, à, â, ä | `a` (ah) |
-| e, é, i, í, y | `e` (ee) |
-| o, ó, u, ú, w | `o` (oo) |
-| any other | the previous letter's vowel; a sentence with none yet opens on `a` |
-- Accents drop through NFD before the match.
-- The audio's place in the text: `text` and its `sounds` make one LINE; each sound takes the characters below at its `at` (an offset in `text`), so the line is longer than the text. The audio's share is `elapsed / seconds` of the line, with `seconds` the player's `duration` once the sentence's body has ended, else the line's length at 15 characters a second. Inside a sound the text stands still at the last character said before it.
-
-## Sounds — `soundAt(text, sounds, elapsed, duration)` → `{ index, tag } | null`
-- The latest sound whose place the audio has reached; null before the first. A sound is reached the way a character is, so the caller plays its clip once, when `index` first passes the last one played.
-- Characters a sound takes in the line (a `Map`: a tag spelled like an Object property, e.g. `constructor`, is looked up as a tag):
-
-| tag | giggle | chuckle | laugh | gasp | sigh | phew | tsk | breath | short pause | long pause | any other |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| characters | 10 | 10 | 16 | 6 | 12 | 10 | 4 | 6 | 6 | 14 | 8 |
-
-- The clip each tag plays (`faceClips.ts`, a `Map`): `giggle`, `chuckle` → giggle; `laugh` → laugh; `gasp` → gasp; `sigh`, `phew` → sigh; `tsk` → shake; `breath` → breath. The pauses and a tag added to the allow-list later play nothing until the map names it. The laugh, giggle, sigh and gasp play `manifest.clips[<clip>].frames` as listed: the gasp's list already holds `state.surprise` between its two frames, and `frameNames` numbers a clip's own frames without a frame another table names (`clip.gasp.0`, `clip.gasp.1`).
-
-| clip (`data-motion`) | frames | pace | motion lasts at least |
-|---|---|---|---|
-| `laugh` | `clip.laugh.0–5` | 12 fps | 500 ms |
-| `giggle` | `clip.giggle.0–3` | 12 fps | 333 ms |
-| `gasp` | `clip.gasp.0`, `state.surprise`, `clip.gasp.1` | 10 fps | 420 ms |
-| `sigh` | `clip.sigh.0–2` | 8 fps | 1000 ms |
-| `shake` (tsk) | `pose.left_10`, `pose.right_10`, `pose.left_10`, `pose.right_10` | 12 fps | its frames; no keyframe |
-| `breath` | none | | 1600 ms (one 1.03 swell) |
-| `nod` (press begins) | `pose.down_5`, `pose.down_10`, `pose.down_5`, `state.listening` | 8 fps | 600 ms |
-- One clip plays at a time. A sound reached while one plays waits (one place, the latest wins); a clip that has just ended leaves one step with no motion before the next begins, so a repeat restarts its animation. A new sentence counts its sounds from the first again. The movement each `data-motion` plays: MAN-9223 §Layers.
-
-## Mood words — `moodOf(word)` → one of the nine faces
-| face | words |
-|---|---|
-| `delighted` | delighted, bright, happy, excited, cheerful, joyful |
-| `playful` | playful, teasing, cheeky |
-| `gentle` | gentle, warm, kind |
-| `thoughtful` | thoughtful, curious, pensive |
-| `brisk` | brisk, quick, crisp, focused |
-| `soft` | soft, tender, calm |
-| `whispered` | whispered, whisper, hushed, quiet |
-| `mock_serious` | mock serious, deadpan, serious |
-| `neutral` | any other word, or none |
-- The word is the server's lower-cased one to three words (MAN-9081); hyphens read as spaces (`mock-serious`).
-- The lean a mood adds (`moodTilt`): playful −4°, thoughtful +2°, the rest 0.
-
-## The mood hold — `createMoodHold().read(...)`
-- A page that plays her voice takes the mood when a sentence STARTS sounding (a smaller `elapsed`, or different words, is a new sentence). A page with no voice takes it from `newestMood` as the sentence arrives. A sentence with no word is neutral, so it clears the last one's face.
-- A new turn begins neutral unless a sentence still sounds.
-- Holds 2.5 s after the turn has ended and her voice has stopped, then eases to neutral (`move: 'eased'`).
-- The brows' hold (`faceBrows.ts`, MAN-9429) is read beside it from the same `playing`: a question that has just stopped sounding lifts `brows[mood]` for the mood this hold still wears, for 1200 ms, which ends inside the 2.5 s; it never changes the mood, and the mood's own ease back to neutral is the one the lift's end uses (300 ms).
-- The warm spell (`faceWarmth.ts`, MAN-9430) needs the mood neutral: while the hold wears a mood, its 2.5 s after her voice stops included, no spell begins and its 25–60 s count has not started; the count starts at the first still step after the ease back. A spell wears `mood.gentle.closed`, a face the hold never sets, and the next sentence ends it.
-
-## Proof
-Her real voice through the level mouth, the sounds and the mood hold on the live page, 2026-10-30 (mouth against the audio's loudness r 0.72 to 0.82 at a 150 ms lag; a giggle clip of four frames against a real giggle of 0.1 s to 0.85 s): MAN-9254.
-
-`TSX_TSCONFIG_PATH=tsconfig.json node --import tsx .verify/kaylee-face-replay.ts` (MAN-9238) replays a turn with a `<giggle>`, plays every sound in one sentence, and plays her saved sentence 1 with its recorded pieces: `exact` frames are `mood.delighted.<MOUTH_OF_SHAPE[shape]>` for their cue.
-
-The server's side, its replay and its measurements: MAN-9413, MAN-9414.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceClipPlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceClips.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceMoodHold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceMoodMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceMouth.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
 
 ## MAN-9240 — src/modules/companion — her disc grows: useCompanionSize, the 28 px rest, activeFabSize, the 2.5 s shrink, --companion-fab-size, restFor and storedFrom, and the CSS that eases it
 
@@ -10653,7 +10496,7 @@ The whole run with her voice on, on the live page (28 px, 115 px at +419 ms from
 - 2026-10-30: ALL PASS, 28 checks, 1 min 25 s. 1440 × 900: 28.00 px in all 74 rest frames; growing from +149 ms and 115 px at +365 ms after the turn's first active frame; 114.6–115.0 over the 171 frames to the end of the pause; docked left edge least 8.00 px; 28 px again +2853 ms after the turn's last frame; 1024 px wide 82.0 px, back at 1440 115.0 px; a drag taken at 113.8 px stored `{"docked":false,"x":686.2,"y":416.0}` and, shrunk, her centre was 0.23 px off the drop. 390 × 844: 48 px at +263 ms, 47.6–48.0 to the end of the pause, centre moved 0.02 px, 28 px again +2796 ms.
 - `node --import tsx .verify/kaylee-avatar-placement.mjs` (bare numbers, no page): 28 px numbers unchanged, and 48, 82, 115 and 120 px discs overlap a row by 12 px and a box by 14 px. 2026-10-30: ALL PASS.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSize.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useSizeEasing.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/fabGrowth.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-growth.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-growth.mjs
 
 ## MAN-9247 — src/shared/cloudcliDoors.ts — routerBasename, openStation and backToCloudcli: the doors between the workspace and the station, in one tab
 
@@ -11194,41 +11037,6 @@ One attribute both platforms set, for CSS to key on (`html[data-keyboard=up]`). 
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/Sidebar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/usePwaModeClass.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts
 
-## MAN-9259 — src/modules/station — StationBar: the title, the strip slot and the way back to CloudCLI
-
-`StationBar` (`StationBar.tsx`): the bar across the top of every arrangement but the phone's. A pure view: the press is the caller's. Drawn by `StationShellView` (MAN-9230) above the body of `wide`, `laptop` and `compact`; the phone's top row is her head and holds the title's place (`HeadRow`, MAN-9371), so `arrangement === 'phone'` draws no bar. Touch law: INV-10275. The way back it carries: MAN-9247.
-
-## Props
-| prop | type | meaning |
-|---|---|---|
-| `strip` | `ReactNode` | the `strip` slot's region (MAN-9287), drawn across the middle; `undefined`, `null` or `false` = no region fills it. In compact the shell hands null: the strip is a row of compact's own |
-| `compactSwitch` | `StationCompactSwitch \| null` | his "Compact" switch (`{ on, onChange }`), drawn before "CloudCLI"; null where it would change nothing (below 1024 px) and none is drawn. `StationShell` binds it: `on` is `useStationPref('compact', false)`'s value and `onChange` its setter (per device, kept across a reload); null while the window is under 1024 px, where compact is the only arrangement |
-| `onBackToCloudcli` | `() => void` | the press on "CloudCLI". `StationShell` binds it (`backToCloudcli`). why not here: a bar that bound its own press would run router hooks inside the shots probe and break every later region's shots |
-
-## What it draws
-`<header data-station-bar>` = `flex min-h-14 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-4 py-2`.
-| part | markup | words |
-|---|---|---|
-| title | the page's one `<h1>` (serif, 22 px, `font-normal`) | `station.bar.title` = "Kaylee <accent>Station</accent>"; the accent word is `<em className="text-garnish">`, Verve's `--garnish` through the `garnish` colour name in `tailwind.config.js` (MAN-739 rule 3) |
-| strip | `[data-station-slot=strip]`, `flex-1` | whatever the `strip` region draws |
-| compact | `<label data-station-compact-toggle=on\|off>`, `ml-auto`: the word (`aria-hidden`) and the kit `Switch`, which carries the name | `station.compact.switch` "Compact" |
-| back | `[data-station-back-to-cloudcli]`, an outline `sm` `Button`, `ml-auto` when no Compact switch stands, `AppLogo` + word | `station.bar.back` "CloudCLI"; `aria-label` `station.bar.backLabel` "Back to CloudCLI" |
-
-## States
-| state | when | draws |
-|---|---|---|
-| strip drawn | a region fills `strip` | title, the strip, "CloudCLI" |
-| no strip | no region fills it | title and "CloudCLI" only; no strip box |
-| compact | the shell hands no strip | no strip (compact's own row, MAN-9337); the Compact switch on when it is his switch that made it compact, and none below 1024 px |
-
-## Empty state
-No strip: no box is drawn. The bar never draws empty: the title and the way back stand always.
-
-## Touch
-"CloudCLI" is 44 px tall under a finger (`finger:h-11`). It has no tooltip: its name says where it goes. The Compact label is a 44 px catch under a finger (`finger:min-h-11`): a press anywhere on it presses the kit's 30 px switch.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationBar.tsx
-
 ## MAN-9260 — src/modules/station — StageGone and StageReadFailed: a thing that has gone, and a read that failed (stageStates.tsx)
 
 `StageGone` and `StageReadFailed` (`stageStates.tsx`): what a stage draws for a thing that has gone and for a read that failed. Never a blank. `StageGone` is drawn by `CardStageView` for a name nobody holds, by the right rail's three stages (`AskStageView`, `FollowupsStageView`, `CheckStageView`), by `ChatStageView` (MAN-9291) for a chat his sessions no longer hold, and by her cards' two stages (`NoteStageView`, `WalkStageView`) for a card taken down and a walk ended; `StageReadFailed` by those two for a read of her picture that failed. `STAGE_VIEWS` (MAN-9264) holds a view for every kind, so `StationStage` (MAN-9228) draws no stand-in for a kind without one. Touch law: INV-10275.
@@ -11404,7 +11212,7 @@ The station's two registries and how a later plan lands its component on them. A
 2. If a picture shows it: its drawing `{ view, props, canGoBack, shelf }` in `FAKE_STAGE` (`station-fake.ts`; `shelf` her cards' shelf over it, `null` for none).
 3. A thing it can no longer find is `StageGone` (MAN-9260) with the kind's line, never a blank.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageViews.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stationRegions.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageViews.ts
 
 ## MAN-9265 — src/modules/station — the component inventory: one row per component with its props, states, empty state, compact form and touch form, and where the rest of the station is documented
 
@@ -11551,76 +11359,6 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /h
 - 2026-10-30, `.verify/kaylee-station-rail-live.mjs` on :5183 as account 1: the rail's 21 rows are this answer's, in its order, each chip its state's word, each line its `activity`; the chat's stage draws the same line whole. A probe's chat (a hidden root) is in no answer, by `chatRows()`'s definition.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/sessions.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/station-sessions.ts
-
-## MAN-9269 — server/modules/companion/station — the landed route: GET /station/landed, stationLanded, landedOf and the five landing codes
-
-`GET /api/companion/station/landed` serves the station's strip "since you last looked": what landed for the account in the last seven days, read from the notification history alone. Transport: `station/landed.routes.ts` (`createStationLandedRoutes`). Read: `station/station-landed.ts` (`stationLanded`, `landedOf`, `planChatOf`, `LANDED_KIND_BY_CODE`). Wire type: `StationLanded` (MAN-9256). The rows it reads: the notification history (MAN-9153). Mounted by `companion.routes.ts` (MAN-9188).
-
-## Route
-| part | rule |
-|---|---|
-| mount | `router.use('/station', createStationLandedRoutes(service))` at the foot of `createCompanionRoutes`, behind the module's `authenticateToken` |
-| request | `GET /landed` only. The account's own history, so it names the account; no `x-companion-client` |
-| verb | `companionService.landed(userId)` → `stationLanded(userId, attached().house)` (MAN-9059) |
-| 200 | `{ landed: StationLanded[] }`; `[]` when nothing landed |
-| 401 | no token |
-| 503 | `{ error: 'What landed could not be read just now.' }`, logged `[Station] account <id>: what landed could not be read`. why: the history's database threw; the strip draws a state, never a stack |
-
-## `stationLanded(userId, house)`
-1. `listNotificationHistorySince(userId, sinceIso)` with `sinceIso` = now minus `NOTIFICATION_HISTORY_WINDOW_MS` (seven days; both through the notifications barrel): every row of the account at or after the stamp, newest first. why: the week is read by TIME and not by a count of rows, and the history keeps every row of the window whole (MAN-9153).
-2. Keep a row whose `code` is in `LANDED_KIND_BY_CODE`.
-3. `slice(0, 300)` (`LANDED_MAX`): the order he was told, at most 300, the most a strip holds (`LANDED_HELD`, MAN-9285). 2026-10-31, account 1: 8 landings of 242 kept rows (4 `dispatcher.epic_finished`, 3 `dispatcher.feature_finished`, 1 `run.background_completed`).
-4. Read the dispatcher lane (`house.dispatcher()`) ONLY when a `shipped` or `epic` row among them names no chat of its own and has a `plan` (`landsThroughLane(row)`). A lane that throws is logged (`[Station] the dispatcher lane could not be read for the landings' chats`) and read as `null`: those landings name no chat and the strip is still answered.
-5. Each row through `landedOf`.
-
-## `LANDED_KIND_BY_CODE` — what counts as landed
-| code | `kind` |
-|---|---|
-| `dispatcher.finished` | `shipped` |
-| `dispatcher.feature_finished` | `shipped` |
-| `dispatcher.epic_finished` | `epic` |
-| `run.background_completed` | `landed` |
-| `cerberus.recovered` | `recovered` |
-
-`dispatcher.feature_finished` is a feature of an epic finishing: a `record`, kept for this strip and pushed nowhere (MAN-5639), drawn as `shipped`. Every other code (an ask, a failure, a pause, the usage family, `dispatcher.limit_paused`) is news, left out. The map is the one home of the rule.
-
-## `landedOf(row, planChat)` — one row as a `StationLanded`
-- `{ id, at, kind, title, plan, sessionId, chat }`: `id`, `at`, `title` and `plan` are the row's own, as kept. The title already has every figure taken out (`spendFreeWording`, MAN-9153) and no `meta` is read, so no cost reaches the strip (ruling 17).
-- The chat, by kind:
-  | kind | chat |
-  |---|---|
-  | `shipped` | the row's own `session_id` first (the chat that asked for the work, as the dispatcher's endings hand it); else `planChat(row.plan)`: the dispatcher plan's `session_app_id` |
-  | `epic` | the row's own `session_id` first; else `planChat(row.plan)`: the epic's lead plan, the first of `arc.plans` the lane still holds that names a chat |
-  | `landed` | the history row's own `session_id` |
-  | `recovered` | none: a check recovering was no chat's doing |
-- `heldChatId` then runs on the chosen id: `null` for `null`, `''` or an id with no `sessions` row. A dead chat leaves `sessionId` and `chat` both `null`, whichever kind chose it. why: `chatNameOf` answers "Untitled Session" for an unknown id and `resolveAppSessionId` hands an unmatched id back unchanged, so the strip would offer a press on a chat that does not exist.
-- `chat` = `chatNameOf(sessionId)`: the name the sidebar shows.
-
-## `planChatOf(picture)`
-- `(plan: string) => string | null` over one `DispatcherPicture`. A plan's own `session_app_id`; for an epic name, its lead plan's. `null` for a name the lane does not hold, a card that names no chat, and every name when `picture` is `null`.
-- `landedOf`, `planChatOf`, `landsThroughLane(row)` (does naming this row's chat take the lane's picture: a `shipped` or `epic` row with a `plan` and no `session_id` of its own, a landing kept before the endings handed the chat) and `dispatcherPictureOrNull` (the lane's picture, or `null` when it does not answer) are exported for the station's landed feed, `station/station-landed-feed.ts` (`stationLanded` uses the same four).
-
-## The feed: `startStationLandedFeed(house)`
-- `station/station-landed-feed.ts`. Started by `createCompanionModule` beside her feeds and the station's hint; `stop()` unsubscribes it with them.
-- It hears `onHistoryKept` (the notification history's seam, after a row is stored, with its id). A row whose `code` is not in `LANDED_KIND_BY_CODE` sends nothing. A landing becomes ONE `{ kind: 'station_landed', entry }` frame, `entry = landedOf(row, planChatOf(picture))`, to `sendToUser(userId, …)`: that account's open pages, no one else's.
-- `picture` is `await dispatcherPictureOrNull(house)` for a row `landsThroughLane` and `null` for every other, a row that carries its chat among them: it never waits on the lane. A lane that does not answer leaves the entry naming no chat; the frame is still sent.
-- No landing is sent twice: the history replaces a repeat ask in place and keeps every other kind as it happens, and only a kept row is announced. Frames of two landings close together may arrive out of order (one waited on the lane); each carries its `id` and `at`.
-- A fault building or sending one frame is logged (`[Station] account <id>: the landing of <code> (row <id>) could not be sent to his pages`) and costs no other landing.
-- The stop (`stopStationLandedFeed()`) unsubscribes and sets a flag: a landing whose lane read is still in flight is dropped when the read returns, so a winding-down module sends nothing new.
-- Nothing polls: the landing arrives on the history's own write.
-- Proof of a kept feature's landing: `.verify/kaylee-feature-landed-direct.mjs` over a scratch copy of `auth.db`: a feature of an epic's `complete` taken through the endings leaves one `dispatcher.feature_finished` row with its chat and sends nothing on any channel, and `stationLanded` over the copy draws it as `shipped` beside the week's other landings, its chat from the row alone.
-- Proof, 2026-10-30, live :3011: `.verify/station-landed-feed.mjs` — a probe chat on Haiku in the scratch project ran a backgrounded `sleep 2`; the runtime raised `run.background_completed`; a websocket client of account 1 heard `{"kind":"station_landed","entry":{"id":216,"kind":"landed","title":"Background agent finished · Untitled Session","plan":null,"sessionId":<the probe chat>,"chat":"Untitled Session",…}}` once, the id of the kept row; the probe chat's `run.stopped` row kept before it sent none. The script removes the history rows it caused once it has read them, so a repeat leaves no landing in the strip.
-
-## Limits
-- The week is whole: the history prunes a row only when it is older than seven days AND past the newest 300 (MAN-9153), and the strip answers at most 300 of the week. Re-measure the history: `sqlite3 -readonly ~/.cloudcli/auth.db "select count(*), round(julianday(max(at)) - julianday(min(at)), 2) from notification_history where user_id = 1"`.
-- A `shipped` or `epic` landing kept before the endings handed the chat names it only through the lane: with no first reading yet after a restart (about 12 s on :3011, 2026-10-30) or a reading that outlasts the 5 s wait it comes back with `sessionId` and `chat` `null`, and the page re-reads on `websocket_reconnected` and once the lane has landed. A landing that carries its chat names it at once.
-- A landing kept before the endings handed the chat, and older than the lane's day of memory for a finished plan, names no chat.
-
-## Proof
-- 2026-10-30, live :3011 as account 1: `{"landed":[{"id":210,"kind":"epic","title":"Epic finished · kaylee","plan":"kaylee",…}]}`, the one landing the history held, equal to its sqlite row.
-- On a `.backup` copy of the real database, through the real write path (`startNotificationHistory`, `announceToListeners`, a stub house): `shipped`, `epic`, `landed`, `recovered` in the table's order; an 8-day-old landing and a `dispatcher.limit_paused` row left out; chats from `session_id`, the plan and the epic's lead plan; no cost figure in any title.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/landed.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/station-landed-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/station-landed.ts
 
 ## MAN-9273 — server/modules/companion/station — the needs route: GET /station/needs, POST /station/asks, stationNeeds, the four readers and answerStationAsk
 
@@ -11824,122 +11562,6 @@ Only her tools send `companion_open`, so the frame is handed to the page's real 
 - Screenshot `workspace-check-open.png` in `SHOTS_DIR` (`lib/console.mjs`). 2026-10-30 (builder): passed. Opens her panel once to take the floor.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-check-open.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-workspace-check-open.mjs
-
-## MAN-9281 — src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs you"
-
-The `needs` slot: everything waiting on his word, read at a glance and acted on from the stage. Nothing fires from the rail: an item's press puts its whole on the stage, where the owner's own form fires it. Stages: ask MAN-9282, follow-ups and check MAN-9283. Fixtures and probe: MAN-9284. The presses on a live client: MAN-9304. Wire (`StationNeed`) and `STATION_NEED_KINDS`: MAN-9256. Route: MAN-9273. Registries: MAN-9264. Inventory: MAN-9265. Touch law: INV-10275.
-
-## Status
-- `WhatNeedsYouView` and `NeedItem` are pure and drawn by the shots probe on fixtures. `WhatNeedsYou` (the wrapper) is live and binds the view: `needs`, `faults`, `failure`, `reread` from `useStationNeeds()` (MAN-9249); `pending` (`picture?.pending`), `name` (`picture?.settings.name`, else `companion.defaultName`) and `cancelAction(pending.id)` (the card's ×) from `useCompanion()`; `focus`, `setFocus`, `scrollMemory('needs')` from `useStation()`.
-- `STATION_REGIONS` (`stationRegions.ts`) has `needs: WhatNeedsYou`.
-- An item's press: `setFocus(target)`, then `land(target)` (`useLandOnStageControl`, MAN-9303).
-
-## `WhatNeedsYouView` — props
-| prop | type | meaning |
-|---|---|---|
-| `density` | `StationDensity` | `compact`: each item on one line (§"`NeedItem` at compact"); the rail scrolls inside itself at either density (a column or compact's section: a size container, so her card's caps are shares of it); her action card is unchanged |
-| `pending` | `CompanionPendingAction \| null` | her action waiting for his word; `CompanionActionCard` keyed by `pending.id` |
-| `needs` | `StationNeed[] \| null` | in the server's order; null until the first read answers |
-| `faults` | `StationNeed['kind'][]` | kinds whose read failed; each is absent from `needs` |
-| `failure` | `string \| null` | the whole read failed: the server's sentence, or the page's |
-| `onReread` | `() => void` | Try again |
-| `focus` | `StationFocus \| null` | the item whose target has this `focusKey` is current |
-| `onPress` | `(focus) => void` | an item's press: its whole onto the stage, and the keyboard to the control that fires it |
-| `onWithdraw` | `() => Promise<void>` | the card's ×; a refusal rejects with the server's sentence |
-| `name` | `string` | her name, the card's × hint |
-| `scrollRef?` | ref callback | the scroller, for `scrollMemory('needs')`; absent on a fixture |
-
-## The count
-The head's badge, compact's "Needs you" button and the phone's bar say ONE number, `needsCountOf(needs, useLivePending(pending))` (`needsCount.ts`; the rule and its three readers: MAN-9346). The items, plus her pending action unless it answers an item on the rail (a Queue, Hold, Hide or Rework on an Accept's card, an Answer on a round's): then it is that item and counts once. A count of 0, or one not yet read (`needs` null), draws no badge on the rail.
-
-## States — `data-station-needs` is `reading` or the item count
-| state | when | draws |
-|---|---|---|
-| reading | `needs` null, `failure` null | `Spinner` "Reading what needs you…" (`data-station-needs-reading`), no count |
-| failed | `failure` set | warn `Banner` with the sentence and Try again, over the last good list if `needs` is set |
-| waiting | `needs` non-empty | a `NeedItem` per need, in order; the head's badge (`data-station-needs-count`) is the one count above 0 (§"The count") |
-| empty | `needs` is `[]` | `EmptyState` "Nothing needs you." (`data-station-needs-empty`); the head's badge is 1 while her action stands (it answers no item), none otherwise; the line is hidden by `:has([data-companion-action])` while her card stands, so a card lapsing on its deadline gives the line back |
-| action | `pending` set | her `CompanionActionCard` first in the body: act and target, prompt or carried words, when it lapses, ×; MAN-9186's rules. It counts once with the Accept or round it answers |
-| faults | `faults` non-empty | one warn line per distinct text under the rest, "▲ " + words (`data-station-needs-fault`); `accept` and `questions` share `station.needs.fault.plans` ("Couldn’t read the Accepts and design questions just now"), said once; others `fault.ask`, `fault.followups`, `fault.check` |
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx
-
-## MAN-9329 — src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs — Head and body
-section: src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs you"/001 Head and body
-
-- Head: `<h2>` "What needs you" (`station.needs.title`) and a warn `Badge` (`data-station-needs-count`) of the one count (`needsCountOf`, MAN-9346) when it is above 0: the items plus her pending action, which counts once with the Accept or round it answers. None at 0 or before the first read. Compact's button and the phone's bar say the same number. The `h2` is `min-h-[1.625rem]` (the height the badge makes the line): the head is as tall before the count lands as after, and as the left rail's head, so the two hairlines meet (MAN-9288).
-- The head carries nothing else: no how-line, no phrase to say. She reads an action back in her own words and judges from the conversation whether he agreed (MAN-9171), so there is no set phrase to teach.
-- Padding: 12 px a side up to 1360 px, 16 above; at compact, 12 at every width (the one column is not the wide rail). why: her card's head stands whole at 12 on the laptop's 296 px rail.
-- Compact: the list's gap is `gap-2` (full `gap-2.5`). Her action card is exactly as in full: his lines are the last to give way and travel word for word (MAN-9186).
-- Columns: the scroller is a size container (`[container-type:size]`), so her card's height caps are shares of the rail, as in her panel. In compact's Needs you the same: the rail's own scroller fills the section and is the size container.
-- Order in the body: failed banner, her card, the items (or reading, or empty), fault lines.
-
-## `focusOf` — where a press goes
-| need | focus put on the stage |
-|---|---|
-| `accept`, `questions` | `{ kind: 'card', plan: need.card, label: need.title }` |
-| `ask` | `{ kind: 'ask', sessionId, requestId, label: need.chat }` |
-| `followups` | `{ kind: 'followups', sessionId, label: need.chat }` |
-| `check` | `{ kind: 'check', node, key, label: need.label }` |
-- After `setFocus`, `WhatNeedsYou` calls `land(target)`: the keyboard goes to the control that fires the stage (`useLandOnStageControl`, MAN-9303). Every `[data-station-fire]` element takes focus as a group, list, region or field and is never a button: Enter from the rail fires nothing. The exception is a question with no options, where the field is the landing and Enter only writes. An Accept's landing is the dispatcher card's own Queue button; the Enter that pressed the act is held back until it comes up, and a fresh Enter on Queue is his word.
-
-
-## `NeedItem` — props
-| prop | type | meaning |
-|---|---|---|
-| `need` | `StationNeed` | the thing, as the server answers it |
-| `density` | `StationDensity` | `compact`: one line (§"`NeedItem` at compact"); `data-station-need-density=<density>` on the `<li>` |
-| `current` | `boolean` | on the stage: `aria-current`, accent edge, "On the stage" at the row's end |
-| `onPress` | `() => void` | the act and the card body are the same press |
-| `tooltipSide` | `left \| top` | `left` in the columns, `top` at compact density, where the item spans the column |
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx
-
-## MAN-9330 — src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs — `NeedItem` — what it draws
-section: src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs you"/002 `NeedItem` — what it draws
-
-`<li data-station-need=<kind> data-station-need-id data-tone="warn"?>` where `<kind>` is `StationNeedKind` (an ask's own kind). Top to bottom:
-1. Kind glyph and word in caps (`STATION_NEED_KINDS[kind]`), then the facts after `· `.
-2. Title, two lines max (`titleOf`): `accept`/`questions` `title`; `ask`/`followups` `chat`; `check` `label`.
-3. One line, cut at one (`lineOf`), whole in a `Tooltip` for a pointer; the tooltip is not drawn where nothing hovers (`[@media(hover:none)]:hidden`). A permission's is mono 11.5 px; a question's and a plan's are prose in the body face.
-4. The act, a kit `Button` (`data-station-need-act`, described by the title). No phrase to say stands beside it. A permission or plan with `cut !== false` (MAN-9256) reads `station.needs.act.open` ("Open"), not "Allow…": its stage offers no Allow (MAN-9282).
-- `accept` and `check` (`warn`): `data-tone="warn"`, a 4 px bar down the left edge, the kind word in the tone's ink. Amber, never red.
-- The card body is one `<button data-station-need-press tabIndex={-1}>`: a finger presses anywhere on the words; the act is the keyboard's one stop.
-
-| kind | facts (`factsOf`) | line (`lineOf`) |
-|---|---|---|
-| `accept` | `Feature`, or `Epic · N features` | `headline`, the census's first line |
-| `questions` | `N to answer` | `headline`, a round's first question |
-| `ask` | a permission's `tool`, then `N more waiting` when `more > 0` | `what`, the command whole as the server decides on it |
-| `followups` | `N open` | `newest` |
-| `check` | `Failing`, or `Refused` for `denied` | `<value> · <node> · since <when>` (`station.needs.where`; `<when>` is `stationStamp`'s words in the page's clock, `station.needs.when.*`: "2:04 PM", "yesterday 7:34 PM", "Oct 28 2:04 PM"); `since` null or not a time → node only; `value` null → no value |
-
-## `NeedItem` at compact — `density: 'compact'`
-| line | draws |
-|---|---|
-| 1 | the kind's glyph and word, `·`, the title cut to one line (`truncate`), the act (`h-8`, `finger:h-11`) |
-| 2 | "On the stage" at this line's end, only while `current` (the line is not drawn otherwise) |
-- Line 1's words are `<button data-station-need-press tabIndex={-1}>` (`finger:min-h-11`): a press anywhere on them is the act's press; the act is the keyboard's one stop. The warn bar and `data-tone="warn"` are as in full.
-- The facts and the one `lineOf` line are the stage's to say whole. One `Tooltip`, at `top` over line 1, repeats the title, the facts and the line ("<title> · <facts> · <line>") for a pointer; it is not drawn where nothing hovers.
-- Claims: every need's press ≤ 45 px and its title ≤ 21 px (one line), its act ≥ 44 px under a finger, her card word for word as in full (`.verify/kaylee-station-density.mjs`, MAN-9328).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx
-
-## MAN-9331 — src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs — The waiting-on-you state — a data condition, never a mode
-section: src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs you"/003 The waiting-on-you state — a data condition, never a mode
-
-- The rail is in it when `needs` holds Accepts and a red check, whatever else stands. No prop, flag or branch names it: `WhatNeedsYouView` draws what `needs` holds, live (`GET /needs`) and on the fixture (`fake/needs.ts`, `NEEDS_FAKE.waiting`, MAN-9284) alike.
-- The fixture's story: two Accepts, the waiting feature's (current: its plan card is on the stage) and an epic's over three features, which is ONE item naming the epic ("Kaylee’s desk"; the Inbox's rule, MAN-9013); one red check ("Session is valid", failing, `eis1`); and her `queue` action for the epic at the head.
-- It draws, top to bottom: head "What needs you" with the count 3; her action card; the three items in the server's order (Accept · Feature, Accept · Epic · 3 features, Red check · Failing); the two Accepts and the check toned warn (`data-tone="warn"`, the bar and the kind word in the tone's ink); acts `Queue…`, `Queue…`, `Open`; no `Say “…”` line on any item; `aria-current` on the feature's item alone; no "Nothing needs you.".
-- The count is 3, one number in the rail's head, compact's button and the phone's bar: her `queue` answers the epic's Accept, so the card and the Accept count once (`needsCountOf`, MAN-9346). A card that lapses on its deadline leaves the three items and the count 3.
-- Shots: `station-waiting-<1440x900|1280x800>.png`, and `station-waiting-compact-<size>.png` on Needs you (MAN-9336). At compact 390×844 every item's act measures 44 px (INV-10275, MAN-9328). Live, each event that changes the list reaches the rail by one `GET /needs` (MAN-9249).
-
-## Empty state, touch, words
-- Empty: "Nothing needs you." with no count and no how-line.
-- Touch (INV-10275): under a finger the act, the press body (`finger:min-h-11`) and Try again are 44 px; her card's × is the companion's. The probe measures them.
-- Words: `station.needs.*` in `en/common.json`: `title`, `retry`, `reading`, `empty`, `onStage`, `where`, `facts.*`, `fault.*`, `kind.*`, `act.*`, `status.*`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx
 
 ## MAN-9282 — src/modules/station — AskStage and AskAnswers: a chat's waiting ask on the stage
 
@@ -12171,7 +11793,7 @@ Throws outside the provider.
 ## Probe — `.verify/station-landed-provider.mjs`
 `node .verify/station-landed-provider.mjs` on the dev client :5183 against :3011 as account 1; exit 1 on any FAIL. Signs in with `loginToken` (not `openConsole`: its theme walk times out on a loaded box). Real: the reads, server-closed sockets, frames, a second browser context, the stored stamp read from the API. Dispatched in the page: `visibilitychange`, `blur`, `focus` (headless Chromium never hides a tab or moves focus); `pagehide` once dispatched, then fired for real by navigating away. Counts reads against the reopens it saw: the page's socket flaps while it boots on this box, and each reopen is a read. Puts the account's stamp back to what it found, only if no other writer has moved it; after the page-gone leg it waits for the stored stamp to hold still 1.5 s (a page-gone writes twice, a few ms apart). A leg-E `focus` also starts the come-back read, so the mirror check can fail if another session writes a newer stamp at that moment.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationLandedContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-landed-provider.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-landed-provider.mjs
 
 ## MAN-9286 — src/modules/station — the strip's fixtures and probe claims (fake/strip.ts, lib/station-strip.mjs)
 
@@ -12212,126 +11834,7 @@ Called by `.verify/kaylee-station-shots.mjs` (MAN-9229). `STRIP_PICTURES` holds,
 - 2026-10-30 at 390 px: every landing 208x68, the chip 74x44, the fold press 44x44, Try again 90x44; the swipe moved the line 135 px, the `pan-y` control 0 px.
 - `.verify/lib/station-touch.mjs` counts the strip's presses with every region's (MAN-9229).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/strip.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-strip.mjs
-
-## MAN-9287 — src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and StripLines: the bar's strip, "Since you last looked"
-
-The `strip` slot: "Since you last looked", one line across the bar's middle (MAN-9259): what landed this week and where he last looked; its fold is the pref `stripCollapsed` in the columns and the arrangement's `week` at compact (§"`SinceYouLastLooked()`"). Files: `SinceYouLastLooked.tsx` (view, the one map of kinds, wrapper), `LandedTimeline.tsx`, `LandedEntry.tsx`, `StripLines.tsx`. Data and the last look: MAN-9285. Wire (`StationLanded`): MAN-9256. Route: MAN-9269. Fixtures and probe: MAN-9286. Live probes: MAN-9300, MAN-9302. Registries: MAN-9264. Touch law: INV-10275.
-
-## Status
-- LIVE. `SinceYouLastLookedView` and its parts are pure and drawn by the shots probe on fixtures; `SinceYouLastLooked` (the wrapper) is the `strip` line of `STATION_REGIONS` (MAN-9264), bound as below.
-
-## `SinceYouLastLooked()` — the live binding
-| view prop | bound to |
-|---|---|
-| `landed`, `seenAt`, `failure`, `onReread` | `useStationLanded()` (MAN-9285): the week's landings (a `station_landed` frame joins one on the history's own write, within a second), his last look, the read's failure, `reread` |
-| `density` | the region's own prop (`StationRegionProps`, MAN-9264) |
-| `collapsed`, `onCollapse` | with no `week`: `useStationPref('stripCollapsed', false)`, the columns' fold, per device, written by his press alone; at compact, `collapsed: true` and a no-op: compact never writes the pref. With `week`: the week's, `collapsed = !week.open` and `onCollapse(shut) = week.onOpen(!shut)` |
-| `onSeen` | `markSeen` of the same hook: his last look written now and flushed at once |
-| `onPress` | `setFocus(stageOf(entry))`, below; then `week?.onOpen(false)`: a landing put on the stage shuts the week |
-| `scrollRef` | `useStation().scrollMemory('strip')`: it follows `scrollTop` only, so it remembers nothing of the sideways line; bound so the region is registered with the memory like every other |
-- `stageOf(entry, sessions)`: `shipped` and `epic` put `{ kind: 'card', plan, label: title }` on the stage; `landed` puts `{ kind: 'chat', sessionId, label }`, the label the name `useStationSessions()` holds for the chat now, else the entry's `chat`, else its title (a frame's `chat` is the name the chat had when the history kept the row, "Untitled Session" for a chat not yet named, and the stage stores its label). The kind decides first (a shipped feature whose lane also named its chat still shows its card) and the other is the fallback; `null` only for a landing that names neither, which the view opens in place and never asks about.
-- A press marks nothing seen: the look-aways of the provider and "<n> new" do. The one-column arrangement pulls the stage into view (`useStationSection`, MAN-9337), so the press needs nothing more; at compact it also shuts the week. A recovered check never reaches `onPress`: it opens its line in place.
-
-`SinceYouLastLooked({ density, week?, countOnly? })`: `week?: { open: boolean; onOpen(open: boolean): void }` is a one-column arrangement's input for the week it holds open over its body (`useStripWeek`, MAN-9372, for compact and the phone). Handed, it replaces the pref at either density: the line at compact opens the week with its fold button; the strip drawn at full density over the body shows the week open whatever the pref says, and its fold button shuts it. The arrangement hands the SAME `week` to both. Without `week`, compact's fold button does nothing. `countOnly?` passes to the view (the count form, MAN-9332): the phone on its side.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedEntry.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SinceYouLastLooked.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StripLines.tsx
-
-## MAN-9332 — src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and — `SinceYouLastLookedView` — props
-section: src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and StripLines: the bar's strip, "Since you last looked"/001 `SinceYouLastLookedView` — props
-
-| prop | type | meaning |
-|---|---|---|
-| `density` | `StationDensity` | `compact`: always the folded line (`folded` = `collapsed \|\| density === 'compact'`), its fold press opening and closing the week the arrangement draws over its body |
-| `landed` | `StationLanded[] \| null` | newest first as the read answers; `null` while the first read is out. The view sorts them itself (oldest first, by `at`, then `id`) |
-| `seenAt` | `string \| null` | his last look; `null` = none on record: every landing new, no rule |
-| `collapsed` | `boolean` | folded to the head and the newest landing; at compact, the week shut (the fold press's words and glyph follow it) |
-| `onCollapse` | `(collapsed: boolean) => void` | receives the NEXT fold, so `setCollapsed` binds directly |
-| `onSeen` | `() => void` | the "<n> new" press |
-| `onPress` | `(entry) => void` | fires only for a landing the stage can hold (a `plan` or a `sessionId`, kind not `recovered`) |
-| `failure` | `string \| null` | why the read failed; non-null wins over any held `landed` |
-| `onReread` | `() => void` | Try again |
-| `scrollRef?` | ref callback | the timeline's scroller; absent on a fixture. `scrollMemory` follows `scrollTop` only, so on this sideways line it remembers nothing |
-| `countOnly?` | `boolean` | the count form (default false): the phone on its side, where the line stands at the top row's end (MAN-9370). Below |
-
-## States — `data-station-strip` is `reading`, `failed`, `quiet`, `timeline` or `folded`
-| state | when | draws |
-|---|---|---|
-| `failed` | `failure` set | `StripFailedLine`: warn tone, `TriangleAlert`, "Couldn’t read what landed · <failure>" (`role="alert"`, wraps to 2 lines below 768 px), Try again (`data-strip-retry`) |
-| `reading` | `landed` null | `StripReadingLine`: `role="status"` "Reading what landed…" (sr-only) and skeleton boxes of the real shapes (one when folded, three open) |
-| `quiet` | `landed` is `[]` | `StripQuietLine`: `CalendarClock` + "Nothing has landed this week"; no fold |
-| `timeline` | landings, `collapsed` false | head, `LandedTimeline`, fold press |
-| `folded` | landings, `collapsed` true or `density` `compact` | head, the newest landing as `oneLine`, fold press |
-- Order of tests: `failure`, then `landed === null`, then empty. `data-strip-fresh` carries the new count.
-
-## The count form — `countOnly`
-The folded line cut to its count and fold, each a 44 px catch wherever the window's width puts it; the newest landing is in the week the fold opens (`useStripWeek`, MAN-9372).
-| state | draws |
-|---|---|
-| `folded`, fresh | "<n> new" `Chip` (catch `STATION_COUNT_FORM_CATCH`: 8 px past its 32 px pill), then the fold (`size-11`); no landing, no `below` line |
-| `folded`, none new | "Nothing new" (`station.strip.nothingNewShort` at every width) after a hairline (`border-l`), so it never reads as her state; then the fold |
-| `failed` | `TriangleAlert` + "Couldn’t read" (`station.strip.failedShort`); Try again named `station.strip.retryLabel` "Try again: {{failure}}" (the failure's own words live only there), catch `STATION_COUNT_FORM_CATCH` past its 36 px box |
-| `reading` | skeleton of the form's shape: a pill 4.5rem wide and a box the fold's width (`w-11`) |
-| `quiet` | unchanged: "Nothing has landed this week" |
-
-## Head of the line
-| when | draws |
-|---|---|
-| `freshCount > 0` | `Chip` "<n> new" with a `bg-garnish` dot (`data-strip-seen`); press = `onSeen`; `aria-label` `station.strip.seenLabel` ("<n> new since you last looked: mark them seen") |
-| none new | `<p data-strip-nothing-new>` "Nothing new since you last looked"; below 768 px "Nothing new" |
-- New = `Date.parse(at) > Date.parse(seenAt)`; `seenAt` null or unparseable = all new. `firstFresh` = index of the first new landing in the oldest-first list.
-- Focus: when "<n> new" holds a keyboard's focus and is pressed, the focus moves to the "Nothing new…" `<p>` (`tabIndex=-1`), never the page's top. why: a removed element fires no blur.
-
-## The kinds — `LANDED_KINDS` (in `SinceYouLastLooked.tsx`)
-| kind | glyph | word | tone |
-|---|---|---|---|
-| `shipped` | `PackageCheck` | Shipped | positive |
-| `epic` | `Layers` | Epic complete | positive |
-| `landed` | `PlaneLanding` | Landed | info |
-| `recovered` | `ShieldCheck` | Recovered | positive |
-- `shipped` is a feature that finished: one in no epic (`dispatcher.finished`) or one of an epic (`dispatcher.feature_finished`, kept and never pushed: MAN-9269); `epic` is the epic's own finish.
-- Drawn as the compact kit `Badge`, glyph beside word. A kind is never colour alone (MAN-578). The provider holds its own `LANDED_KINDS` set (MAN-9285): two things, one name.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedEntry.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SinceYouLastLooked.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StripLines.tsx
-
-## MAN-9333 — src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and — `LandedTimeline` — the open week
-section: src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and StripLines: the bar's strip, "Since you last looked"/002 `LandedTimeline` — the open week
-
-- Props: `entries` (oldest first), `firstFresh`, `lastLook` (words on his clock, `null` = no rule), `entryOf(entry, at, { tabbable })`, `scrollRef?`.
-- A horizontal `ScrollArea` (`orientation="horizontal"`: `pan-x`, `overscroll-x-contain`; `data-strip-timeline`) holding an `<ol aria-label="This week’s landings, oldest first">`. Each `<li>` is `max-w-52`, `md:max-w-72`.
-- The rule (`data-strip-rule`): dashed garnish left edge, "You last looked" over his last look's time, before the first new landing, and with nothing new at the line's end, after the newest (he has looked at everything: the "<n> new" press and every look-away move it there; the next landing joins after it, and the rule then stands before it); none only when `lastLook` is null (no last look on record: every landing is new). 44 px tall below 768 px.
-- Lands on the newest (`newestPlace`) at draw and whenever the newest id changes, even from a line scrolled back: `scrollLeft` at the line's end, except where the rule after the newest would push the newest out at the left on a line hardly wider than one landing (a phone's): there the newest whole in view first, clear of the 24 px leading fade second, and as far toward the rule as that allows, which leaves the rule one swipe on.
-- Holds the landing: scroll events set `atEnd` (the line at or past `newestPlace`, 1 px slack); a `ResizeObserver` (`resizeObserverIn(useHostWindow(), …)`) on the scroller and its list puts a line that rested there back on it, and so does the rule moving to or from the end (`ruleAtEnd`, which changes no width). A line scrolled back stays. Covers the head growing, the rule moving and a narrower window.
-- Leading edge: while not at the start, a 1.5rem `mask-image` fade (`atStart` state).
-- Wheel: `useSidewaysWheel` (`hooks/useSidewaysWheel.ts`, which the shelf's row binds too, MAN-9297), as `onWheel` on the scroller: a mostly-vertical wheel turns the line sideways (`deltaMode` 1 = lines, x16); a sideways sweep and a Shift+wheel are the browser's own.
-- ONE TAB STOP (roving): the stop is the landing last focused, else the first new, else the newest. Focus on a landing makes it the stop. ←/→ walk, Home/End jump, no wrap, only from a landing's press. The stop is set by `LandedTimeline` alone; the wrapper never sets `tabIndex`.
-
-## `LandedEntry` — one landing
-| prop | type | meaning |
-|---|---|---|
-| `entry` | `StationLanded` | title and chat read here |
-| `badge` | `ReactNode` | the kind's badge; not drawn when `oneLine` |
-| `when` | `string` | "3:05 AM", "yesterday 7:34 PM", "Oct 26" (`whenOf`, the strip's key wording over `stationStamp`, `stationClock.ts`: locale clock today, `station.strip.when.*`, `formatShortDate`'s day); `''` for a stamp that is not a time |
-| `fresh` | `boolean` | after his last look |
-| `fold` | `{ open, line } \| null` | for a landing that opens in place: `aria-expanded`; `aria-controls` the line's id while open |
-| `oneLine` | `boolean` | the folded newest: title then time, no who and no kind |
-| `tabbable` | `boolean` | default true; `tabIndex` 0 or -1 |
-| `onPress` | `() => void` | |
-- Draws a bordered 2-line box: time · "by <chat>" (or "by the house" when `chat` is null) · badge; under it the title on one line. Below 768 px the badge takes its own line.
-- New = garnish border and sr-only "New" first in the press's name. `data-landed-entry` = id, `data-landed-kind`, `data-landed-new`.
-- The title is cut to one line; its `Tooltip` repeats it (`showOnFocus`) and the stage or the open line shows it whole. The bubble is `[@media(hover:none)]:hidden`: where there is no hover a tap's compatibility mouse events would leave it over the stage head or the opened line.
-- `opensInPlace(entry)`: kind `recovered`, or no `plan` and no `sessionId`. Its press toggles `openId` (view state, one at a time, never stored) and shows `<p data-landed-line>` full width under the strip; a `FoldChevron` ends its title. Folded, the line is drawn only while the open landing is the newest.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedEntry.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SinceYouLastLooked.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StripLines.tsx
-
-## MAN-9334 — src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and — Touch and words
-section: src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and StripLines: the bar's strip, "Since you last looked"/003 Touch and words
-
-- Below 768 px: each landing, the chip, the fold press (`size-11`), Try again and the rule are 44 px catches. In the count form (`countOnly`, MAN-9332) the chip, the fold and Try again are 44 px at any width: the chip and Try again by `STATION_COUNT_FORM_CATCH`, a transparent `::before` 8 px past the padding box. Nothing is said on hover alone.
-- No cost figure reaches the strip: the title is the history's, and nothing else of a row is read.
-- Words: `station.strip.*` in `en/common.json`: `name`, `timeline`, `kind.{shipped,epic,landed,recovered}`, `when.{today,yesterday,day}`, `by`, `byHouse`, `new`, `newCount`, `seenLabel_one/_other`, `rule`, `nothingNew`, `nothingNewShort`, `quiet`, `loading`, `failed`, `failedShort`, `retry`, `retryLabel`, `expand`, `collapse`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedEntry.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SinceYouLastLooked.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StripLines.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-strip.mjs
 
 ## MAN-9288 — src/modules/station — WhereThingsStand and RailRow: the left rail, "Where things stand"
 
@@ -12364,7 +11867,7 @@ The `sessions` slot: his chats over the roadmap he selected, one rail. Every row
 - Compact: the rail fills the Where things stand section (`StationSectionsView`, MAN-9335) and scrolls inside itself; the page never scrolls.
 - States and empty state: the rail draws none of its own; its two sections draw theirs (MAN-9289: reading, failed, none, nothing running, rows; MAN-9290: reading, none, nothing open, epics). Touch: MAN-9306.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RailRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhereThingsStand.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-turn.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-turn.mjs
 
 ## MAN-9305 — src/modules/station — WhereThingsStand and RailRow: the left rail, "Where things — `WhereThingsStand` — the live binding
 section: src/modules/station — WhereThingsStand and RailRow: the left rail, "Where things stand"/001 `WhereThingsStand` — the live binding
@@ -12398,7 +11901,7 @@ section: src/modules/station — WhereThingsStand and RailRow: the left rail, "W
 - Unlit: `text-foreground hover:bg-muted/60`.
 - Fold head: `flex-col items-start justify-center gap-1`, `FoldChevron` and the label (`text-sm font-medium`); while closed, `closedMark` stands on a line of its own under the label with `pl-6`. why: the mark never shares the label's line, so a narrow rail cuts the mark, not the label.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RailRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhereThingsStand.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-whole-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-rail-whole.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-whole-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-rail-whole.mjs
 
 ## MAN-9306 — src/modules/station — WhereThingsStand and RailRow: the left rail, "Where things — Words (`en/common.json`)
 section: src/modules/station — WhereThingsStand and RailRow: the left rail, "Where things stand"/002 Words (`en/common.json`)
@@ -12418,7 +11921,7 @@ The rows' `Tooltip` (the line, or the feature's phrase, whole on the stage the p
 - Errors: the station's own console errors are the gate; a `Failed to fetch` within 3 s of the script moving a page, and the errors of the chat pages the door opened, are counted apart and printed.
 - Not run by it: seam J, which `station-rail-whole.mjs` below runs.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RailRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhereThingsStand.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-whole-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-rail-whole.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-whole-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-rail-whole.mjs
 
 ## MAN-9307 — Probing the rail whole — station-rail-whole.mjs and lib/rail-whole-recorder.mjs: one typed Haiku turn through the rail's six words (seam J)
 section: src/modules/station — WhereThingsStand and RailRow: the left rail, "Where things stand"/003 The whole — `.verify/station-rail-whole.mjs` and `lib/rail-whole-recorder.mjs` (seam J)
@@ -12432,138 +11935,6 @@ section: src/modules/station — WhereThingsStand and RailRow: the left rail, "W
 - THE FIRST TOUCH. The turn is sent after a second of quiet on the script's own socket (1,200 ms with no hint, waited for up to 30 s). why: the first touch of a quiet stretch goes at once, and a frame another of his chats raises in the second before the send takes that away; the first frame is then owed at the close of that second and the check says so in its name. When the second was quiet, the turn's first `station_sessions_changed` frame stands within 150 ms of the send and carries `states: true` (the turn's own start, never a foreign chat's `false` frame landing in the same 150 ms), and the row reads Working within a second of it, both from the moment `chat.send` leaves the chat page (measured 2026-10-31 in four runs: the frame 1 to 2 ms after the send, the row 128 to 145 ms).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-whole-cleanup.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-whole-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-rail-whole.mjs
-
-## MAN-9289 — src/modules/station — SessionRows: his chats in the left rail, with the state chip, the asleep fold and her mark
-
-The rail's first section (MAN-9288): "Sessions" over his chats in her order. Chats that are up (`working`, `waiting`, `live`) stand as rows; the asleep ones fold under "Asleep · N". Fixtures and probe: MAN-9292. Wire `StationSession`: MAN-9256. Touch law: INV-10275.
-
-## Exports
-| export | what |
-|---|---|
-| `SessionRows` | the section |
-| `SessionStateChip({ state })` | the state's chip: kit `Badge as="span"`, `vv-badge--compact`, `data-station-session-state=<state>`; drawn on a row and on the chat's stage (MAN-9291), so a state reads alike in both |
-
-## `SessionRows` — props
-| prop | type | meaning |
-|---|---|---|
-| `tier` | `StationTier` | the row tooltip's side: `narrow` `top`, else `right` |
-| `density` | `StationDensity` | `compact`: each chat's row on one line (§"One row at compact"); the asleep fold as in full |
-| `sessions` | `StationSession[] \| null` | in her order; null until the first read |
-| `failure` | `string \| null` | the FIRST read's failure; set only while `sessions` is null |
-| `onReread` | `() => void` | Try again |
-| `focus` | `StationFocus \| null` | a `chat` focus lights that row |
-| `her` | `StationHerMark \| null` | her mark |
-| `asleepOpen`, `onAsleepOpen` | `boolean`, `(open) => void` | the fold |
-| `onPress` | `(focus) => void` | `{ kind: 'chat', sessionId, label: name }` |
-
-## States — a data condition each
-| state | when | draws |
-|---|---|---|
-| reading | `sessions` null, `failure` null | `[data-station-sessions-reading]`: `Spinner` "Reading your sessions…" |
-| failed | `sessions` null, `failure` set | `[data-station-sessions-failed]` `role="alert"`: warn `Banner` with the server's sentence as it is and Try again (`finger:h-11`), in the rows' place |
-| none | `sessions` is `[]` | `EmptyState` "No sessions yet" + "A chat you start in CloudCLI stands here, with what it is doing." |
-| nothing running | every chat asleep | `EmptyState` "Nothing is running" + "One chat is asleep. A message wakes it." / "{{count}} chats are asleep. A message wakes any of them.", the fold under it |
-| rows | otherwise | `<ul>` of `SessionRow` for the up chats; the asleep fold under it when any chat sleeps |
-- A read that fails AFTER a good one keeps the rows as they stand and says nothing: `failure` is only ever set while `sessions` is null.
-- `data-station-sessions` marks the section; `h2` is the eyebrow `station.sessions.heading` ("Sessions").
-
-## One row (`SessionRow`) — a `RailRow kind="session"` (`data-station-name` = session id)
-- Name `line-clamp-2` (`text-sm font-medium`), the state chip at the right of the name's first line, the project (`truncate`, muted), the line she reads of it (`data-station-session-line`, `truncate`, omitted when `activity` is `''`), her mark when she looks at this chat.
-- A `waiting` chat's line is in `text-warn-ink`; every other line is muted.
-- The line is cut to one line on the rail and stands whole on the chat's stage (MAN-9291), which is how a finger reads it. The `Tooltip` over the row repeats it for a pointer and, with `showOnFocus`, for a keyboard; class `max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere]`.
-
-## One row at compact (`density: 'compact'`)
-One line, centred in the row (a finger's 44 px makes the row taller than the line), left to right:
-| part | draws |
-|---|---|
-| name | `[data-station-session-name]`, `text-sm font-medium`, `truncate`, at most 60% of the line: a long name never pushes out what follows |
-| line | `[data-station-session-line]`, `flex-1 truncate`: `activity`, cut to what is left; `text-warn-ink` while the chat is `waiting` |
-| her mark | only on the chat she looks at: her initial in a 16 px `info` disc (`[data-station-her=<sessionId>]`, `aria-hidden`) and her words in `sr-only`. Her status line in her head says them in view |
-| chip | `SessionStateChip` at the line's end, so every row's chip stands in one column |
-- No project line: the stage says it.
-- The row's `Tooltip` is at `top` and reads "<name> · <activity>" (the name alone when `activity` is `''`).
-- Claims: every row ≤ 45 px, its name ≤ 21 px (`.verify/kaylee-station-density.mjs`, MAN-9328).
-
-## State chip words
-| state | tone | chip | key |
-|---|---|---|---|
-| `working` | info | Working | `station.sessions.state.working` |
-| `waiting` | warn | Waiting on you | `station.sessions.state.waiting` |
-| `live` | neutral | Idle | `station.sessions.state.idle` |
-| `asleep` | neutral, outline (faint) | Asleep | `station.sessions.state.asleep` |
-Every chip says its state in words (MAN-578).
-
-## Her mark (`HerMark`)
-- `[data-station-her=<sessionId>]`, `data-tone="info"`: her initial in an `aria-hidden` info `Badge` disc, then her words in `text-tone-ink`.
-- On a row: words `truncate` (one line; the row's name stands just above). On the closed fold's head (`wrap`): `line-clamp-2 break-words`, so the chat's name, the last part of the words, is not cut.
-- While her mark names an asleep chat and the fold is closed, the fold's head carries the mark (`closedMark`); `herAsleep` decides. Where she looks is never hidden.
-
-## Fold
-`RailFold kind="asleep"`, label `station.sessions.asleep` ("Asleep · {{count}}"), open state is the caller's (`asleepOpen`).
-
-## Touch (under a finger; INV-10275)
-- Every `SessionRow`, the asleep fold's head and the failed state's Try again are 44 px catches: `RailRow` and `RailFold` carry `finger:min-h-11` (MAN-9288), Try again `finger:h-11`. A fold head grows past 44 px while her mark stands under its label.
-- The line is cut to one line on the rail and stands whole on the chat's stage its press opens (MAN-9291): a finger reads it there. The `Tooltip` repeats it for a pointer and a keyboard only (`[@media(hover:none)]:hidden`). Nothing is said only in a hover.
-- A chip says its state in words and her mark says what she does: no state is colour alone (MAN-578).
-
-## Words
-`station.sessions.*`: `heading`, `state.{working,waiting,idle,asleep}`, `asleep`, `reading`, `retry`, `none.{title,message}`, `nothingRunning.{title,message_one,message_other}`, `her.{reading,drafting,walking}`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SessionRows.tsx
-
-## MAN-9290 — src/modules/station — RoadmapRows: the roadmap he selected, in the left rail, in its own words
-
-The rail's second section (MAN-9288): "Roadmap" over the title of the roadmap he selected, its open epics in its own order with their features under them, the rest folded under "Complete · N". Every word, phrase, colour and dot is the roadmap module's or `src/shared/constants.ts`'s; the station adds none. Fixtures and probe: MAN-9292. Roadmap words: MAN-7634. Touch law: INV-10275.
-
-## Reads through the roadmap barrel (`@/modules/roadmap`)
-| import | gives |
-|---|---|
-| `useStepPhrase(feature)` | the step in the roadmap's words ("being designed", "waiting on you: Accept", "waiting on <title>", "shipped Oct 3 · 3h 42m"), read off the live picture on the live bus (MAN-7637); so each feature is a component of its own (`FeatureRow`) |
-| `dotStateOf(feature, epic, milestone)` | the dot's state, blocked by the nearest reason above (MAN-7819) |
-| `PanelDot` | the dot's drawing (MAN-7840) |
-A feature's dot on the rail and on the tree never disagree. `ROADMAP_EPIC_WORD_KEYS` (`src/shared/constants.ts`) spells the epic's word.
-
-## `RoadmapRows` — props
-| prop | type | meaning |
-|---|---|---|
-| `tier` | `StationTier` | the feature tooltip's side: `narrow` `top`, else `right` |
-| `density` | `StationDensity` | `compact`: each feature's row on one line (§"Rows"); the epics and the complete fold as in full |
-| `roadmap` | `Roadmap \| null \| undefined` | `undefined` = picture not landed; `null` = it holds no roadmap |
-| `focus` | `StationFocus \| null` | a `card` focus lights the epic or feature of that `plan` |
-| `completeOpen`, `onCompleteOpen` | `boolean`, `(open) => void` | the fold |
-| `onPress` | `(focus) => void` | `{ kind: 'card', plan: <name>, label: <title> }`, for a feature and an epic alike |
-
-## States
-| state | when | draws |
-|---|---|---|
-| reading | `roadmap` undefined | `[data-station-roadmap=reading]`: eyebrow + `Spinner` "Reading the roadmap…" |
-| none | `roadmap` null | `[data-station-roadmap=none]`: eyebrow + `[data-station-roadmap-none]` "No roadmap yet. Make one on the Roadmap tab, and its open epics stand here." A quiet line, no `EmptyState`. why: the sessions above may already stand in their own empty frame; a second frame overruns a laptop's rail |
-| nothing open | every epic folded | `p` "Nothing is open on this roadmap." over the fold |
-| epics | otherwise | `[data-station-roadmap=<roadmap name>]`: eyebrow `p` "Roadmap", `h2` the roadmap's title (`font-serif text-lg/tight`), the open epics, the fold |
-
-## Which epic stands where
-- Open = epic `word` is `not started` or `in progress` (`OPEN_WORDS`): a row with its features under it (`[data-station-epic-features=<epic>]`, `ml-4 border-l pl-1`), in the epic's own order, milestone by milestone.
-- Every other epic (`complete`, `empty`) is one row under `RailFold kind="complete"`, label `station.roadmap.complete` ("Complete · {{count}}"), no features.
-- No milestone is drawn, no unplaced feature, no picker.
-
-## Rows
-| row | `RailRow` kind | draws |
-|---|---|---|
-| epic | `epic` | title (`line-clamp-2`, `font-medium`) over its line: the word alone while it holds no feature, else `roadmap.tree.epicLine` ("<word> · <shipped> of <count> shipped"); `" · Blocked"` (`roadmap.tree.blocked`) appended while `epic.blocked` is set |
-| feature | `feature` | `PanelDot` on the title's first line (`h-5` = its line height), the title (`line-clamp-2`), under it `[data-station-feature-phrase]` (`truncate`): the step phrase, `" · Blocked"` appended while the dot is `blocked` (red is never the whole signal) |
-- A feature at `density: 'compact'` is ONE line, centred in its row: `PanelDot`, `[data-station-feature-title]` (`flex-1 truncate`), and `[data-station-feature-phrase]` at the line's end, `max-w-[45%] shrink-0 truncate`. why: "waiting on you" (warn ink) is never the part a long title pushes out. Its `Tooltip` is at `top` and reads "<title> · <phrase>". The epic row is as in full and heads its features' one-line rows.
-- A feature with `waiting_on_you` set has its phrase in `text-warn-ink`; the phrase says "waiting on you" itself. No feature word is drawn: the phrase carries it.
-- The phrase is cut to one line; it stands whole on the card the press opens. The `Tooltip` over a feature row repeats it for a pointer and a keyboard (`showOnFocus`).
-
-## Touch (below 768 px; INV-10275)
-- Every epic row, every feature row and the "Complete · N" head are 44 px catches: `RailRow` and `RailFold` carry `finger:min-h-11` (MAN-9288).
-- A feature's phrase is cut to one line and stands whole on the card its press opens. The `Tooltip` repeats it for a pointer and a keyboard only (`[@media(hover:none)]:hidden`). Nothing is said only in a hover.
-- A feature owed to him says "waiting on you" in its phrase, a blocked one ends " · Blocked", an epic spells its word: no dot is colour alone (MAN-578).
-
-## Words
-`station.roadmap.*`: `eyebrow`, `reading`, `none`, `noneOpen`, `complete`. Everything else is `roadmap.*` and `roadmap.tree.*` (MAN-7634).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RoadmapRows.tsx
 
 ## MAN-9291 — src/modules/station — ChatStageView and ChatStage: a chat on the stage
 
@@ -12674,51 +12045,6 @@ The `sessions` slot's slice of the fixtures (MAN-9229) and the claims `.verify/k
 - Below 768 px every press of the rail (rows, fold heads, Try again) and of the stage must be a 44 px catch (`lib/station-touch.mjs`, MAN-9229): the rail's rows are measured in compact's `-where` shots at 390×844 (MAN-9336); the stage's `phone` leg waits for a phone-sized window the stage runs are drawn in, and none is.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/roadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-rail.mjs
-
-## MAN-9293 — src/modules/station — useMemoryLines: the corner's read of her memory, on the frame and on reconnect, and the sentences of a failed read
-
-`useMemoryLines()` (`src/modules/station/hooks/useMemoryLines.ts`): the station's read of her memory bank for the memory corner. Used by `MemoryCorner` (`MemoryCorner.tsx`), which draws "What I'm keeping" from what it returns (MAN-9312). The registry that places the corner: MAN-9264. The probe: MAN-9294. Touch law: INV-10275.
-
-## useMemoryLines() — returns
-| field | type | meaning |
-|---|---|---|
-| `lines` | `CompanionMemoryLines \| null` | the last good reading (`src/shared/companion-types.ts`: `{ count: number \| null, pageId, reason: string \| null, lines: CompanionMemoryLine[] }`); `null` until one lands |
-| `failure` | `string \| null` | why the read after the last good one failed; stands over `lines`; the next read that lands clears it |
-| `reread` | `() => void` | the corner's Try again |
-- Both fields live in one `useState` (`Held`), so one update changes both.
-- `count: null` with a `reason` is a reading (her door could not read the bank), never a `failure`. `MemoryCorner` draws `failure ?? lines.reason`.
-
-## The read
-`api.companion.memory.lines()` = `GET /api/companion/memory/lines` (`src/shared/api.ts`; the route: MAN-9188). It names no client: her bank is the account's, no page's.
-| when | what |
-|---|---|
-| mount | one read |
-| `companion_memory` frame | `request()` (the frame carries nothing: the answer is always "read the list again"; MAN-9308, MAN-9243) |
-| `websocket_reconnected` | `request()` (a frame sent while the socket was down is lost; the read has it) |
-| `reread()` | `request()`; while `lines` is `null` it first clears `failure`, so the waiting state draws |
-- Nothing else reads: no timer, no poll.
-- ONE READ IN FLIGHT, ONE QUEUED (`readingRef`, `queuedRef`): a hint during a read queues exactly one more, run when the first lands; any number of hints in that time are the one. Reads never overlap.
-- The subscription is made BEFORE the first read. why: a frame landing between the two starts a read of its own.
-- Strict mode mounts twice in development: the second mount finds the first one's read out and asks for no second.
-- `aliveRef` is false after unmount: a read that lands then sets nothing.
-- A 200 whose body is not the shape (`isMemoryLines`: `count` number or null, `pageId` string, `reason` text or null, `lines` all `isMemoryLine`: a token, title and kind, `via` `spoken`, `typed` or `null`, and `saidAt`, `account` and `quote` text or `null`) is a failed read, never an empty bank. A line with no `via` (a server of an older build) or a `via` that is neither channel fails the whole read, all its lines with it: the corner never guesses "said" for a line. It heals on the next read (a server restart drops the socket, and `websocket_reconnected` reads again).
-
-## failure — the sentences
-| the read | `failure` |
-|---|---|
-| the request never answered | `the server did not answer` (`MEMORY_NO_ANSWER`, exported: `fake/corner.ts`'s failed picture says it too) |
-| a non-2xx answer | the route's own sentence (`refusalSentence(response)`), else `Request failed (<status>)` |
-| a 200 that is not JSON, or not the shape | `the answer was not a list of her memories this page can draw` |
-- Every sentence `failure` carries is the route's or the page's own, never a browser's (`Failed to fetch`, `Unexpected token '<'`). A new failure path keeps that. why: `MemoryCorner` draws `failure` verbatim in its Banner.
-- The raw error goes to `console.warn` (`[Station] The memory route did not answer:`, `[Station] Could not read her memory:`).
-- `lines` stays the last good reading under a `failure`.
-
-## Known edges
-- A tier change moves the corner to another slot box and re-mounts `MemoryCorner`: the hook reads again and `openLine` folds. State held in the hook, not a provider.
-- Her Settings card (`useCompanionMemorySettings`, MAN-9184) follows no frame.
-- 2026-10-30: the probe ends `ALL PASS` (31 PASS) with 9 reads on a 7-memory bank. The two page sentences above (`the server did not answer`, `the answer was not a list …`) are tsc- and oxlint-checked only: the probe stubs a 200 `count: null` and a 503, no dropped connection or non-JSON body.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useMemoryLines.ts
 
 ## MAN-9294 — Probing the station's memory corner — kaylee-station-corner-live.mjs and lib/station-corner-live.mjs: "What I'm keeping" on the live client
 
@@ -13170,35 +12496,6 @@ Whole-journey probe of the strip: one day on the live client, from the history a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-strip-whole.mjs
 
-## MAN-9303 — src/modules/station — useLandOnStageControl: the keyboard's landing after a rail item's act, and the hold on the pressing key
-
-`useLandOnStageControl()` → `land(focus)` (`hooks/useLandOnStageControl.ts`): moves the keyboard to what answers the focus's stage, once the stage has drawn it. Focuses and presses nothing. Used by `WhatNeedsYou` (MAN-9281), once, for every act the rail offers; called right after `setFocus(target)`.
-
-## Handles — searched in `[data-station-stage="<kind>"] [data-station-stage-body]`
-| focus `kind` | handle |
-|---|---|
-| `card` | `[data-ask-answers], [data-ask-question]`: LockAnswer's answers group for an Accept (Queue one Tab away: an Accept approves exactly what was shown, so the landing is never a press), RoundAnswer's first question for a round (the dispatcher's own `PlanCard`) |
-| `ask`, `followups`, `check` | `[data-station-fire]` (MAN-9282, MAN-9283) |
-| any other | none: `land` returns and the keyboard stays |
-- Only the stage's body is searched, and only while its `kind` is the pressed one, so a control of the previous thing is never taken.
-- The landing is the handle when it can take focus (`button:not(:disabled)`, `a[href]`, a field, anything with a `tabindex`), else the first focusable inside it. A round's question is an `<li>`: its first option is the landing.
-
-## How it waits and stops
-- Waits on the DOM, no timer re-asks: a `MutationObserver` on `document.body` (children, subtree) and one `requestAnimationFrame` check.
-- Stops at the first of: control found; a newer `land`; his next `pointerdown` or non-repeat `keydown`; `LANDING_DEADLINE_MS` (5000, a deadline for giving up); the rail unmounting.
-
-## `holdBackHeldKey(code, onReleased)` — the pressing Enter
-| part | rule |
-|---|---|
-| armed | by `land`, only when `keyDownRef` is non-null: the `code` of the latest keydown still down, set in the capture phase so it is set before the act's click. A mouse or touch press arms nothing |
-| swallows | every `event.repeat` `keydown` and `keypress`, in capture: `preventDefault`, `stopImmediatePropagation`. A fresh keydown goes through |
-| released | by THAT `code`'s `keyup`, or a window `blur`. Another key's keyup (Shift in Shift+Enter) does not release it |
-- why: Enter clicks the act on keydown and is still down when the keyboard lands; on an Accept's answers group (or a permission's) the repeat does nothing, but a round's first option is a button and so is "Open the chat", and the repeat would press what he has seen for less than one repeat interval.
-- `keyDownRef` is cleared by that code's keyup or a blur. A newer `land`, and unmount, release the hold.
-- Proof: `.verify/station-needs-live.mjs` (MAN-9304): leg A (the act's Enter fires nothing and lands on `[data-ask-answers]`, a second Enter fires nothing, Tab reaches Queue, the Enter on Queue approves), legs B and C (the landing on a `data-station-fire` element). The hold on a held Enter's repeat is not exercised there; it keys on `KeyboardEvent.repeat`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useLandOnStageControl.ts
-
 ## MAN-9304 — Probing the rail's presses live — station-needs-live.mjs, station-needs-check-live.mjs and station-round-touch.mjs: an item's act, the stage it opens, the firing, a round under a finger
 
 The rail's items on a live client: the act puts the whole of the item on the stage with the keyboard on what answers it (an Accept's answers group, Queue one Tab away), and the firing happens there. Rail: MAN-9281. Landing: MAN-9303. Stages: MAN-9282, MAN-9283. The fixtures' probe: MAN-9284. The provider's probe: MAN-9249. Touch law: INV-10275.
@@ -13288,7 +12585,7 @@ All on the memory showings' scratch stack; his live bank is only read. Setup and
 - Measured 2026-10-30, `readMemoryLines()` against his live bank (read only): `count` 7, `reason` `null`, the tokens of `docstore list kaylee:memory`, newest first (`MAN-9219` then `INV-10198`, `INV-10167`, `INV-10162`, `INV-10161`, `INV-10159`, `INV-10160`).
 - The corner's live probe: MAN-9294.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-announce.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-corner-typed.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-corner-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-lines.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-announce.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-corner-typed.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-corner-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-lines.mjs
 
 ## MAN-9312 — src/modules/station — MemoryCornerView, MemoryCorner and MemoryLine: "What I'm keeping", her memory at the left rail's foot, never auto-expanded
 
@@ -13380,101 +12677,7 @@ A `Map` (a kind spelled `constructor` is a word, not a prototype key). `[data-st
 ## Compact form
 `density` is taken and the corner draws the same at both, on the width it is given. In compact it stands at the foot of Where things stand, closed until his press, and open never takes more than half the section, so his sessions keep the rest (MAN-9335). At the narrow tier it opens downward and its lines take their own height, so the section holds it in a scroller.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/corner.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/MemoryCorner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/MemoryLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-corner.mjs
-
-## MAN-9314 — src/modules/station — StationHeadView and StationHead: her face, her name, her one state in words, the failed process's banner and her controls
-
-Her head on Kaylee Station: the `head` line of `STATION_REGIONS` (MAN-9264), the top of her column. Every piece in it is the companion module's own, drawn through its barrel (MAN-569): the face `CompanionFace` (MAN-9129), the state words `CompanionStatus` (MAN-9089), the controls `CompanionControls` (MAN-9062; rules: MAN-9090). Below it: her conversation or her portrait (MAN-9325) and her talk control (MAN-9324). Layout: MAN-9230. Fixtures and the center probe: MAN-9315. Touch law: INV-10275.
-Her column has two views, `herView` (§"The two views"): `portrait`, the default, draws no face here; `chat` draws every form below.
-- `StationHeadView` draws every state from props. `StationHead` binds it and adds no state of hers (MAN-9089).
-
-## `StationHeadView` — `tier`, `name`, `presence`, `face`, `controls`, `failure`, `herView`, `onHerView`, `row`
-| prop | type | meaning |
-|---|---|---|
-| `tier` | `StationTier` | `wide` or `laptop` pick the arrangement at full density (§"Tiers"); `narrow` draws the compact head whatever `density` says (§"Compact density") |
-| `density` | `StationDensity` | `full`, or `compact`: the one form of the one-column arrangement, at every tier (§"Compact density") |
-| `name` | `string` | her name as he set it; `companion.defaultName` while her picture loads |
-| `presence` | `CompanionPresence` | `useCompanionPresence()`: the status line reads it as her face does (MAN-9089) |
-| `face` | `(px: number) => ReactNode` | her face at the px the view draws its box |
-| `controls` | `(align: 'start' \| 'center') => ReactNode` | `CompanionControls` with `layout: 'line'` (MAN-9062; given `ears`, MAN-9342); at compact, drawn inside the "Her controls" panel while it is open |
-| `failure` | `{ sentence: string \| null } \| null` | her process failed (`sentence` = the server's, null when it gave none); null while it runs |
-| `herView` | `StationHerView` | `useHerView()` on the page: `chat` draws her face in its disc as every form here stands it; `portrait` draws none (§"The two views") |
-| `onHerView` | `(next: StationHerView) => void` | the toggle's press: her column in the other view |
-| `row?` | `StationHeadRow` | handed by the phone's arrangement over `density: 'compact'`: the head is then the phone's top row, `HeadRow` (MAN-9371), whatever else §"Compact density" says. `StationHead` passes it through |
-- `face` and `controls` are slots, so a fixture draws `CompanionAvatar` on a fixture's presence and `CompanionControls` (MAN-9315).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationHead.tsx
-
-## MAN-9398 — src/modules/station — StationHeadView and StationHead: her face, her name, her — Tiers — `density: 'full'`
-section: src/modules/station — StationHeadView and StationHead: her face, her name, her one state in words, the failed process's banner and her controls/001 Tiers — `density: 'full'`
-
-These are the forms of the `chat` view (`herView: 'chat'`, MAN-9399 §"The two views"). In `portrait`, the default, every tier and density draws the compact look below WITHOUT its face (`data-station-head="portrait"`, the toggle beside "Her controls"), and none of the face forms in this table; the phone's row draws no face either (MAN-9401).
-| tier | form |
-|---|---|
-| `wide`, her column ≥ 62rem tall | face 200 px centred over name and status; controls under, centred |
-| `wide`, shorter, her column ≥ 47rem tall (1440×900: 833 px) | face 132 px beside name and status, the two centred as one; controls centred under, two lines in her 360 px column (three given her ears), the section padded 12 px across so Stop, the model and Live (332 px) share the first line |
-| `laptop`, her column ≥ 47rem tall | face 132 px beside name, status and controls (`start`) |
-| `wide` or `laptop`, her column under 47rem tall (1280×800, 1366×768) | the compact look: face 64 px (`size-16`), name and state on one line (16 px on a 24 px line), the controls' line hidden and "Her controls" under her words holding it (the compact form's `controlsPress`, one set of markup); the banner stands under the rest (on a laptop in her words' column, under the press) |
-
-- `narrow` (under 1024 px) has no full-density form: `fullTier` (`FullTier` = `wide` \| `laptop`) is null there and `StationHead` draws the compact head (MAN-9230).
-- The 62rem rule is the container query `her` on her column (`[@container_her_(min-height:62rem)]`, MAN-9230), never a mode. why: measured 1440×900, the 200 px form stood 402 px = 48% of her column and held the conversation at its floor with a draft docked; the 132 px form stands 260 px, 294 px given her ears and 322 px while their `unavailable` sentence runs three lines (the ears scaffold's fixtures, 2026-10-30).
-- The 47rem rule is the same container query, `[@container_her_not_(min-height:47rem)]` on her column. why: the 132 px form stood 178 px at 1280×800 with the dock docked; the compact look stands 82 px (2026-10-31), the room going to his sends, the thing on the stage and her newest line.
-- `FACE` (px and box per `FullTier`) and `NAME` (type per `FullTier`) are the tables in `StationHead.tsx`. Face box `[data-station-head-face]` (`bg-accent-soft`: the ground under her portrait while its sheets decode). The view reads the box's drawn width (`ResizeObserver` via `resizeObserverIn`) and calls `face(drawnPx)`, so her initial fills its disc at 132 and 200 alike.
-- Hooks: `[data-station-head=<tier>]`, `[data-station-head-name]`, `[data-station-head-failed]`. Status line: `CompanionStatus` `emphasis="station"`.
-
-## Compact density — `density: 'compact'`
-`data-station-head="compact"` in the `chat` view (`"portrait"`, the same look without its face, in the default `portrait` view: MAN-9399 §"The two views"), one form at every tier, and the only form at the `narrow` tier:
-| part | draws |
-|---|---|
-| face | 64 px (`COMPACT_FACE`) beside her words: one column has no height for a larger one |
-| name and state | one line where both fit; the state wraps under the name, its words whole, where they do not |
-| controls | ONE press `[data-station-head-controls]`, "Her controls" (`station.head.controls`), under her words: the kit `Menu` `{ panel, label }` (MAN-9016) holding `controls('start')`. Every rule of `CompanionControls`' line holds (MAN-9090); Stop leads it while her turn runs |
-| failure | the warn `Banner` across the head's full width, under the rest |
-- The panel hangs from the press's left edge, under her words, so it never stands over her face at any width. `CONTROLS_PANEL_PX` = 380: two lines of the line at 44 px catches, three given her ears. It is a most: the window less 16 px comes first and the controls wrap (`.vv-menu__panel--controls`).
-- A pick in the model list (a `Select` drawn on `body`) leaves the panel open; Escape closes the list, then the panel.
-- Stop is one press deeper than at full: it sits inside "Her controls".
-- Claims: `.verify/kaylee-station-density.mjs` (MAN-9328).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationHead.tsx
-
-## MAN-9399 — src/modules/station — StationHeadView and StationHead: her face, her name, her — States
-section: src/modules/station — StationHeadView and StationHead: her face, her name, her one state in words, the failed process's banner and her controls/002 States
-
-| state | when | draws |
-|---|---|---|
-| loading (the empty state) | `picture` null | `companion.defaultName`; status "Loading…"; her initial in the face box (no face id); model, Live and Clear wait; no Stop; "Voice on this device" answers (it is this device's) |
-| read failed | `picture` null, `readFailure` set | the loading head unchanged; the reason and Try again stand in the conversation (MAN-9325) |
-| any presence | `presence.state` | the status words of MAN-9089's table; the face's `data-state` is the same value |
-| turn running | `picture.turnId` set | Stop leads the controls line |
-| failed | `picture.process.state === 'failed'` | status "Stopped · your next message starts her again"; a warn `Banner` right under it: the server's sentence, else `companion.panel.failedUnknown` "<name> stopped." (the panel's rule) |
-- No look turns her toward a rail: she faces him (`CompanionFace` is given no `look`).
-
-## Touch
-- At full density the head holds no press of its own while her column is 47rem tall; at compact, and at full density under 47rem, it holds one, "Her controls", `finger:h-11`. Its presses are `CompanionControls`' `line` (behind "Her controls", in the open panel, where the head is compact), each 44 px under a finger (`finger:`, INV-10275): Stop `finger:h-11`; the model `Select` (`size="sm"`) by the kit (`.vv-select--sm`, `verve/controls.css`, 44 px below 768 px); the Live, voice and ears rows' labels `finger:min-h-11`, the label being the press that presses the switch; Clear `finger:h-11`.
-- The line wraps rather than cut a word; voice and Clear wrap as one unit; given her ears the voice switch stands alone and the ears' switch and Clear wrap as one (MAN-9062, MAN-9342).
-- The toggle (`HerViewToggle`) is one kit `Button`, `finger:h-11`, its word drawn: a 44 px catch under a finger (INV-10275).
-
-## The two views — `herView`
-`herView` is the station pref of that name (`useHerView`; the view, her portrait and the toggle's own row: MAN-9401; its place in the record: MAN-9248): `portrait` (the default, and what a record with no `herView` reads) or `chat`. The toggle between them stands in her head and reads the view it brings: "Show chat" in `portrait`, "Show portrait" in `chat` (`station.head.showChat`, `station.head.showPortrait`, each with a glyph), `[data-station-head-view]` reading the view drawn now.
-| where | the toggle stands |
-|---|---|
-| `wide`, her column ≥ 47rem tall | under `CompanionControls`' line, centred |
-| `laptop`, her column ≥ 47rem tall | under her face, in the face's column (`items-center`): her words beside it are the taller column, so the head's height is what it was. why: a row under her controls took the iPad's stage (laptop tier, a finger's 44 px) its last 34 px and "Item 4 of 15" stood clipped (`.verify/lib/station-room.mjs`) |
-| compact form, and full density under 47rem | beside "Her controls" in one wrapping row |
-| the phone's top row | in her one menu's panel, over "CloudCLI" (`h-11 w-full`): the row has no room for a word |
-- `portrait`: no face and no disc in the head. At every tier and density the head is the compact look without its face (`data-station-head="portrait"`): name and state on one line, "Her controls" and the toggle under them, the banner under those. On the phone's row, `HeadRow` without its face (her name takes the row's start). Her portrait stands in her conversation's place (MAN-9325).
-- `useDrawnSquare` reads a face box's drawn px (the `ResizeObserver` of §"Tiers"), shared with the portrait's face.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationHead.tsx
-
-## MAN-9400 — src/modules/station — StationHeadView and StationHead: her face, her name, her — Live binding — `StationHead`
-section: src/modules/station — StationHeadView and StationHead: her face, her name, her one state in words, the failed process's banner and her controls/003 Live binding — `StationHead`
-
-`tier` and `density` = the props the station hands every region (`StationRegionProps`, MAN-9264). `presence` = `useCompanionPresence()`, the one value her status line reads and her face reads too (`CompanionFace` calls the hook itself): MAN-9089. `face` = `(px) => <CompanionFace size={px} />` (a render slot: a fixture cannot mount the bound face). `controls` = `CompanionControls` `line` with `voice`, `onModelChange` = `saveSettings({ model })`, `onLiveChange` = `saveSettings({ live })`, `onInterrupt` = `interrupt`, `onClear` = `clear`. `failure` = `picture?.process.state === 'failed' ? { sentence: picture.process.error } : null`. `name` = `picture?.settings.name`, else `companion.defaultName`.
-- The press rules of the controls are the panel's (MAN-9090): a choice shows at once and is restored with a toast when its save is refused; Clear asks first.
-- Words: `station.head.controls` ("Her controls"); the rest are `companion.*` (`defaultName`, `panel.failedUnknown`, the controls', the status').
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationHead.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-corner.mjs
 
 ## MAN-9315 — src/modules/station — fake/head.ts, fake/conversation.ts, fake/talk.ts and lib/station-center.mjs: her head's, conversation's and talk control's fixtures and the center probe
 
@@ -13505,7 +12708,7 @@ Nothing in the app imports them; the probe does (MAN-9229). One line each in `RE
 | `TALK_COMPACT_STATES` | at compact density over `home`: `composer` (the box alone, `part: 'composer'`), and the button alone in `listening`, `transcribing`, `refused` and `loading` |
 - Her face on a fixture is `CompanionAvatar` on the picture's presence with no face id: her initial. The probe lays the account's own face id (`GET /api/companion`) over it. Controls are `CompanionControls` `line` with `voice` on and presses that do nothing.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/conversation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/head.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/talk.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-center-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-center.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/conversation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/talk.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-center-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-center.mjs
 
 ## MAN-9422 — src/modules/station — fake/head.ts, fake/conversation.ts, fake/talk.ts and — `.verify/lib/station-center.mjs` — the center probe (called by `kaylee-station-shots.mjs`)
 section: src/modules/station — fake/head.ts, fake/conversation.ts, fake/talk.ts and lib/station-center.mjs: her head's, conversation's and talk control's fixtures and the center probe/001 `.verify/lib/station-center.mjs` — the center probe (called by `kaylee-station-shots.mjs`)
@@ -13525,7 +12728,7 @@ section: src/modules/station — fake/head.ts, fake/conversation.ts, fake/talk.t
 - `presencesRun`: 1440×1100, fourteen heads at 200 px in a `her` container 1100 px tall, controls left out; each face drawn at its presence, its initial (where drawn) as wide as its disc, each status in words. Shot `station-head-presences-1440x1100.png`; each presence also stands in place, `station-head-<presence>-<size>.png`.
 - 2026-10-30 at 390×844, every press ≥ 44 px: Model 144×44, Live 85×44, Voice 202×44, Clear 60×44, Stop 82×44, chips ×44, Talk 366×56, field 312×44, Send 44×44.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/conversation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/head.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/talk.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-center-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-center.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/conversation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/talk.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-center-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-center.mjs
 
 ## MAN-9423 — src/modules/station — fake/head.ts, fake/conversation.ts, fake/talk.ts and — `.verify/kaylee-station-center-live.mjs` — her head, conversation and talk control LIVE on `/station
 section: src/modules/station — fake/head.ts, fake/conversation.ts, fake/talk.ts and lib/station-center.mjs: her head's, conversation's and talk control's fixtures and the center probe/002 `.verify/kaylee-station-center-live.mjs` — her head, conversation and talk control LIVE on `/station
@@ -13540,7 +12743,7 @@ section: src/modules/station — fake/head.ts, fake/conversation.ts, fake/talk.t
 - A phone (390×844, iPhone 13 touch): `data-station-arrangement` = `phone` with her head as the top row (MAN-9371: the face 44 px beside her status, her controls in her one menu, opened and settled by `menuSettled` before measuring); the top row's count and menu, every control in her menu, every chip and the bar's four sections 44 px catches or more (a switch is caught by its label row, the send by its `::before`); the round talk control ≥ 44 tall, the composer's send a 44 px catch and its field ≥ 44; the log's "Newest" 44; nothing runs past the phone's width; a tap on the chip reaches the stage and the bar's Stage press reads `aria-current` named for the note (MAN-9376). A 390 px window with a mouse: the phone's arrangement too, the same catches (the phone predicate keys on width, MAN-9249). The catches measured are those of the controls drawn while she is idle: Stop stands only while her turn runs, and neither narrow leg runs a turn, so its catch is not measured by the probe; nor does the probe press the head's Select, Stop or Clear.
 - Shots `station-center-live-*.png` (thinking, turn, chip pressed, place before and kept, the phone's head and its stage).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/conversation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/head.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/talk.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-center-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-center.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/conversation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/talk.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-center-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-center.mjs
 
 ## MAN-9320 — src/shared/ui — kit EmptyState: props, size="sm" and its Verve styles
 
@@ -13588,7 +12791,7 @@ Her draft dock, `dock` slot of Kaylee Station: her one draft at the foot of her 
 | `scrollRef` | `useStation().scrollMemory('dock')` |
 - A chat in a hidden root (the probe's scratch project) has no row in the station's sessions, so `targetWorking` is `false` for it and its stage has no row to draw: the live probe answers the page's sessions read with a stand-in row for it, its state read off the real run registry (`.verify/kaylee-station-dock-live.mjs`). What that leaves unshown: the server's own row for a working chat (`chatRows()` → `chatStates()`: `waiting` on a pending approval, else `working` while `chatRunRegistry` holds a run, the test `sendToChat` folds on) is read in the code, never shown live, and the stage's activity line in the probe's shots is the stand-in's literal `working`, not the station's own line for the chat.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useDockFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-dock-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-dock-live.mjs
 
 ## MAN-9338 — src/modules/station — StationDockView, StationDock and useDockFloor: her draft — Live probe — `.verify/kaylee-station-dock-live.mjs`
 section: src/modules/station — StationDockView, StationDock and useDockFloor: her draft dock, its states, its room and the phone keyboard/001 Live probe — `.verify/kaylee-station-dock-live.mjs`
@@ -13623,7 +12826,7 @@ section: src/modules/station — StationDockView, StationDock and useDockFloor: 
 - Section `aria-label` = `station.dock.label` ("{{name}}’s draft").
 - Every rule of the card holds here (MAN-9090): edit saved on blur and before any send; a refused send keeps everything and shows the server's sentence; Clear asks first. Nothing of the brief is drawn twice.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useDockFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-dock-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-dock-live.mjs
 
 ## MAN-9339 — src/modules/station — StationDockView, StationDock and useDockFloor: her draft — Room
 section: src/modules/station — StationDockView, StationDock and useDockFloor: her draft dock, its states, its room and the phone keyboard/002 Room
@@ -13657,7 +12860,7 @@ section: src/modules/station — StationDockView, StationDock and useDockFloor: 
 ## Compact form
 `density` is taken and the dock draws the same at both. In the Conversation section it takes at most 45% of the section and scrolls itself; with the keyboard's mark up and its field focused, the section lifts that cap and folds her box, so the card, its target and its sends stand whole above the keys; with the mark up and her box focused it draws its head line alone (MAN-9335). At the narrow tier its own hold is 60% of the frame above the keyboard.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useDockFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-dock-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-dock-live.mjs
 
 ## MAN-9322 — src/modules/station — fake/dock.ts and lib/station-dock.mjs: the draft dock's fixtures and the dock probe
 
@@ -13862,72 +13065,6 @@ STATION_DENSITY=full node .verify/kaylee-station-density.mjs                    
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-density.mjs
 
-## MAN-9335 — src/modules/station — StationSectionsView: the one-column station's body, four sections drawn and one shown (StationSections.tsx)
-
-`StationSectionsView` (`StationSections.tsx`): the body of the one-column station, the section he chose at full height, its regions as `SECTIONS` stands them. A pure view; the compact arrangement draws it (`StationCompactView`, MAN-9337) and the phone's arrangement draws it again (`StationPhoneView`, MAN-9370); which section shows, and the stage's pull on it, is `useStationSection` (MAN-9344). Layout: MAN-9230. Touch law: INV-10275.
-
-## Props
-| prop | type | meaning |
-|---|---|---|
-| `section` | `StationCompactSection` | `conversation`, `needs`, `where` or `stage`: the section shown |
-| `slots` | `Partial<Record<SectionPlace, ReactNode>>` | what each place holds: the shell's region elements and the stage, drawn. A place left out draws nothing |
-| `density` | `StationDensity` | handed to every region: `compact` in compact's arrangement and the phone's |
-| `scrollRefs` | `Partial<Record<SectionPlace, (node) => void>>` (optional) | the scroller of a `held` place, for the station's scroll memory on the page; absent on a fixture. Bound only where the region draws no scroller of its own, so a place has one binder: compact and the phone bind `corner` at the narrow tier (the corner opened there takes its own height, `MemoryCornerView`'s `rail` false), and the corner's own list is the one bound at `wide`/`laptop` |
-- `SectionPlace` = `conversation` \| `dock` \| `talk` \| `needs` \| `sessions` \| `corner` \| `stage`.
-- Each region is its OWN ELEMENT, never wrapped (no boundary, no provider). why: the sections clone it with `density`, and the talk control with `part: 'composer'`; a wrapper would take both props and draw the talk button a second time under her head's. The stage is drawn as handed.
-
-## Sections — `SECTIONS`
-| section | pieces, top to bottom (box) | notes |
-|---|---|---|
-| `conversation` | `conversation` (`min-h-0 flex-1`, her log `min-h-0`); `dock` (`max-h-[45%] min-h-0 flex-[0_1_auto]`); `talk` (`shrink-0`) | the dock scrolls itself, so a long draft never squeezes her log; `talk` is the composer half, the box to type to her (its button is in compact's head, and the round one in the phone's bar) |
-| `needs` | `needs` (`min-h-0 flex-1`, held) | the whole section |
-| `where` | `sessions` (`min-h-0 flex-1`); `corner` (`mt-auto max-h-[50%] min-h-0 flex-[0_1_auto]`, held) | the corner closed until he opens it, never more than half the section |
-| `stage` | `stage` (`min-h-0 flex-1`) | its body scrolls inside it, under its head |
-- Held: the piece is a `ScrollArea` holding `flex h-full min-w-0 flex-col`; a region that scrolls itself fills it and the box never moves, a region of its own height (the memory corner opened at the narrow tier) scrolls in it.
-- A hairline `border-t border-border` parts a piece from the one above. A piece with nothing in it is not drawn and the rest close up.
-
-## What it draws
-`<div data-station-sections=<section>>` (`relative min-h-0 flex-1`) holds all four `[data-station-section=<name>]` (`group/section absolute inset-0 flex min-w-0 flex-col`). The ones not shown are `invisible`, `inert` and `aria-hidden`. why: a switch away and back loses no half-typed words, no scroll place and no open fold; each region's scroller is also the station's scroll memory under its own key.
-- A piece carries the shell's `data-station-slot=<place>`; the stage's cell `data-station-stage-cell`. A probe finds a region here as in the columns.
-
-## States
-| state | when | draws |
-|---|---|---|
-| shown | `section` is the section's name | its pieces, visible and in the tab order |
-| hidden | the other three | still drawn: `invisible`, `inert`, `aria-hidden` |
-- A section is a state of one drawing, never a mode of a region: every region gets `density` and nothing else from it.
-
-## Empty state
-A place with nothing in `slots` draws nothing and its section closes up. A section with no drawn piece is an empty box (a fixture without a `stage`: the Stage section holds nothing).
-
-## Touch
-The sections add no press: each piece's presses are its region's, and the hairlines carry none. The regions keep their 44 px catches under a finger at `density: 'compact'` (INV-10275, MAN-9337 §"Touch").
-- The one size the sections set: under a finger the dock's field box is floored at 56 px (`FIELD_UNDER_A_FINGER`, `min-h-14`: the field's 8 px top margin, its 44 px catch and the box's 4 px foot), and the field keeps its own `min-h-11`. why: in the sections the dock scrolls the field rather than shrink it to a press under 44 px; in her column the field gives way to nothing and steps aside whole (MAN-9393).
-
-## The folds while he types
-While the keyboard's mark is up (`html[data-keyboard=up]`, MAN-9258) and her draft's field is focused:
-| fold | class | when |
-|---|---|---|
-| the dock's cap lifts (`max-h-none`) | `[html[data-keyboard=up]_&]:has-[textarea:focus]` on the dock | the mark up, her draft's own field focused |
-| her box folds (`hidden`) | `[html[data-keyboard=up]_&]:group-has-[[data-station-slot=dock]_textarea:focus]/section` on `talk` | the mark up, her draft's field focused |
-- why: the card, its target and its sends stand whole above the keys (the dock's own hold, 60% of the frame); her conversation takes what is left.
-- The mark says there are keys; the focused field says which box they are for. A press of one of the dock's buttons, or a mouse window of any height, folds nothing.
-
-While the mark is up and HER BOX (the talk control's field) holds the focus — he types to her, not to the brief — the dock draws its head line alone (`DOCK_HEAD_LINE_ALONE`; every class keyed `[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section`):
-| steps aside | class on the dock's piece |
-|---|---|
-| the dock's quiet line (no draft), whole | `:has-[[data-station-dock=empty]]:hidden` |
-| the dock's padding | `[&_[data-station-dock]]:py-0` |
-| the card's frame, and the floor its style holds | `[&_[data-companion-draft]]:` `border-0`, `bg-transparent`, `p-0`, `shadow-none`, `!min-h-0` |
-| all of the card but its head row and a refusal | `[&_[data-companion-draft]>:not([data-companion-draft-head]):not([role=alert])]:hidden`: the field's box, Send steer's words, the notice |
-- What stands: the one row (target, Steer's state, the sends, Clear, each a 44 px catch under a finger) and a refused send's sentence (MAN-9393).
-- Her lines take the room: `LOG_ON_ITS_FOOT` (`[&_[role=log]]:pb-0` on `conversation`: her newest line stands on the scroller's foot) and `BOX_ON_THE_KEYS` (her box's top padding 0 and bottom 4 px, on `talk`: the keys stand right there).
-- Her log fits whatever room it is given in these sections: its panel's 3.5rem floor is let go (`[&_[data-companion-log]]:min-h-0` on `conversation`), so it never runs under the dock or her box.
-- 2026-10-31 on its side at 844×390 under a 190 px keyboard (live page, no draft): conversation 100 px, was 21. On the fixtures with a draft under a 170 px keyboard: about 17 → 51 px, her line whole.
-- The sections read no container and name none: the room rule stays with the arrangement that draws them (compact's fold of the strip's line and the switch, MAN-9343).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx
-
 ## MAN-9336 — src/modules/station — lib/station-compact.mjs: the compact arrangement on the four pictures, at two sizes, typed in
 
 The compact arrangement drawn on the four fixture pictures at two sizes, measured, and photographed. Compact draws from 768 px up: a window under 768 px is the phone's (MAN-9373). Run by `.verify/kaylee-station-shots.mjs` for a size whose `compact` key is set (MAN-9229); the arrangement: MAN-9337; its body: MAN-9335. Every region at compact density, without the arrangement: MAN-9328. Touch law: INV-10275.
@@ -13970,115 +13107,6 @@ STATION_SHOTS_SIZES=compact-1280x600,compact-1080x1920 node .verify/kaylee-stati
 `station-<picture>-compact-<size>.png`; `station-<picture>-compact-<size>-where.png`; `station-home-compact-<size>-week.png`; `station-home-compact-<size>-typing-<box|draft|button>.png` (mouse).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-compact.mjs
-
-## MAN-9337 — src/modules/station — StationCompactView and StationCompact: the station in one column, her head, the strip's line, one switch, a section (StationCompact.tsx)
-
-`StationCompactView` and `StationCompact` (`StationCompact.tsx`): the station in one column under the bar, the `compact` arrangement of `StationShellView` (MAN-9230). A pure view drawn by the shell's `compact` prop; `StationCompact` binds it, whenever the arrangement is `compact`: below 1024 px, and wherever his switch is on (the rule: MAN-9230). The body it holds: MAN-9335. The section and the stage's pull on it: `useStationSection`, MAN-9344. The bar's Compact switch: MAN-9259. The probe: MAN-9336. Touch law: INV-10275. Breakpoint units: INV-10383. The kit's switch: MAN-8580.
-
-## StationCompactView — props
-| prop | type | meaning |
-|---|---|---|
-| `head` | `ReactNode` | the `head` slot's region at compact density (`StationHead`: face 64 px, controls behind one press, MAN-9314; in the portrait view no face: her portrait stands large in the Conversation section, MAN-9401, and the head holds her name, her state, "Her controls" and the toggle) |
-| `talk` | `ReactNode` | the talk control's button half (`StationTalk` `part: 'button'`, words kept, MAN-9324). The box to type to her is in the Conversation section |
-| `strip` | `ReactNode` | the `strip` slot's region at compact density: always its folded one line (MAN-9332) |
-| `openStrip` | `ReactNode` | the strip's whole week, laid over the strip's line and the switch; null while shut |
-| `sections` | `ReactNode` | the body: `StationSectionsView` at compact density |
-| `section` | `StationCompactSection` | the section the body shows |
-| `onSection` | `(next) => void` | a section chosen: by the switch, or by the count of what needs him (`needs`) |
-| `needsCount` | `number \| null` | how many things need him, the one count (`needsCountOf`, MAN-9346): the rail's items and her pending action, once with the Accept or round it answers; null until the first read of the items has landed |
-| `focusLabel` | `string \| null` | the label of what stands on the stage; null while it is empty |
-
-## What it draws — top to bottom
-`<div data-station-compact=<section>>` (`COLUMN`): `mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col`, the size container `station-column` (`[container-name:station-column] [container-type:size]`, its height the frame's less the bar; `FOLDS_FOR_THE_KEYS` asks it, MAN-9343). From 800 px (`[@media(min-width:50rem)]`) it keeps 768 px centred with `border-x border-border`; narrower it is the window's width.
-| part | markup | notes |
-|---|---|---|
-| her head row | `[data-station-compact-head]`, grid `HEAD_ROW`; `[data-station-slot=head]`, `[data-station-slot=talk]` (only while `talk` is drawn) and the count | one line: head, talk (12–16rem), count. Never scrolls away |
-| the count | `[data-station-compact-needs=<n>]`, outline `sm` `Button`, `Inbox` icon and a `warn` `Badge` of the number (a muted `0` at none; nothing at null, `data-station-compact-needs=unread`); `aria-label` `station.compact.needsPress`, or `station.compact.needsPressUnread` "Open Needs you" at null | presses `onSection('needs')`; `finger:h-11 finger:min-w-11` |
-| the strip line | `[data-station-compact-strip=line\|open]` around `[data-station-slot=strip]`; not drawn without a `strip` | `open` while `openStrip` is drawn: the line is then `inert` and `aria-hidden` |
-| the switch | `[data-station-compact-switch]` holding `[data-station-compact-sections]`, the kit `SegmentedControl` | MAN-9343 |
-| the week | `[data-station-compact-week]`, `absolute inset-x-0 top-0 z-10 min-h-full bg-background shadow-lift` in the box that holds the line and the switch | covers both whole, both `inert` under it, so no press is half covered; nothing under it moves |
-| the body | `sections` | |
-- Her face is never covered: the stage is a section of the body under her head, never an overlay.
-
-## States
-| state | when | draws |
-|---|---|---|
-| section | `section` = `conversation`, `needs`, `where` or `stage` | `data-station-compact=<section>`; the body shows it, the other three hidden and inert (MAN-9335) |
-| stage offered | `focusLabel` non-null | the fourth section, Stage, with the label; null: three sections |
-| count | `needsCount` n > 0 / 0 / null | `warn` badge of n / a muted `0` / the icon alone (`unread`) |
-| week open | `openStrip` drawn | the week over the strip's line and the switch, both `inert` under it |
-| keys up | the keyboard's mark up (`html[data-keyboard=up]`, MAN-9258) and the column under 36rem tall | the strip's line and the switch fold away (MAN-9343) |
-- Empty state: MAN-9343 §"Empty state". Touch: MAN-9343 §"Touch".
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationSection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx
-
-## MAN-9343 — src/modules/station — StationCompactView and StationCompact: the station in one — The switch — one set of sections, one drawing
-section: src/modules/station — StationCompactView and StationCompact: the station in one column, her head, the strip's line, one switch, a section (StationCompact.tsx)/001 The switch — one set of sections, two drawings
-
-The kit `SegmentedControl` (MAN-8580), `label` `station.compact.switchLabel`, in `[data-station-compact-sections]` (`flex min-w-0`) at every width the compact arrangement draws: a phone window draws the phone's bar instead (MAN-9370). `count` on Needs you (> 0 only); `detail` on Stage = `focusLabel`: the one word that gives way.
-- Offered: Conversation, Needs you, Where things stand; Stage only while `focusLabel !== null`.
-
-## The folds while he types
-| class | folds | when |
-|---|---|---|
-| `FOLDS_FOR_THE_KEYS` | the box holding the strip line and the switch | both: the keyboard's mark up (`[html[data-keyboard=up]_&]`, MAN-9258); the column under 36rem tall (`@container station-column (max-height:36rem)`) |
-- why: the keys take the room; his field and her last lines stand above them, her head stays. The mark says there are keys; the column says whether they leave too little room.
-- The mark stays `down` with a mouse and with no field focused, so a tiled window or a laptop's 600 px folds nothing, and nothing folds before the keys rise. A touch window shrunk by 120 px or more with a field focused (Android's keys) or a visual viewport 2 px short (iOS's) is `up`.
-- Measured 2026-10-31: a touch tablet window at 810×560, a field focused: the column is 499 px and the strip's line and the switch fold; both return on blur.
-- Known edge (open, operator's call): the fold asks no focused field, so an iOS zoom (MAN-9258) with the column under 36rem folds with no keys.
-- Known edge (INV-10415): a phone on its side, 844×390 touch with no keys up, has a 117 px body: the dock (46) and the box (71) take it and the Conversation section's log is 0 px tall.
-- The dock's cap lift and her box's fold in the sections read the mark alone, never this container: MAN-9335.
-
-## Touch
-Under a finger every press is a 44 px catch: the switch's segments (the kit's rule, MAN-8580), the count, the regions' own. The count's words are its name; nothing is said only on hover.
-
-## Words — `station.compact.*`
-| key | english |
-|---|---|
-| `switch` | Compact (the bar's, MAN-9259) |
-| `switchLabel` | Section |
-| `section.<conversation\|needs\|where\|stage>` | Conversation · Needs you · Where things stand · Stage |
-| `needsPress_zero` / `_one` / `_other` | Nothing needs you: open Needs you · 1 needs you: open Needs you · {{count}} need you: open Needs you |
-| `needsPressUnread` | Open Needs you (the count's name before the first read has landed) |
-
-## Empty state
-- No `strip`: no strip box. No `talk`: no talk slot. `focusLabel` null: three sections, no Stage.
-- `needsCount` 0: the count shows a muted `0`; Needs you carries no count.
-- `needsCount` null (the first read of what needs him is in flight, or failed): the count draws the icon alone and its name is "Open Needs you", never "Nothing needs you"; the rail says in its own words why it has no items. A `0` is a read's answer.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationSection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx
-
-## MAN-9344 — src/modules/station — StationCompact and useStationSection: the live binding, the section and the stage's pull (StationCompact.tsx, hooks/useStationSection.ts)
-section: src/modules/station — StationCompactView and StationCompact: the station in one column, her head, the strip's line, one switch, a section (StationCompact.tsx)/002 StationCompact — the live binding
-
-`StationCompact({ slots, stage, tier })`, drawn by `StationShell` while the arrangement is `compact`.
-| prop of the view | from |
-|---|---|
-| `head` | `slots.head`, the head region drawn at compact density |
-| `strip` | the `line` of `useStripWeek(slots.strip)` (MAN-9372): the region's own element cloned with `week` `{ open, onOpen }`, the input of `SinceYouLastLooked` (MAN-9287); not drawn without a `strip` slot |
-| `talk` | `<StationTalk tier density="compact" part="button" />` |
-| `headRef` | `useStationHeadFoot()` (MAN-9390): the ref on `[data-station-compact-head]`, whose foot is written as `--station-head-foot` for the check sheet to stand below |
-| `sections` | `<StationSectionsView section slots={{ ...slots, stage }} density="compact" />` |
-| `section`, `onSection` | `useStationSection()`, below |
-| `needsCount` | `useNeedsCount()` (MAN-9346): the one count, `needsCountOf` over the rail's items and her live pending action, which counts once with the Accept or round it answers; null while `needs` is null. The rail's head and the phone read the same number |
-| `sections`' `scrollRefs` | `{ corner: scrollMemory('corner') }` at the narrow tier, else none: the memory corner opened at the narrow tier draws no scroller of its own, so the section's held one is the place `corner` remembers (MAN-9335) |
-| `focusLabel` | `useStation().focus.label`; null while the stage is empty |
-| `openStrip` | the `week` of `useStripWeek`: the strip region at `density: 'full'`, its timeline, while open; null while shut |
-- The week and the focus following the press are `useStripWeek`'s (MAN-9372), shared with the phone's arrangement. At compact density the strip draws its folded line whatever `collapsed` says, and `week` replaces the columns' pref `stripCollapsed` as the fold; compact never writes that pref.
-
-## `useStationSection()` — the section and the stage's pull
-`hooks/useStationSection({ offersEmptyStage = false })`: `[section, setSection]`, the one home of the rule, read by this arrangement and by the phone's (which passes `offersEmptyStage: true`, below). The section is the station pref `compactSection` (`useStationPref('compactSection', 'conversation')`, per device; a stored value outside the four words is dropped on read, MAN-9248).
-- A change of `useStation().focus` to a different thing (a different `focusKey`) selects `stage`, whoever put it there: his press on a row or a need, her card, her open, a landing in the strip, Back.
-- The section he was in when the stage pulled him is held aside in the station pref `compactSectionAside` (a pref, not a ref, so it outlives a remount: the window dragged across 1024 px and back, his switch flipped, a reload); clearing the stage (✕) returns him to it while he is still on `stage`, else leaves him where he is, and drops it either way. With none held (a device that never pulled) clearing falls back to `conversation`. Pulled again while on `stage`, the held section stays.
-- Back is a change to a different thing too, so it keeps `stage`.
-- A press on the thing that already stands on the stage selects `stage` too. The context drops a same-key `setFocus` (the focus does not change), so it counts it (`useStation().restaged`, MAN-9249) and the hook answers each count made after the one the column opened on. why: the row is drawn as what is on the stage, and with the stage out of view a dead press was the one gesture that should have shown it. Her walk moving while it stands is not a press: `useCardsTakeStage` (MAN-9250) does not restage it.
-- It reads the focus's CHANGE and the presses made after the hook mounted: a focus already standing as the column opens (a reload, a window that grew narrow) pulls nothing. A stored `stage` with no focus is released the same way, so the switch never rests on a section it does not offer.
-- `offersEmptyStage` is the arrangement's answer to "is Stage a section with nothing on it?". Compact offers Stage only while a thing stands there, so its default is false and a `stage` with no focus is released. The phone's bar always draws Stage (the talk control keeps the center), so with it true a stage he asked for while it was empty (the press, or a reload on `stage`) stays, showing "Nothing on the stage"; only a stage that EMPTIED under him (a thing stood on it a render ago: its ✕, Back's end, another window clearing it) still sends him back to the section he came from. why: with the release alone, the bar's Stage press with nothing there bounced off in the same layout effect, a dead press on a tab that is always drawn.
-- The keyboard goes with the pull. The section he pulled from is hidden and `inert`, and a focus left in it falls to `<body>`. A second layout effect, once `stage` is the section drawn, finds the focus inside an `inert` ancestor and moves it to the stage's heading (`[data-station-stage-label]`, the `h2` of `StationStageView`: `tabIndex={-1}`, a programmatic focus and no Tab stop). A control the rail's press then lands the keyboard on (`useLandOnStageControl`, MAN-9303) takes it from the heading; a focus that stood outside the sections (her head, the strip) or already on `<body>` is not moved.
-- Layout effects on the focus's key, the press count, the section and the held section: the pull lands before the paint of the render that brought the focus. No timer, no poll.
-- Every section stays drawn (MAN-9335), so a switch loses no place; each region keeps its scroll under its own key in the station's scroll memory (`conversation`, `needs`, `sessions`, `corner`, `stage`, MAN-9248).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationSection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx
 
 ## MAN-9340 — Probing the compact arrangement live — kaylee-station-compact-live.mjs: the window resized, his switch, the section and the stage's pull on /station
 
@@ -14710,143 +13738,6 @@ Her ears, whole, once (kaylee--wake-word seam J): ONE page on a SCRATCH stack (a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-wake-whole.mjs
 
-## MAN-9370 — src/modules/station — StationPhoneView and StationPhone: the phone's arrangement — top row, strip, middle, pending line and bottom bar (StationPhone.tsx)
-
-`StationPhoneView` and `StationPhone` (`StationPhone.tsx`): the station made for the thumb, the `phone` arrangement of `StationShellView` (MAN-9230): the whole frame, her head as the top row (no `StationBar` is drawn). A pure view drawn by the shell's `phone` prop; `StationPhone` binds it. Sections: `StationSectionsView` (MAN-9335), the section and the stage's pull `useStationSection` (MAN-9344). The bar, the keyboard up, touch and the shared pieces: MAN-9376. Her top row: MAN-9371. The strip: MAN-9287, its week `useStripWeek` (MAN-9372). The probe: MAN-9373. Touch law: INV-10275.
-
-## Status — 2026-10-30
-- Live: `StationShell` picks `phone` before `compact` whenever `useStation().phone` (`isPhoneWindow()`: a window under 768 px, or a touch window under 500 px tall; MAN-9249), and `StationPhone` binds the view (§"StationPhone() — the bindings"). Drawn on fixtures by the shots probe (`phone-*` sizes) and read live by `.verify/kaylee-station-phone-live.mjs` (MAN-9378: 390×844 with touch as the home-screen app, 844×390 on its side).
-
-## StationPhoneView — props
-| prop | type | meaning |
-|---|---|---|
-| `head` | `ReactNode` | the `head` slot's region at compact density; handed `row` here (`headAs` clones it with `{ sideways, onBackToCloudcli, trail }`) |
-| `strip` | `ReactNode` | the strip's folded line (`useStripWeek`): its own line under the top row upright; on its side it stands in the top row's `trail` in its count form |
-| `openStrip` | `ReactNode` | the strip's whole week, laid over the middle; null while shut |
-| `middle` | `ReactNode` | `StationSectionsView` at compact density, showing `section` |
-| `pendingLine` | `ReactNode` | `CompanionActionLine` (the card's head, its action, its lapse, never his census), its press selecting Needs you; null while no action waits |
-| `section` | `StationCompactSection` | the section shown; `aria-current` in the bar |
-| `onSection` | `(next) => void` | a section chosen: by the bar or by the count |
-| `needsCount` | `number \| null` | the one count (`needsCountOf`, MAN-9346): the rail's items and her pending action, once with the Accept or round it answers; null until the first read: no number, never "0" |
-| `focusLabel` | `string \| null` | what stands on the stage: the Stage press's word; null = "Stage" |
-| `talk` | `{ press: TalkPress; name: string }` | the page's one talk press and her name, which names it |
-| `sideways` | `boolean` | the phone on its side |
-| `onBackToCloudcli` | `() => void` | "CloudCLI" in her menu |
-
-## What it draws — top to bottom
-Root `<div data-station-phone=<section> data-station-phone-form=upright|sideways>`: `flex min-h-0 w-full flex-1 flex-col [container-type:size]`: a size container with no name, so a width rule inside it that names no container reads the phone's own column. The keyboard rules read the mark alone (MAN-9258): the sections name no container (MAN-9335).
-| part | markup | notes |
-|---|---|---|
-| top row | `[data-station-phone-top]` `relative z-20 shrink-0 border-b` round `[data-station-slot=head]` | her face, name and state, the `trail`, her one menu (MAN-9371). `z-20` is a stacking context over the week's `z-10`. why: at `z-[1]` the opened week covered the menu panel's first line (Stop while she runs) and took its tap |
-| the count | `[data-station-phone-needs=<n>\|unread]`, ghost icon `Button`: `Inbox` + a `warn` `Badge` of n (neutral at 0, none at null) | in `trail`; press = `onSection('needs')`; name `station.compact.needsPress`, `station.compact.needsPressUnread` at null |
-| strip line | upright only: `[data-station-phone-strip=line\|open]` under the row, `[data-station-slot=strip]` `px-3 py-1` | `inert` + `aria-hidden` (`OUT_OF_REACH`) while the week is open |
-| the week | `[data-station-phone-week]` `absolute inset-x-0 top-0 z-10 bg-background shadow-lift` | upright: from the strip line's top, `min-h-full`, over line and middle. Sideways: at the middle's top, its own height. Nothing under it moves |
-| middle | `[data-station-phone-middle]` `relative flex min-h-0 flex-1`, `[&_*]:overscroll-contain` | taps only: no swipe moves between sections (the edge swipe is the browser's Back, the cards scroll sideways) |
-| foot | `[data-station-phone-foot]`: pending line, talk error, bar | hidden while `html[data-keyboard=up]`, except while `talk.press.state === 'listening'` (MAN-9376) |
-| pending line | `[data-station-phone-pending]` | its press selects Needs you, where the whole card stands (MAN-9186) |
-| talk error | `[data-station-phone-talk-error]` `role="alert"` `data-tone="warn"`, in the flow | `talk.press.error` in words, just above the bar, covering nothing |
-| bar | `[data-station-phone-bar]` `role="group"` aria-label `station.phone.bar`; `border-t pb-[var(--safe-area-inset-bottom)]` | MAN-9376 |
-- Her face is never covered: everything this arrangement lays over anything opens under the top row. The check sheet (MAN-9283) stands below it: `StationPhone` puts `useStationHeadFoot`'s ref (`headRef`, MAN-9390) on `[data-station-phone-top]`, and the view's `headRef` is absent on a fixture.
-- The week is a box of this arrangement, never a full-screen overlay: it takes no `pwa-status-clear`.
-
-## States
-| state | when | draws |
-|---|---|---|
-| section | `section` = `conversation`, `needs`, `where`, `stage` | root `data-station-phone=<section>`; the middle shows it, the other three hidden and inert (MAN-9335); its bar press `tonal` + `aria-current` |
-| form | `sideways` false / true | root `data-station-phone-form=upright\|sideways`: the rows' sizes and where the strip stands (MAN-9376) |
-| pending line | `pendingLine` drawn | `[data-station-phone-pending]` right above the bar (sideways `pb-1`); gone once the action lapses |
-| week open | `openStrip` drawn | the week over the middle; the strip's line (upright) or count form (sideways) `inert` + `aria-hidden`, the count form also `invisible` |
-| count n | `needsCount` n > 0 | the top count's `warn` badge of n; the bar's Needs you carries n |
-| count 0 | `needsCount` 0 | a neutral badge `0`; the bar's Needs you carries none |
-| count unread | `needsCount` null | the glyph alone, `data-station-phone-needs=unread`, name "Open Needs you" |
-| stage | `focusLabel` string / null | the Stage press's word is the label, name `station.phone.stagePress` / "Stage" |
-| talk press | `talk.press.state` `idle` / `listening` / `transcribing` | the round control's looks (MAN-9383); `listening` keeps the foot under `data-keyboard=up` |
-| talk error | `talk.press.error` set | `[data-station-phone-talk-error]` above the bar until the next press |
-| keys up | `html[data-keyboard=up]` | strip line and foot hidden (MAN-9376) |
-
-## Empty states
-| nothing | draws |
-|---|---|
-| no `strip` drawn | no strip row upright; no strip in the top row sideways |
-| no pending action, or it lapsed | no `[data-station-phone-pending]` (`empty:hidden`) |
-| `needsCount` null | no number anywhere, never "0" |
-| nothing on the stage (`focusLabel` null) | the Stage press says "Stage" and shows `StationStage`'s empty state, "Nothing on the stage" (`offersEmptyStage`) |
-| no `head` region | the top row stands empty: the count and the menu are drawn by her head through `row`, so they go with it |
-| a section's regions not drawn | its section is an empty box (MAN-9335) |
-
-## StationPhone() — the bindings
-`StationPhone({ slots, stage, onBackToCloudcli })`, drawn by `StationShell` while `arrangement` is `phone`:
-| prop of the view | from |
-|---|---|
-| `head` | `slots.head` |
-| `strip`, `openStrip` | `useStripWeek(slots.strip, { countOnly: sideways })` |
-| `middle` | `StationSectionsView` over `{ ...slots, stage }` at compact density; `scrollRefs.corner` = `scrollMemory('corner')` at the narrow tier only (above it the corner binds its own list), as compact binds it |
-| `pendingLine` | `<CompanionActionLine key={pending.id} pending onOpen={openPendingCard} />` while `useCompanion().picture?.pending`; `openPendingCard` is `useOpenPendingCard(section, setSection)` (`hooks/useOpenPendingCard.ts`): it selects Needs you and scrolls the card (`[data-companion-action]` in that section) into view with `scrollIntoView({ block: 'nearest' })`, because the rail's remembered place may have the card above its top. why: the line points at the card, so it must be in sight. The wrapper `[data-station-phone-pending]` is `empty:hidden`: once the action lapses the line draws nothing and the wrapper goes with it |
-| `section`, `onSection` | `useStationSection({ offersEmptyStage: true })` (MAN-9344) |
-| `needsCount` | `useNeedsCount()` (MAN-9346), the number compact's button and the rail's head say |
-| `focusLabel` | `useStation().focus?.label ?? null` |
-| `talk` | `{ press: useCompanion().talk, name: picture?.settings.name ?? companion.defaultName }` |
-| `sideways` | `useStation().sideways` (a touch window under 500 px tall and wider than tall, MAN-9249) |
-- Stage is always drawn in the bar, so a press on it with nothing there rests on the empty stage ("Nothing on the stage"): `offersEmptyStage`. The stage emptying under him (its ✕, Back's end) still returns him to the section he came from.
-- No second path to her head: its face size and the way back arrive through `row`.
-
-## Words
-`station.phone.bar` "Sections", `station.phone.needsPress`, `station.phone.stagePress`; `station.compact.section.*`, `station.compact.needsPress*` (MAN-9343); `station.head.menu` (MAN-9371).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useOpenPendingCard.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx
-
-## MAN-9371 — src/modules/station — HeadRow and StationHeadView's `row`: her head as the phone's top row (HeadRow.tsx)
-
-`HeadRow` (`HeadRow.tsx`): her head drawn as the phone's top row, the bar and her head in one under the status bar. `StationHeadView` (MAN-9314) draws it whenever it is handed `row`; every other form of the head is MAN-9314's. The arrangement that hands `row`: MAN-9370. Touch law: INV-10275.
-
-## `row` — `StationHeadRow` (`src/shared/types.ts`)
-| field | type | meaning |
-|---|---|---|
-| `sideways` | `boolean` | the phone on its side: the row 40 px, her face 32 px (`ROW_FACE.sideways`); upright 56 px, face 44 px (`ROW_FACE.upright`) |
-| `trail` | `ReactNode` | what stands after her words and before her menu: the count of what needs him and, sideways, the strip's count form |
-| `onBackToCloudcli` | `() => void` | "CloudCLI" in her menu's panel |
-- `StationHead` passes `row` through (as `StationTalk` passes `part`): the phone's arrangement clones the `head` slot's element with it (`headAs`, MAN-9370). Absent everywhere else.
-
-## What it draws — `<section data-station-head="row">`
-`data-station-head-sideways` reads the form. Left to right, in `flex min-w-0 items-center` (`h-14 py-1` upright, `h-10` sideways):
-| part | markup | notes |
-|---|---|---|
-| face | `[data-station-head-face]` at the row's px | drawn by `StationHeadView`; never covered. None in the portrait view (MAN-9401): her name takes the row's start, and her menu's panel holds the toggle between her views ("Show chat" / "Show portrait", `h-11 w-full`) over "CloudCLI" |
-| name + state | `ml-2 flex min-w-0 flex-[1_1_auto] items-baseline gap-x-2` | name `h2` (`[data-station-head-name]`) `max-w-[40%] shrink-0 truncate text-base leading-5`; state `CompanionStatus` `emphasis="panel"`, the companion's own 12 px line |
-| `trail` | `row.trail` | gives way before her words, which take their own width first |
-| her menu | kit `Menu`, trigger `[data-station-head-controls]`: `Ellipsis` glyph alone, name `station.head.menu` "Her controls and CloudCLI" (`sr-only`) | panel: `controls('start')` over `[data-station-back-to-cloudcli]` (outline `sm` `h-11` `w-full`, `AppLogo` + `station.bar.back`) |
-| banner | `pb-2` under the row, at its whole width | a failed process's `Banner`; false while she runs |
-- The panel hangs under the row (`width` = `CONTROLS_PANEL_PX`), so it never covers her face; the kit's edge shift keeps it inside the window.
-- Her state is 12 px on 20 px lines, two at most, and the row is fixed (56 px), so it never moves as her state changes. why 12 px: at the station's 16 px her state had 110 px beside her name at 390 and "Asleep · your next message wakes her" lost "wakes her", "· item 4 of 15" lost its 5. At 12 px every state's two lines stand whole beside her name down to 360 px (needs 112 px, the row gives 118) but one.
-- 360 px, her failed state: "Stopped · your next message starts her again" needs 142 px, clamps at two lines by `CompanionStatus`'s own rule and loses "again"; the banner under the row carries the server's sentence.
-- Her name keeps up to 40% of the line; a chat's name in her state is cut by its own rule, "· item 4 of 15" kept.
-- The trigger wears the count's ink (`text-foreground`): the ghost's accent green would say "healthy".
-
-## Touch
-- Upright: trigger `size-11`, 44 px. Sideways (row 40 px): trigger `STATION_SIDEWAYS_CATCH` + `w-11`, a transparent `::before` growing the catch (MAN-9376). "CloudCLI" in the panel `h-11`.
-- Known edge, 2026-10-30: sideways, the menu's panel reaches 39 px into the right safe-area inset; the kit's `useEdgeShift` (`Menu`, `ActionMenu`) keeps panels inside the window, not the insets. A shared kit hook, its own change.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/HeadRow.tsx
-
-## MAN-9372 — src/modules/station — useStripWeek: the strip's line and its week in a one-column arrangement (hooks/useStripWeek.tsx)
-
-`useStripWeek(strip, { countOnly? })` (`hooks/useStripWeek.tsx`): the strip's region drawn twice from the shell's `strip` slot for a one-column arrangement, compact's (`StationCompact`, MAN-9344) and the phone's (`StationPhone`, MAN-9370). Returns `{ line, week }`, which the arrangement's view lays where it asks. The region: MAN-9287.
-
-## Returns
-| field | draws |
-|---|---|
-| `line` | the strip's folded line: the region cloned with `week: { open, onOpen }` and `countOnly`, in a `contents` box (`lineBox`) |
-| `week` | while open: the region cloned at `density: 'full'` (its timeline) with `week: { open: true, onOpen }`, in a `contents` box (`weekBox`); null while shut |
-- A strip slot that draws nothing (`isDrawn` false, or no element) returns `{ line: null, week: null }`.
-- `countOnly: true` (default false) draws `line` in the strip's count form ("<n> new" or "Nothing new" and its fold; MAN-9332): the phone on its side, where the line stands at the top row's end. `week` is always the whole timeline.
-
-## State and focus
-- `weekOpen` is state of the hook, never stored: a reload starts with the line.
-- The line's fold opens it (`week.onOpen(true)`); the week's own fold, or a landing put on the stage (`SinceYouLastLooked`'s `onPress`), shuts it. Both reach the region by its `week` input whatever the columns' `stripCollapsed` says; neither writes that pref.
-- The focus follows the press. Opening makes the line `inert` under the week and shutting removes the week, so the press that did it loses its control and the browser drops the focus to the page. A layout effect on `weekOpen` (acting on a change only, never on mount or an unrelated render) hands the focus to the other fold (`[data-strip-fold]` inside `weekBox` on open, `lineBox` on shut), only when it was lost: on `<body>`, or still on the line when the week opened. A focus he put elsewhere is his.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStripWeek.tsx
-
 ## MAN-9373 — src/modules/station — lib/station-phone.mjs: the phone's arrangement on the four pictures, at four sizes, as the home-screen app
 
 The phone's arrangement (`StationPhoneView`, MAN-9370) drawn on the four fixture pictures at four sizes, measured and photographed. Run by `.verify/kaylee-station-shots.mjs` for a size whose `phone` key is set (MAN-9229). Touch law: INV-10275. Compact's probe: MAN-9336.
@@ -14907,42 +13798,6 @@ STATION_SHOTS_SIZES=phone-390x844,phone-844x390,phone-360x780,phone-390x664 node
 - 2026-10-30: all four sizes in one run, 790 claims, ALL PASS (390×844, 360×780, 390×664 upright; 844×390 on its side with the strip states and the pending foot). The live phone probe `.verify/kaylee-station-phone-live.mjs` beside it: 47 checks, ALL PASS. The sitting: MAN-9379.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs
-
-## MAN-9376 — src/modules/station — StationPhoneView: the bar, the keyboard up, touch and the shared pieces (StationPhone.tsx)
-
-`[data-station-phone-bar]` of `StationPhoneView` (MAN-9370), its keyboard behaviour, touch and the shared pieces it wears.
-
-## The bar
-- Grid `minmax(0,1fr) ×2 · auto · minmax(0,1fr) ×2` with `grid-rows-[minmax(0,1fr)]`: left `conversation`, `needs`; the round talk control at the center; right `where`, `stage`. All four sections always drawn, so the control keeps the center. why not `auto` rows: the row grew to its tallest press and pushed presses 13 px into the home indicator.
-- A section press: glyph (`GLYPHS`: `MessageCircle`, `Inbox`, `LayoutList`, `Focus`) AND its word (`station.compact.section.*`), `[data-station-phone-section=<name>]`; the shown one `tonal` + `aria-current`, the rest `ghost` muted.
-- Needs you carries its count: a `warn` `Badge` on the glyph's corner upright, after the word sideways; name `station.phone.needsPress` "Needs you · {{count}}". Stage's word is `focusLabel`, name `station.phone.stagePress` "Stage: {{label}}".
-- The round control: `CompanionTalkButton` `size="round"` (`compact` sideways), the page's one talk press; Conversation's box has no talk button of its own.
-| | upright | sideways |
-|---|---|---|
-| top row | 56 px (`h-14 py-1`), face 44 px | 40 px (`h-10`), face 32 px |
-| strip | its own line | `countOnly` form at the row's end, before the count; `ml-2 max-w-96`; the newest landing is in the week the fold opens; `invisible` + `inert` while the week is open |
-| week | from the strip line's top | at the middle's top |
-| bar row | 64 px, presses `h-full`, glyph over word (10 px on 12 px lines, two max, `line-clamp-2`; "Where things stand" is 102 px at 11 px, so a 73 px press) | 48 px, presses `h-11`, glyph beside word 12 px (`truncate`), count after the word |
-| round control | 64 px | 52 px, `self-end`: stands on the row's foot, rises 4 px over the bar's edge, never into the inset |
-| pending line | at the foot | `pb-1`: ground for the control's rise. why: it rose 3 px into the line and took the tap meant to open the card |
-
-## Keyboard up — `html[data-keyboard=up]`
-- The mark is set on both platforms (rules and baseline: MAN-9258): on iOS by the visual viewport's gap, on Android by a focused text field and a layout viewport 120 px shorter. The phone reads the mark alone.
-- The frame ends at the keys: on iOS by `--keyboard-height` (the shell's root: MAN-9230); on Android the browser has already resized the layout viewport to end there and `--keyboard-height` stays `0px`. The strip line, the foot (pending line, talk error, bar) step aside; her box stands on the keys' top edge, her face and state over it. EXCEPT while the microphone is open (`talk.press.state === 'listening'`): the foot stays, and its bar drops the home indicator's padding (the keys cover it), so the round control that ends the recording is never hidden under the keys. why: the box to type to her has no talk button of its own, so with the foot gone nothing drawn could stop a recording started before he tapped the box. Once the press leaves `listening` (Transcribing has nothing to stop) the foot steps aside again.
-- Her box pads nothing for the home indicator: `CompanionComposer` `atScreenFoot={false}` (set by `StationTalkView`); the frame and the bar clear it. why: padded twice, the box floated 34 px over the bar, and over the keyboard while he typed (the inset still reads 34). Chromium has no `env()` inset, so the probe reads the class.
-
-## Touch
-- Every press here is a 44 px catch under a finger (`finger:`: a touch screen, or a window under 768 px), sideways too: the top row's two borderless presses (her menu, the count) wear `STATION_SIDEWAYS_CATCH` (drawn 40 px, catch 48), the strip's chip and Try again wear `STATION_COUNT_FORM_CATCH`. Nothing is said only on hover: each section's word is drawn, the count's words are its name.
-
-## Shared pieces
-| piece | where | use |
-|---|---|---|
-| `STATION_SIDEWAYS_CATCH`, `STATION_COUNT_FORM_CATCH` | `src/shared/constants.ts` | the catches above |
-| `OUT_OF_REACH` | `src/shared/constants.ts` | `inert` + `aria-hidden` on the strip's line under the week (and on a held page: MAN-9426) |
-| `isDrawn(node)` | `src/shared/utils.ts` | false for `undefined`, `null`, `false`; the shell, the sections, compact and the phone ask it of every slot |
-| `StationHeadRow`, `StationArrangement` (`'phone'`) | `src/shared/types.ts` | the head's `row`; the shell's arrangement |
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx
 
 ## MAN-9378 — Probing the phone arrangement live — kaylee-station-phone-live.mjs: /station as the home-screen app with a real finger, the keyboard's mark and the sideways rows
 
@@ -15189,7 +14044,7 @@ Two seams that let a drawing over the page stand below her face ("cards never co
 3. otherwise `tier` (`wide` or `laptop`).
 - Callers: `StationShell` (draws the arrangement; `compactOn` from `useStationPref('compact', false)`) and `CheckStage` (places its sheet by it). `useStation()` does not expose the arrangement: his Compact switch is a pref. why one home: the shell that draws it and a stage view that places something by it never disagree.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationHeadFoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stationArrangement.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stationArrangement.ts
 
 ## MAN-9391 — Probing the check sheet under her face — kaylee-station-check-sheet-live.mjs: the sheet below her head in four arrangements, and her voice unlocked by a finger
 
@@ -15326,7 +14181,7 @@ One kit `Button` (`outline`, `sm`, `finger:h-11`, INV-10275), its glyph and word
 - `.verify/kaylee-station-portrait-live.mjs`: the view on the LIVE client as the dev account, desktop dark: a record with no `herView` opens on the portrait; ONE Haiku turn typed through the station's own box (her voice off), her words exactly her newest turn as `GET /api/companion` holds it, the dots alone from the send to her first sentence; "Show chat" brings the thread and the record holds `chat`, a reload keeps it; "Show portrait" brings it back, a reload keeps it; no console error in each settled load. Her model is put back.
 - Every other station probe that reads her conversation or her head's face disc seeds the chat view: `CHAT_VIEW_RECORD` (`.verify/lib/station-chat-view.mjs`; INV-10528). An empty record opens on the portrait.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionReply.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/portrait.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/HerViewToggle.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useDrawnSquare.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useHerView.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-portrait-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-portrait.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionReply.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/portrait.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useDrawnSquare.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-portrait-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-portrait.mjs
 
 ## MAN-9406 — The chat's file intake — useAttachmentIntake, uploadAttachmentFiles, isImageAttachment, ComposerAttachmentTray, ComposerDropOverlay
 
@@ -16175,7 +15030,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/sk
   - blinks a minute, seed 7 and up, 300 s: idle 12.2, asleep 14.0, loading 12.6, walking 12.6, listening 14.2, speaking 18.4, thinking 17.6 (29 carried), waking 17.2 (29 carried), transcribing 8.2, drafting 8.6, reading_session 9.0 (19 carried), reading_code 9.4 (30 carried): her reading states at most 9.4, every other state at least 12.2.
   - reduced motion: 0 blink, sweep and glance frames in all four plays; a held look shows `pose.left_20`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBlink.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-blinks.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-kit.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-blinks.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-kit.ts
 
 ## MAN-9429 — src/modules/companion — her brows: faceBrows.ts, the rule at the end of a question, the hold, reduced motion, the replay's brow runs
 
@@ -16196,7 +15051,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/face
 - On the 158-frame face (`bakeManifest(true, true)` of `.verify/lib/face-replay-kit.ts`), each run keeping its check that no draw changes before the `nextAt` it was promised: "Want me to send it?" ending into silence (`brow.delighted` 0 ms after the end, held 1200 ms, 0 blink frames in 90 draws from the lift to the ease's end, counted as a draw's target or its base (a blink in play when the sentence stops is cut and the lift fades in from her open eyes), the lift 140 ms and the ease back 300 ms read from alpha); the question in each of the nine moods (each its own `brow.<mood>`); the same text followed at once by another sentence (0 brow draws of 444); followed after half a second of silence by a short "Yes." (the lift 500 ms, ending at the next sentence, and 0 brow draws after the short sentence ended); a new state with no clip of its own, `thinking`, 400 ms after the end (the lift 400 ms, 0 brow draws from the state's first step on: listening's nod clip is drawn over the brows, so it could not show the hold had ended); reduced motion (`brow.delighted` at the end step, no draw with a fade); a page with no voice and a face with its `brows` taken out (none). `QUESTION_END` on eight real strings. 2026-11-01: 0 checks FAILED, 0 draws changed before their `nextAt`.
 - On the live page: `node .verify/kaylee-brows-page.mjs` mounts the app's own `CompanionAvatar` at 115 px and 512 px on the made face (`GET /api/companion` names it), on one voice playing her saved sentence 1 through the app's own PCM player with the log text ending in a question mark (`lib/mouth-page-stage.mjs`, recording 1.9 s past the audio's end). 2026-11-01, ALL PASS: at both sizes `brow.delighted` drawn toward 23 ms after the audio's end and never while she speaks, held 1205 ms, then `mood.delighted.closed`; the same sentence with a full stop draws no `brow.*` in 264 animation frames; under reduced motion the lift shows 23 ms after the end for 1182 ms with 0 animation frames of a fade; two stills of 512 px in `.verify/shots/kaylee-brows/`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBrows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceNames.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-brows-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-brows.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mouth-page-stage.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-brows-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-brows.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mouth-page-stage.mjs
 
 ## MAN-9430 — src/modules/companion — her eyes' search and her warm spell: faceEyes.ts, faceWarmth.ts, the sweep, the idle smile, the replay's eyes runs
 
@@ -16235,56 +15090,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/face
   - reduced motion: thinking and waking draw only `gaze.up_right`, idle only `mood.neutral.closed`: 0 blink, 0 gentle frames.
   - the 115-frame face: thinking draws `gaze.up_right` only and idle never smiles; its seven runs and the head's run print what they printed before (diffed against the output kept before the change: nothing).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEyes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceWarmth.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-eyes.ts
-
-## MAN-9434 — src/modules/companion — her head while she speaks: createHeadMotion, FaceDraw.head, stampHead, --kaylee-bob and --kaylee-roll
-
-Her head moves in the picture's plane while she speaks: a bob (the layer's `translate` y) and a roll (its `rotate`). No frame changes: her speaking frames face forward, so a nod and a roll are the head movement she can make while she talks. Pure part: `utils/faceHead.ts` (`createHeadMotion(seed)`), stepped by the engine (MAN-9238) as `FaceDraw.head`. Page part: `utils/portraitHead.ts` (`createHeadMemory`, `stampHead`), called by `CompanionPortrait` (MAN-9223) on every step. Rules: INV-10600 (the portrait's: INV-10257). Proof: MAN-9435.
-
-## `FaceDraw.head: FaceHead | null` — `faceHead.ts`
-`FaceHead = { bob, roll }`: `bob` in % of the layer's own height (positive is down), `roll` in degrees (positive clockwise). Null at rest.
-| `HeadInput` | |
-|---|---|
-| `now` | the engine's clock, ms |
-| `speaking` | presence is `speaking` |
-| `level` | the player's `level()`, read on every step she speaks, with or without the exact mouth's pieces; a non-finite level reads as 0; a page that plays no voice draws no head |
-| `freshSentence` | a sentence began sounding this step |
-| `clipStarted` | a clip began this step (`!clipWasPlaying && clips.playing()`) |
-| `reducedMotion` | always null |
-- Its random draws (the side of the first roll, where the drift begins) come from its own `createRandom(seed ^ HEAD_SEED_SALT)`, so the blink and glance draws keep their order.
-- While `head` is not null the engine asks for the next frame (`wantAt(now + 1)`).
-
-## What moves her head, added together
-| part | rule |
-|---|---|
-| envelope | the level followed with an attack of 50 ms and a release of 220 ms (`ATTACK_MS`, `RELEASE_MS`); its slow average over 1200 ms (`SLOW_MS`). Strength = (envelope − `HALF_OPEN_AT`) / 0.2 (`STRENGTH_SPAN`), clamped 0..1; `HALF_OPEN_AT` = 0.035, exported by `faceMouth.ts` (MAN-9239) so the threshold has one home |
-| breath in | a sentence starts sounding: a lift of 0.6% (`BREATH_PCT`) that peaks 250 ms in (`BREATH_IN_MS`) and is settled 700 ms later (`BREATH_OUT_MS`). A sentence that starts with a clip draws none: the clip is its cue. While it lasts it takes the lift's place, never a sum: `rise = 0.6·b + 0.5·strength·(1−b)`. why: sentence 0's speech starts 200 ms in, and a sum clamps at −0.9% by 250 ms |
-| lift | her head rises with her voice: 0.5% × strength (`LIFT_PCT`) |
-| beat | where the envelope crosses upward over max(1.5 × its slow average, 0.08) (`BEAT_RATIO`, `BEAT_FLOOR`): a nod down 0.7% in 90 ms and back in 260 ms (`NOD_PCT`, `NOD_IN_MS`, `NOD_OUT_MS`), with a roll of 0.7° over 450 ms (`BEAT_ROLL_DEG`, `BEAT_ROLL_MS`) whose side alternates. A crossing, not every step above it. None within 320 ms of the last beat or of a sentence's start (`BEAT_GAP_MS`): the breath in or the clip owns that moment |
-| drift | a roll of 1.0° (`DRIFT_DEG`) on a sine of 3400 ms (`DRIFT_PERIOD_MS`). It starts at a zero of the sine when she wakes, so her roll leaves rest without a snap. A new sentence moves its phase by up to a quarter turn either way, spread over 1200 ms (`DRIFT_RETUNE_MS`). why: a phase set outright snaps the roll by up to 1° in a frame |
-- Bounds on the sum: ±0.9% bob, ±1.8° roll (`BOB_LIMIT_PCT`, `ROLL_LIMIT_DEG`). `bob = shown × (nod − rise)`: a rise is negative.
-- Settle: a weight runs 1 → 0 over 300 ms once she stops (`SETTLE_MS`), back up if she speaks again meanwhile, eased (`smooth`). Under `AT_REST_WEIGHT` (1e-6) the answer is null. why: stepping 300 ms of frames leaves float dust above 0 that held the head one step late.
-
-## `stampHead(memory, faceLayer, hairLayer, lagMs, head, now): boolean` — `portraitHead.ts`
-- Writes `--kaylee-bob` (`<n>%`) and `--kaylee-roll` (`<n>deg`), to a thousandth, as inline style on each layer div (`.kaylee-portrait__layer--face`, `--hair`), only when the string changes. `portraitHead.ts` touches the nodes it is handed and is no part of the engine.
-- Face layer: the engine's answer as it comes. Hair layer: the newest history sample at least `lagMs` old (`--kaylee-lag`, 90 ms), rest before that; so the hair follows by the one lag. Both layers' variables name the same number a lag apart.
-- History: `createHeadMemory()` in a ref (`headMemory`), never React state. Every step drops the samples older than the one the hair shows, so it holds the lag's worth of steps and one more. `TRAIL_LENGTH` = 64 is a safety bound, not its length: 64 entries span 90 ms up to about 700 Hz, and above that the hair shows the oldest entry.
-- `lagMs` is read once per loop (`hairLagMs(hairCanvas)`): a computed-style read after each frame's writes forces a restyle each frame.
-- Once `head` is null and the hair's sample is null, both variables are removed from both layers and the history emptied. Returns true while it wrote or the hair still trails; the loop asks for animation frames while `draw.head !== null` or it returns true.
-- After her voice stops: `head` is null 300 ms after her last speaking step; the variables are gone 90 ms after that. Measured 2026-10-31 at 22–28 ms frames: 393 ms after her state left speaking, 400 ms after the audio's end (replay: null from 287 ms after the end).
-
-## `CompanionAvatar.css` — inside `@media (prefers-reduced-motion: no-preference)`
-- `.kaylee-portrait__layer { translate: 0 var(--kaylee-bob, 0%); rotate: var(--kaylee-roll, 0deg); }` and `will-change: transform, translate, rotate`. The individual properties compose with the lean's `transform` untouched, so its easing never smears a beat.
-- A clip's keyframes on the layer's `translate` (`kaylee-laugh`, `-giggle`, `-gasp`, `-sigh`, `-nod`): every rest stop is `var(--kaylee-bob, 0%)` (the laugh's 0%, 33%, 67%, 100%; the giggle's 0%, 50%, 100%; the other three's 0% and 100%), every lift stop absolute (−1.5% laugh, giggle, gasp; +2% sigh, nod). An animation beats the declared value, so a laugh is not doubled.
-  - A clip begins and ends where her head is, each layer on its own bob (the hair's 90 ms behind, as its clip is): by its keyframes neither layer steps at a clip's edge: the face layer never does, the hair's does only where the portrait cuts its animation short (the bullet after the next). The lift is never added to the bob.
-  - A clip with `--kaylee-bob` unset (listening's nod) rests at 0%. Chromium re-reads a keyframe's `var()` while the animation runs.
-- Measured 2026-11-01 at 512 px, the layer's translate y minus the same sample's bob at a clip's edge frame, one run with the giggle at 0 and the laugh at 36: 0.000% at the laugh's first and last frame and the giggle's last. A giggle-only run read its last sampled frame 0.078% off the bob (0.4 px): the keyframes' own ease, one stalled frame before the rest.
-- A clip the engine drops mid-run (`clear()` of the clip player: a state change, or motion off) steps from its lift to the bob. Firefox is not installed here: `var()` in a moving keyframe is unmeasured there.
-- The hair's clip is cut short in about half the runs. `CompanionPortrait`'s `stamp` takes `data-motion` off the root `hairLagMs` (90 ms) after the engine's first draw with no motion, and the hair's animation (90 ms delay, then the clip's length) starts 15–32 ms after the attribute is written, so the attribute can leave before the animation ends. Measured 2026-11-01 on the live dev stack, eight readings (two sizes of four runs): it left 5.8 to 20.5 ms before the hair animation's end in five, and 12.9 to 28.1 ms after it in three. A cut leaves the ease's remainder, a step of the hair to its bob of 0.10 to 0.125% of the layer (0.5 to 0.7 px at 512 px, 0.1 to 0.15 px at 115 px). The face layer's animation ends about 360 ms after the write, before the attribute leaves, so it is never cut. Cure, in the portrait: take the attribute off when the hair's own animation ends (`animationend`), not on a timer counted from the engine's end.
-- Rim: the bob is at most 0.9% of the layer (0.95% of the disc; 1.59% with the breath's 0.64%) against 3.32% of slack (MAN-9223 §"Layers"). Added to a clip's lift it would leave 0.14% of the slack (1.09% after the clip and the breath, less the bob's 0.95%): 0.16 px at 115 px against a painted edge's 0.7 px, so a lift stop never adds the bob.
-- Reduced motion: the head is always null, no variable is written, and the layer's computed `translate` and `rotate` are `none`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceHead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/portraitHead.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-eyes.ts
 
 ## MAN-9435 — src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the replay) and .verify/kaylee-head-page.mjs (the page)
 
@@ -16377,25 +15183,6 @@ The breath's probe (`.verify/` is gitignored: on disk only). What the breath is:
 - 2026-11-01: exit 0, ALL PASS (59 s); smallest rim margin 1.259 px at 115 px and 5.590 px at 512 px (1.09% of the disc both); the old 3% lift left −0.569 and −2.550 px, the old 2.5% lift 0.040 and 0.163 px.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-breath-page.mjs
-
-## MAN-9437 — src/modules/companion — her face card's wiring: the Settings slot, CompanionFaceSettings and useCompanionFaceSettings
-
-Her face card's page wiring: how the card reaches the Settings section, and what `useCompanionFaceSettings` does for it. The card itself — props, the look drawn, the switch, the band, the question: MAN-9220.
-
-## Wiring
-- `CompanionSettingsView` takes `face?: ReactNode`, drawn in `<div className="mb-3">` directly after the talk button's card, above the `memory` slot. Order: talk, face, memory, fields.
-- `CompanionSettingsSection` passes `face={settings && face && <CompanionFaceSettings name={settings.name} face={face} />}`. `face` comes from `useCompanionSettings()`, which keeps `picture.face` out of the same `GET /api/companion` that brings `settings` (and out of its read again on `websocket_reconnected`) and answers it null until that read lands; the card mounts with its face known and makes no read of its own.
-- `CompanionFaceSettings` hands the view the hook's `refusal`, `pickRefusal`, `onUpload` = `upload`, `onPick` = `pick` (`PUT /api/companion/face/avatar`), `onRemove` = `remove` (`DELETE /api/companion/face`), `onSeeFrames` and `onCloseFrames`; the live card draws its switch while two looks are made.
-- `hooks/useCompanionFaceSettings.ts` (`useCompanionFaceSettings(initial)`) is the card's behaviour: it starts from the section's face, replaces it with each `companion_face` frame of the account (`useWebSocket().subscribe`) and with a new `initial` (set while rendering, so a re-read is never drawn late). A frame carries no sequence: a frame heard while an upload, a pick or a removal is out wins over that request's answer (`frameCountRef`), and `useCompanionSettings` hands on the newest frame's face instead of a read that was out while the frame came. A face of a read, an answer or a frame must pass the reducer's `isFace` (exported from `utils/companionReducer.ts`), else it is not drawn. Settings renders wherever the app does and the companion provider lives only in the project workspace, so it never reads the provider's picture. It returns `{ face, uploading, refusal, pickRefusal, framesOpening, contactUrl, pick, upload, remove, seeFrames, closeFrames }`:
-  - `pick(avatar)` → `api.companion.face.pick`; the server stores and announces the pick before it answers, so the `companion_face` frame moves the card and every other page of the account, and the answer's face is taken only when no frame came while it was out. Until the answer is in, the returned `face.avatar` is the look just pressed (`asked`, so the switch shows it and a press on it is no new pick; the portrait and line follow `id`, which only the server moves); the later of two picks owns it. A refusal (400 `COMPANION_FACE_INVALID`: no look of that name, or one not made yet; any other refusal) is the server's sentence as `pickRefusal` under the buttons, a thrown request a fixed sentence (`voiceSettings.companion.face.pickFailed`); the switch goes back to the look she wears. `pickRefusal` clears at the next pick, an upload and a removal.
-  - `upload(file)` → `api.companion.face.upload`; 200 `{ face }` switches her at once, 202 `{ face }` starts the meter (the frames then count it to the end). Any refusal's sentence (`refusalSentence`; a 400 `COMPANION_FACE_INVALID` is the usual) is `refusal`, a thrown request a fixed sentence (`voiceSettings.companion.face.uploadFailed`); `refusal` clears at the next upload and at a removal; an upload clears `pickRefusal` too. `uploading` is true while it is out.
-  - `remove()` → `api.companion.face.remove`; its 200 `{ face }` is what she wears now (a pick of his photo goes back to the house's first look). It clears `refusal` and `pickRefusal`. A refusal is a warn toast (`removeFailed`, "Your photo wasn't removed") carrying the server's sentence when it sent one, never the transport's words; the face as it was.
-  - `seeFrames()` → `api.companion.face.contact(face.id)` fetched through the authenticated client (an `<img src>` to the route would carry no token), shown from an object URL (`contactUrl`) that an effect revokes when it goes back to null (`closeFrames`) or the card unmounts. A failed fetch is a warn toast (`framesFailed`), the server's sentence under it when there is one. A 2xx answer to an upload, a pick or a removal whose body is not a face (a proxy's page) is not a failure: the frames bring the face.
-  - Each control holds a ref guard, so two presses in one task send one request.
-- The portrait is `CompanionAvatar` (`presence` idle, `faceId={face.id}`, no voice, no sentences, no look, `size` 96): its atlas cache (`useFaceAtlas`) is shared with her button, so a switch of face reaches both.
-- Probes: `.verify/lib/face-card-live.mjs`, `.verify/lib/memory-card-live.mjs` and `.verify/lib/memory-card-kit.mjs`'s `readPlace` place the live section as `['talk','face','memory','fields','save']`. `face-card-kit.mjs`'s `mountCard` stands in the app's `ToastProvider` and a socket context that holds no socket, which the hook needs.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFaceSettings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionFaceSettings.ts
 
 ## MAN-9438 — server/modules/companion/face — the house's looks: face-avatars.ts, face-house.ts, face-house-ids.ts, avatars.json, the drawn face and the failed bake
 
