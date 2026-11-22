@@ -9,7 +9,9 @@ import { execFileSync } from 'node:child_process';
 
 type SelfName = { name: string; address: string } | null;
 
-let cached: SelfName | undefined;
+// Only a successful read is kept: a read made while tailscaled is down or restarting
+// is asked again at the next launch (the read costs ~13 ms), never cached as "no pin".
+let cached: SelfName = null;
 
 function readSelfName(): SelfName {
   try {
@@ -29,7 +31,7 @@ function readSelfName(): SelfName {
 
 /** Chromium args that pin this box's own tailnet name to its tailnet IP (empty when there is none). */
 export function selfTailnetResolverArgs(): string[] {
-  if (cached === undefined) {
+  if (!cached) {
     cached = readSelfName();
   }
   return cached ? [`--host-resolver-rules=MAP ${cached.name} ${cached.address}`] : [];
