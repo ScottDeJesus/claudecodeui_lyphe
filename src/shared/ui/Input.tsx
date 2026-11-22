@@ -9,7 +9,7 @@ type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
 
 /**
  * The application-wide text input, used by the app-switcher, auth, cerberus, chat, dispatcher,
- * file-tree, heal, kanban, mcp, notes, project-creation-wizard, roadmap, settings, sidebar, skills,
+ * file-tree, heal, kanban, mcp, notes, project-creation-wizard, rnd, roadmap, settings, sidebar, skills,
  * task-master and universe modules — in cerberus, Fleet's search, the time and date fields of a
  * lookup, the sheet's name for a check, and the Enroll dialog's name and description.
  *

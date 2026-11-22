@@ -66,6 +66,8 @@ export type AgentLaunchService = {
   setRow(name: string, change: AgentLaunchRowChange): Promise<AgentLaunchResult<AgentLaunchCensus>>;
   /** Change the table's defaults. Answers the census the CLI printed AFTER the write. */
   setDefaults(change: AgentLaunchDefaultsChange): Promise<AgentLaunchResult<AgentLaunchCensus>>;
+  /** One row as a launch reads it now (`launch-table resolve <name> --side <side>`): `{name, side, model, effort}`. */
+  resolve(name: string, side: 'claude'): Promise<AgentLaunchResult<Record<string, unknown>>>;
 };
 
 export type AgentLaunchServiceDependencies = {
@@ -186,5 +188,7 @@ export function createAgentLaunchService({ bin }: AgentLaunchServiceDependencies
     setRow: (name, change) => ask(bin, setRowArgv(name, change), WRITE_TIMEOUT_MS),
 
     setDefaults: (change) => ask(bin, setDefaultsArgv(change), WRITE_TIMEOUT_MS),
+
+    resolve: (name, side) => ask(bin, ['resolve', name, '--side', side], READ_TIMEOUT_MS),
   };
 }

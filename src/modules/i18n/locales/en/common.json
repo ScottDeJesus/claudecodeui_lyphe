@@ -15,10 +15,12 @@
     "copy": "Copy",
     "download": "Download",
     "upload": "Upload",
-    "browse": "Browse"
+    "browse": "Browse",
+    "listView": "List view"
   },
   "tabs": {
     "chat": "Chat",
+    "rnd": "R&D",
     "shell": "Shell",
     "files": "Files",
     "git": "Git",
@@ -31,7 +33,8 @@
     "universe": "Universe",
     "schedules": "Schedules",
     "notes": "Notes",
-    "cerberus": "Cerberus"
+    "cerberus": "Cerberus",
+    "analytics": "Analytics"
   },
   "chatHead": {
     "chat": "Chat"
@@ -453,6 +456,157 @@
     },
     "subtabsLabel": "API services"
   },
+  "rnd": {
+    "title": "R&D",
+    "mark": "{{count}} new or proved",
+    "spikeNoProject": "Open a project first: a spike's chat opens in the project that is open.",
+    "launchMissing": "The launch table has no rnd.scout or rnd.spike row yet.",
+    "weeklyOn": "{{day}}s at {{time}}",
+    "dailyAt": "every day at {{time}}",
+    "noMilestone": "No milestone",
+    "loading": "Reading what the scout has filed…",
+    "unreachable": {
+      "title": "R&D is not answering",
+      "retry": "Try again"
+    },
+    "stale": "Last read {{ago}}, and it may have moved since. {{sentence}}",
+    "settingsOpen": "R&D settings",
+    "scout": {
+      "now": "Scout now",
+      "out": "A scout is out · started {{ago}}",
+      "lastFiled": "Last scout {{ago}} · {{filed}} filed",
+      "lastNothing": "Last scout {{ago}} · nothing new",
+      "lastTrouble": "Last scout {{ago}} ended without an answer",
+      "never": "No scout has gone out yet",
+      "noSources": "No sources yet, so a scout has nothing to read",
+      "weekly": "Goes out by itself: {{when}}",
+      "noWeekly": "No weekly scout is scheduled; one goes out only when you press Scout now",
+      "outcome": {
+        "failed": "Failed",
+        "lost": "Lost"
+      }
+    },
+    "views": {
+      "label": "Candidates by where they stand",
+      "counted": "{{view}} {{n}}",
+      "waiting": "Waiting",
+      "spiking": "Spiking",
+      "verdicts": "Verdicts",
+      "rejected": "Rejected"
+    },
+    "word": {
+      "waiting": "Waiting",
+      "spiking": "Spiking",
+      "proved": "Proved",
+      "adopted": "Adopted",
+      "rejected": "Rejected"
+    },
+    "row": {
+      "meta": "{{host}} · {{age}}",
+      "spiking": "{{host}} · spike started {{age}}"
+    },
+    "empty": {
+      "noSources": {
+        "title": "No sources yet",
+        "message": "Give the scout a page to read each week: a changelog, a blog, a release feed.",
+        "action": "Add a source"
+      },
+      "noProved": "No yes is waiting for your Adopt",
+      "waiting": {
+        "title": "Nothing is waiting",
+        "message": "What the scout files lands here, each with a question a spike can settle."
+      },
+      "spiking": {
+        "title": "No spike is out",
+        "message": "Press Spike on a waiting candidate to try it in a chat."
+      },
+      "verdicts": {
+        "title": "No verdicts yet",
+        "message": "A spike that answers yes lands here, ready to adopt onto the roadmap."
+      },
+      "rejected": {
+        "title": "Nothing rejected",
+        "message": "What you reject, and what a spike answers no to, is kept here with its reason, so the scout does not file it again."
+      }
+    },
+    "opening": {
+      "back": "Back to the candidates",
+      "filed": "filed {{ago}}",
+      "spikeStarted": "Spike started",
+      "what": "What it is",
+      "why": "Why it might help",
+      "question": "The spike’s question",
+      "source": "Source",
+      "verdict": "Verdict",
+      "verdictValue": "{{word}} · {{ago}}",
+      "verdictWord": {
+        "yes": "Yes",
+        "no": "No",
+        "unsettled": "Unsettled"
+      },
+      "evidence": "Evidence",
+      "dir": "Spike directory",
+      "rejectedBecause": "Rejected because",
+      "became": "Became",
+      "becameValue": "{{plan}} · {{word}} · under {{epic}}",
+      "adoptedNote": "It is the roadmap’s now; there is nothing more to do here."
+    },
+    "act": {
+      "spike": "Spike",
+      "spikeAgain": "Spike again",
+      "openChat": "Open chat",
+      "adopt": "Adopt",
+      "reject": "Reject",
+      "reopen": "Bring back"
+    },
+    "adopt": {
+      "title": "Adopt",
+      "accent": "as an idea",
+      "about": "“{{title}}” becomes an idea on the roadmap, under the epic you choose. Its question, its verdict and its evidence go with it.",
+      "epic": "Epic",
+      "epicPlaceholder": "Choose an epic…",
+      "noEpics": "The roadmap has no epic to adopt under. Add one on the Roadmap, then come back.",
+      "goal": "Goal",
+      "goalHelper": "Optional. In your own words, what this should do for us.",
+      "cancel": "Cancel",
+      "confirm": "Adopt"
+    },
+    "reject": {
+      "title": "Reject",
+      "accent": "this candidate",
+      "about": "“{{title}}” moves to Rejected with your reason. The scout reads it, so the same thing is not filed again. Bring back undoes it.",
+      "why": "Why",
+      "whyHelper": "Required. One sentence the next scout can read.",
+      "whyPlaceholder": "We already do this with…",
+      "cancel": "Cancel",
+      "confirm": "Reject"
+    },
+    "settings": {
+      "title": "R&D",
+      "accent": "settings",
+      "sources": "Sources",
+      "noSources": "No sources yet",
+      "remove": "Remove",
+      "removeLabel": "Remove {{source}}",
+      "removed": "Removed {{source}}. The candidates it gave are kept.",
+      "undo": "Undo",
+      "add": "Add",
+      "addLabel": "Add a source",
+      "addHelper": "The address of a page the scout reads each week. Changes here are saved as you make them.",
+      "addPlaceholder": "https://…",
+      "launch": "Scout and spike",
+      "launchLoading": "Reading the launch table…",
+      "scout": "Scout",
+      "scoutAbout": "The weekly reader. It reads the sources and files candidates; it changes nothing.",
+      "spike": "Spike",
+      "spikeAbout": "The chat that tries one candidate and answers yes or no.",
+      "modelLabel": "{{who}} model",
+      "effortLabel": "{{who}} effort",
+      "web": "Web search",
+      "webOn": "On. The scout and a spike may search the web.",
+      "webOff": "Off. They read the sources and named public downloads only."
+    }
+  },
   "agentLaunch": {
     "title": "Agent Chains",
     "reload": "Read the launch table again",
@@ -737,7 +891,7 @@
       "vitals": {
         "building": "Building",
         "asking": "Asking",
-        "queued": "Queued",
+        "queued": "Waiting to start",
         "lessons": "Lessons",
         "memories": "Memories",
         "everyBoard": "{{count}} · every board"
@@ -1491,6 +1645,7 @@
       "paused": "paused",
       "stalled": "stalled — its run ended",
       "starting": "starting",
+      "gaps": "finished with gaps — being healed",
       "shipped": "shipped {{date}}",
       "shippedUndated": "shipped"
     },
@@ -1793,6 +1948,33 @@
     }
   },
   "dispatcher": {
+    "decided": {
+      "title": "Decided for you",
+      "fresh": "new",
+      "freshCount": "{{count}} new",
+      "by": {
+        "builder": "the builder",
+        "designer": "the designer",
+        "rule": "a rule"
+      },
+      "wholeFeature": "the whole feature",
+      "what": "Was open",
+      "choice": "Chose",
+      "why": "Why",
+      "undo": "To undo",
+      "earlier": "Show {{count}} earlier",
+      "gaps": "Gaps being healed",
+      "gapsBelow_one": "{{count}} gap below",
+      "gapsBelow": "{{count}} gaps below",
+      "priority": {
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
+      },
+      "ticket": "Ticket {{ticket}}",
+      "ticketCopied": "Ticket {{ticket}} copied — paste it on the bug board",
+      "ticketNotCopied": "Ticket {{ticket}} could not be copied here — it is ticket {{ticket}} on the bug board"
+    },
     "ask": {
       "waiting": "Waiting for your word",
       "open": "Open",
@@ -1815,7 +1997,8 @@
       "parked": "PARKED",
       "idle": "IDLE",
       "hidden": "HIDDEN",
-      "complete": "COMPLETE"
+      "complete": "COMPLETE",
+      "gaps": "FINISHED WITH GAPS"
     },
     "phase": {
       "running": "running",
@@ -1853,7 +2036,8 @@
     },
     "now": {
       "next": "Next",
-      "more": "+{{count}} more"
+      "more": "+{{count}} more",
+      "ruling": "waiting for the designer's ruling"
     },
     "rounds_one": "{{count}} round",
     "rounds": "{{count}} rounds",
@@ -2393,7 +2577,8 @@
       "silent": "Silent",
       "enrolling": "Enrolling",
       "services": "Services",
-      "more": "{{count}} more"
+      "more": "{{count}} more",
+      "passingOf": "{{passing}} of {{checks}}"
     },
     "header": {
       "eyebrow": "Fleet health",
@@ -5133,6 +5318,195 @@
     "dock": {
       "label": "{{name}}’s draft",
       "empty": "When {{name}} drafts a brief for a session, it waits here for your Send."
+    }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "head": {
+      "sections": "Section",
+      "window": "How far back",
+      "days": "{{days}} days"
+    },
+    "sections": {
+      "codeMode": "Code Mode"
+    },
+    "frame": {
+      "reading": "Reading the numbers…",
+      "unreachable": "The numbers could not be read.",
+      "tryAgain": "Try again",
+      "takenToday": "Numbers taken today at {{time}}.",
+      "takenOn": "Numbers taken {{date}} at {{time}}.",
+      "newer": "Reading newer numbers…",
+      "refresh": "Refresh"
+    },
+    "codeMode": {
+      "unknown": "not known",
+      "allKinds": "All kinds",
+      "with": "With Code Mode",
+      "without": "Without",
+      "listSeparator": ", ",
+      "uncounted": "Not counted here: {{kinds}}.",
+      "historyStarts_one": "The history starts on {{date}}, so these numbers cover {{count}} day of the {{days}} asked for.",
+      "historyStarts_other": "The history starts on {{date}}, so these numbers cover {{count}} days of the {{days}} asked for.",
+      "empty": {
+        "title": "No launches in the last {{days}} days",
+        "message": "Nothing the house counts ended in this window. A longer one may hold some.",
+        "noHistoryTitle": "No history yet",
+        "noHistoryMessage": "It starts with the first launch that ends. Its numbers are here from then on."
+      },
+      "units": {
+        "count": "{{value}}",
+        "thousand": "{{value}}k",
+        "million": "{{value}}M",
+        "share": "{{value}}%",
+        "more": "+{{value}}%",
+        "fewer": "−{{value}}%",
+        "same": "±0%",
+        "seconds": "{{seconds}}s",
+        "minutes": "{{minutes}}m {{seconds}}s",
+        "hours": "{{hours}}h {{minutes}}m",
+        "pointsMore": "+{{value}} pts",
+        "pointsFewer": "−{{value}} pts",
+        "pointsSame": "±0 pts",
+        "shareUnder": "under {{value}}%",
+        "days": "{{days}}d {{hours}}h",
+        "billion": "{{value}}B"
+      },
+      "compare": {
+        "title": "With and without Code Mode",
+        "lead": "Launches with Code Mode: {{with}}. Without: {{without}}. The median launch with it, across every kind:",
+        "leadOnlyWith": "Launches with Code Mode: {{with}}, and none without to measure them against. The median launch, across every kind:",
+        "leadOnlyWithout": "No launch ran with Code Mode in this window. Without: {{without}}.",
+        "headline": {
+          "ok": "Ended ok",
+          "turns": "Turns",
+          "tokens": "Tokens, in and out",
+          "time": "Time"
+        },
+        "noteAgainst": "{{without}} without · {{change}}",
+        "noteWithout": "{{without}} without",
+        "noteAlone": "nothing ran without",
+        "mode": "Figures shown",
+        "median": "Median",
+        "total": "Total",
+        "models": "Models",
+        "modelsTogether": "All models",
+        "modelsEach": "Each model",
+        "medianAbout": "The median launch of each row. Under a Code Mode figure: how far it is from the same figure without, as a share of that figure. Under Ended ok: in percentage points.",
+        "totalAbout": "Sums over each row’s launches. A total follows how many launches ran, so only the share that ended ok is compared, in percentage points.",
+        "tableLabel": "Launches with and without Code Mode, by kind and by model",
+        "with": "with Code Mode",
+        "without": "without",
+        "noModel": "No model named",
+        "ok": "{{ok}} · {{share}}",
+        "against": "against without",
+        "columns": {
+          "who": "Launches of",
+          "launches": "Launches",
+          "ok": "Ended ok",
+          "turns": "Turns",
+          "tokensIn": "Tokens in",
+          "tokensOut": "Tokens out",
+          "time": "Time"
+        }
+      },
+      "outcomes": {
+        "title": "How the scripts fared",
+        "scripts": "Scripts run",
+        "scriptsNote_one": "in {{count, number}} launch with Code Mode",
+        "scriptsNote_other": "in {{count, number}} launches with Code Mode",
+        "none": "No launch ran with Code Mode in the last {{days}} days, so there is no script to count.",
+        "about": "Refused and failed count the actions inside a script. The last three rows count the edits a script handed to the merger.",
+        "thrown": "Threw",
+        "resent": "Sent again",
+        "refused": "Refused",
+        "failed": "Failed",
+        "mergesAsked": "To merger",
+        "mergesMerged": "Merged",
+        "declined": "Declined",
+        "ofScripts": "{{share}} of scripts",
+        "thrownOfScripts": "{{share}} of scripts, {{timedOut}} timed out",
+        "byKind": "By kind",
+        "tableLabel": "Script outcomes by kind, for launches with Code Mode",
+        "columns": {
+          "kind": "Kind",
+          "scripts": "Scripts",
+          "thrown": "Threw",
+          "resent": "Sent again",
+          "refused": "Refused",
+          "failed": "Failed",
+          "mergesAsked": "To merger",
+          "mergesMerged": "Merged",
+          "declined": "Declined"
+        },
+        "timedOut": "{{timedOut}} timed out"
+      },
+      "causes": {
+        "title": "What went wrong",
+        "none": "Nothing failed in this window.",
+        "head_one": "{{count, number}} failure in all. Its row opens to the sentences it was said in.",
+        "head_other": "{{count, number}} failures in all, the commonest first. A row opens to the sentences it was said in.",
+        "inLaunches_one": "in {{count, number}} launch",
+        "inLaunches_other": "in {{count, number}} launches",
+        "endedScript_one": "{{count, number}} ended its script",
+        "endedScript_other": "{{count, number}} ended their scripts",
+        "where": "{{launches}} · {{ended}} · {{kinds}}",
+        "whereQuiet": "{{launches}} · {{kinds}}",
+        "times": "{{times}}×",
+        "otherWords_one": "and {{count, number}} more, worded another way",
+        "otherWords_other": "and {{count, number}} more, worded other ways",
+        "unlisted_one": "{{count, number}} more failure is of a rarer kind, not listed.",
+        "unlisted_other": "{{count, number}} more failures are of rarer kinds, not listed.",
+        "fault": {
+          "refused": "Refused",
+          "failed": "Failed",
+          "threw": "Threw",
+          "timeout": "Timed out",
+          "declined": "Declined"
+        },
+        "showRest_one": "Show {{count}} rarer kind of failure",
+        "showRest_other": "Show {{count}} rarer kinds of failure",
+        "showFirst": "Show only the commonest {{count}}"
+      },
+      "trend": {
+        "title": "Day by day",
+        "measure": "Measure",
+        "kind": "Kind",
+        "measures": {
+          "launches": "Launches",
+          "turns": "Turns",
+          "tokens": "Tokens",
+          "seconds": "Time",
+          "failures": "Failures"
+        },
+        "about": {
+          "launches": "Launches that ended each day.",
+          "turns": "Turns taken each day, summed over the day’s launches.",
+          "tokens": "Tokens in and out each day, in thousands.",
+          "seconds": "Time spent each day, in minutes.",
+          "failures": "Launches with Code Mode only: scripts that threw above the line, actions refused or failed below it."
+        },
+        "thrown": "Scripts that threw",
+        "refusedOrFailed": "Actions refused or failed",
+        "plot": "{{about}} {{kind}}, the last {{days}} days.",
+        "peak": {
+          "launches": "Tallest bar: {{peak}} launches in a day",
+          "turns": "Tallest bar: {{peak}} turns in a day",
+          "tokens": "Tallest bar: {{peak}} thousand tokens in a day",
+          "seconds": "Tallest bar: {{peak}} minutes in a day",
+          "failures": "Tallest bar: {{peak}} in a day"
+        },
+        "barTitle": "{{date}} · {{above}} {{aboveLabel}} · {{below}} {{belowLabel}}",
+        "quiet": "Nothing to draw for {{kind}} in the last {{days}} days.",
+        "byDay": "The days as a table",
+        "tableLabel": "{{measure}} per day: {{above}}, and {{below}}",
+        "quietLeftOut": "Days with nothing to count are left out.",
+        "columns": {
+          "day": "Day",
+          "thrown": "Threw",
+          "refusedOrFailed": "Refused or failed"
+        }
+      }
     }
   }
 }

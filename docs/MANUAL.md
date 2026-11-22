@@ -3334,7 +3334,7 @@ section: dispatcher/000/002 The read. `readDispatcherState({ bin, timeoutMs, env
 **The read.** `readDispatcherState({ bin, timeoutMs, env })` runs `dispatcher status --json` by argv,
 `cwd` the home directory, `maxBuffer` 16 MiB (`STATUS_MAX_BUFFER` in `dispatcher-state.transport.ts` — the document carries
 every plan's `goal` and events whole, so a verb's 1 MiB is not headroom enough). The subprocess is `readDispatcherJson` in `server/shared/dispatcher-command.ts`, the one run every lane reading a dispatcher document goes through (the roadmap module's `roadmap show --json` read too); `maxBuffer` is its caller's argument, and a failure is a throw naming `dispatcher <argv joined by spaces>`. A document past the ceiling reaches the journal as `printed more than <maxBuffer> bytes — past the buffer this read allows`, the ceiling named (`2026-10-09`: 4.22 MB over 74 plans, one finished plan alone carrying 520 KB of events — past the former 4 MiB ceiling, so the lane answered `the dispatcher has not been read yet` and drew nothing; the ceiling is 16 MiB). The body is validated
-FIELD BY FIELD into the F1 types — `dispatcher-plan.reader.ts` reads one plan with its phases, stages
+FIELD BY FIELD into the F1 types — `dispatcher-plan.reader.ts` reads one plan with its phases, stages `decided`, `open_gaps` and a phase's `ruling` are read by `dispatcher-decided.reader.ts` (`decidedSince`, `gapsSince`, `rulingSince`): an absent key reads `[]` or `null`, so the house and this lane may land in either order, and a key that is there and does not match is refused by name. `PLAN_STATUSES` holds ten words, `gaps` among them.
 and events, and `launched`, the one fact its own card words its button off (Resume at 3:00 AM for a
 plan that has walked, Start for one that has not), plus `accept_armed` (the Accept-when-cut press, `{at, by, design}` or null) and `design_loaded_at`, both read tolerantly (`acceptArmedOf`, `textSince`), `queue_hold` (the queue's clause for a plan waiting on its epic's turn, `textSince`, null when none) and `pace_hold` (the pacer's clause, `textSince`, ABSENT reads `""` — a dispatcher build older than the key draws no line) and `planning_paused` (the operator's planning pause on that plan alone, `{ at, by }` or `null`, through `planningPausedSince` in the transport — ABSENT reads `null`, and a key that IS there and is neither is refused by name); `dispatcher-arc.reader.ts` reads one arc
 (its own words and status, its model word, the NAMES of its plans — never resolved into plan rows, the
@@ -3453,7 +3453,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 ## MAN-9543 — The dispatcher lane — The store watch: what pokes the dispatcher and roadmap lanes
 section: dispatcher/000/008 The store watch. `dispatcher-store-watch.service.ts` pokes the dispatcher and roadmap lanes
 
-**The store watch.** `server/shared/dispatcher-store-watch.service.ts` (one instance, built in `server/index.ts` and handed to `createDispatcherModule` and `createRoadmapModule`) is what pokes the two dispatcher lanes (`PolledLane.poke`, MAN-534). It is a set of `fs.watch`es on DIRECTORIES (`directory-watch.service.ts`: a WAL checkpoint or an atomic `os.replace` kills a watch on a file with its inode), filtered to the names below, coalesced into ONE poke per lane per burst (`SETTLE_MS` 300 ms from the first event; a source that asks for longer never delays a quicker one), and re-armed by event when its directory is deleted or moved (the parent is watched for the name; an unarmable watch is said once and the lane's backstop keeps it honest).
+**The store watch.** `server/shared/dispatcher-store-watch.service.ts` (one instance, built in `server/index.ts` and handed to `createDispatcherModule` and `createRoadmapModule`) is what pokes the dispatcher lanes (`PolledLane.poke`, MAN-534): `status` and `roadmap` on the inputs below, and the third twin, `rnd` (`createRndModule`, MAN-10113), on `STORE_LANES` alone — a store write the board gate lets through and a re-armed watch. The R&D document reads no chain record, daemon lock, socket or flag, so none of those pokes it. It is a set of `fs.watch`es on DIRECTORIES (`directory-watch.service.ts`: a WAL checkpoint or an atomic `os.replace` kills a watch on a file with its inode), filtered to the names below, coalesced into ONE poke per lane per burst (`SETTLE_MS` 300 ms from the first event; a source that asks for longer never delays a quicker one), and re-armed by event when its directory is deleted or moved (the parent is watched for the name; an unarmable watch is said once and the lane's backstop keeps it honest).
 
 THE INPUTS, measured with strace over `dispatcher status --json` and `dispatcher roadmap show --json` — the list that says the screen reads what it read under a poll:
 
@@ -3556,10 +3556,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 section: dispatcher/010 The plan card/006 The status words.
 
 **The status words.** `dispatcher.status.*` — `LIVE`, `STALLED`, `PAUSED`, `HELD`, `SCHEDULED`, `PARKED`, `IDLE`, `HIDDEN`,
-`COMPLETE` — toned by `planStatusTone` (`live`, `complete` positive; `stalled` warn — released work whose run has ended with nothing to record it, the one status nobody asked for; the rest neutral: every other status
+`COMPLETE`, `FINISHED WITH GAPS` — toned by `planStatusTone` (`live`, `complete` positive; `gaps` warn — finished work with a follow-up ticket still open, being healed; `stalled` warn — released work whose run has ended with nothing to record it, the one status nobody asked for; the rest neutral: every other status
 is one the operator chose or is waiting on). `PlanClock`: live → elapsed since the newest `launched` /
 `relaunched` event; complete → `ended <elapsed> ago` off `completed_at`, re-read once a minute; scheduled
-→ `starts <time>` (`runner.schedule.starts`, `scheduleClock` of the armed hour); queued, paused, stalled, parked, hidden
+→ `starts <time>` (`runner.schedule.starts`, `scheduleClock` of the armed hour); queued, paused, stalled, gaps, parked, hidden
 and idle → nothing. `HIDDEN` is the plan the operator hid (`plan.hidden`, MAN-8492): paused and held out of the queue until Show; `dispatcher.arcStatus.hidden` reads `HIDDEN` for an epic whose every open plan is. `HELD` is the word for the `queued` status (a plan accepted and held for its Start): `dispatcher.status.queued` and `dispatcher.arcStatus.queued` read `HELD`, `roadmap.step.queued` reads `held for its Start`.
 
 A STALLED plan says why: its head's second row carries one line (`data-plan-stalled`, `dispatcher.stalled.<cause>` — `plan.stalled`, the dispatcher's own cause word `dispatcher_down` | `ended_unrecorded`; the card words it and decides none of it), and its task wears the warning mark `!` (`phaseWord` key `stalled`, off `phase.stalled`), never the walking `▶︎` — `report_stall`, MAN-7783.
@@ -3651,7 +3651,7 @@ section: dispatcher/010 The plan card/010 The face (`PlanFace`), top to bottom:
 1. **The track** (`StatusFlow.tsx`, Verve's horizontal StatusFlow): one node per phase on ONE row, every node 1.5rem (24px) to look at, at every width, and a 44px column under a finger (`finger:`, the touch law: the node keeps its 24px look, and a transparent 44px `::before` centred on it is its catch). Where the nodes fit, they share the row in equal columns; where they do not, the row SCROLLS sideways and never shrinks them (`coi-backend-conformance`, 23 phases, is 24px nodes in a 552px row at a desk and 44px columns in a 1012px row under a finger, scrolled on a 332px one at 390px, opened on the walking phase: squeezed into that row they would be 14px, too small for a two-digit label). The scroll's own rules are `StatusFlow` rules, MAN-6791. Nodes are `LaneFlowNode` `{ key, mark, tone, label, live }`, built by `PlanFace` from `phaseWord`. Mark: `✓` done, `▶︎` walking, `…` settling, the phase's position while not started. The fill spans the whole row to done ÷ total, like a meter; it does not join nodes, because done phases need not be adjacent. A plan with no phases cut draws no track.
 2. **The caption** (`dispatcher.flow.caption`): `<done> of <total> done · <rounds> rounds · <route.word>`, `data-flow-caption`. The plan's spend is the header's pills, not said again; the route is the BOX's posture (`deepseek route`); a plan's own `posture` states ITS route (`width.word`). The posture is drawn through `operatorWords` (MAN-7596), so the dispatcher's `plan` and `phase` reach the operator as `feature` and `task`.
 3. **The receipt**: a pressed node (`aria-pressed`) opens that phase's `PlanPhaseRow` under the track with its stages open (`data-flow-receipt=<phase key>`); the same node pressed again closes it. One receipt per card; its state is `PlanFace`'s.
-4. **`PlanNow`** (`PlanNow.tsx`, `data-plan-now`): one line per running phase (walking or settling), up to three, then `+N more` (`dispatcher.now.more`). With none running on a plan not complete: the first phase not started, as `Next` (`dispatcher.now.next`). A complete plan draws nothing. A line: the node's own mark, position, the title on ONE line (truncated), the assignee capped at 25% of the line and the part that shrinks first. Handles `data-now-phase=<key>`, `data-now-next`, `data-now-more`.
+4. **`PlanNow`** (`PlanNow.tsx`, `data-plan-now`): one line per running phase (walking or settling), up to three, then `+N more` (`dispatcher.now.more`). With none running on a plan not complete: the first phase not started, as `Next` (`dispatcher.now.next`). A complete plan draws nothing. A line: the node's own mark, position, the title on ONE line (truncated), the assignee capped at 25% of the line and the part that shrinks first. Handles `data-now-phase=<key>`, `data-now-next`, `data-now-more`. A phase whose `ruling` is `asked` keeps its line (whatever its status) and draws `dispatcher.now.ruling` — "waiting for the designer's ruling" — in a `warn` Badge in place of its assignee.
 5. **`All N tasks`** (`dispatcher.allPhases`, `data-dispatcher-phases`): a `Collapsible`, CLOSED — stated in `PlanFace` (`listOpen`) and passed in by no home, so the tab and the gutter draw one face. Its rows are mounted only while it is open: a closed `Collapsible` still mounts its children (INV-4354), which would count as painted and put N buttons in the tab order.
 6. **The event feed** (below).
 
@@ -4033,7 +4033,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningC
 ## MAN-9867 — The plan card — The Planning card — The press lives here and only here.
 section: dispatcher/010 The plan card/033 The Planning card/002 The press lives here and only here.
 
-**The press lives here and only here.** `PlanningPausePress` at the line's end, from the readings in `planningPress.ts` (`featurePress` for a feature through the `plan` door, `epicPress` for an epic and `loosePress` for a loose epic through the `arc` door): Pause planning while the subject is being planned, Resume planning where its own pause stands — none for a complete feature (`featurePress`). Plan cards and epic decks carry no planning press; they keep their `Planning paused` words in the head (`PlanCard`, `DispatchArcDeck`). A line whose subject has NO card or deck drawn on this screen (`PlanningLine.drawn` false: a loose epic, or a feature or epic the operator has put away) also carries its outing's pace hold with the `Override` (`PaceOverride`, through the line's own door: `plan` for a feature, `arc` for an epic), since nothing else on the screen carries it; a drawn card or deck carries its own hold, so each hold has one press. A stalled outing's Resume planner stays on its card (`PlanControls`) and stands down while the feature's planning is paused, its own or its epic's (`planningPausedVia`): Resume planning on the line is the one way back then, and it sends back that same entry. A PUT-AWAY SUBJECT IS READ LIKE ANY OTHER: a hide holds the walk and none of the planning (`dispatcher hide` signals no planner, and the dispatcher takes both verbs on a hidden plan), and the card lists a hidden feature's or epic's outing, so its line keeps Resume planning where its own pause stands and Pause planning while its own outing is out. `featurePress` reads a parked feature off its STATE, since a hide outranks `parked` in the status word and an epic's Hide takes its parked plans along. Resume planning writes twice — the lift, then the send-back of what the pause left stalled (`cmd/planning.resume_planning`) — so a frame can show the line `Ended short` with Pause planning for a moment before the re-queued outing reads `Waiting to …`.
+**The press lives here and only here.** `PlanningPausePress` at the line's end, from the readings in `planningPress.ts` (`featurePress` for a feature through the `plan` door, `epicPress` for an epic and `loosePress` for a loose epic through the `arc` door): Pause planning while the subject is being planned, Resume planning where its own pause stands — none for a complete feature or one finished with gaps (`featurePress`, `planningPausedVia`). Plan cards and epic decks carry no planning press; they keep their `Planning paused` words in the head (`PlanCard`, `DispatchArcDeck`). A line whose subject has NO card or deck drawn on this screen (`PlanningLine.drawn` false: a loose epic, or a feature or epic the operator has put away) also carries its outing's pace hold with the `Override` (`PaceOverride`, through the line's own door: `plan` for a feature, `arc` for an epic), since nothing else on the screen carries it; a drawn card or deck carries its own hold, so each hold has one press. A stalled outing's Resume planner stays on its card (`PlanControls`) and stands down while the feature's planning is paused, its own or its epic's (`planningPausedVia`): Resume planning on the line is the one way back then, and it sends back that same entry. A PUT-AWAY SUBJECT IS READ LIKE ANY OTHER: a hide holds the walk and none of the planning (`dispatcher hide` signals no planner, and the dispatcher takes both verbs on a hidden plan), and the card lists a hidden feature's or epic's outing, so its line keeps Resume planning where its own pause stands and Pause planning while its own outing is out. `featurePress` reads a parked feature off its STATE, since a hide outranks `parked` in the status word and an epic's Hide takes its parked plans along. Resume planning writes twice — the lift, then the send-back of what the pause left stalled (`cmd/planning.resume_planning`) — so a frame can show the line `Ended short` with Pause planning for a moment before the re-queued outing reads `Waiting to …`.
 
 Handles: `data-planning-card` on the root (valued with the number of lines), `data-planning-line` (the subject's name), `data-planning-kind`, `data-planning-loose`, `data-planning-drawn` (whether the subject's card or deck is on this screen), `data-planning-state` (what the line says: `out`, `queued`, `ended`, `paused`), `data-planning-outing` (the outing's own state — `out`, `queued` or `ended` — or `none`); the press keeps `data-dispatcher-pause-planning` / `data-dispatcher-resume-planning` with `data-pause-scope`. The words are `dispatcher.planning.*` (the lines) and `dispatcher.planningPause.*` (the press and the paused line) in `src/modules/i18n/locales/en/common.json`.
 
@@ -5729,17 +5729,16 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
 ## MAN-589 — The panel
 section: kanban/008 The panel
 
-`src/modules/kanban/` composes the tab's pane, its header — which mounts `KanbanVitalsStrip`, the
-board's five counts, its design carried in its own docstring, wired through `useBoardVitals` off a
-publish/subscribe store the lane feed keeps rather than a prop the header would have to carry — the
-card drawer under
-`card-drawer/`, the module's hooks and four module-private utilities under `utils/`. The barrel exports
+`src/modules/kanban/` composes the tab's pane, its head (`BugHead.tsx`: the way back, BUGS and the board's picker), its instrument (`BugInstrument.tsx`: the cards as
+slots on the hoop round the board's core), its foot (`BugFoot.tsx`) and what the core opens (`BugBoardOpening.tsx`: the
+board's switch, its five counts wired through `useBoardVitals` off a publish/subscribe store the lane feed keeps, its
+repositories and its acts) — the card drawer under
+`card-drawer/`, the module's hooks and its module-private utilities under `utils/`. The barrel exports
 `KanbanPanel` and nothing else — a second export is how a policy that must be decided in one place
 starts being read in two.
 
 **A lane is a set of statuses.** Which statuses compose which lane is decided in exactly one file,
-`src/modules/kanban/utils/lanePolicy.ts`'s `kanbanLanes(autonomy)`, and read by the panel, the
-rail, the lanes hook, the lane feed, the board menus and the drag hook alike. With autonomy OFF it
+`src/modules/kanban/utils/lanePolicy.ts`'s `kanbanLanes(autonomy)`, and read by every module file that sorts cards into lanes alike (today: card-drawer/KanbanCardDrawer.tsx hooks/useKanbanDrag.ts hooks/useKanbanLaneFeed.ts hooks/useKanbanLanes.ts KanbanPanel.tsx utils/bugHoop.ts). With autonomy OFF it
 returns four lanes and To Do carries TWO statuses; with autonomy ON it returns five:
 
 | autonomy off | statuses | autonomy on | statuses |
@@ -5805,18 +5804,18 @@ never through this hook's own returned state; the shape is in the file's own doc
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
 
-## MAN-10002 — The panel — The vitals strip's five registers, in ONE round trip.
+## MAN-10002 — The panel — The board's five counts, in ONE round trip.
 section: kanban/008 The panel/002 The vitals strip's five registers, in ONE round trip.
 
-**The vitals strip's five registers, in ONE round trip.** `vitalsCounts`
-(`kanban-vitals.service.ts`) answers the header's strip from four scalar sub-SELECTs in one
+**The board's five counts, in ONE round trip.** `vitalsCounts`
+(`kanban-vitals.service.ts`) answers the board's counts (drawn by `BugBoardOpening.tsx`, what the board's core opens) from four scalar sub-SELECTs in one
 statement, every card count excluding archived cards:
 
 - `building` — cards in the Building lane (`status = 'active'`), where a card stays while its walk is out.
 - `awaitingAnswer` — cards with at least one question nobody has answered: the operator's turn, and
   the panel's own `needsAnswer`.
-- `queued` — cards in To Do (`status = 'todo'`): the To Do lane's own count, so the strip and the
-  lane never disagree.
+- `queued` — cards in To Do (`status = 'todo'`): the To Do lane's own count, so the count and the
+  To Do run never disagree.
 - `lessonsPendingEstate` — STAGED lessons awaiting a person's review. It reads the board's own lesson
   table and is NOT board-scoped: a lesson belongs to the estate and its card is provenance, so there
   is no board filter here to get wrong.
@@ -5829,7 +5828,7 @@ Every estate-wide key carries the word ESTATE in its name, so no caller can read
 the whole install as one board's own. The read is read-only — no transaction, no audit row, no frame —
 and a missing board is the board's ordinary 404, never zeros: "no such board" and "a board with
 nothing on it" are different answers. A fault is NOT caught, and that is the ruling rather than an
-omission: the strip draws an unknown reading as an em-dash, and the wire shape has no null to say
+omission: the Opening draws an unknown reading as an em-dash, and the wire shape has no null to say
 "unknown" with, so a refusal is the only honest way this read can say "I could not count".
 
 Every lane then pages through the same tail, which the kit owns: an 8px sentinel inside the lane
@@ -5849,7 +5848,9 @@ instead, in the shape `<title> moved to <lane>, position <n> of <total>`. Only t
 the lane the card left and the lane it landed in, and a toast leaves — and a thing that leaves
 cannot announce.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-vitals.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanVitalsStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
+**Where they are drawn.** `BugBoardOpening.tsx` lists them in one fixed order as label and value (`KeyValueList`): Building (`building`), Asking (`awaitingAnswer`), Waiting to start (`queued`, the To Do count — the operator's ruled words, never "Queued"; key `kanban.ring.vitals.queued`), then Lessons and Memories, each said "· every board" beside its number. The vitals strip that once drew them in the board header was deleted by the bug screen's redraw (689bdd2b); the case the-board-strips-to-do-count-reads-waiting-to-start keeps the To Do words.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-vitals.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/BugBoardOpening.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
 
 ## MAN-590 — The lessons lane
 section: kanban/009 The lessons lane
@@ -9858,7 +9859,7 @@ key for key. The emitted document is the source of the shape.
   `Resume at …` for a plan that has walked, Start for one that has not, MAN-1557). Read
   through `flagSince`, so a frame from a build older than the key reads `false`. `DispatcherArc.stopped`
   does NOT read it: an arc's STOPPED set holds a plan at the gate as readily as one stopped mid-walk (MAN-5220).
-- `DispatcherPlanStatus` is the nine words of `report.status_word`, in its precedence (`complete`, `hidden`, `scheduled`, `paused`, `queued`, `stalled`, `live`, `parked`, `idle`). `DispatcherPlan.hidden` is `DispatcherPlanHidden | null` — `{ at, arc }`, since when the operator has had the plan hidden and the epic whose press it was (`report.hidden_reading`, MAN-8492) — set exactly while the word is `hidden`, read tolerantly (`hiddenOf`): a build older than the key reads as shown. `DispatcherArcStatus` gains `hidden` (every open plan of the epic hidden) and `DispatcherArcQueue.turn` gains `hidden` (the epic keeps its place and is out of the line).
+- `DispatcherPlanStatus` is the ten words of `report.status_word`, in its precedence (`gaps`, `complete`, `hidden`, `scheduled`, `paused`, `queued`, `stalled`, `live`, `parked`, `idle`). `DispatcherPlan.hidden` is `DispatcherPlanHidden | null` — `{ at, arc }`, since when the operator has had the plan hidden and the epic whose press it was (`report.hidden_reading`, MAN-8492) — set exactly while the word is `hidden`, read tolerantly (`hiddenOf`): a build older than the key reads as shown. `DispatcherArcStatus` gains `hidden` (every open plan of the epic hidden) and `DispatcherArcQueue.turn` gains `hidden` (the epic keeps its place and is out of the line). `gaps` is a plan whose every phase is done while a gap ticket one of them left is still open; it reads `complete` once the last such ticket ends. `DispatcherPlan.decided` is `DispatcherDecided[]` (`{ id, at, task, by, what, choice, why, undo }`, `by` a `DispatcherDecidedBy`: `builder`, `rule` or `designer`; `task` the phase's title or `null`) and `DispatcherPlan.open_gaps` is `DispatcherGap[]` (`{ task, title, ticket, priority }`); `DispatcherPhase.ruling` is `DispatcherPhaseRuling | null` (`asked` while the walk waits on its designer). The station fakes (`src/modules/station/fake/stage.ts`) carry `[]` and `null`.
   `DispatcherPhase.status` is the three values of the store's `phases.status` column: `not started`,
   `running`, `done`.
 - `offpeak_at` is a `string`, never null: `plan_runner.when.stamp` answers the literal `none` when
@@ -10160,7 +10161,7 @@ Mount: `app.use('/api/agent-launch', authenticateToken, createAgentLaunchModule(
 | `PUT /api/agent-launch/defaults` | `{model?: string, effort?: {<model>: string\|null}, deepseek_effort?: string, dactyl_model?: string, dactyl_effort?: string, summarizer_model?: string, summarizer_effort?: string}`; at least one field | `defaults [--model M] [--effort <model>=<E\|none>]... [--deepseek-effort E] [--dactyl-model W] [--dactyl-effort E] [--summarizer-model W] [--summarizer-effort E]`; `null` → `none`; the dactyl's two and the summarizer's two cannot be cleared, and the CLI says so in a sentence |
 
 - A 200 body is the census the CLI printed, whole. A PUT answers the census read back AFTER the write, never the input (MAN-628).
-- `:name` matches `^(?:hunt\.)?[a-z][a-z0-9_]{0,63}$`: a soul's slug, `sorter`, `tweak`, or one of the five hunt rows `hunt.<kind>` (`security`, `behaviour`, `ui`, `data`, `code`). The census carries each hunt row (`kind: "hunt"`, its `soul`) and `choices.hunt_souls`. The routes check transport shape only; the vocabulary is Python's, so `PUT /rows/hermes` with `{"effort":"loud"}` answers 400 carrying the CLI's sentence.
+- `:name` matches `^(?:(?:hunt|rnd)\.)?[a-z][a-z0-9_]{0,63}$`: a soul's slug, `sorter`, `tweak`, one of the five hunt rows `hunt.<kind>` (`security`, `behaviour`, `ui`, `data`, `code`), or one of the two R&D rows `rnd.scout` and `rnd.spike`. The census carries each hunt row (`kind: "hunt"`, its `soul`) and `choices.hunt_souls`. The routes check transport shape only; the vocabulary is Python's, so `PUT /rows/hermes` with `{"effort":"loud"}` answers 400 carrying the CLI's sentence.
 
 | the CLI | reason | status | body |
 |---|---|---|---|
@@ -10194,10 +10195,11 @@ The Agent Chains panel's data path, its hook and the rules a change to either mu
 | piece | home |
 |---|---|
 | panel | `src/modules/agent-launch/AgentLaunchPanel.tsx`, re-exported lazily by `index.ts`, rendered only by `AgentChainsContent` (MAN-7427) |
+| barrel | `index.ts` exports two names: `AgentLaunchPanel` (lazy) and `AgentLaunchChoice`, the slot imported whole; `RndSettingsSheet` (`src/modules/rnd`) draws the scout's and the spike's model and effort slots with it |
 | panel props | `onClose?: () => void` (draws the header's close button) · `titleId?: string` (the id the `<h2>` carries, so the window is named by it) |
 | parts | `AgentLaunchNotices` (warnings, reach notice) · `AgentLaunchDefaults` (mounts `AgentLaunchDactylField` and `AgentLaunchSummarizerField`, twins: a model list and an effort list each) · `AgentLaunchRowItem` · `AgentLaunchLanes` · `AgentLaunchChoice` (a slot is a list, or `said` words with no list, as the tweak's effort) |
 | hook | `useAgentLaunch()` → `{ census, error, saving, refresh, saveRow, saveDefaults }` |
-| types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading. Row `kind` is `'soul' \| 'sorter' \| 'tweak' \| 'hunt'` (a hunt row carries `soul`); lane `'agent' \| 'dispatcher' \| 'chain' \| 'sorter' \| 'hunt'`; `choices.sorter_models` / `choices.tweak_models` are the two board-card model lists; `choices.hunt_souls` (optional: a table older than the hunts lacks it) is every soul that may wear a hunt |
+| types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading. Row `kind` is `'soul' \| 'sorter' \| 'tweak' \| 'hunt' \| 'rnd'` (a hunt row carries `soul`; an `rnd` row, `rnd.scout` and `rnd.spike`, carries model and effort only and is edited by the R&D settings sheet, MAN-10115, never listed here); lane `'agent' \| 'dispatcher' \| 'chain' \| 'sorter' \| 'hunt'`; `choices.sorter_models` / `choices.tweak_models` are the two board-card model lists; `choices.hunt_souls` (optional: a table older than the hunts lacks it) is every soul that may wear a hunt |
 
 ## hook contract
 - `census` is `null` until read; a failed call keeps the census already held.
@@ -11882,7 +11884,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorW
 Types — `server/shared/roadmap-types.ts` (18 exports; a sibling of `server/shared/types.ts`, like `kanban-types.ts`)
 | group | exports | source of truth |
 |---|---|---|
-| words | `RoadmapFeatureWord`, `RoadmapFeatureStep`, `RoadmapEpicWord`, `RoadmapMilestoneWord`, `RoadmapWord`, `RoadmapCaseWord` | dispatcher `report_roadmap.py` (and `store_case_words.case_word` for a case's), derived at read; this server derives and spells none it was not told |
+| words | `RoadmapFeatureWord`, `RoadmapFeatureStep`, `RoadmapEpicWord`, `RoadmapMilestoneWord`, `RoadmapWord`, `RoadmapCaseWord` | dispatcher `report_roadmap.py` (and `store_case_words.case_word` for a case's), derived at read; this server derives and spells none it was not told | `RoadmapFeatureStep` holds `gaps`: a feature whose every task is done while a gap ticket is still open (`report_roadmap`); its word stays `in flight`, and `shipped_at` is the later of the last task's end and the last gap ticket's.
 | picture | `RoadmapTask`, `RoadmapCases`, `RoadmapFeature`, `RoadmapEpic`, `RoadmapMilestone`, `Roadmap`, `RoadmapPicture` | keys of `dispatcher roadmap show --json`, key for key |
 | dialog | `RoadmapCase` = `{ name: string; sentence: string; word: RoadmapCaseWord; last_run_at: string \| null; last_saw: string \| null }` | not in `roadmap show --json`; `readFeatureCases` builds it from a cases-door list item (`newest_run.at`, `newest_run.saw`: each `null` with no newest run), served by `GET /api/roadmap/cases` (MAN-7631, MAN-7658); `name` is never drawn (INV-6394) |
 | frame | `RoadmapStateEvent` = `{ kind: 'roadmap_state'; at: number } & RoadmapPicture` | `/ws` frame |
@@ -11997,6 +11999,8 @@ Constants, `roadmap.module.ts` unless named
 
 Routes, mounted at `/api/roadmap`
 
+`FEATURE_STEPS` holds `gaps` (a finished feature with a gap ticket still open), read like every other step.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-cases.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
 
 ## MAN-9176 — The roadmap lane — the module: GET /api/roadmap, GET /api/roadmap/cases, the — route
@@ -12073,7 +12077,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/, /home/l
 
 ## MAN-7632 — The roadmap lane and the dispatcher lane — what the twins share, where they differ
 
-The roadmap lane (`server/modules/roadmap/`, MAN-7631) and the dispatcher lane (`server/modules/dispatcher/`, MAN-1498) are twins: two modules over one dispatcher, sharing code through `server/shared/`, importing nothing from each other.
+The roadmap lane (`server/modules/roadmap/`, MAN-7631) and the dispatcher lane (`server/modules/dispatcher/`, MAN-1498) are twins: two modules over one dispatcher, sharing code through `server/shared/`, importing nothing from each other. A THIRD TWIN, the R&D lane (`server/modules/rnd/`, MAN-10113), follows the "same on both" rows below except two: its `createPolledLane` has NO backstop (`backstopMs: null`), since its document moves only by store writes, and is poked by the store watch's `rnd` lane and its own writes; and its writes run over the bug hunters' relay (`runVerb`, `relayJson`, `relayLine` with `RND_REFUSAL_EXITS` [1, 2]: 200, 409 with the dispatcher's sentence, 502), not `statusForWrite`. Its frame is `rnd_state`, its read `rnd show --json` under `RND_MAX_BUFFER` (4 MiB).
 
 Same on both
 | what | how |
@@ -12445,7 +12449,7 @@ section: The roadmap screen's pieces — StateLine and useStepPhrase (src/module
 | `shipped` | `roadmap.step.shipped` with `formatShortDate(shipped_at)` (`src/shared/utils.ts`: `Oct 3`, the year once it is not this year's) |
 | `shipped`, `shipped_at` null or not a time | `roadmap.step.shippedUndated` |
 | `shipped`, `runtime_s` above 0 | either phrase above, then ` · ` and `humanizeDuration(runtime_s)` (`roadmap.facts.withTime`): `shipped Oct 3 · 3h 42m` — how long agents worked on it (`report_runtime`, MAN-7770), counting what has ended |
-| `idea proposed designing questions cutting accept parked building queued paused stalled starting` | `roadmap.step.<step>` |
+| `idea proposed designing questions cutting accept parked building queued paused stalled starting gaps` | `roadmap.step.<step>` |
 | any other | the dispatcher's own word, as sent |
 - Drawn by `FeatureFacts` (MAN-7645), which hands it to `StateLine` for its label, and by the tree panel's `FeaturePanel`, after the word in its State fact (MAN-7841).
 - `building` names no count: the panel's Tasks fact carries `3 of 13 done` (`roadmap.panel.tasksDone`).
@@ -12881,7 +12885,7 @@ The Roadmap tab is the workspace view whose id is `runner`: label `Roadmap`, gly
 | fact | value |
 |---|---|
 | run | `plans` (`PLAN_VIEWS` in `src/modules/project-workspace/hooks/useWorkspaceViews.ts`), FIRST of it |
-| rail order | `chat` · `files git browser (shell tasks)` · `runner kanban schedules notes` · `universe cerberus api` · plugins · `inbox` (foot); the runs are `SCROLL_GROUPS` of `WorkspaceRail.tsx`, a hairline between two drawn runs |
+| rail order | `chat` · `files git browser (shell tasks)` · `runner kanban schedules rnd notes` · `universe cerberus api` · plugins · `inbox` (foot); the runs are `SCROLL_GROUPS` of `WorkspaceRail.tsx`, a hairline between two drawn runs |
 | id | `runner`, kept. why: `VALID_TABS` (`useProjectsState.ts`), `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), the server's `landingPathOf` and a stored `activeTab` all say `runner` |
 | label | `tabs.runner` = `Roadmap` (`en/common.json`); the ten other locales hold no `tabs.runner` and fall back to English |
 | glyph | `Route`; the glyph comment at the top of `useWorkspaceViews.ts` names it |
@@ -14313,3 +14317,42 @@ Kit parts only: `SettingRow`, `SettingsToggle`, `Button`. Icon `SquareCode`. No 
 - 2026-11-20: 9 states × 3 widths (1440, 390, 320 at 1.07 text scale) × light/dark, 54 pictures: no overflow, switch targets ≥44px on phones. At 320 scaled the kind rows sit 8px left of the title's sentences so the switch stays beside its name.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/code-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerCodeModeRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCodeMode.ts
+
+## MAN-10121 — PlanDecided — the Decided-for-you list and open gaps on a plan face
+
+`PlanDecided({ plan })` (`src/modules/dispatcher/PlanDecided.tsx`) draws what was decided in the operator's place on one plan, and the gaps it finished with that are still being healed. Mounted by `PlanFace` above the events fold. Types `DispatcherDecided`, `DispatcherDecidedBy`, `DispatcherGap` come from `src/shared/types.ts` (MAN-1495).
+
+## Data
+| Read | From | Absent key |
+|---|---|---|
+| rows | `plan.decided ?? NO_DECIDED` | empty list; an older dispatcher build draws nothing, never throws |
+| gaps | `plan.open_gaps ?? NO_GAPS` | empty list |
+
+Both lists come from the dispatcher's document (`hooks/dispatcher`); no plan carries rows until the Python reader produces them (2026-11-22: live GET answers `decided: []`, `open_gaps: []`).
+
+## States
+| Rows | Gaps | Draws |
+|---|---|---|
+| none | none | nothing (`return null`) |
+| some | none | one fold "Decided for you" with its count, in `FaceTrigger` |
+| some | some | the fold; the gaps stand under its trigger when folded, after the rows when open; the open trigger says how many gaps are below |
+| none | some | the gaps alone |
+- The fold starts OPEN when a row is newer than this plan's last look, closed otherwise; a newer row wears "new".
+- Rows mount only while the fold is open. Newest first, `ROW_LIMIT = 5` drawn; "Show N earlier" raises the count to all rows.
+- Colour says a state, never who: the three deciders (`builder`, `designer`, `rule`) share the neutral badge. "new" is info; a high gap is warn; any other rank is neutral; nothing is red.
+
+## Last look
+- Key `dispatcher.decided.lastLook:<plan name>` in `localStorage`, one a plan, read once when the card is drawn (`lastLookOf`).
+- Storage blocked (`DOMException`) or a non-number value: `NEVER_LOOKED = 0`, every row is new.
+- Opening or closing the fold stores the stamp of the newest row (the row's `at`, never the browser clock; `rememberLook`), then sets the fold. A refused write is `console.warn`ed.
+- A non-`DOMException` error is rethrown.
+
+## Gap ticket button
+- `copyTicket(ticket)` puts the number on the clipboard and returns whether it landed (no `navigator.clipboard` or a refused write: false, cause in the console).
+- The press shows one `aria-live="polite"` line under the gaps list (`data-gap-ticket-copied`): `ticketCopied` or `ticketNotCopied`. No toast: the card imports none.
+- No way yet to open a ticket from outside the bug board (bug 195).
+
+## Words
+All through `t()` under `dispatcher.decided.*` in `en/common.json`: `title`, `fresh`, `freshCount`, `by.{builder,designer,rule}`, `wholeFeature`, `what`, `choice`, `why`, `undo`, `earlier`, `gaps`, `gapsBelow` (+ `gapsBelow_one`), `priority.{high,medium,low}`, `ticket`, `ticketCopied`, `ticketNotCopied`. Every string reaches the DOM as a text node: titles, choices, reasons and gap titles are free text souls wrote.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanDecided.tsx

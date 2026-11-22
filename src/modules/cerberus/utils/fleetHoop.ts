@@ -121,8 +121,12 @@ export type FleetHoop = {
   groupOf: (nodeId: string) => FleetGroupId | null;
 };
 
-/** The fleet as slots: one run per state that holds a machine (a run with nothing in it is not drawn), worst machines first in each. */
-export function fleetHoop(items: FleetItem[], nodes: CerberusNodeView[], t: TFunction): FleetHoop {
+/**
+ * The fleet as slots: one run per state that holds a machine (a run with nothing in it is not drawn), worst machines first in each.
+ * `most` is the most slots a run stands, its "more" slot among them: `RUN_MOST` when absent, and no end for the fleet as a list
+ * (`HoopList`).
+ */
+export function fleetHoop(items: FleetItem[], nodes: CerberusNodeView[], t: TFunction, most = RUN_MOST): FleetHoop {
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const machinesOf: Partial<Record<FleetGroupId, string[]>> = {};
   const groupById = new Map<string, FleetGroupId>();
@@ -138,7 +142,7 @@ export function fleetHoop(items: FleetItem[], nodes: CerberusNodeView[], t: TFun
     const ids = machinesOf[groupId] ?? [];
     if (ids.length === 0) continue;
     const groupName = groupLabel(t, groupId);
-    const shown = ids.length > RUN_MOST ? ids.slice(0, RUN_MOST - 1) : ids;
+    const shown = ids.length > most ? ids.slice(0, most - 1) : ids;
     for (const id of shown) {
       const item = itemById.get(id);
       const node = nodeById.get(id);

@@ -15,9 +15,11 @@ import { KanbanPanel } from '@/modules/kanban';
 import { RoadmapTab } from '@/modules/roadmap';
 import { ApiPanel } from '@/modules/api-tab';
 import { CerberusPanel } from '@/modules/cerberus';
+import { AnalyticsPanel } from '@/modules/analytics';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
+import { RndTab } from '@/modules/rnd';
 import { NotesPanel } from '@/modules/notes';
 import type { AppTab, CompanionPresence, FileOpenRequest, FilesRoot, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
@@ -507,6 +509,13 @@ function WorkspaceMain({
             </div>
           )}
 
+          {/* No gate: the house's numbers are the house's whichever project is open. */}
+          {activeTab === 'analytics' && (
+            <div className="h-full overflow-hidden">
+              <AnalyticsPanel />
+            </div>
+          )}
+
           {/* No gate: the board is always on the strip, the way chat, files and git are. It is also
               GLOBAL — the project it is handed is a first-run hint about which board to select, not
               a filter — so nothing here unmounts or refetches when the open project changes, and
@@ -537,6 +546,16 @@ function WorkspaceMain({
           {activeTab === 'schedules' && (
             <div className="h-full overflow-hidden">
               <SchedulesPanel />
+            </div>
+          )}
+
+          {/* No gate either: what the scout found is the house's, not the open project's. The project only names where a
+              spike's chat opens. Lazy, so the place loads on its first open. */}
+          {activeTab === 'rnd' && (
+            <div className="h-full overflow-hidden">
+              <Suspense fallback={null}>
+                <RndTab projectPath={selectedProject?.fullPath || selectedProject?.path || null} />
+              </Suspense>
             </div>
           )}
 

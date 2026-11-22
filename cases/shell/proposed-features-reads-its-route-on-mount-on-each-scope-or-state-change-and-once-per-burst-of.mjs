@@ -11,7 +11,7 @@
 // The board is lib/kanban_board.mjs's made-up board; the proposals' answer is this case's, and the app's socket is
 // handed on with the server's board and dispatcher frames held back (lib/bug_hunt_faces.mjs). Nothing is written.
 //
-// protects: src/modules/kanban/proposed/useProposals.ts, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/utils/proposalRings.ts, src/modules/kanban/KanbanPanel.tsx
+// protects: src/modules/kanban/proposed/useProposals.ts, src/modules/kanban/proposed/ProposedFeatures.tsx, src/modules/kanban/utils/proposalHoop.ts, src/modules/kanban/KanbanPanel.tsx
 // writes: none
 
 import { withPage } from "../lib/app.mjs";

@@ -30,6 +30,8 @@ export const LIVE_TOPIC_ALLOWLIST: readonly RegExp[] = [
   // is: the screen draws one roadmap at a time but the celebrations diff the whole picture, and a
   // per-roadmap topic would be a topic nothing could tell had gone stale.
   /^roadmap:all$/,
+  // The R&D lane's whole picture — its settings, its scouts and every candidate — as one document, for the place and the wheel's mark.
+  /^rnd:all$/,
   // The estate's activity as one DIGEST — how many edits and executions the last window carried and
   // when the newest one landed. A digest and never the raw rows: the estate's stream is coalesced
   // and flushed up to ten times a second, and this bus retains one value per topic and compares
@@ -57,6 +59,12 @@ export const DISPATCHER_ALL_TOPIC = 'dispatcher:all';
  * Published by `RoadmapFeed`, read by `useRoadmap` for the Roadmap tab and its widget.
  */
 export const ROADMAP_ALL_TOPIC = 'roadmap:all';
+
+/**
+ * The topic carrying the R&D lane's whole picture (RndPicture). Published by RndFeed, read by useRnd for the place and by
+ * useRndMark for the wheel.
+ */
+export const RND_ALL_TOPIC = 'rnd:all';
 
 /** The topic carrying every launcher soul the lane can see, running and recently ended alike. */
 export const SOULS_ALL_TOPIC = 'souls:*';

@@ -353,10 +353,13 @@ Module internals of the `/api/agent-launch` relay. Its contract (routes, bodies,
 | instance | one `createAgentLaunchService({ bin })`, built on first use, used by the router |
 | spawn | `execFile` with argv (no shell), `cwd` = `os.homedir()`, env = `userFacingEnv()`, stdout cap 4 MiB |
 
+## resolve — a door for other modules, no route
+`service.resolve(name, 'claude')` runs `launch-table resolve <name> --side claude` and answers `{name, side, model, effort}` as a launch reads the row now. `resolveLaunchRow(name)` (`server/modules/agent-launch/index.ts`) is the one-shot caller over the same `execFile` door and failure classes; the R&D spike asks it for `rnd.spike` (MAN-10113). No `/api/agent-launch` route carries it.
+
 ## route checks — shape only
 | check | value |
 |---|---|
-| row name | `^(?:hunt\.)?[a-z][a-z0-9_]{0,63}$`; a shape, not a soul whitelist (`hunt.<kind>` names a hunt row) |
+| row name | `^(?:(?:hunt\|rnd)\.)?[a-z][a-z0-9_]{0,63}$`; a shape, not a soul whitelist (`hunt.<kind>` names a hunt row, `rnd.scout` / `rnd.spike` an R&D row) |
 | `soul` | a word (below), never `null`: a hunt's soul cannot be cleared; whether the row takes one is the CLI's to say |
 | word (`model`, `effort`, an `effort` map key, `deepseek_effort`, `dactyl_model`, `dactyl_effort`, `summarizer_model`, `summarizer_effort`) | `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`; a token fence, not the vocabulary — `-` first would read as a CLI flag; the dactyl's two and the summarizer's two have no `null` |
 | unknown body key | 400 |
@@ -376,6 +379,7 @@ Every failure is `AgentLaunchResult` `{ok: false, reason, message}`; the status 
 | verb | timeout |
 |---|---|
 | `show` | 20 s (`READ_TIMEOUT_MS`) |
+| `resolve` | 20 s (`READ_TIMEOUT_MS`) |
 | `set`, `defaults` | 90 s (`WRITE_TIMEOUT_MS`): the CLI's lock wait plus the 60 s regeneration |
 
 An error thrown outside these branches goes to the app's error handler.
@@ -4402,7 +4406,7 @@ The palette's `Navigate` group is the workspace's views list, one `Go to <label>
 |---|---|---|
 | `chat` | `chat` | none |
 | `tools` | `files`, `git`, `browser`, then `shell`, then `tasks` | `shell` iff `!hideShellTab` (default `true`, `src/shared/uiPreferences.ts`); `tasks` iff `tasksEnabled && isTaskMasterInstalled`. A gated view joins at the END of the run |
-| `plans` | `runner` (label Roadmap), `kanban`, `schedules`, `notes` | none |
+| `plans` | `runner` (label Roadmap), `kanban`, `schedules`, `rnd` (label R&D), `notes` | none |
 | `house` | `universe`, `cerberus`, `api` | none |
 | `plugins` | `plugin:<name>` for each enabled plugin | `icon: null`, `label` = the plugin's `displayName`, keywords `plugin <name>` |
 | after the list | the Settings row | none |
@@ -4435,7 +4439,7 @@ The palette's `Navigate` group is the workspace's views list, one `Go to <label>
 
 | check | read |
 |---|---|
-| Navigate rows | Chat, Files, Git, Browser, Roadmap, Kanban, Schedules, Notes, Universe, Cerberus, API, Settings |
+| Navigate rows | Chat, Files, Git, Browser, Roadmap, Kanban, Schedules, R&D, Notes, Universe, Cerberus, Analytics, API, Settings |
 | Actions rows | Start new chat, Toggle theme |
 | Shell and Tasks gates pinned on for one page | `Files, Git, Browser, Shell, Tasks, Roadmap …` |
 | `Go to Browser` | lands on the Browser pane, `activeTab` stays `browser`; with the feature stubbed off, "Browser is disabled"; no snap-back after a reload and a project pick |
@@ -18007,11 +18011,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useBoar
 
 ## MAN-10051 — Bugs view faces — the Board | Dashboard | Proposed features strip, src/modules/kanban/dashboard/ and proposed/, their live reads and presses
 
-The Bugs view has three faces, switched by a strip under its header (`kanban.faces.*`): Board (the lane rail), Dashboard (how the board stands) and Proposed features. State: 2026-11-19, all three live: Board, Dashboard over `GET /api/kanban-dispatch/dashboard` (MAN-10052) with its Hunters section over the answer's `hunts` part, and Proposed features over `GET /api/kanban-dispatch/proposals`.
+The Bugs view has three faces, chosen at its foot (`BugFoot.tsx`, `kanban.faces.*`): Board (the cards as slots on the hoop round the board's core, `BugInstrument.tsx`), Dashboard (how the board stands) and Proposed features. State: 2026-11-19, all three live: Board, Dashboard over `GET /api/kanban-dispatch/dashboard` (MAN-10052) with its Hunters section over the answer's `hunts` part, and Proposed features over `GET /api/kanban-dispatch/proposals`.
 
 ## Faces — `KanbanPanel.tsx`
 - `face` (`'board' | 'dashboard' | 'proposed'`, `'board'` on every arrival), `proposalsView` (`ProposalsView`: `scope`, `state`, default `board`/`open`) and `dashboardView` (`BugDashboardView`: `scope` `'board'|'all'`, `days` `7|30|90`, default `board`/30) are panel state. why: a visit to the Board face or a board switch keeps the dashboard's scope and window; neither is remembered across visits.
-- `KanbanBoardFace.tsx` is the rail and its autonomy-off banner, moved out of the panel.
 - The Dashboard tab's count (`openHigh`) is the open board's open High cards, counted off the cards the panel already holds (`board.cardIds` of every lane but Done, `board.summaryOf(id).priority`), so the Board face asks for no dashboard read; none while the lanes load, no pill at 0.
 - `openDashboardCard(cardId, boardId)` (a dashboard row's press, and a stopgap's or a sent-back proposal's card on the Proposed features face): selects `boardId` when it is not the open board, turns to the Board face, and `board.openCardOn(boardId, cardId)` (`useKanbanLanes`): the selection is held WITH its board, so it shows the moment that board is open.
 
@@ -18030,9 +18033,9 @@ The Bugs view has three faces, switched by a strip under its header (`kanban.fac
 - `DashboardHunters.tsx` (tonight's line, the two night presses, per-hunter groups), `DashboardHunterSkips.tsx`, `DashboardHunterNights.tsx`: the Hunters section, after the regression cases; see "Hunters section".
 - Wire types: `src/shared/types.ts` under `BUG DASHBOARD`; `KanbanStats` / `KanbanChangelogEntry` from the kanban types (MAN-10033).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanBoardFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/proposed/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/dispatcherAnswer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/BugFoot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/BugInstrument.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/proposed/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/dispatcherAnswer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-## MAN-10069 — Bugs view faces — the Board | Dashboard | Proposed features strip — The read — `useBugDashboard`
+## MAN-10069 — Bugs view faces — the Board | Dashboard | Proposed features strip — The read —
 section: Bugs view faces — the Board | Dashboard | Proposed features strip, src/modules/kanban/dashboard/ and proposed/, their live reads and presses/001 The read — `useBugDashboard`
 
 - One `api.kanban.dashboard(scope, days)` on mount and on a change of scope or window; again on any `kanban_event` frame (`useWebSocket().subscribe`; any board, since All boards and the house parts are not one board's) and on each new `DISPATCHER_ALL_TOPIC` value (`useLiveTopic`; the value present at mount is not news). No timer.
@@ -18047,9 +18050,9 @@ section: Bugs view faces — the Board | Dashboard | Proposed features strip, sr
 - `ProposalPromoteDialog` reads `api.roadmap.picture()` (`GET /api/roadmap`) each time it opens and flattens roadmaps → milestones → epics in their own order to `ProposalEpicChoice` (`arc` = the epic's `name`); epics under no milestone (`unplaced`) are left out. Try again re-reads. The kit's `Select` has no group headers: the hint says `roadmap · milestone`.
 - A stopgap's card and a sent-back proposal's card are presses through `openDashboardCard`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanBoardFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/proposed/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/dispatcherAnswer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/BugInstrument.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/proposed/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/dispatcherAnswer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-## MAN-10070 — Bugs view faces — the Board | Dashboard | Proposed features strip — Hunters section — the presses in `BugDashboard.tsx`
+## MAN-10070 — Bugs view faces — the Board | Dashboard | Proposed features strip — Hunters section — the presses in
 section: Bugs view faces — the Board | Dashboard | Proposed features strip, src/modules/kanban/dashboard/ and proposed/, their live reads and presses/002 Hunters section — the presses in `BugDashboard.tsx`
 
 - `hunts` is `reading.answer.hunts` (`dispatcher hunt status --json`); an `ok: false` part says its sentence and draws nothing. The next-night line says "by the server's clock" (`kanban.dashboard.hunters.tonight.next`), because `hunt status` gives `start` as the box's local `HH:MM`, not an instant.
@@ -18067,7 +18070,7 @@ section: Bugs view faces — the Board | Dashboard | Proposed features strip, sr
 ## Verify
 The Bugs view on the dev server (`:5183`) through `withPage` (`cases/lib/app.mjs`) at 1440×900 and 390×844: Dashboard tab, All boards, `[data-bug-dashboard="ready"]` with `aria-busy="false"`; at 390 every press of the face is ≥ 44 px. 2026-11-19: no page errors; an oldest row opened its card's drawer on the Board face. Proposed features, 2026-11-20 on the live store: a proposal filed by `bug propose` from a chat-shaped shell drew on All boards (tab count 1); the promote dialog listed the 73 epics `dispatcher roadmap show` holds on milestones; the face's Dismiss press ended the proposal and the face redrew empty; a second dismiss through the route answered 409 `REFUSED bug proposal dismiss: "<title>" is already dismissed`. Hunters: the live `hunts` part drew every hunter and project; `hunts/reopen` of an unmade pass answered 409 with the dispatcher's sentence.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanBoardFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/proposed/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/dispatcherAnswer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useKanbanWalks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/KanbanPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/proposed/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/dispatcherAnswer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
 ## MAN-10052 — kanban-dispatch dashboard route — GET /api/kanban-dispatch/dashboard: the board's stats and changelog beside the house's cases and tickets stats and the bug hunters' report
 
@@ -18096,3 +18099,127 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/dashboard/, /
 `GET /api/kanban-dispatch/dashboard?board=all&days=30` with the checks token (`api` in `cases/lib/app.mjs`): 200, `cases.ok`, `tickets.ok` and `hunts.ok` true; `?board=b-nope` is 404.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.dashboard-hunts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.dashboard-parts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.dashboard.ts
+
+## MAN-10105 — src/modules/analytics/ — the client frame: AnalyticsPanel, AnalyticsSectionFrame, the section registry, the Code Mode section
+
+## src/modules/analytics/ — the client frame: panel, section frame, registry, the Code Mode section
+
+The Analytics area's client half. The server half is MAN-10102 (`/api/analytics`); the wire types are `src/shared/analytics-types.ts`. The pane draws from the kit (`Rule`, `SegmentedControl`, `Spinner`, `EmptyState`, `Button`, `Banner`; MAN-569) and reads through `hooks/useAnalyticsSection.ts`, which calls `api.analytics.section(id, days)` (`src/shared/api.ts`, beside `api.analytics.sections()`). The Code Mode section (`sections/code-mode/`) reads `useAnalyticsSection<CodeModeAnalytics>('code-mode', days, narrow)` once inside `AnalyticsSectionFrame` and hands parts of the one answer to four parts that fetch nothing: Compare (`kinds`, `groups`, `rollups`), Outcomes (the Code Mode rollups), Causes (`causes`, `faults`) and Trend (`series`, `kinds`, `first_day`, `today`, `days`). Every figure is the verb's: the screen takes no median and holds no list of kinds (the labels are `kinds[].label`); `codeModeFigures.ts` only derives shares and differences of those figures, the plot's day list, and durations and token counts as words.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsSectionFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeCauses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeCompare.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/codeModeFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeOutcomes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeTrend.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/types.ts
+
+## MAN-10106 — src/modules/analytics/ — the client frame: AnalyticsPanel — File
+section: src/modules/analytics/ — the client frame: AnalyticsPanel, AnalyticsSectionFrame, the section registry, the fake read and its states/001 File
+
+| File | Holds |
+|---|---|
+| `index.ts` | the barrel: `AnalyticsPanel`, `lazy` (its own chunk). `WorkspaceMain.tsx` imports it for the `analytics` pane. |
+| `AnalyticsPanel.tsx` | `AnalyticsPanel()`: `Rule` level 2 (`analytics.title`), then the head, then the chosen section's `Body` in a `Suspense`. Head = two `SegmentedControl`s on one wrapping row: sections (one option per `ANALYTICS_SECTIONS` row) and windows (the chosen row's `windows`, `analytics.head.days`). The head sits outside the `Suspense` and the frame, so both controls stand in every state. Suspense fallback = `Spinner` with `analytics.frame.reading`, `data-analytics-frame="opening"`. Root `section[data-analytics-panel=<id>]`. |
+| `AnalyticsSectionFrame.tsx` | `AnalyticsSectionFrame<T>({ reading, refresh, takenAt, children })`; `children: (data: T) => ReactNode`, `takenAt: (data) => epoch seconds`. Draws the four states below. |
+| `types.ts` | `AnalyticsReading<T>` = `{status:'loading'}` \| `{status:'unreachable'}` \| `{status:'ready', data: T, stale: boolean}`; `AnalyticsChoice` = `{ section: string; days: number }`. |
+| `sections/registry.ts` | `AnalyticsSection` = `{ id, titleKey, windows, defaultDays, Body }` (`Body` is `lazy`, takes `{ days }`); `ANALYTICS_SECTIONS`, one row today: `'code-mode'`, windows 7/30/90, default 30, title key `analytics.sections.codeMode`. |
+| `sections/code-mode/CodeModeSection.tsx` | `CodeModeSection({ days })`: reads `useAnalyticsSection<CodeModeAnalytics>('code-mode', days, narrow)` once (`narrow`, beside it, checks the top-level keys by type and carries the rows as the verb printed them), wraps the answer in the frame with `takenAt = answer.generated_at`. Inside, `CodeModeAnswer` draws, in order: the notes (`div[data-code-mode-notes]`, only when one is true: an info `Banner` `analytics.codeMode.historyStarts` while `daysCovered` is under the window; the `uncounted` kinds' labels in muted ink), then the four parts. `groups` empty ⇒ one `EmptyState` and no part: `analytics.codeMode.empty.noHistory*` when `first_day` is null, else `analytics.codeMode.empty.title`/`message`. |
+| `sections/code-mode/CodeModeCompare.tsx` | `CodeModeCompare({ kinds, groups, rollups })`, `[data-code-mode-compare]`: four `Readout`s (ended ok, turns, tokens, time of the median launch with Code Mode, each with the figure without and the signed share), then a `DataTable` of with/without pairs (all kinds, then each kind). Toggles: Median \| Total, All models \| Each model. |
+| `sections/code-mode/CodeModeOutcomes.tsx` | `CodeModeOutcomes({ kinds, rollups, days })`, `[data-code-mode-outcomes]`: scripts as a `Readout`; threw, sent again, refused, failed, to merger, merged, declined as `KeyValueList` rows with their share of scripts; per kind in a `DataTable`. `rollups` = the Code Mode rows with `model === null`. |
+| `sections/code-mode/CodeModeCauses.tsx` | `CodeModeCauses({ causes, faults, kinds })`, `[data-code-mode-causes]`: total, then families ranked, each a `Collapsible` row opening to its top sentences (first open), then the count worded otherwise and the unlisted. |
+| `sections/code-mode/CodeModeTrend.tsx` | `CodeModeTrend({ series, kinds, firstDay, today, days })`, `[data-code-mode-trend]`: `DayBars` with two series; `SegmentedControl` launches/turns/tokens/time/failures; `Select` for the kind; the days as a folded `DataTable` under the plot. |
+| `sections/code-mode/codeModeFigures.ts` | the figures seam shared by the four parts: `shareWords`, `ratio`, `difference`, `pointsDifference`, `durationWords`, `tokenWords`, `measureWords`, `dayList`, `daysCovered`, `restOf`; types `Worded`, `Difference`, `TrendMeasure`, `TrendDay`, `TrendSpan`; `PLOT_UNIT`. Pure, and only shares and differences of the verb's figures: a share to a tenth under 10% and whole from there, "under 0.1%" for a part too small to draw, null with no whole; the difference with against without as a signed whole percent (0% never worse); points as the two shares AS DRAWN subtracted; the day list from the later of the window's start and `first_day` to `today`, a day with no row as zeros, dates counted as UTC calendar days so a clock change loses none; durations in two units at most (s, m s, h m, d h); tokens in three figures at most (k, M, B), in the reader's locale. |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsSectionFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeCauses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeCompare.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/codeModeFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeOutcomes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeTrend.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/types.ts
+
+## MAN-10107 — src/modules/analytics/ — the client frame: AnalyticsPanel — Frame states — `AnalyticsSectionFrame`
+section: src/modules/analytics/ — the client frame: AnalyticsPanel, AnalyticsSectionFrame, the section registry, the fake read and its states/002 Frame states — `AnalyticsSectionFrame`
+
+| `reading` | Draws | `data-analytics-frame` |
+|---|---|---|
+| `loading` | `Spinner`, `analytics.frame.reading` | `loading` |
+| `unreachable` | `EmptyState` (`CloudOff`, `analytics.frame.unreachable`, action `analytics.frame.tryAgain` → `refresh`) inside `role="alert"` | `unreachable` |
+| `ready`, `stale:false` | taken line (`role="status"`) + `Refresh` button + the section | `ready` |
+| `ready`, `stale:true` | the numbers stay; the status line says `analytics.frame.newer` in the taken line's place; `Refresh` `busy`; the section wrapper alone gains `aria-busy` | `stale` |
+
+- Taken line: `takenToday` ({{time}}) when the day is today, else `takenOn` ({{date}}, {{time}}); formatted with `Intl.DateTimeFormat(i18n.language)`.
+- Both sentences always lie in one grid cell (col 1, row 1); the unspoken one is `aria-hidden` and `invisible`. why: the row is as tall in both states, so `Refresh` and the section never move at any width.
+- `Refresh` is 44 px tall on touch (`finger:h-11`).
+
+### Words
+
+- Under `analytics.` in `src/modules/i18n/locales/en/common.json`, asked by key through `useTranslation('common')`: `title`; `head.{sections,window,days}`; `sections.codeMode`; `frame.{reading,unreachable,tryAgain,takenToday,takenOn,newer,refresh}`; `codeMode.*` (the Code Mode section's own words).
+- `lyphecli` case `analytics-module-words-are-en-common-json-values-under-analytics-asked-by-key` checks every key the module asks exists.
+
+### The read — `hooks/useAnalyticsSection.ts`
+
+- `useAnalyticsSection<T>(id, days, narrow: (data: unknown) => T | null)` → `{ reading: AnalyticsReading<T>, refresh }`. One read of `GET /api/analytics/<id>?days=<days>`; the envelope must name the section asked and carry `days` and `data`; `data` goes through `narrow`, and a null from it, a non-2xx, a thrown fetch or a wrong envelope are all `unreachable`. `narrow` must be total (never throw).
+- Reads on mount, on a change of `id` or `days`, on `refresh`, and on `visibilitychange` to visible. No timer. why: told, never asking on a clock (useBugDashboard's rule).
+- A read already out turns further asks into ONE owed read; an answer to a question no longer asked is never drawn; a newer answer replaces the drawn one whole (`stale: true` while it is out). The pattern is `useBugDashboard`'s.
+
+### The kept choice — `AnalyticsPanel.tsx`
+
+- `{ section, days }` in `localStorage['analytics-view']`, written at each press. On mount: a stored id the registry lacks, a window its section does not offer, unparseable JSON or storage that refuses all fall to `ANALYTICS_SECTIONS[0]` and its `defaultDays`.
+- Pressing a section opens it on its own `defaultDays`; pressing the open one changes nothing. Pressing a window keeps the section.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsSectionFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeCauses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeCompare.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/codeModeFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeOutcomes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeTrend.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/types.ts
+
+## MAN-10108 — src/modules/analytics/ — the client frame: AnalyticsPanel — Where the place stands
+section: src/modules/analytics/ — the client frame: AnalyticsPanel, AnalyticsSectionFrame, the section registry, the fake read and its states/003 Where the place stands
+
+| piece | fact |
+|---|---|
+| `AppTab` (`src/shared/types.ts`) | `'analytics'`, after `'cerberus'` |
+| `VALID_TABS` (`useProjectsState.ts`) | `'analytics'`, after `'cerberus'` |
+| rail (`useWorkspaceViews.ts`) | `HOUSE_VIEWS` `{ id: 'analytics', group: 'house', icon: ChartLine, keywords: 'analytics stats statistics numbers code mode trends' }`, directly after Cerberus; ungated; label `tabs.analytics` = "Analytics" (en only: no other locale spells `tabs.schedules`) |
+| pane (`WorkspaceMain.tsx`) | `activeTab === 'analytics'` → `<div className="h-full overflow-hidden"><AnalyticsPanel /></div>`, after Cerberus, inside the file's `Suspense`, no gate |
+| palette | "Go to Analytics", listed with the wheel's places (it is in `PLACE_VIEWS`, ProjectCommandPalette.tsx). The palette does not open from the landing page: a hand enters another view first |
+| wheel | a place on the outer ring, slot 2 between Cerberus and Inbox (`PlacesWheel.tsx` `SLOT`; the ring holds eight, its bearings in MAN-10115): `PlaceId` `'analytics'`, its `SCREEN_PLACES` row and `pick('analytics')` in `PlacesContext.tsx`, wearing its view's ChartLine and `tabs.analytics` |
+| rail badge | none |
+| `CodeModeSection.tsx` | reads the real route through `useAnalyticsSection<CodeModeAnalytics>('code-mode', days, narrow)`; Refresh and Try again ask again |
+| the four parts | each toggle is held in the part's own state for the visit: Compare Median \| Total and All \| Each model; Causes a family's fold and Show all; Trend the measure, the kind and the day table's fold |
+| `codeModeFigures.ts` | the real derivations (MAN-10106) |
+
+**Adding a section, whole.** Server: (1) `server/modules/analytics/sections/<id>.ts`, a reader `(days) => Promise<data>` calling the owning module's door, and its row in `sections/index.ts` (MAN-10102); (2) the answer's type in BOTH `server/shared/analytics-types.ts` and `src/shared/analytics-types.ts`, key for key. Client: (3) `sections/<id>/` with a `Body` that calls `useAnalyticsSection<YourType>('<id>', days, narrow)` once and draws inside `AnalyticsSectionFrame`, and its row in `sections/registry.ts`; (4) its words under `analytics.` in `en/common.json`. Candidates already drawn elsewhere: the Bugs dashboard (`GET /api/kanban-dispatch/dashboard`), the API view's DeepSeek and Jev spend by day, the accounts widget's usage, the heal numbers.
+
+**The client half in detail.** (1) Write `sections/<id>/<Id>Section.tsx`: `({ days }) =>` an `AnalyticsSectionFrame` with its read, `takenAt` and a render of the data. (2) Add its row to `ANALYTICS_SECTIONS` (id = the server reader's id, `windows`, `defaultDays`, `Body` lazy). (3) Add `analytics.sections.<id>` and its words to `en/common.json`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsSectionFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeCauses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeCompare.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/codeModeFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeOutcomes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/code-mode/CodeModeTrend.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/types.ts
+
+## MAN-10115 — The R&D place — the panel, its views, dialogs and settings sheet: where each piece lives, the contracts the fill feeds
+
+The R&D place: a panel of candidates (things the scout found) in four views, an Opening for the open one, two dialogs and a settings sheet. Composed from the kit (`src/shared/ui`) and `AgentLaunchChoice` (MAN-7420); no component kind of its own. Shape types: `src/shared/rnd-types.ts` (`RndPicture`, `RndCandidate`, `RndWord`, `RndSettings`, `RndSource`, `RndScoutOut`, `RndScoutLast`, `RndStanding`).
+
+## where each piece lives — `src/modules/rnd/`
+| file | role |
+|---|---|
+| `RndPanel.tsx` | the wired root, `RndPanel({ projectPath })`: reads `useRnd`, `useRndWrites`, `useRndLaunch`, `useRndEpics`; Open chat and the spike's landing are `useStationDoors().openChatInWorkspace` (the wheel's goChat); stamps `rnd.lastSeenAt` at each new picture while shown |
+| `CandidateRow.tsx`, `CandidateOpening.tsx`, `AdoptDialog.tsx`, `RejectDialog.tsx`, `RndSettingsSheet.tsx` | pure views: props in, no hooks of their own to the server |
+| `rndWords.ts` | `RND_VIEWS`, `RndView`, `WORD_TONE`, `rowsOf`, `countOf`, `scoutLine`, `hostOf`, `OPENING_WIDTH_PX` (440), `OPENING_BESIDE_PX` |
+| `RndFeed.tsx` | the lane's feed, mounted once in `App.tsx` inside `RoadmapFeed`: seeds from `GET /api/rnd`, takes `rnd_state` frames, re-seeds on `websocket_reconnected` (RoadmapFeed's rule), publishes `rnd:all` (`RND_ALL_TOPIC`, live-bus topics.ts); a failed read is said through `useRnd`'s failure, and the next frame or read takes it back |
+| `hooks/useRnd.ts` | the picture off the bus, the feed's failure sentence, Try again (the feed's own read) |
+| `hooks/useRndWrites.ts` | every press, one `api.rnd` call each (src/shared/api.ts); `busy` and `refusal {where, sentence}`; a landed write's dispatcher line is a toast; nothing optimistic, the frame redraws |
+| `startSpikeChat.ts` | posts the spike route, sends `chat.send` {provider claude, the answered model, bypassPermissions, skipPermissions true} and `chat.subscribe` (git-delegation/startRun.ts's two frames), then goChat; a refusal is `SpikeRefusal` with the server's sentence; no open project is refused before the call |
+| `hooks/useRndLaunch.ts` | the census rows `rnd.scout`, `rnd.spike` (kind `rnd` in `AgentLaunchRow`) as the sheet's slots, read from `GET /api/agent-launch` and replaced by the census a save answers; saves through `api.agentLaunch.saveRow`. Agent Chains lists kind `soul` only, so the rows are the sheet's alone |
+| `hooks/useRndEpics.ts` | the Adopt dialog's epics from the roadmap picture (`useRoadmap`): each roadmap's milestones' epics in order, then the unplaced under "No milestone" |
+| `hooks/useRndSeen.ts` | `rnd.lastSeenAt` (localStorage) and `useRndMark`: the wheel's mark, lit (owed) while a candidate is proved or one was filed after the stamp |
+| `weeklyWords.ts`, `rndWire.ts`, `lazyRndTab.ts`, `index.ts` | the cron line in words (`sayWeekly`: "Mondays at 06:30"); the answer readers (`readBody`, `sentenceOf`); the lazy pane; the barrel (`RndFeed`, `RndTab`, `useRndMark`) |
+| `en/common.json` | the `rnd` block and `tabs.rnd`; English only, other languages fall back |
+
+## on the wheel
+`'rnd'` is an `AppTab` and a `PlaceId`. `SCREEN_PLACES` and the places list (PlacesContext.tsx) put it first on the outer ring, before Cerberus; the rail's plans run carries it (FlaskConical, `tabs.rnd` "R&D"); it is in `VALID_TABS` and `PLACE_VIEWS`; `WorkspaceMain` renders `RndTab` ungated, in a Suspense, with the open project's path. PlacesWheel's outer ring holds eight: slots rnd 0, cerberus 1, analytics 2, inbox 3, api 4, universe 5, schedules 6, settings 7; bearings at the desk 0, 45, 90, 135, 180, 225, 270, 315 (half 22.5), on the fan 9.75, 29.25, 48.75, 68.25, -68.25, -48.75, -29.25, -9.75 (half 9.75).
+
+## contracts the fill feeds
+- `busy`: `'scout'`, `'settings'` or a candidate's name.
+- `refusal`: `{where, sentence}`, `where` one of those same three.
+- A dialog closes itself when its candidate's word moves on; the Opening closes when its candidate leaves the view. No handler closes anything.
+- `RndLaunch` (`RndSettingsSheet.tsx`) = `Record<'scout'|'spike', {model, effort}>`, each an `RndLaunchSlot` `{choices, current, pinned, defaultWord}`.
+- `RndEpicChoice` (`AdoptDialog.tsx`) = `{name, title, milestone}`.
+- Ages: `formatRelativeTime`; the weekly time in words is `sayWeekly` (`weeklyWords.ts`).
+
+## rules that bite
+| rule | why |
+|---|---|
+| Views are `waiting`, `spiking`, `verdicts`, `rejected`; under 640 px the count sits inside the word (`Waiting 6`), above it a pill | four words and four pills do not fit 390 px; the kit cuts the word |
+| The Opening stands beside the list from 63rem of room; under that and not a phone, the kit's Opening covers the list's right part | the kit's fallback |
+| Colour: Proved is the one green, Spiking info, the rest neutral; Reject is quiet, never red | Bring back undoes it |
+| Scout now is an outline; the open candidate's main act is the one filled press | one filled press |
+| Acts stand before the evidence; Spike started is shown on a spiking candidate | the only sign of a spike that never answered |
+| Settings sheet focus: Remove → Undo takes focus; Undo → that source's Remove (found by `data-rnd-source`); line closed → the Add field (`data-rnd-add-source`); a refused removal moves nothing | focus never falls to the page |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/PlacesContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/places/PlacesWheel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/AdoptDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/CandidateOpening.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/CandidateRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndEpics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndSeen.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRnd.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/lazyRndTab.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RejectDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndSettingsSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/rndWire.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/rndWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/startSpikeChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/weeklyWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/rnd-types.ts

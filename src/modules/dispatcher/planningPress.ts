@@ -23,7 +23,7 @@ import type {
  * feature has a line, and whether it reads paused), and by `featurePress` below.
  */
 export function planningPausedVia(plan: DispatcherPlan, epic: DispatcherArc | null): PlanningPausedVia | null {
-  if (plan.status === 'complete') return null;
+  if (plan.status === 'complete' || plan.status === 'gaps') return null;
   if (plan.planning_paused) return 'own';
   return epic?.planning_paused ? 'epic' : null;
 }
@@ -50,7 +50,7 @@ export function planningPausedVia(plan: DispatcherPlan, epic: DispatcherArc | nu
  * Used by `planningLines`, for a feature's line.
  */
 export function featurePress(plan: DispatcherPlan, epic: DispatcherArc | null): PlanningPress | null {
-  if (plan.status === 'complete') return null;
+  if (plan.status === 'complete' || plan.status === 'gaps') return null;
   const heldBy = planningPausedVia(plan, epic);
   if (heldBy === 'own') return 'resume';
   if (heldBy === 'epic') return null;

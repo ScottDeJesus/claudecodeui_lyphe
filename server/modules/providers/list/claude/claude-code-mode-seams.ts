@@ -88,7 +88,7 @@ function rebuildLaunch(answer: unknown): ChatCodeModeLaunch | null {
  */
 export async function askCodeModeLaunch(
   context: CodeModeContext,
-  input: { appSessionId: string | null; onNode: boolean; cwd: string; servers: Record<string, unknown> },
+  input: { appSessionId: string | null; onNode: boolean; cwd: string; servers: Record<string, unknown>; compactionSeed: boolean; model?: string },
   deadlineMs = LAUNCH_DEADLINE_MS
 ): Promise<ChatCodeModeLaunch> {
   const off = (message: string): ChatCodeModeLaunch => {

@@ -80,6 +80,7 @@ import { createCompanionModule } from './modules/companion/index.js';
 import { createChatNamer } from './modules/chat-names/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
+import { createAnalyticsModule } from './modules/analytics/index.js';
 import { createAgentLaunchModule } from './modules/agent-launch/index.js';
 import { createJevModule } from './modules/jev/index.js';
 import { createAffectedAreasModule } from './modules/affected-areas/index.js';
@@ -93,6 +94,7 @@ import { dispatcherBin } from './shared/dispatcher-command.js';
 import { createDispatcherStoreWatch } from './shared/dispatcher-store-watch.service.js';
 import { endOpenEventStreams } from './shared/shadow-connector-lane-stream.js';
 import { createRoadmapModule } from './modules/roadmap/index.js';
+import { createRndModule } from './modules/rnd/rnd.module.js';
 import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
@@ -391,6 +393,9 @@ app.use('/api/dispatcher', authenticateToken, dispatcher.router);
 // writes (protected). Built once here for the dispatcher's reason: its lane starts after `listen`.
 const roadmap = createRoadmapModule(dispatcherStoreWatch);
 app.use('/api/roadmap', authenticateToken, roadmap.router);
+// R&D — the roadmap lane's twin behind the `rnd_state` frame, and the relay for the place's writes (protected).
+const rnd = createRndModule(dispatcherStoreWatch);
+app.use('/api/rnd', authenticateToken, rnd.router);
 
 // The board and the dispatcher, joined (protected): the board tells the dispatcher what a person did to a card of a
 // self-running board (`dispatcher card told`), and applies the notes the dispatcher's card walks owe the board, poked by
@@ -405,6 +410,11 @@ app.use('/api/kanban-dispatch', authenticateToken, kanbanDispatch.router);
 // for `listen` or a shutdown to start or stop.
 const heal = createHealModule();
 app.use('/api/heal', authenticateToken, heal.router);
+
+// The Analytics area: one reader per section, each asking the module that owns its numbers. Inline for
+// heal's reason: no timer, no socket.
+const analytics = createAnalyticsModule();
+app.use('/api/analytics', authenticateToken, analytics.router);
 
 // The launch table — the model and effort every soul, the card sorter and the tweak builder launch at — and the doors that pin a
 // row or move a default (protected: a save regenerates the shims every session reads). Built inline
@@ -862,6 +872,7 @@ async function startServer() {
             dispatcherStoreWatch.start();
             dispatcher.start();
             roadmap.start();
+            rnd.start();
             kanbanDispatch.start();
 
             // The Claude update check: armed here rather than at module build, because its first
@@ -928,6 +939,7 @@ async function startServer() {
             stopChatCompaction();
             dispatcher.stop();
             roadmap.stop();
+            rnd.stop();
             kanbanDispatch.stop();
             dispatcherStoreWatch.stop();
             claudeUpdates.stop();

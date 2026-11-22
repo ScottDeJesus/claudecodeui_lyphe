@@ -1,7 +1,7 @@
 // protects: server/modules/code-mode/code-mode.service.ts, server/modules/code-mode/code-mode.module.ts, server/modules/database/repositories/session-user-state.db.ts
 // writes: none
 //
-// A chat keeps the mode it was started in. The first launch of a chat whose code_mode is NULL asks the house verb
+// Between compactions a chat keeps its mode. The first launch of a chat whose code_mode is NULL asks the house verb
 // with no --born, so the chats switch decides, and the module stores that answer; every later launch passes the
 // stored word as --born, which the verb obeys before it reads the switch. So a chat started while the switch was off
 // stays off when the operator turns it on.

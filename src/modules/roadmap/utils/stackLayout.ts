@@ -53,6 +53,7 @@ function featureOfPlan(plan: DispatcherPlan): RoadmapFeature {
   const { status } = plan;
   const word: RoadmapFeature['word'] = status === 'complete' ? 'shipped' : status === 'idle' || status === 'parked' ? 'designing' : 'in flight';
   const step: RoadmapFeature['step'] = status === 'complete' ? 'shipped'
+    : status === 'gaps' ? 'gaps'
     : status === 'live' ? 'building'
       : status === 'stalled' ? 'stalled'
         : status === 'paused' || (status === 'scheduled' && plan.launched) ? 'paused'

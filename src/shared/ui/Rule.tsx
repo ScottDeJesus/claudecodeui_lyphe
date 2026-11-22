@@ -27,7 +27,7 @@ type RuleProps = {
  * adds to it, so a section needs no second line of its own.
  *
  * Used by the kanban module's open bug (each of its sections) and its dashboard (each of its groups), and by the cerberus module's
- * Openings, its check sheet and its History.
+ * Openings, its check sheet and its History, and by the rnd module's open candidate and its settings sheet.
  */
 export function Rule({ children, id, level = 3, headingRef, end, endTone, className }: RuleProps) {
   const Heading = level === 4 ? 'h4' : level === 2 ? 'h2' : 'h3';

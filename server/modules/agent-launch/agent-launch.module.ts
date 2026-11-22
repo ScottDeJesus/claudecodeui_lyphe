@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import type { Router } from 'express';
 
+import type { AgentLaunchResult } from '@/shared/types.js';
 import { expandHome } from '@/shared/utils.js';
 
 import { createAgentLaunchRouter } from './agent-launch.routes.js';
@@ -41,4 +42,12 @@ function launchService(): AgentLaunchService {
  */
 export function createAgentLaunchModule(): AgentLaunchModule {
   return { router: createAgentLaunchRouter(launchService()) };
+}
+
+/**
+ * One launch-table row's Claude side as a launch would read it now, through the same CLI door the routes use. The R&D
+ * spike route asks `rnd.spike` here for the model its chat starts on, so the table stays the one home of that word.
+ */
+export function resolveLaunchRow(name: string): Promise<AgentLaunchResult<Record<string, unknown>>> {
+  return launchService().resolve(name, 'claude');
 }

@@ -4,7 +4,7 @@
 // holds it. The promise: two writes in the door's window both land.
 //
 // The window is made certain, not raced: the scratch home's HOME holds a stand-in crontab door at
-// ~/.claude/scripts/cron-registry-sync (the path `hunt_cron.door()` expands) that marks a file when it is called, waits
+// ~/.claude/scripts/cron-registry-sync (the path `cron_door.door()` expands) that marks a file when it is called, waits
 // two seconds and answers `add ok`. It writes no tab and no registry; the real door is never run, and the operator's
 // crontab is only read, to show it never moved.
 //

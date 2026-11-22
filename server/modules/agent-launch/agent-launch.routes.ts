@@ -6,10 +6,10 @@ import type { AgentLaunchService } from './agent-launch.service.js';
 
 /**
  * A row's name as the CLI takes one: a soul's slug, `sorter` or `tweak`, the shape `~/.claude/agents/<name>.md`
- * and the table's `[soul.<slug>]` share, or a hunt row, `hunt.<kind>`. It is NOT a whitelist of the souls that exist — a new soul
+ * and the table's `[soul.<slug>]` share, a hunt row, `hunt.<kind>`, or an R&D row, `rnd.<kind>`. It is NOT a whitelist of the souls that exist — a new soul
  * must not need an edit here — and the CLI answers a name it does not know in its own sentence.
  */
-const ROW_NAME = /^(?:hunt\.)?[a-z][a-z0-9_]{0,63}$/;
+const ROW_NAME = /^(?:(?:hunt|rnd)\.)?[a-z][a-z0-9_]{0,63}$/;
 
 /**
  * What a model word, an effort word or a model key may look like. This is a TOKEN fence and not the
@@ -164,7 +164,7 @@ export function createAgentLaunchRouter(
     // them; this route names one row, and anything that is not one string names no row.
     const name = request.params.name;
     if (typeof name !== 'string' || !ROW_NAME.test(name)) {
-      response.status(400).json({ error: 'a row name is lowercase letters, digits and underscores, beginning with a letter, optionally after `hunt.`' });
+      response.status(400).json({ error: 'a row name is lowercase letters, digits and underscores, beginning with a letter, optionally after `hunt.` or `rnd.`' });
       return;
     }
     const parsed = parseRowChange(request.body);

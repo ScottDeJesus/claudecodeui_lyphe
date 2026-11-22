@@ -83,7 +83,7 @@ import '@/shared/ui/verve/data.css';
 // at 220 lines; MANUAL rule 6).
 import '@/shared/ui/verve/readings.css';
 // astrolabe.css holds the paint of the design system's own objects, the Hoop's core, Track, Opening and Rule, and of Steps, Trace,
-// Choice and Files (`.ast-*`, every selector its own, every rule reading only tokens), so its place is as free as readings.css's.
+// Choice, Files, KeyValueList and Excerpt (`.ast-*`, every selector its own, every rule reading only tokens), so its place is as free as readings.css's.
 import '@/shared/ui/verve/astrolabe.css';
 
 export { ActionMenu } from '@/shared/ui/ActionMenu';
@@ -132,6 +132,9 @@ export { DockableFab } from '@/shared/ui/DockableFab';
 export type { DockableFabPosition } from '@/shared/ui/DockableFab';
 export { ResizeGrip } from '@/shared/ui/ResizeGrip';
 export { EmptyState } from '@/shared/ui/EmptyState';
+// Astrolabe's Excerpt in its still form: lines of text as they were written, numbered in the gutter, between two hairlines.
+// The rnd module's open candidate shows a spike's evidence with it.
+export { Excerpt } from '@/shared/ui/Excerpt';
 export { Field } from '@/shared/ui/Field';
 // Verve's §10 Media gallery: square photo tiles, each with its tag, the final tile collapsing the overflow into
 // "+N", the grey tile where a photo is missing. The affected-areas module draws a tour's panos with it.
@@ -144,6 +147,10 @@ export { HeldPage } from '@/shared/ui/HeldPage';
 export { Hoop } from '@/shared/ui/Hoop';
 export { hoopHeightFor, hoopMiddle, hoopWidthFor } from '@/shared/ui/hoopPainter';
 export { InstrumentCore } from '@/shared/ui/InstrumentCore';
+// The same things as a plain list under the core, run by run, for a set too crowded to read round a band; and the switch in a
+// screen's head between the two. The bug board and Cerberus's fleet offer it.
+export { HoopList } from '@/shared/ui/HoopList';
+export { HoopViewSwitch } from '@/shared/ui/HoopViewSwitch';
 // How often: a window's items by day (stacked clean / hiccup / test columns) and by local hour, each with its sentence. The
 // Cerberus tab's Uploads view draws it, handing in its own words as a key prefix.
 export { HowOften } from '@/shared/ui/HowOften';

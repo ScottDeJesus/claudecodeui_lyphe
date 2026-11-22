@@ -1,7 +1,7 @@
 // protects: server/modules/providers/list/claude/claude-runtime.provider.js, server/modules/providers/list/claude/claude-code-mode-seams.ts, server/modules/providers/list/claude/claude-toolset-seams.ts, server/modules/providers/list/claude/chat-process.ts
 // writes: none
 //
-// A chat keeps the mode it was born in, and a process keeps the mode it was LAUNCHED in. A process re-adopted after a
+// A chat keeps its mode until its next compaction, and a process keeps the mode it was LAUNCHED in. A process re-adopted after a
 // server restart is already running: its host recorded its launch profile (`codeMode` included), and nothing the
 // re-adopting server asks can change what that CLI holds. So where a tool-set sync sends a set's servers must follow
 // the process's recorded mode, not the house's answer at re-adoption: a Code Mode CLI's only MCP server is `cm`, and

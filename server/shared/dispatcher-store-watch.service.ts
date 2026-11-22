@@ -59,7 +59,7 @@ import { pacerHomeDir } from './utils.js';
  * therefore taken on `change` alone — and the daemon lock too, whose only write is its claim.
  */
 
-export type StoreWatchLane = 'status' | 'roadmap';
+export type StoreWatchLane = 'status' | 'roadmap' | 'rnd';
 
 /** A poke for these lanes, once a burst has gathered for this long. */
 type Poke = { kind: 'poke'; lanes: readonly StoreWatchLane[]; settleMs: number };
@@ -107,6 +107,11 @@ const SETTLE_MS = 300;
 const PACER_SETTLE_MS = 10_000;
 
 const BOTH_LANES: readonly StoreWatchLane[] = ['status', 'roadmap'];
+/**
+ * Every lane whose document is read from the store: the two above and the R&D lane (`rnd show --json`). The R&D picture
+ * reads no chain record, daemon lock or flag, so only a store write the board gate lets through and a re-armed watch poke it.
+ */
+const STORE_LANES: readonly StoreWatchLane[] = ['status', 'roadmap', 'rnd'];
 const STATUS_LANE: readonly StoreWatchLane[] = ['status'];
 
 /** The database and its WAL: written by every commit, a regression case's run among them. */
@@ -150,7 +155,7 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
   const dialWithFlags = path.resolve(stateRoot) === flagsDir;
   const transientDir = path.join(env.XDG_RUNTIME_DIR || `/run/user/${os.userInfo().uid}`, 'systemd', 'transient');
 
-  const pokes: Record<StoreWatchLane, Set<() => void>> = { status: new Set(), roadmap: new Set() };
+  const pokes: Record<StoreWatchLane, Set<() => void>> = { status: new Set(), roadmap: new Set(), rnd: new Set() };
 
   /** The one pending poke per lane: its due time and the timer that will fire it. */
   const pending = new Map<StoreWatchLane, { due: number; timer: NodeJS.Timeout }>();
@@ -206,8 +211,8 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
       dir,
       classify,
       onInterest: gather,
-      // A watch that was blind may have missed anything: both lanes read once more.
-      onRearm: () => mark(quickly(BOTH_LANES)),
+      // A watch that was blind may have missed anything: every lane reads once more.
+      onRearm: () => mark(quickly(STORE_LANES)),
       logError: (message) => logError(`[dispatcher store watch] ${message}`),
     });
 
@@ -244,7 +249,7 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
       if (sources.length > 0) return;
       gate = createBoardGate({
         read: readBoardVersion,
-        onMoved: () => mark(quickly(BOTH_LANES)),
+        onMoved: () => mark(quickly(STORE_LANES)),
         minGapMs: SETTLE_MS,
         logError: (message) => logError(`[dispatcher store watch] ${message}`),
       });

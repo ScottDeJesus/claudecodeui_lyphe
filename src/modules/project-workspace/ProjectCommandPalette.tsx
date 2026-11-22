@@ -14,7 +14,7 @@ import { useHomeShowing, useStationShowing } from '@/shared/context/StationLayer
 import type { AppTab, ChatDoor, PaletteGroup, PaletteNavRow } from '@/shared/types';
 
 /** The views that are places of the wheel's, listed with the places: the rest of the views follow them. */
-const PLACE_VIEWS: ReadonlySet<AppTab> = new Set<AppTab>(['runner', 'kanban', 'cerberus', 'inbox', 'api', 'universe', 'schedules']);
+const PLACE_VIEWS: ReadonlySet<AppTab> = new Set<AppTab>(['runner', 'kanban', 'cerberus', 'analytics', 'inbox', 'api', 'universe', 'schedules', 'rnd']);
 
 /**
  * Rendered by WorkspaceFrame to bind this module's project state, and the chat's door, to the

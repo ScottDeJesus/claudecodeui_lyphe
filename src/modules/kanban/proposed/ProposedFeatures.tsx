@@ -18,7 +18,8 @@ import { Banner, ConfirmDialog, EmptyState, Opening, SegmentedControl, Spinner }
  * THE PROPOSALS ARE THE INSTRUMENT'S SECOND SET. The board's core stays in the middle and the slots on the hoop round it are the
  * proposals (`utils/proposalHoop`, drawn by the panel): Open first, every square the accent and breathing, because each is owed your
  * word; then what has ended, when all are asked for. A press on the slot at the front opens that proposal, hung from it
- * (`ProposalOpening`, in the kit's Opening), read down to your call.
+ * (`ProposalOpening`, in the kit's Opening), read down to your call. With the head's switch on the list, the same proposals are rows
+ * under the core, run by run, and a press on a row opens it on the row's right (`side`).
  *
  * TWO CONTROLS, AND THEY STAY PUT. Which boards (this one, or all) and which proposals (the open ones, or all) stand at the head
  * of the face in every state, a spinner and a failure included. What they are set to is the panel's, so it survives a visit to
@@ -57,13 +58,15 @@ type ProposedFeaturesProps = {
   anchor: () => AstrolabePoint | null;
   /** The instrument's box: the Opening stands clear of it where the room allows. */
   avoid: () => { left: number; right: number } | null;
+  /** The side the open proposal opens on: the right of its row while the proposals are a list; absent, whichever side has room. */
+  side?: 'right';
 };
 
 /** The question asked over the open proposal: which of the three answers is being given. */
 type Asking = { id: number; act: 'promote' | 'send-back' | 'dismiss' };
 
 /** Rendered by KanbanPanel while its face is the proposed features. Nothing else mounts it. */
-export function ProposedFeatures({ view, onView, reading, onRetry, onOpenCard, home, openId, onOpen, anchor, avoid }: ProposedFeaturesProps) {
+export function ProposedFeatures({ view, onView, reading, onRetry, onOpenCard, home, openId, onOpen, anchor, avoid, side }: ProposedFeaturesProps) {
   const { t } = useTranslation();
   // The question open over the Opening, by the proposal's id: the proposal itself is read from the newest answer, so a proposal
   // that has ended elsewhere closes its question instead of asking about one that is gone.
@@ -190,6 +193,7 @@ export function ProposedFeatures({ view, onView, reading, onRetry, onOpenCard, h
         title={opened?.title}
         status={status}
         width={360}
+        side={side}
         marks={{ 'data-proposal': opened === undefined ? '' : String(opened.id), 'data-proposal-state': opened?.state ?? '' }}
       >
         {opened !== undefined && (

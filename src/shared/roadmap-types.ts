@@ -30,8 +30,8 @@ export type RoadmapFeatureWord = 'idea' | 'proposed' | 'designing' | 'in flight'
 
 /**
  * The finer step under a feature's word. `designing` carries the steps `designing`, `questions`,
- * `cutting`, `parked` and `accept`; `in flight` carries `building`, `paused`, `queued`, `stalled`, `waiting`
- * and `starting`; every other word is its own step.
+ * `cutting`, `parked` and `accept`; `in flight` carries `building`, `paused`, `queued`, `stalled`, `waiting`,
+ * `starting` and `gaps` (every task done, a gap ticket still open); every other word is its own step.
  */
 export type RoadmapFeatureStep =
   | 'idea'
@@ -47,7 +47,8 @@ export type RoadmapFeatureStep =
   | 'paused'
   | 'stalled'
   | 'starting'
-  | 'shipped';
+  | 'shipped'
+  | 'gaps';
 
 /** An epic's (arc's) word. */
 export type RoadmapEpicWord = 'empty' | 'not started' | 'in progress' | 'complete';

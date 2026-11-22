@@ -87,6 +87,7 @@ export function AgentLaunchPanel({ onClose, titleId }: AgentLaunchPanelProps) {
           ? t('agentLaunch.refused.notSavedRow', { name: last })
           : t('agentLaunch.refused.notSaved');
   const reloadLabel = t('agentLaunch.reload');
+  // Souls alone: the R&D rows (kind 'rnd') are edited on the R&D place's own settings sheet, beside what they launch.
   const souls = census?.rows.filter((row) => row.kind === 'soul') ?? [];
   const pinnedSouls = souls.filter((row) => row.model_pinned || row.effort_pinned).length;
   // Sorter first, then tweak: the order a card meets them; a census without either draws no section.

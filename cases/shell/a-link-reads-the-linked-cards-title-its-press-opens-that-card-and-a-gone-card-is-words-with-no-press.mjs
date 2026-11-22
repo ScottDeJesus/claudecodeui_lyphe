@@ -9,7 +9,7 @@
 // gave". This case answers that card's detail itself with one more tag, regression-of: an id the board's routes answer
 // 404 for. Read at 390x844. Nothing is written.
 //
-// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/card-drawer/DrawerLinks.tsx, src/modules/kanban/card-drawer/KanbanCardDrawer.tsx, src/modules/kanban/utils/walkModel.ts, src/modules/kanban/utils/bugRings.ts
+// protects: src/modules/kanban/KanbanPanel.tsx, src/modules/kanban/card-drawer/DrawerLinks.tsx, src/modules/kanban/card-drawer/KanbanCardDrawer.tsx, src/modules/kanban/utils/walkModel.ts, src/modules/kanban/utils/bugHoop.ts
 // writes: none
 
 import { withPage } from "../lib/app.mjs";

@@ -71,10 +71,12 @@ type KanbanCardDrawerProps = {
   /** Opens another card in this sheet: a link's press. */
   onOpenCard: (cardId: string) => void;
   onClose: () => void;
-  /** Where the card's slot stands now, for the Opening to hang from: the board's hoop answers it each frame. */
+  /** Where the card's slot stands now, for the Opening to hang from: the board's hoop answers it each frame (or its list, its row). */
   anchor: () => AstrolabePoint | null;
   /** The board's instrument on the page: where the room allows, the card stands clear of it, so the hoop stays whole. */
   avoid: () => { left: number; right: number } | null;
+  /** The side the card opens on: the right of its row while the board is a list; absent, whichever side of its slot has room. */
+  side?: 'right';
   /** The board's lanes in their order: the card's course. */
   lanes: KanbanLaneSpec[];
   /** The lane the open card is in, by id, or null while the board does not hold it. */
@@ -100,7 +102,7 @@ type DrawerRead = {
 };
 
 /** Rendered by KanbanPanel, once, inside the board's scene. Nothing else mounts it. */
-export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOpenCard, onClose, anchor, avoid, lanes, laneId, status, onMove, onShift, onArchive, fresh }: KanbanCardDrawerProps) {
+export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOpenCard, onClose, anchor, avoid, side, lanes, laneId, status, onMove, onShift, onArchive, fresh }: KanbanCardDrawerProps) {
   const { t } = useTranslation();
   const { subscribe } = useWebSocket();
 
@@ -310,6 +312,7 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, walk, titleOf, onOp
       status={status ?? undefined}
       width={360}
       avoid={avoid}
+      side={side}
       marks={{ 'data-bug-opening': cardId ?? '' }}
     >
       {read.loading && (

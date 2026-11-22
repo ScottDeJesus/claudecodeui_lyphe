@@ -534,13 +534,23 @@ const addSessionToolsetsColumn = (db: Database): void => {
 };
 
 /**
- * Adds `sessions.code_mode`: whether a chat was started in Code Mode (1) or not (0). A chat keeps the mode it was started in, so its first launch writes the answer and every later launch reads it.
+ * Adds `sessions.code_mode`: the mode a chat's current conversation was started in, Code Mode (1) or not (0). A chat keeps it between compactions: its first launch writes the answer and every later launch reads it. A compaction starts a new conversation, so its seed launch is decided by the switch again, and the swap moves that answer in (`swapped_code_mode`).
  *
- * Nothing is backfilled: NULL means no word was stored. A chat with no word that already holds a conversation reads as born off (`sessionUserStateDb.getCodeMode`), so every chat that existed before this column keeps launching without Code Mode; only a chat's first launch is decided by the switch.
+ * Nothing is backfilled: NULL means no word was stored. A chat with no word that already holds a conversation reads as born off (`sessionUserStateDb.getCodeMode`), so every chat that existed before this column keeps launching without Code Mode until its next compaction; only a chat's first launch, and the launch that seeds a compaction, are decided by the switch.
  */
 const addSessionCodeModeColumn = (db: Database): void => {
   const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
   addColumnToTableIfNotExists(db, 'sessions', columnNames, 'code_mode', 'INTEGER');
+};
+
+/**
+ * Adds `sessions.swapped_code_mode`: the word on the other side of a compaction's swap. A compaction's seed launch writes the mode it decided for the session it starts (1 or 0; NULL when no answer could be stored); `swapToCompactedSession` trades it with `code_mode`, so the chat takes the new conversation's mode and the old conversation's word waits here for `unswapCompactedSession` to put back. No launch reads it.
+ *
+ * Nothing is backfilled: NULL on every existing chat, which a swap reads as "keep the chat's word".
+ */
+const addSessionSwappedCodeModeColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'swapped_code_mode', 'INTEGER');
 };
 
 /**
@@ -949,6 +959,7 @@ export const runMigrations = (db: Database) => {
     addSimpleListFolders(db);
     addSessionToolsetsColumn(db);
     addSessionCodeModeColumn(db);
+    addSessionSwappedCodeModeColumn(db);
     ensureProjectsForSessionPaths(db);
     // After the project rows exist: the rollout pin reads a chat's project to tell the feed's chats from the rest.
     addSessionPinnedColumn(db);

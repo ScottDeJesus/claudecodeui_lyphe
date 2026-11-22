@@ -3,8 +3,10 @@
 //
 // The board the house's own tickets land on: a board named House, made once through POST /api/kanban/boards over the
 // house's folders (/home/lyphe/.claude and this repo), its switch off, is kept. The proof board made beside it to walk
-// one ticket end to end (Ways in proof, the same two folders, its switch on) is archived once the proof is shown, so it
-// never outbids House for a ticket filed in those folders (boardForPath prefers a board that runs itself on a tie).
+// one ticket end to end (Ways in proof, the same two folders, its switch on) must never outbid House for a ticket filed
+// in those folders. boardForPath (kanban-boards.service.ts) breaks a tie on equal folders first by the switch, then by
+// the oldest board. So a Ways in proof board that stands with its switch on takes every house ticket, and one that is
+// archived, or switched off as the operator left b-154 on 2026-11-20, leaves them to the older House.
 //
 // Reads only: the running server's board list with the checks token.
 
@@ -32,9 +34,11 @@ runCase(async () => {
     }
   }
 
-  const proofs = boards.filter((b) => b.name === "Ways in proof" && !b.archived);
-  if (proofs.length) wrong.push(`${proofs.length} board(s) named Ways in proof still stand (${proofs.map((b) => b.id).join(", ")})`);
+  const proofs = boards.filter((b) => b.name === "Ways in proof" && !b.archived && b.autonomy !== false);
+  if (proofs.length) {
+    wrong.push(`${proofs.length} board(s) named Ways in proof stand with the switch on, outbidding House (${proofs.map((b) => b.id).join(", ")})`);
+  }
 
   if (wrong.length) return broken(wrong.join("; "));
-  return held("one House board stands, switched off over the two house folders, and no Ways in proof board stands");
+  return held("one House board stands, switched off over the two house folders, and no Ways in proof board stands switched on");
 });

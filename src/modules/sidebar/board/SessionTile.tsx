@@ -1,3 +1,4 @@
+import { SUBAGENT_DOT_FILL } from '@/shared/constants';
 import type { SimpleChatMark, SubagentDot } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
@@ -15,13 +16,6 @@ type SessionTileProps = {
 const MOST_DOTS = 7;
 /** From one dot's middle to the next. */
 const DOT_STEP = 6;
-/** What each model's dot is filled with: the model's own material, and the quiet ink for an agent whose model is not known. */
-const DOT_FILL: Record<NonNullable<SubagentDot>, string> = {
-  mercury: 'var(--ink-strong)',
-  tube: 'var(--tube)',
-  wire: 'var(--wire)',
-  plasma: 'var(--plasma)',
-};
 
 /**
  * ONE CHAT AS A SMALL WINDOW THAT SHOWS ITS STATE BY HOW IT STANDS, 66 by 44. The frame alone is a chat asleep. A plate in it is a chat awake.
@@ -75,7 +69,8 @@ export function SessionTile({ marks, subagents, isAsleep, className }: SessionTi
               cx={33 + (index - (dots.length - 1) / 2) * DOT_STEP}
               cy={39}
               r={1.9}
-              style={{ fill: dot ? DOT_FILL[dot] : 'var(--ink-muted)' }}
+              // Its model's material, and the quiet ink for an agent whose model is not known.
+              style={{ fill: dot ? SUBAGENT_DOT_FILL[dot] : 'var(--ink-muted)' }}
             />
           ))}
         </g>

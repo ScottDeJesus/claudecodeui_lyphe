@@ -40,6 +40,7 @@ export const PANEL_WORDS: Readonly<Record<string, string>> = {
   'roadmap.step.paused': 'paused',
   'roadmap.step.stalled': 'stalled — its run ended',
   'roadmap.step.starting': 'starting',
+  'roadmap.step.gaps': 'finished with gaps — being healed',
   'roadmap.step.shipped': 'shipped {{date}}',
   'roadmap.step.shippedUndated': 'shipped',
 
@@ -57,6 +58,7 @@ export const PANEL_WORDS: Readonly<Record<string, string>> = {
   'dispatcher.status.idle': 'IDLE',
   'dispatcher.status.hidden': 'HIDDEN',
   'dispatcher.status.complete': 'COMPLETE',
+  'dispatcher.status.gaps': 'FINISHED WITH GAPS',
 
   'dispatcher.phase.running': 'running',
   'dispatcher.phase.stalled': 'stalled',

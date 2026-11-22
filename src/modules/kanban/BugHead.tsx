@@ -14,6 +14,8 @@ type BugHeadProps = {
   currentBoardId: string | null;
   onSelectBoard: (boardId: string) => void;
   onNewBoard: () => void;
+  /** The switch between the board's hoop and its list (`HoopViewSwitch`), just before the menu; null where nothing is a hoop. */
+  view?: ReactNode;
   /** The way to every other place, the workspace's (`PlacesMenu`), last in the head. */
   menu: ReactNode;
 };
@@ -22,13 +24,14 @@ type BugHeadProps = {
  * THE HEAD OF THE BUGS VIEW, as the chat's head is drawn: the way back at the start (Kaylee Station when the screen was reached
  * from there, else the sessions home; Escape presses it, `WAY_BACK`; held, it opens the trail of places, `HOLDS_TRAIL`), then what this is: BUGS, and the board's name, which is its
  * picker (the old header's switcher, under the same name, with New board under its list), the two on one line. At the end the menu to
- * every other place. Nothing else: what the board is doing is its instrument's to say, and everything that sets the board up is behind
- * its core. It is drawn in every screen's head row (`HEAD_ROW`), so its arrow and its menu stand on the same spot as on every page.
+ * every other place, and before it, on the faces that show the instrument, the switch between its hoop and its list (`view`). Nothing
+ * else: what the board is doing is its instrument's to say, and everything that sets the board up is behind its core. It is drawn in
+ * every screen's head row (`HEAD_ROW`), so its arrow and its menu stand on the same spot as on every page.
  *
  * It stands in place of the sidebar, the rail and the phone's strip while the Bugs view is on screen (`WorkspaceMain` and
  * `ProjectSidebarRegion` leave them out). Drawn by the panel (`KanbanPanel`).
  */
-export function BugHead({ boards, currentBoardId, onSelectBoard, onNewBoard, menu }: BugHeadProps) {
+export function BugHead({ boards, currentBoardId, onSelectBoard, onNewBoard, view = null, menu }: BugHeadProps) {
   const { t } = useTranslation();
   const doors = useStationDoors();
   const toStation = doors.cameFrom() === 'station';
@@ -65,6 +68,7 @@ export function BugHead({ boards, currentBoardId, onSelectBoard, onNewBoard, men
           />
         </div>
       </div>
+      {view}
       {menu}
     </header>
   );

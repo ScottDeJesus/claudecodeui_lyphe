@@ -110,6 +110,18 @@
 .ast-kv dt { margin: 0; text-transform: uppercase; }
 .ast-kv dd { margin: 0; min-width: 0; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* ---------------- Excerpt ---------------- */
+/* Lines of text as they were written: each on its own row with its number in the gutter, between two hairlines. A line longer
+   than the pane scrolls sideways and never wraps, so a path or a measurement reads whole; `rows` caps the pane and the rest
+   scrolls inside it. */
+.ast-excerpt { --ast-row: 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 0; }
+.ast-excerpt-path { overflow: hidden; color: var(--ink-muted); font-family: var(--font-mono); font-size: 10.5px; line-height: 1.55; letter-spacing: 0.04em; text-overflow: ellipsis; white-space: nowrap; }
+.ast-excerpt-body { position: relative; overflow: auto; padding: 8px 0; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+.ast-excerpt-pre { margin: 0; color: var(--ink); font-family: var(--font-mono); font-size: 11px; line-height: var(--ast-row); white-space: pre; }
+.ast-excerpt-line { display: block; position: relative; padding: 0 12px 0 44px; }
+.ast-excerpt-line code { padding: 0; background: none; color: inherit; font: inherit; }
+.ast-excerpt-n { position: absolute; left: 0; width: 32px; color: var(--ink-faint); text-align: right; font-variant-numeric: tabular-nums; user-select: none; }
+
 /* The plate takes the focus as a container when it opens; the key's ring is for what is inside it. Two classes, so it outranks
    tokens.css's `[tabindex]:focus-visible`, which lands later in the cascade. */
 .ast-opening .ast-opening-plate:focus-visible { outline: none; }

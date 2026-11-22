@@ -126,10 +126,24 @@ export const sessionUserStateDb = {
     return row.held_conversation === 1 ? false : null;
   },
 
-  /** Records the mode a chat was started in (1 or 0). False when no row has the id. Consumed by the code-mode module, which writes it only for a chat whose row held nothing. */
+  /** Records the mode a chat's conversation was started in (1 or 0). False when no row has the id. Consumed by the code-mode module, which writes it only for a chat whose row held nothing. */
   setCodeMode(sessionId: string, on: boolean): boolean {
     const db = getConnection();
     const result = db.prepare('UPDATE sessions SET code_mode = ? WHERE session_id = ?').run(on ? 1 : 0, sessionId);
+
+    return result.changes > 0;
+  },
+
+  /**
+   * Records the mode a compaction's seed launch decided for the session it starts (1 or 0), or clears it (null), in
+   * `swapped_code_mode`; the chat's own word is untouched until `swapToCompactedSession` trades the two. False when
+   * no row has the id. Consumed by the code-mode module: cleared at the start of every seed launch, written with the
+   * switch's own answer.
+   */
+  setSwappedCodeMode(sessionId: string, on: boolean | null): boolean {
+    const db = getConnection();
+    const word = on === null ? null : on ? 1 : 0;
+    const result = db.prepare('UPDATE sessions SET swapped_code_mode = ? WHERE session_id = ?').run(word, sessionId);
 
     return result.changes > 0;
   },

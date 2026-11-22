@@ -5,6 +5,7 @@ import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
 import { openHome, openStation } from '@/shared/cloudcliDoors';
 import { HEAD_NAME, HEAD_PRESS, HEAD_ROW, HOLDS_TRAIL } from '@/shared/constants';
 import { useHeadBack } from '@/shared/context/HeadBackContext';
+import { HeadToolsPlace } from '@/shared/context/HeadToolsContext';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import { Button } from '@/shared/ui';
 import { WAY_BACK } from '@/shared/ui/overlayEscape';
@@ -16,7 +17,9 @@ type ScreenHeadProps = {
 
 /**
  * THE HEAD OF A SCREEN THAT HAS NONE OF ITS OWN, drawn as the chat's and the Bugs screen's are (`HEAD_ROW`): the way back at the
- * start, the screen's name, and the menu to every other place at the end. Nothing else: what a screen shows and does is its own.
+ * start, the screen's name, and the menu to every other place at the end. Nothing else of its own: what a screen shows and does is
+ * the screen's, and a screen with a press for the head draws it into the head's place for one, just before the menu (`HeadTools`:
+ * Cerberus's switch between its fleet's hoop and its list).
  *
  * ONE WAY BACK PER SCREEN. The arrow goes to Kaylee Station when the screen was reached from there, else the sessions home; but while
  * a page inside the screen stands (a carrier's pages, a bulletin's page, a tour, a panorama) that page claims it (`useHeadBack`): the
@@ -70,6 +73,7 @@ export function ScreenHead({ name }: ScreenHeadProps) {
           <h1 className="truncate text-xl font-normal leading-6 text-foreground finger:min-w-0 finger:text-sm" title={title}>{title}</h1>
         </div>
       </div>
+      <HeadToolsPlace />
       <PlacesMenu />
     </header>
   );

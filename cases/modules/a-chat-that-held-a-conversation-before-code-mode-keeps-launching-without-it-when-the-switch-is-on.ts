@@ -1,7 +1,7 @@
 // protects: server/modules/code-mode/code-mode.service.ts, server/modules/database/migrations.ts, server/modules/database/repositories/session-user-state.db.ts
 // writes: none
 //
-// "A chat keeps the mode it was started in" (the chats switch's own words on the Settings card). Every chat on this
+// "A chat keeps its mode until its next compaction" (the chats switch's own words on the Settings card). Every chat on this
 // box was started before Code Mode for chats existed, and every one reads code_mode NULL (the column was added with
 // nothing backfilled: 7,007 rows NULL on 2026-11-21). NULL is read as "undecided", so the first relaunch of such a
 // chat after the operator turns the switch on would put a conversation started with the full tool set into Code

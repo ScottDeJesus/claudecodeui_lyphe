@@ -38,7 +38,9 @@ export type ChatCodeModeLaunch =
  */
 export type ChatCodeModeHooks = {
   /** `servers` is the chat's own MCP server map plus its on tool sets' servers; `{}` when there are none. */
-  launchFor(input: { appSessionId: string | null; onNode: boolean; cwd: string; servers: Record<string, unknown> }): Promise<ChatCodeModeLaunch>;
+  /** `compactionSeed` is true for the launch that seeds a compaction's new session: it is decided by the switch, as a new chat's first launch is. */
+  /** `model` is the model the launch runs on: the house decides a chat on one Code Mode does not serve (Haiku) off, at birth and at a compaction. */
+  launchFor(input: { appSessionId: string | null; onNode: boolean; cwd: string; servers: Record<string, unknown>; compactionSeed: boolean; model?: string }): Promise<ChatCodeModeLaunch>;
   /** Tells the house a Code Mode chat's server map changed, so its `server.json` gets rewritten; rejects with the reason when it could not be. */
   serversChanged(input: { appSessionId: string; servers: Record<string, unknown> }): Promise<void>;
 };

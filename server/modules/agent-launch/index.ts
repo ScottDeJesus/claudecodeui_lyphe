@@ -2,3 +2,5 @@
 // lane at `/api/agent-launch` — the launch table's census, and the doors that pin a row or change
 // the defaults through its CLI.
 export { createAgentLaunchModule } from './agent-launch.module.js';
+// resolveLaunchRow: used by the R&D relay (`server/modules/rnd/rnd.module.ts`) for the spike chat's model (`rnd.spike`).
+export { resolveLaunchRow } from './agent-launch.module.js';

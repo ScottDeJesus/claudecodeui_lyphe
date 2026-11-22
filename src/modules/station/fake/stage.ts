@@ -73,14 +73,14 @@ const ACCEPT: DispatcherAsk = {
 const task = (key: string, position: number, title: string, assignee: string, waitsOn: string[] = []): DispatcherPhase => ({
   key, position, title, assignee, status: 'not started', chain_id: null, done_at: null, waits_on: waitsOn, busy: false,
   stalled: null, rounds: 0, cost_usd: 0, paid_vendor: null, tokens: 0, tokens_in: 0, tokens_out: 0, tokens_cache_read: null,
-  start_here: [], stages: [],
+  ruling: null, start_here: [], stages: [],
 });
 
 /** The `waiting` picture's feature: cut (`loaded`), owing its Accept, nothing approved, nothing run. */
 export const WAITING_FEATURE: DispatcherPlan = {
   name: WAITING_PLAN, state: 'loaded', status: 'idle', hidden: null, repo: '/home/lyphe/.claude/claudecodeui_lyphe',
   goal: '3. RIGHT RAIL — "What needs you". A stacked inbox: Accept prompts, design questions with options, permission requests, follow-ups she filed, health checks that are red.',
-  delivers: '"What needs you", the station\'s right rail.', session: null, session_app_id: null, author: null,
+  delivers: '"What needs you", the station\'s right rail.', session: null, session_app_id: null, author: null, decided: [], open_gaps: [],
   arc: 'kaylee-station', planner: null, model: 'claude', model_own: null, posture: 'claude route', queue_hold: null,
   pace_hold: '', overridden: false, cpu_wait: null, planning_paused: null, created_at: ago(170), updated_at: ago(6), completed_at: null, prompted_at: ago(6),
   paused: false, launched: false, stalled: null, approved: null, accept_armed: null, design_loaded_at: ago(40),

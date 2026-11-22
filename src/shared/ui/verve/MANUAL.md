@@ -687,3 +687,28 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Readout.tsx, /home
 `.vv-daybars`, `__legend`, `__names`, `__series`, `__mark`, `__total`, `__peak`, `__plot`, `__day`, `__side[data-side='up'|'down']`, `__bar`, `__zero` (the rule, absolutely placed across the gaps), `__axis`. A bar's ground is `var(--tone-dot, var(--accent))`, with no opacity of its own. The hover look stands inside `@media (hover: hover)`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DayBars.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/readings.css
+
+## MAN-10114 — `Excerpt` — numbered lines in a capped pane, built to Astrolabe's Excerpt: props, rules, paint (`verve/astrolabe.css`)
+
+`src/shared/ui/Excerpt.tsx` is in the library because Astrolabe draws it (the design system's Excerpt), in its still form. Exported from `@/shared/ui`. Caller: `CandidateOpening` (`src/modules/rnd`), a spike's evidence.
+
+## Props
+| prop | meaning |
+|---|---|
+| `text` | the lines as one string; a line break starts the next row |
+| `label` | required; the pane's accessible name (`role="group"`, `tabIndex=0` so a keyboard scrolls it) |
+| `path?` | caption over the lines (`figcaption`, `title` = path); absent, no head |
+| `start?` | first line's number, default 1 |
+| `rows?` | lines standing at once (pane height = rows × 16 px + 2 × 8 px); absent, all stand; the rest scroll inside |
+| `className?` | flow and size only |
+
+## Rules
+- A line longer than the pane scrolls sideways; it never wraps.
+- An empty line draws a space so its row keeps its height.
+- Not ported from Astrolabe: the read head, the diff kinds, Footprint.
+- Row height 16 px = `--ast-row` in `astrolabe.css`; `ROW_PX` in `Excerpt.tsx` must follow it.
+
+## Paint — `verve/astrolabe.css`
+`.ast-excerpt` section of the sheet that also paints Hoop, InstrumentCore, Track, Opening and Rule; selectors `.ast-excerpt-path`, `-body`, `-pre`, `-line`, `-n`. Not a `.vv-*` component: MAN-740's count excludes it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Excerpt.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/astrolabe.css

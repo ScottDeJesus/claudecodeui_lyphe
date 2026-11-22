@@ -1114,6 +1114,13 @@ export const api = {
       put(`/api/toolsets/sessions/${encodeURIComponent(sessionId)}/sets/${encodeURIComponent(set)}`, { on }, { timeoutMs: 45_000 }),
   },
 
+  // The Analytics area (server/modules/analytics): the sections the server holds a reader for (`AnalyticsSectionList`), and
+  // one section's answer over a window of days (`AnalyticsAnswer<T>`, src/shared/analytics-types.ts). Each is the Response;
+  // `useAnalyticsSection` narrows the envelope and hands `data` to the section's own narrow.
+  analytics: {
+    sections: () => get('/api/analytics'),
+    section: (id: string, days: number) => get(`/api/analytics/${encodeURIComponent(id)}${query({ days })}`),
+  },
   // The Cerberus lane (server/modules/cerberus/MANUAL.md): center's read model of the fleet, read
   // whole. Every read answers its wire shape BARE — not wrapped in `{ success, data }` — and a
   // refusal is the app's `{ success: false, error }` envelope. The `cerberus_changed` frame is only
@@ -1456,6 +1463,21 @@ export const api = {
       put('/api/agent-launch/rows/' + encodeURIComponent(name), change, { timeoutMs: AGENT_LAUNCH_WRITE_TIMEOUT_MS }),
     saveDefaults: (change: AgentLaunchDefaultsChange) =>
       put('/api/agent-launch/defaults', change, { timeoutMs: AGENT_LAUNCH_WRITE_TIMEOUT_MS }),
+  },
+
+  // The R&D place (src/modules/rnd): the picture, and one dispatcher rnd verb per write. A refusal is the dispatcher's own sentence
+  // in the body (stdout, or the relay's error), so the reader looks at the body whatever the status; the picture redraws from the
+  // rnd_state frame a landed write pokes.
+  rnd: {
+    picture: () => get('/api/rnd'),
+    settings: (body: { webSearch: boolean }) => put('/api/rnd/settings', body),
+    addSource: (body: { url: string; label?: string }) => post('/api/rnd/sources', body),
+    removeSource: (body: { url: string }) => del('/api/rnd/sources', body),
+    scout: () => post('/api/rnd/scout', {}),
+    adopt: (name: string, body: { arc: string; goal?: string; as?: string }) => post('/api/rnd/candidates/' + encodeURIComponent(name) + '/adopt', body),
+    reject: (name: string, body: { why: string }) => post('/api/rnd/candidates/' + encodeURIComponent(name) + '/reject', body),
+    reopen: (name: string) => post('/api/rnd/candidates/' + encodeURIComponent(name) + '/reopen', {}),
+    spike: (name: string, body: { projectPath: string }) => post('/api/rnd/candidates/' + encodeURIComponent(name) + '/spike', body),
   },
 
   // The API tab's Jev view: one reader answer per window, and the one thing the view can CHANGE —
