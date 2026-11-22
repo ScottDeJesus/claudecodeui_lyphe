@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { clockOf, epochOf } from '@/modules/dispatcher/dispatcherState';
 import { FaceTrigger } from '@/modules/dispatcher/FaceTrigger';
 import { Badge, Button, Collapsible, CollapsibleContent } from '@/shared/ui';
-import type { DispatcherPlan, Tone } from '@/shared/types';
+import type { DispatcherDecided, DispatcherDecidedBy, DispatcherGap, DispatcherPlan, Tone } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
 /**
@@ -45,64 +46,77 @@ import { cn } from '@/shared/utils';
  * Used by `PlanFace`, above its events fold.
  */
 
-// FILL: types — the shared pair, DispatcherDecided and DispatcherGap of src/shared/types.ts, replaces these two local types
-/** One choice taken in the operator's place. `task` is the task's TITLE, or null for a choice about the feature whole. */
-export type DecidedRow = { id: number; at: string; task: string | null; by: 'builder' | 'rule' | 'designer'; what: string; choice: string; why: string; undo: string };
-
-/** One gap a task finished with, open as a ticket. `task` is the task's TITLE; `priority` is the ticket's rank as the dispatcher writes it (low, medium, high), a string because an open ticket can be re-ranked. */
-export type GapRow = { task: string; title: string; ticket: number; priority: string };
-
 /** How many decided rows an opened fold draws until "Show N earlier" is pressed: the newest, newest first. A row is about 250px at phone width, so five is a screen and a half; the rest wait behind "Show N earlier". */
 const ROW_LIMIT = 5;
 
-const NO_ROWS: readonly DecidedRow[] = [];
-const NO_GAPS: readonly GapRow[] = [];
 /** The last look of an operator who has never opened this plan's list: every row is newer than it. */
 const NEVER_LOOKED = 0;
+/** Where this browser keeps a plan's last look, one key a plan: the prefix and the plan's name. */
+const LAST_LOOK_KEY_PREFIX = 'dispatcher.decided.lastLook:';
+/** What a plan from a dispatcher build older than the keys reads as. The client is served live (HMR) and may meet a server whose reader predates them, so an absent key draws nothing rather than throwing. */
+const NO_DECIDED: readonly DispatcherDecided[] = [];
+const NO_GAPS: readonly DispatcherGap[] = [];
 
-// FILL: locale keys — every word below moves to en/common.json under dispatcher.decided.* and is read through t()
-const COPY = {
-  title: 'Decided for you',
-  fresh: 'new',
-  freshCount: (count: number) => count + ' new',
-  by: { builder: 'the builder', designer: 'the designer', rule: 'a rule' },
-  wholeFeature: 'the whole feature',
-  what: 'Was open',
-  choice: 'Chose',
-  why: 'Why',
-  undo: 'To undo',
-  earlier: (count: number) => 'Show ' + count + ' earlier',
-  gaps: 'Gaps being healed',
-  gapsBelow: (count: number) => (count === 1 ? '1 gap below' : count + ' gaps below'),
-  priority: { high: 'high', medium: 'medium', low: 'low' } as Readonly<Record<string, string | undefined>>,
-  ticket: (ticket: number) => 'Ticket ' + ticket,
-} as const;
+/** Every word the list says, read through the locale under `dispatcher.decided.*`. */
+function copyOf(t: ReturnType<typeof useTranslation>['t']) {
+  return {
+    title: t('dispatcher.decided.title'),
+    fresh: t('dispatcher.decided.fresh'),
+    freshCount: (count: number) => t('dispatcher.decided.freshCount', { count }),
+    by: {
+      builder: t('dispatcher.decided.by.builder'),
+      designer: t('dispatcher.decided.by.designer'),
+      rule: t('dispatcher.decided.by.rule'),
+    } as Readonly<Record<DispatcherDecidedBy, string>>,
+    wholeFeature: t('dispatcher.decided.wholeFeature'),
+    what: t('dispatcher.decided.what'),
+    choice: t('dispatcher.decided.choice'),
+    why: t('dispatcher.decided.why'),
+    undo: t('dispatcher.decided.undo'),
+    earlier: (count: number) => t('dispatcher.decided.earlier', { count }),
+    gaps: t('dispatcher.decided.gaps'),
+    gapsBelow: (count: number) => t('dispatcher.decided.gapsBelow', { count }),
+    priority: {
+      high: t('dispatcher.decided.priority.high'),
+      medium: t('dispatcher.decided.priority.medium'),
+      low: t('dispatcher.decided.priority.low'),
+    } as Readonly<Record<string, string | undefined>>,
+    ticket: (ticket: number) => t('dispatcher.decided.ticket', { ticket }),
+    ticketCopied: (ticket: number) => t('dispatcher.decided.ticketCopied', { ticket }),
+    ticketNotCopied: (ticket: number) => t('dispatcher.decided.ticketNotCopied', { ticket }),
+  };
+}
 
 /** A gap's tone by its priority: a high one is watched, any other rank is later. */
 const gapTone = (priority: string): Tone => (priority === 'high' ? 'warn' : 'neutral');
 
 /** Whether a row was decided after the operator last looked at this plan's list. */
-function isFresh(row: DecidedRow, lastLook: number): boolean {
+function isFresh(row: DispatcherDecided, lastLook: number): boolean {
   return (epochOf(row.at) ?? 0) > lastLook;
 }
 
 export function PlanDecided({ plan }: { plan: DispatcherPlan }) {
-  // FILL: rows — the plan's decided rows since Accept, oldest first (plan.decided), in place of NO_ROWS
-  const rows = NO_ROWS;
-  // FILL: gaps — the plan's open gap tickets (plan.open_gaps), in place of NO_GAPS
-  const gaps = NO_GAPS;
-  // FILL: lastLook — the operator's last look at THIS plan's list, kept in localStorage per plan (plan.name), in place of NEVER_LOOKED
-  const lastLook = NEVER_LOOKED;
+  const { t } = useTranslation();
+  const COPY = copyOf(t);
+  const rows = plan.decided ?? NO_DECIDED;
+  const gaps = plan.open_gaps ?? NO_GAPS;
+  // Read once, when the card is drawn: a row stays "new" for as long as the operator is reading it.
+  const [lastLook] = useState(() => lastLookOf(plan.name));
   const fresh = rows.filter((row) => isFresh(row, lastLook)).length;
   const [open, setOpen] = useState(fresh > 0);
-  // FILL: onOpenChange — folding the list is the look: write now as this plan's last look, then set the fold
-  const onOpenChange = setOpen;
-  // FILL: onOpenTicket — take the operator to this ticket where the bug board opens it
-  const onOpenTicket = (ticket: number) => void ticket;
-  // FILL: shownCount — how many rows an opened fold draws: ROW_LIMIT until "Show N earlier" is pressed, then what the press adds
-  const shownCount = ROW_LIMIT;
-  // FILL: onShowEarlier — the press: raise shownCount by the rows it adds
-  const onShowEarlier = () => undefined;
+  // Folding the list either way is the look. The newest row's own stamp is kept, never this browser's clock, so a skewed clock cannot hide a row.
+  const onOpenChange = (next: boolean) => {
+    rememberLook(plan.name, rows);
+    setOpen(next);
+  };
+  // The bug board has no door that opens one ticket from outside it, so the press hands the operator the ticket's number to take there.
+  const [copied, setCopied] = useState<{ ticket: number; ok: boolean } | null>(null);
+  const onOpenTicket = (ticket: number) => {
+    void copyTicket(ticket).then((ok) => setCopied({ ticket, ok }));
+  };
+  const [shownCount, setShownCount] = useState(ROW_LIMIT);
+  // "Show N earlier" names every row still behind it, so the press draws them all.
+  const onShowEarlier = () => setShownCount(rows.length);
 
   if (rows.length === 0 && gaps.length === 0) return null;
   const shown = rows.slice(-shownCount).reverse();
@@ -168,6 +182,10 @@ export function PlanDecided({ plan }: { plan: DispatcherPlan }) {
               </li>
             ))}
           </ul>
+          {/* What the last ticket press did, said where the operator pressed: the copy is silent otherwise. */}
+          <p className="px-2 text-xs text-muted-foreground" aria-live="polite" data-gap-ticket-copied>
+            {copied === null ? '' : copied.ok ? COPY.ticketCopied(copied.ticket) : COPY.ticketNotCopied(copied.ticket)}
+          </p>
         </div>
       )}
     </div>
@@ -182,4 +200,42 @@ function Said({ label, answer = false, children }: { label: string; answer?: boo
       <dd className="inline">{children}</dd>
     </div>
   );
+}
+
+/** The stamp of the newest row this plan's list was last folded over, or NEVER_LOOKED. Blocked storage or a stored value that is not a number reads as never looked, so every row shows as new: the list errs toward being read. */
+function lastLookOf(plan: string): number {
+  try {
+    const stored = Number(window.localStorage.getItem(LAST_LOOK_KEY_PREFIX + plan) ?? NEVER_LOOKED);
+    return Number.isFinite(stored) ? stored : NEVER_LOOKED;
+  } catch (error) {
+    if (!(error instanceof DOMException)) throw error;
+    return NEVER_LOOKED;
+  }
+}
+
+/** Keeps the newest row's stamp as this plan's last look. */
+function rememberLook(plan: string, rows: readonly DispatcherDecided[]): void {
+  const newest = rows.length > 0 ? epochOf(rows[rows.length - 1].at) : null;
+  if (newest === null) return;
+  try {
+    window.localStorage.setItem(LAST_LOOK_KEY_PREFIX + plan, String(newest));
+  } catch (error) {
+    if (!(error instanceof DOMException)) throw error;
+    console.warn(`PlanDecided: the last look at ${plan} was not kept, storage refused it`, error);
+  }
+}
+
+/** Puts a gap's ticket number on the clipboard and answers whether it landed. A page with no clipboard (plain http off localhost) or a refused write answers false and leaves the cause in the console, naming the ticket. */
+async function copyTicket(ticket: number): Promise<boolean> {
+  if (!navigator.clipboard) {
+    console.warn(`PlanDecided: no clipboard on this page to copy ticket ${ticket}`);
+    return false;
+  }
+  try {
+    await navigator.clipboard.writeText(String(ticket));
+    return true;
+  } catch (error: unknown) {
+    console.warn(`PlanDecided: ticket ${ticket} could not be copied`, error);
+    return false;
+  }
 }

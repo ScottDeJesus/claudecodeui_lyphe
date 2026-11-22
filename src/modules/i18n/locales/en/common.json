@@ -1948,6 +1948,33 @@
     }
   },
   "dispatcher": {
+    "decided": {
+      "title": "Decided for you",
+      "fresh": "new",
+      "freshCount": "{{count}} new",
+      "by": {
+        "builder": "the builder",
+        "designer": "the designer",
+        "rule": "a rule"
+      },
+      "wholeFeature": "the whole feature",
+      "what": "Was open",
+      "choice": "Chose",
+      "why": "Why",
+      "undo": "To undo",
+      "earlier": "Show {{count}} earlier",
+      "gaps": "Gaps being healed",
+      "gapsBelow_one": "{{count}} gap below",
+      "gapsBelow": "{{count}} gaps below",
+      "priority": {
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
+      },
+      "ticket": "Ticket {{ticket}}",
+      "ticketCopied": "Ticket {{ticket}} copied — paste it on the bug board",
+      "ticketNotCopied": "Ticket {{ticket}} could not be copied here — it is ticket {{ticket}} on the bug board"
+    },
     "ask": {
       "waiting": "Waiting for your word",
       "open": "Open",
