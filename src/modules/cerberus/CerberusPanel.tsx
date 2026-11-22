@@ -29,8 +29,10 @@ import type { FleetGroupId } from '@/modules/cerberus/utils/fleetHoop';
 import { SchedulingView } from '@/modules/scheduling-report';
 import { UploadsView } from '@/modules/upload-runs';
 import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
-import type { AstrolabePoint, CerberusSheetTarget, CerberusView, FleetDoing, HoopHandle, InstrumentMeasure, ProjectChoice } from '@/shared/types';
-import { Button, Opening, ScrollArea } from '@/shared/ui';
+import { HeadTools } from '@/shared/context/HeadToolsContext';
+import { useHoopView } from '@/shared/hooks/useHoopView';
+import type { AstrolabePoint, CerberusSheetTarget, CerberusView, FleetDoing, HoopHandle, HoopView, InstrumentMeasure, ProjectChoice } from '@/shared/types';
+import { Button, HoopViewSwitch, Opening, ScrollArea } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type CerberusPanelProps = {
@@ -58,7 +60,9 @@ type OtherOpening = { kind: 'fleet' } | { kind: 'more'; groupId: FleetGroupId };
  * hoop, every machine a slot on it, a run for each state a machine can be in, what needs you first. The core's form is what the fleet
  * is doing (the listening dish while a check needs a person, writing toward a machine while a fix runs on it, thinking while a warden
  * updates), and its one measure is the share of checks passing; a press on the measure opens History. Nothing is written on the
- * hoop: the machine facing you is read out under it.
+ * hoop: the machine facing you is read out under it. A fleet too crowded to read round a band is a list at the press of the switch the
+ * screen draws into its head (`HoopViewSwitch` through `HeadTools`, kept on the device by `useHoopView`): the same machines as rows
+ * under the same core, run by run; a row opens its machine on the row's right. Docked at the foot the instrument is still its hoop.
  *
  * WHAT OPENS, hung from where it was pressed (the kit's `Opening`), one at a time:
  * - A machine's slot, at the front: the machine (`NodeOpening`): what needs you on it with its fix, its services and their last 30 minutes, what
@@ -110,6 +114,9 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   // The machine whose Opening hangs from its slot, by id; and what else hangs from the instrument. One at a time.
   const [openNodeId, setOpenNodeId] = useState<string | null>(null);
   const [other, setOther] = useState<OtherOpening | null>(null);
+  // The fleet as its hoop or as a list, this device's choice for the screen.
+  const [hoopView, setHoopView] = useHoopView('fleet');
+  const asList = hoopView === 'list';
 
   const onRetry = () => {
     void refresh().then(() => setAttempt((finished) => finished + 1));
@@ -139,10 +146,18 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
     setOpenNodeId(null);
     setOther(next);
   };
+  // The head's switch: the fleet as its hoop or as a list. What hangs open is put away, as it hung from the other form.
+  const chooseView = (next: HoopView) => {
+    setOpenNodeId(null);
+    setOther(null);
+    setHoopView(next);
+  };
 
   // THE FLEET AS A HOOP, worked out again on every read: worst first.
   const items = useMemo(() => (overview === null ? [] : fleetItems(overview)), [overview]);
   const hoop = fleetHoop(items, overview?.nodes ?? [], t);
+  // The fleet as a list holds every machine: the same runs without the hoop's end to a run. The docked hoop keeps the hoop's.
+  const fleetSlots = asList ? fleetHoop(items, overview?.nodes ?? [], t, Infinity).slots : hoop.slots;
   const hoopRef = useRef<HoopHandle>(null);
   const fixingNode = items.find((item) => item.status === 'fixing')?.id ?? null;
   const doing: FleetDoing = overview === null ? { kind: 'quiet' }
@@ -154,15 +169,16 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   const measure: InstrumentMeasure | null = overview === null || overview.counts.checks === 0 ? null : {
     value: overview.counts.passing / overview.counts.checks,
     label: t('cerberus.status.ok'),
-    detail: `${overview.counts.passing} ${t('cerberus.header.summary.of', { count: overview.counts.checks })}`,
+    // "Passing · 9 of 14", as the board's reads "Fixed · 4 of 17": the label already says what is counted.
+    detail: t('cerberus.ring.passingOf', { passing: overview.counts.passing, checks: overview.counts.checks, defaultValue: '{{passing}} of {{checks}}' }),
     warn: 2,
     danger: 2,
   };
 
   // The slot the open machine faces you on: its own, or its run's "more" slot for one past the slots; null for none.
   const openGroup = openNodeId === null ? null : hoop.groupOf(openNodeId);
-  const openFacing = openNodeId === null ? null : hoop.slots.some((slot) => slot.id === openNodeId) ? openNodeId : openGroup === null ? null : moreSlotId(openGroup);
-  // Where an Opening hangs: a machine's own slot, or its run's "more" slot for one past the slots; the core; a run's "more" slot.
+  const openFacing = openNodeId === null ? null : fleetSlots.some((slot) => slot.id === openNodeId) ? openNodeId : openGroup === null ? null : moreSlotId(openGroup);
+  // Where an Opening hangs: a machine's own slot (its row, in the list), or its run's "more" slot for one past the slots; the core; a run's "more" slot.
   const nodeAnchor = (): AstrolabePoint | null => (openFacing === null ? null : hoopRef.current?.pointOf(openFacing) ?? null);
   const homeRef = useRef<HTMLDivElement>(null);
   const coreAnchor = useCallback((): AstrolabePoint | null => {
@@ -170,13 +186,17 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
     return box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null;
   }, []);
   const moreAnchor = useCallback((groupId: string) => () => hoopRef.current?.pointOf(moreSlotId(groupId)) ?? null, []);
-  // The hoop's box: an Opening stands clear of it where the room allows, so the hoop stays whole beside it.
-  const instrumentBox = useCallback(() => homeRef.current?.querySelector('[data-cerberus-instrument] [data-hoop]')?.getBoundingClientRect() ?? null, []);
+  // The hoop's box, or the list's column: an Opening stands clear of it where the room allows, so the instrument stays whole beside it.
+  const instrumentBox = useCallback(
+    () => homeRef.current?.querySelector('[data-cerberus-instrument] [data-hoop], [data-cerberus-instrument] [data-hoop-list-column]')?.getBoundingClientRect() ?? null,
+    [],
+  );
 
   const instrument = (docked: boolean) => (
     <CerberusInstrument
       hoopRef={hoopRef}
-      slots={hoop.slots}
+      slots={docked ? hoop.slots : fleetSlots}
+      view={docked ? 'hoop' : hoopView}
       doing={doing}
       measure={measure}
       docked={docked}
@@ -197,10 +217,16 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   const openMark = openItem === null ? null : nodeMark(openItem.status);
   const headline = overview === null ? null : fleetHeadline(t, overview);
   const moreGroupId = other?.kind === 'more' ? other.groupId : null;
-  const moreMachines = moreGroupId === null ? [] : (hoop.machinesOf[moreGroupId] ?? []).filter((nodeId) => !hoop.slots.some((slot) => slot.id === nodeId));
+  const moreMachines = moreGroupId === null ? [] : (hoop.machinesOf[moreGroupId] ?? []).filter((nodeId) => !fleetSlots.some((slot) => slot.id === nodeId));
 
   return (
     <div data-cerberus-panel="" data-cerberus-face={view} className="flex h-full min-h-0 flex-col bg-background text-foreground [container-type:inline-size]">
+      {/* The switch between the fleet's hoop and its list, in the screen's head, while the fleet is the face shown. */}
+      {view === 'fleet' && overview !== null && (
+        <HeadTools>
+          <HoopViewSwitch view={hoopView} onChange={chooseView} />
+        </HeadTools>
+      )}
       <ProjectChoicesContext.Provider value={projectChoices}>
         {/* THE SCENE: the instrument at home, or the face chosen as the work. Every Opening is drawn inside it and measures its room here. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
@@ -261,6 +287,7 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
                   open
                   anchor={nodeAnchor}
                   avoid={instrumentBox}
+                  side={asList ? 'right' : undefined}
                   onClose={() => setOpenNodeId(null)}
                   backLabel={t('buttons.close')}
                   source={groupLabel(t, hoop.groupOf(openItem.id) ?? 'silent')}

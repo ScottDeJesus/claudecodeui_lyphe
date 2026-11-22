@@ -72,6 +72,7 @@ const EYEBROW = 'font-mono text-[10px] font-medium uppercase leading-[14px] trac
  *
  * Used by the sidebar module's `SessionsHalo` (the chats round the companion's core and a chat's core), the kanban module's
  * `BugInstrument` (the board's bugs, and its proposed features) and the cerberus module's `CerberusInstrument` (the fleet's machines).
+ * The last two can show the same slots as a list instead (`HoopList`), when the screen's head switch asks for it.
  */
 export const Hoop = forwardRef<HoopHandle, HoopProps>(function Hoop(
   { slots, width, lean, names, reading, label, link = null, coreRadius = 0, current = null, most, openOnTurn = false, decorative = false, onOpen, marks, children },

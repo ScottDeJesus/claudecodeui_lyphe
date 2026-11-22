@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCoreDrawing } from '@/shared/context/CoreDrawingContext';
-import type { HoopHandle, HoopSlot, InstrumentMeasure } from '@/shared/types';
-import { Hoop, hoopWidthFor, InstrumentCore } from '@/shared/ui';
+import type { HoopHandle, HoopSlot, HoopView, InstrumentMeasure } from '@/shared/types';
+import { Hoop, HoopList, hoopWidthFor, InstrumentCore } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /** How often the core's bearing follows the card it is building, in ms: the hoop turns, and the tendril follows the card. */
 const BEARING_EVERY_MS = 700;
@@ -20,6 +21,13 @@ const HOOP_LEAN = 0.62;
 const CORE_SHARE = 0.17;
 /** The most of the hoop one card takes, in radians: a board of a few cards stands them side by side, not each a wall half round it. */
 const SLOT_MOST = (Math.PI * 2) / 12;
+/** The core's body at the head of the list, in px: at a desk, and in a room narrower than an Opening can stand beside (a phone). */
+const LIST_CORE = 64;
+const LIST_CORE_NARROW = 48;
+/** The narrowest room an Opening stands beside its row in; under it, it is a sheet at the foot (the kit's `Opening`). */
+const LIST_WIDE_FROM = 560;
+/** What opens from a row at a desk, a card's or a proposal's Opening, in px: the list leaves it its room on the right. */
+const OPENING_WIDTH = 360;
 
 type BugInstrumentProps = {
   /** The hoop's handle, for an Opening to hang from a card's slot and for the core to find the card it builds. */
@@ -44,6 +52,12 @@ type BugInstrumentProps = {
   onCore?: () => void;
   /** The measure was pressed: the board's numbers. */
   onMeasure?: () => void;
+  /** How the set is shown at home: the hoop, or the same things as a list under the core (`HoopList`). Docked, it is the hoop. */
+  view?: HoopView;
+  /** For the list: how many cards each run holds on the server, where its rows are the pages read so far. */
+  counts?: Record<string, number>;
+  /** For the list: what stands under a run's rows, the press that reads its next page while there is one. */
+  after?: (group: string) => ReactNode;
 };
 
 /**
@@ -58,9 +72,13 @@ type BugInstrumentProps = {
  * their cards (`onOpen`), its core opens the board (`onCore`). Docked at the foot beside the board's numbers it keeps running, small,
  * and takes no press of its own: the foot's own press is the way back to it.
  *
+ * AS A LIST (`view`, the head's switch): the same cards as rows under the same core, a lane at a time, every card read so far on its
+ * row (`HoopList`); the core heads the list with its measure in words beside it, and keeps its presses. The hoop's handle is the list's
+ * then, so an Opening hangs from a card's row as it hangs from its slot.
+ *
  * Drawn by the panel (`KanbanPanel`), at home in the scene's middle and docked at its foot.
  */
-export function BugInstrument({ hoopRef, slots, label, building, measure, docked = false, held, current, onOpen, onCore, onMeasure }: BugInstrumentProps) {
+export function BugInstrument({ hoopRef, slots, label, building, measure, docked = false, held, current, onOpen, onCore, onMeasure, view = 'hoop', counts, after }: BugInstrumentProps) {
   const { t } = useTranslation();
   const draw = useCoreDrawing();
   const roomRef = useRef<HTMLDivElement>(null);
@@ -92,10 +110,44 @@ export function BugInstrument({ hoopRef, slots, label, building, measure, docked
     ? Math.max(0, Math.min(room.w, hoopWidthFor(room.h, HOOP_LEAN)))
     : Math.max(0, Math.min(room.w - 2 * HOOP_AIR, HOOP_MOST, hoopWidthFor(room.h - 2 * HOOP_AIR - HOOP_READING, HOOP_LEAN)));
   const body = Math.max(12, Math.round(width * CORE_SHARE));
+  const setName = label ?? t('kanban.ring.instrument', { defaultValue: 'The board' });
 
+  /** The board's core at a body of `size` px: the same core, its presses and its measure, in the hoop's middle or at the list's head. */
+  const coreOf = (size: number) => (
+    <InstrumentCore
+      size={size}
+      label={t('kanban.ring.board', { defaultValue: 'The board' })}
+      onPress={onCore}
+      measure={docked ? null : measure}
+      onMeasure={onMeasure}
+      decorative={docked}
+      marks={{ 'data-bug-core': '' }}
+    >
+      {draw?.({ material: 'mercury', state: building === null ? 'idle' : 'writing', drive: building === null ? 0 : 0.35, size, azimuth: bearing })
+        ?? <span aria-hidden="true" className="block size-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--chrome-highlight),var(--chrome-mid)_55%,var(--chrome-dark))]" />}
+    </InstrumentCore>
+  );
+
+  const asList = view === 'list' && !docked;
+
+  // One room for both forms, so the room measured stays this element whichever is shown.
   return (
-    <div ref={roomRef} {...(docked ? {} : { 'data-bug-instrument': '' })} className="flex size-full min-h-0 min-w-0 items-center justify-center">
-      {width > 0 && (
+    <div ref={roomRef} {...(docked ? {} : { 'data-bug-instrument': '' })} className={cn('flex size-full min-h-0 min-w-0', !asList && 'items-center justify-center')}>
+      {asList && (
+        <HoopList
+          ref={hoopRef}
+          slots={slots}
+          label={setName}
+          current={current}
+          onOpen={(slotId) => onOpen?.(slotId)}
+          core={coreOf(room.w >= LIST_WIDE_FROM ? LIST_CORE : LIST_CORE_NARROW)}
+          reading={measure === null ? null : [measure.label, measure.detail].filter(Boolean).join(' · ')}
+          counts={counts}
+          after={after}
+          room={OPENING_WIDTH}
+        />
+      )}
+      {!asList && width > 0 && (
         <Hoop
           ref={hoopRef}
           slots={slots}
@@ -103,7 +155,7 @@ export function BugInstrument({ hoopRef, slots, label, building, measure, docked
           lean={HOOP_LEAN}
           names={!docked}
           reading={!docked}
-          label={label ?? t('kanban.ring.instrument', { defaultValue: 'The board' })}
+          label={setName}
           link={building === null ? null : { id: building, way: 'out' }}
           coreRadius={body / 2 + 14}
           current={current}
@@ -113,18 +165,7 @@ export function BugInstrument({ hoopRef, slots, label, building, measure, docked
           onOpen={onOpen}
           marks={docked ? undefined : { 'data-ast-keeps-opening': '' }}
         >
-          <InstrumentCore
-            size={body}
-            label={t('kanban.ring.board', { defaultValue: 'The board' })}
-            onPress={onCore}
-            measure={docked ? null : measure}
-            onMeasure={onMeasure}
-            decorative={docked}
-            marks={{ 'data-bug-core': '' }}
-          >
-            {draw?.({ material: 'mercury', state: building === null ? 'idle' : 'writing', drive: building === null ? 0 : 0.35, size: body, azimuth: bearing })
-              ?? <span aria-hidden="true" className="block size-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--chrome-highlight),var(--chrome-mid)_55%,var(--chrome-dark))]" />}
-          </InstrumentCore>
+          {coreOf(body)}
         </Hoop>
       )}
     </div>

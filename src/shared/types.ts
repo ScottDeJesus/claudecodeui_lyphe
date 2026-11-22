@@ -4212,6 +4212,14 @@ export type HoopHandle = {
 };
 
 /**
+ * How a screen shows the set its instrument turns through: `hoop`, the slots on a band round the core; `list`, the same things as
+ * plain rows under the core, run by run (the kit's `HoopList`), for a set too crowded to read round a band. Chosen with the kit's
+ * `HoopViewSwitch` in the screen's head and kept on the device (`useHoopView`); read by the kanban module's `BugInstrument` and the
+ * cerberus module's `CerberusInstrument`. Docked at a foot an instrument is always its hoop.
+ */
+export type HoopView = 'hoop' | 'list';
+
+/**
  * The one measure an instrument's core wears (the kit's `InstrumentCore`): a flat ring round the body, filled clockwise from twelve
  * (`value`, 0 to 1), named on a plate when it is pointed at (`label` · `detail`). It is grey until it passes `warn` (0.8 when absent),
  * then yellow, then red from `danger` (1 when absent); a measure that is never a load, such as a share finished, passes thresholds it

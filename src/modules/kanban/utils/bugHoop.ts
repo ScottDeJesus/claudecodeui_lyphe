@@ -21,7 +21,8 @@ import type { HoopSlot, HoopSlotState, SubagentDot } from '@/shared/types';
  * is the ordinary one, and its open issues.
  *
  * A LANE SHOWS AT MOST `LANE_MOST` SLOTS. A lane with more puts its first ones on the hoop and one more slot, `moreId`, whose Opening
- * lists the rest.
+ * lists the rest. The board shown as a list (`HoopList`) asks for every card it has read (`most`: no end), and says how many each run
+ * holds on the server (`counts`).
  */
 
 /** The most slots one lane stands on the hoop, the "more" slot among them. */
@@ -50,6 +51,8 @@ export type BugHoop = {
   groupOf: (cardId: string) => string | null;
   /** Whether a run's lanes have more cards on the server than the board has read. */
   unread: Record<string, boolean>;
+  /** How many cards each run holds on the server, or as many as the board has read where that is more. */
+  counts: Record<string, number>;
   /** A card the runs hold, by id, as this render's lanes have it; null for one they do not. */
   summaryOf: (cardId: string) => KanbanCardSummary | null;
 };
@@ -60,6 +63,8 @@ type BugHoopInput = {
   board: Pick<KanbanLanes, 'laneView' | 'laneSummaries'>;
   walkOf: (cardId: string) => KanbanWalk | null;
   t: TFunction;
+  /** The most slots one lane stands, its "more" slot among them: `LANE_MOST` when absent, and no end for the board as a list. */
+  most?: number;
 };
 
 /** What a card on the board is doing. */
@@ -116,10 +121,11 @@ function slotOf(summary: KanbanCardSummary, walk: KanbanWalk | null, group: stri
 }
 
 /** The board as slots, its runs in their order, each absent while it holds nothing (the design system's "empty means absent"). */
-export function bugHoop({ specs, groupSpecs, board, walkOf, t }: BugHoopInput): BugHoop {
+export function bugHoop({ specs, groupSpecs, board, walkOf, t, most = LANE_MOST }: BugHoopInput): BugHoop {
   const slots: HoopSlot[] = [];
   const cardsOf: Record<string, string[]> = {};
   const unread: Record<string, boolean> = {};
+  const counts: Record<string, number> = {};
   const where = new Map<string, string>();
   const held = new Map<string, KanbanCardSummary>();
   for (const groupSpec of groupSpecs) {
@@ -130,12 +136,13 @@ export function bugHoop({ specs, groupSpecs, board, walkOf, t }: BugHoopInput): 
     summaries.forEach((summary) => held.set(summary.id, summary));
     const total = lanes.reduce((sum, spec) => sum + (board.laneView(spec).count ?? 0), 0);
     unread[groupSpec.id] = lanes.some((spec) => board.laneView(spec).hasMore);
+    counts[groupSpec.id] = Math.max(total, ids.length);
     cardsOf[groupSpec.id] = ids;
     ids.forEach((id) => where.set(id, groupSpec.id));
     if (ids.length === 0) continue;
     const groupName = t(groupSpec.titleKey);
-    const overflows = Math.max(total, ids.length) > LANE_MOST;
-    const shown = overflows ? summaries.slice(0, LANE_MOST - 1) : summaries;
+    const overflows = Math.max(total, ids.length) > most;
+    const shown = overflows ? summaries.slice(0, most - 1) : summaries;
     for (const summary of shown) slots.push(slotOf(summary, walkOf(summary.id), groupSpec.id, groupName, t));
     if (overflows) {
       const rest = Math.max(total, ids.length) - shown.length;
@@ -152,5 +159,5 @@ export function bugHoop({ specs, groupSpecs, board, walkOf, t }: BugHoopInput): 
       });
     }
   }
-  return { slots, cardsOf, unread, groupOf: (cardId) => where.get(cardId) ?? null, summaryOf: (cardId) => held.get(cardId) ?? null };
+  return { slots, cardsOf, unread, counts, groupOf: (cardId) => where.get(cardId) ?? null, summaryOf: (cardId) => held.get(cardId) ?? null };
 }

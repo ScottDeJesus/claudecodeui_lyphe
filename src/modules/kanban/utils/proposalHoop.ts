@@ -51,8 +51,11 @@ export type ProposalHoop = {
   groupOf: (proposalId: number) => string | null;
 };
 
-/** The proposals, as slots. `allBoards` adds each one's board to its words. */
-export function proposalHoop(proposals: BugProposal[], allBoards: boolean, t: TFunction): ProposalHoop {
+/**
+ * The proposals, as slots. `allBoards` adds each one's board to its words. `most` is the most slots a run stands, its "more" slot
+ * among them: `RUN_MOST` when absent, and no end for the proposals as a list (`HoopList`).
+ */
+export function proposalHoop(proposals: BugProposal[], allBoards: boolean, t: TFunction, most = RUN_MOST): ProposalHoop {
   const slots: HoopSlot[] = [];
   const proposalsOf: Record<string, BugProposal[]> = {};
   const where = new Map<number, string>();
@@ -62,8 +65,8 @@ export function proposalHoop(proposals: BugProposal[], allBoards: boolean, t: TF
     held.forEach((proposal) => where.set(proposal.id, run.state));
     if (held.length === 0) continue;
     const groupName = t(run.titleKey);
-    const overflows = held.length > RUN_MOST;
-    const shown = overflows ? held.slice(0, RUN_MOST - 1) : held;
+    const overflows = held.length > most;
+    const shown = overflows ? held.slice(0, most - 1) : held;
     for (const proposal of shown) {
       slots.push({
         id: proposalItemId(proposal.id),

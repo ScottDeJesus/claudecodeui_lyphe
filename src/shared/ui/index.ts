@@ -144,6 +144,10 @@ export { HeldPage } from '@/shared/ui/HeldPage';
 export { Hoop } from '@/shared/ui/Hoop';
 export { hoopHeightFor, hoopMiddle, hoopWidthFor } from '@/shared/ui/hoopPainter';
 export { InstrumentCore } from '@/shared/ui/InstrumentCore';
+// The same things as a plain list under the core, run by run, for a set too crowded to read round a band; and the switch in a
+// screen's head between the two. The bug board and Cerberus's fleet offer it.
+export { HoopList } from '@/shared/ui/HoopList';
+export { HoopViewSwitch } from '@/shared/ui/HoopViewSwitch';
 // How often: a window's items by day (stacked clean / hiccup / test columns) and by local hour, each with its sentence. The
 // Cerberus tab's Uploads view draws it, handing in its own words as a key prefix.
 export { HowOften } from '@/shared/ui/HowOften';
