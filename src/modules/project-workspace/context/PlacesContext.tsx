@@ -94,7 +94,7 @@ function wheelFrom(opener: HTMLElement | null, held: number | null): WheelState 
 }
 
 type PlacesValue = {
-  /** Every place the navigation leads to, in the wheel's order: the inner ring's five, then the outer's six. */
+  /** Every place the navigation leads to, in the wheel's order: the inner ring's five, then the outer's eight. */
   places: Place[];
   /**
    * The places away from here with something waiting that the menu shows: each is a bead on the menu's dial at its bearing
