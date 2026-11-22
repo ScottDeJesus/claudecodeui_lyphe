@@ -120,6 +120,9 @@ export { DayBars } from '@/shared/ui/DayBars';
 // the pointed day's figures on a card (or in a line, for a finger). The analytics module's Code Mode section draws its days
 // and its failures each day with it. It is the design system's chart, so it stands here with one module drawing it.
 export { DayChart } from '@/shared/ui/DayChart';
+// Two marks a row on one scale, a figure and its companion, with the bar between them read as the change. The analytics
+// module's Code Mode comparison draws with and without Code Mode by kind and by model with it; the design system's chart.
+export { Dumbbell } from '@/shared/ui/Dumbbell';
 export { AppLogo } from '@/shared/ui/AppLogo';
 export { default as DeepSeekLogo } from '@/shared/ui/DeepSeekLogo';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';

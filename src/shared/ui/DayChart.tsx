@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { CSSProperties, PointerEvent } from 'react';
 
+import { zeroScale } from '@/shared/ui/chartScale';
+
 type DayChartSeries = {
   /** The series' name in the legend and on the pointed day's card ("With Code Mode"). */
   label: string;
@@ -42,24 +44,10 @@ type DayChartProps = {
 const PLOT_PX = 184;
 /** The page's own ground left between two parts of a column, so two inks never touch. */
 const PART_GAP_PX = 2;
-/** How many steps the scale is cut into, at most, above its zero. */
-const SCALE_STEPS = 4;
 /** From this many days on, the columns stand a hairline apart, so 90 days still fit a phone. */
 const DENSE_FROM = 45;
 /** The fewest days that get a third date under the plot, at its middle. */
 const MIDDLE_DATE_FROM = 14;
-
-/** The scale: a top that is a whole number of round steps over the tallest value, and the step. */
-function scaleOf(peak: number, ceiling: number | undefined): { top: number; step: number } {
-  if (ceiling !== undefined) return { top: ceiling, step: ceiling / SCALE_STEPS };
-  if (peak <= 0) return { top: SCALE_STEPS, step: 1 };
-  const rough = peak / SCALE_STEPS;
-  const magnitude = 10 ** Math.floor(Math.log10(rough));
-  const step = [1, 2, 5, 10].map((times) => times * magnitude).find((candidate) => candidate >= rough) ?? 10 * magnitude;
-  // A count is never cut finer than one.
-  const whole = Math.max(step, Number.isInteger(peak) ? 1 : step);
-  return { top: whole * Math.ceil(peak / whole), step: whole };
-}
 
 /** `2026-09-19` → `Sep 19`, built from the parts so the box's own zone never shifts the day. */
 function dateLabel(day: string, weekday = false): string {
@@ -99,9 +87,7 @@ export function DayChart({ form, series, days, label, tickWords, ceiling, todayL
     form === 'columns'
       ? Math.max(0, ...days.map((day) => day.values.reduce<number>((sum, value) => sum + (value ?? 0), 0)))
       : Math.max(0, ...days.flatMap((day) => day.values.map((value) => value ?? 0)));
-  const { top, step } = scaleOf(peak, ceiling);
-  const ticks: number[] = [];
-  for (let tick = 0; tick <= top + step / 2; tick += step) ticks.push(tick);
+  const { high: top, ticks } = zeroScale(peak, ceiling);
   const heightOf = (value: number) => (top > 0 ? (Math.max(0, value) / top) * PLOT_PX : 0);
   const leftOf = (at: number) => `${((at + 0.5) / Math.max(1, count)) * 100}%`;
 

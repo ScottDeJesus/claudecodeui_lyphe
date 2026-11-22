@@ -5385,17 +5385,30 @@
         "okNote": "{{change}} · {{without}} without"
       },
       "compare": {
-        "title": "With and without Code Mode",
-        "lead": "Launches with Code Mode: {{with}}. Without: {{without}}. The median launch with it, across every kind:",
-        "leadOnlyWith": "Launches with Code Mode: {{with}}, and none without to measure them against. The median launch, across every kind:",
-        "leadOnlyWithout": "No launch ran with Code Mode in this window. Without: {{without}}.",
+        "byKind": "By kind",
+        "byModel": "By model",
+        "kindMeasure": "Compare the kinds by",
+        "modelMeasure": "Compare the models by",
+        "measures": {
+          "turns": "Turns",
+          "tokens": "Tokens",
+          "time": "Time",
+          "ok": "Ended ok",
+          "launches": "Launches",
+          "failures": "Failures"
+        },
+        "kindChart": "By kind, {{measure}}: with Code Mode against without",
+        "modelChart": "By model, {{measure}}: with Code Mode against without",
+        "shareWith": "{{share}} with",
+        "failuresOf": "{{failures}} of {{scripts}} scripts",
+        "noModels": "No launch here names its model.",
+        "byTable": "The figures as a table",
         "headline": {
           "ok": "Ended ok",
           "turns": "Turns",
           "tokens": "Tokens, in and out",
           "time": "Time"
         },
-        "noteAgainst": "{{without}} without · {{change}}",
         "noteWithout": "{{without}} without",
         "noteAlone": "nothing ran without",
         "mode": "Figures shown",

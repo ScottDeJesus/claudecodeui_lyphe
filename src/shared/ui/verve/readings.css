@@ -1,6 +1,7 @@
 /* Verve readings paint — the rules for the pieces a number is read FROM: Readout (one figure and its name,
  * Astrolabe's Readout and ReadoutRow), DayBars (one or two series over named days, mirrored), DayChart (a measure over
- * named days on a scale: stacked columns or lines) and MixBar (one whole in its parts).
+ * named days on a scale: stacked columns or lines), MixBar (one whole in its parts) and Dumbbell (two marks a row on one
+ * scale, a figure and its companion).
  *
  * THE CHART MARKS read one property, `--vv-mark`, set here from the mark's job: a model's colour by its material
  * (`--chart-<material>`, the chats' coding stepped for a chart), the full ink or its pale companion (`--chart-ink`,
@@ -95,13 +96,13 @@
 
 /* ---------------------------------------------------------------- chart marks */
 /* One property per mark, from its job. DayChart's series say theirs with `data-mark`; a model's part says its material. */
-:is(.vv-daychart, .vv-mixbar) [data-mark='ink'] { --vv-mark: var(--chart-ink); }
-:is(.vv-daychart, .vv-mixbar) [data-mark='pale'] { --vv-mark: var(--chart-pale); }
-:is(.vv-daychart, .vv-mixbar) [data-mark='warn'] { --vv-mark: var(--warn-dot); }
-:is(.vv-daychart, .vv-mixbar) [data-material='mercury'] { --vv-mark: var(--chart-mercury); }
-:is(.vv-daychart, .vv-mixbar) [data-material='tube'] { --vv-mark: var(--chart-tube); }
-:is(.vv-daychart, .vv-mixbar) [data-material='plasma'] { --vv-mark: var(--chart-plasma); }
-:is(.vv-daychart, .vv-mixbar) [data-material='wire'] { --vv-mark: var(--chart-wire); }
+:is(.vv-daychart, .vv-mixbar, .vv-dumbbell) [data-mark='ink'] { --vv-mark: var(--chart-ink); }
+:is(.vv-daychart, .vv-mixbar, .vv-dumbbell) [data-mark='pale'] { --vv-mark: var(--chart-pale); }
+:is(.vv-daychart, .vv-mixbar, .vv-dumbbell) [data-mark='warn'] { --vv-mark: var(--warn-dot); }
+:is(.vv-daychart, .vv-mixbar, .vv-dumbbell) [data-material='mercury'] { --vv-mark: var(--chart-mercury); }
+:is(.vv-daychart, .vv-mixbar, .vv-dumbbell) [data-material='tube'] { --vv-mark: var(--chart-tube); }
+:is(.vv-daychart, .vv-mixbar, .vv-dumbbell) [data-material='plasma'] { --vv-mark: var(--chart-plasma); }
+:is(.vv-daychart, .vv-mixbar, .vv-dumbbell) [data-material='wire'] { --vv-mark: var(--chart-wire); }
 
 /* ---------------------------------------------------------------- DayChart */
 /* The legend first, each series by its key (a square for a column, a short line for a line, dashed when pale), its word
@@ -167,17 +168,55 @@
 .vv-mixbar__name[data-mono] { font-family: var(--font-mono); font-size: 11.5px; overflow-wrap: anywhere; }
 .vv-mixbar__figure { color: var(--ink); font-variant-numeric: tabular-nums; }
 
+/* ---------------------------------------------------------------- Dumbbell */
+/* A row a thing: its name (a dot of its model's colour first, when it has one), then its track, where the full dot and
+ * the hollow ring stand on the shared scale with a bar between them, the full figure over the dot; then the change. The
+ * rows share the round steps, ruled faint down the whole track column and named under it. */
+.vv-dumbbell { gap: 12px; --vv-dumbbell-row: 40px; }
+.vv-dumbbell__legend { gap: 4px 14px; color: var(--ink-muted); font-size: 12px; }
+.vv-dumbbell__key { gap: 6px; }
+.vv-dumbbell__swatch { width: 10px; height: 10px; border: 2px solid var(--chart-ink); border-radius: 50%; }
+.vv-dumbbell__swatch[data-full] { background: var(--chart-ink); }
+.vv-dumbbell__grid { grid-template-columns: fit-content(10rem) minmax(0, 1fr) auto; align-items: center; column-gap: 14px; }
+.vv-dumbbell__name { gap: 7px; color: var(--ink); font-size: 13px; line-height: 1.25; }
+.vv-dumbbell__name[data-strong] { font-weight: 600; }
+.vv-dumbbell__name[data-mono] .vv-dumbbell__label { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.vv-dumbbell__dot-key { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--vv-mark); }
+.vv-dumbbell__scale,
+.vv-dumbbell__track { position: relative; align-self: stretch; }
+.vv-dumbbell__track { --vv-mark: var(--chart-ink); }
+.vv-dumbbell__rule { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--track); }
+.vv-dumbbell__bar { position: absolute; top: 50%; height: 2px; margin-top: -1px; background: var(--vv-mark); opacity: 0.5; transform-origin: left; }
+.vv-dumbbell__bar[data-grows='left'] { transform-origin: right; }
+.vv-dumbbell__ring { position: absolute; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border: 2px solid var(--vv-mark); border-radius: 50%; background: var(--canvas); }
+.vv-dumbbell__dot { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--vv-mark); box-shadow: 0 0 0 2px var(--canvas); }
+.vv-dumbbell__figure { position: absolute; bottom: calc(50% + 9px); transform: translateX(-50%); color: var(--ink); font-family: var(--font-mono); font-size: 11px; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vv-dumbbell__figure[data-anchor='start'] { transform: translateX(-6px); }
+.vv-dumbbell__figure[data-anchor='end'] { transform: translateX(calc(-100% + 6px)); }
+.vv-dumbbell__change { justify-self: end; color: var(--ink-muted); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vv-dumbbell__change[data-tone] { color: var(--tone-ink); }
+.vv-dumbbell__change[data-tone]::before { content: var(--tone-glyph) ' '; }
+.vv-dumbbell__ticks { position: relative; height: 18px; }
+.vv-dumbbell__tick { position: absolute; top: 4px; transform: translateX(-50%); color: var(--ink-faint); font-family: var(--font-mono); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vv-dumbbell__tick[data-anchor='start'] { transform: none; }
+.vv-dumbbell__tick[data-anchor='end'] { transform: translateX(-100%); }
+
 /* ---------------------------------------------------------------- arrivals */
 /* Columns rise from the zero one after another, lines draw from the left, a whole's parts grow out in turn. Nothing
  * moves for a reader who asked for less motion. */
 @keyframes vv-chart-rise { from { transform: scaleY(0); } }
 @keyframes vv-chart-draw { from { clip-path: inset(0 100% 0 0); } }
 @keyframes vv-chart-grow { from { transform: scaleX(0); } }
+/* A full dot leaves its ring for its place: the ring's position is handed down as `--vv-dumbbell-from`. */
+@keyframes vv-dumbbell-travel { from { left: var(--vv-dumbbell-from); } }
 @media (prefers-reduced-motion: no-preference) {
   .vv-daychart__stack { animation: vv-chart-rise 560ms var(--ease-enter) backwards; animation-delay: calc(var(--vv-daychart-at, 0) * 12ms); }
   .vv-daychart__lines,
   .vv-readout__trend { animation: vv-chart-draw 800ms var(--ease-enter) backwards; }
   .vv-mixbar__part { animation: vv-chart-grow 520ms var(--ease-enter) backwards; animation-delay: calc(var(--vv-mixbar-at, 0) * 70ms); }
+  .vv-dumbbell__dot,
+  .vv-dumbbell__figure { animation: vv-dumbbell-travel 680ms var(--ease-enter) backwards; }
+  .vv-dumbbell__bar { animation: vv-chart-grow 680ms var(--ease-enter) backwards; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vv-daychart__hair,
