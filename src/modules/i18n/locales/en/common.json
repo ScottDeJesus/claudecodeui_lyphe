@@ -5340,6 +5340,7 @@
     "codeMode": {
       "unknown": "not known",
       "allKinds": "All kinds",
+      "kind": "Kind",
       "with": "With Code Mode",
       "without": "Without",
       "listSeparator": ", ",
@@ -5368,7 +5369,20 @@
         "pointsSame": "±0 pts",
         "shareUnder": "under {{value}}%",
         "days": "{{days}}d {{hours}}h",
-        "billion": "{{value}}B"
+        "billion": "{{value}}B",
+        "minutesShort": "{{value}}m"
+      },
+      "glance": {
+        "title": "With Code Mode, the last {{days}} days",
+        "titleKind": "{{kind}} with Code Mode, the last {{days}} days",
+        "launches": "Launches",
+        "launchesNote": "{{share}} of all {{all}} · {{without}} without",
+        "launchesEvery": "All {{all}} launches",
+        "launchesNone": "{{without}} ran without",
+        "mix": "Launches with Code Mode by model: {{parts}}",
+        "okValue": "{{share}} ended ok",
+        "okTick": "{{share}} without",
+        "okNote": "{{change}} · {{without}} without"
       },
       "compare": {
         "title": "With and without Code Mode",
@@ -5469,32 +5483,29 @@
       "trend": {
         "title": "Day by day",
         "measure": "Measure",
-        "kind": "Kind",
         "measures": {
           "launches": "Launches",
+          "ok": "Ended ok",
           "turns": "Turns",
           "tokens": "Tokens",
           "seconds": "Time",
           "failures": "Failures"
         },
         "about": {
-          "launches": "Launches that ended each day.",
-          "turns": "Turns taken each day, summed over the day’s launches.",
-          "tokens": "Tokens in and out each day, in thousands.",
-          "seconds": "Time spent each day, in minutes.",
-          "failures": "Launches with Code Mode only: scripts that threw above the line, actions refused or failed below it."
+          "launches": "Launches that ended each day, those with Code Mode on the line and those without on top of them.",
+          "ok": "The share of each day’s launches that ended ok.",
+          "turns": "Each day’s median launch: its turns.",
+          "tokens": "Each day’s median launch: its tokens in and out, in thousands.",
+          "seconds": "Each day’s median launch: its time, in minutes.",
+          "failures": "Launches with Code Mode only: scripts that threw, and actions refused or failed."
         },
         "thrown": "Scripts that threw",
         "refusedOrFailed": "Actions refused or failed",
         "plot": "{{about}} {{kind}}, the last {{days}} days.",
-        "peak": {
-          "launches": "Tallest bar: {{peak}} launches in a day",
-          "turns": "Tallest bar: {{peak}} turns in a day",
-          "tokens": "Tallest bar: {{peak}} thousand tokens in a day",
-          "seconds": "Tallest bar: {{peak}} minutes in a day",
-          "failures": "Tallest bar: {{peak}} in a day"
-        },
-        "barTitle": "{{date}} · {{above}} {{aboveLabel}} · {{below}} {{belowLabel}}",
+        "today": "Today",
+        "shareOfDay_one": "{{share}} of the day’s one launch",
+        "shareOfDay_other": "{{share}} of the day’s {{count}} launches",
+        "failuresNote": "{{thrown}} threw · {{refusedOrFailed}} refused or failed",
         "quiet": "Nothing to draw for {{kind}} in the last {{days}} days.",
         "byDay": "The days as a table",
         "tableLabel": "{{measure}} per day: {{above}}, and {{below}}",

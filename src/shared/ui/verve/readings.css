@@ -1,5 +1,10 @@
-/* Verve readings paint — the rules for the two pieces a number is read FROM: Readout (one figure and its name,
- * Astrolabe's Readout and ReadoutRow) and DayBars (one or two series over named days).
+/* Verve readings paint — the rules for the pieces a number is read FROM: Readout (one figure and its name,
+ * Astrolabe's Readout and ReadoutRow), DayBars (one or two series over named days, mirrored), DayChart (a measure over
+ * named days on a scale: stacked columns or lines) and MixBar (one whole in its parts).
+ *
+ * THE CHART MARKS read one property, `--vv-mark`, set here from the mark's job: a model's colour by its material
+ * (`--chart-<material>`, the chats' coding stepped for a chart), the full ink or its pale companion (`--chart-ink`,
+ * `--chart-pale`), or the warn gold for a count of things gone wrong. It is a local property, not a tone (rule 4).
  *
  * The ninth paint file, opened rather than squeezed in: data.css stood at 220 lines and these two would carry it
  * past its ceiling (MANUAL rule 6). The next file opens the same way again.
@@ -45,6 +50,16 @@
  * `data-tone` is only ever set for a tone that is not neutral (Readout.tsx). */
 .vv-readout[data-tone] .vv-readout__value { color: var(--tone-ink); }
 .vv-readout[data-tone] .vv-readout__value::before { content: var(--tone-glyph) ' '; font-size: 0.5em; vertical-align: 0.3em; }
+/* A change leads the note's line: the tone's ink and glyph when it has one, then a quiet dot before the note. */
+.vv-readout__change { font-weight: 500; color: var(--ink-mid); }
+.vv-readout__change[data-tone] { color: var(--tone-ink); }
+.vv-readout__change[data-tone]::before { content: var(--tone-glyph) ' '; }
+.vv-readout__change[data-then]::after { content: ' · '; color: var(--ink-muted); font-weight: 400; }
+/* The trend: the figure's days as two thin lines under the note, the full ink over the pale one, dashed. */
+.vv-readout__trend { display: block; width: 100%; max-width: 200px; height: 30px; margin-top: 8px; overflow: visible; }
+.vv-readout__trend-line { fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.vv-readout__trend-line[data-mark='ink'] { stroke: var(--chart-ink); }
+.vv-readout__trend-line[data-mark='pale'] { stroke: var(--chart-pale); stroke-dasharray: 3 3; }
 
 /* ---------------------------------------------------------------- DayBars */
 /* The legend names each series with its mark, its word and its total; the scale's sentence stands at its far end.
@@ -77,3 +92,94 @@
 }
 .vv-daybars__zero { position: absolute; right: 0; left: 0; height: 1px; background: var(--border-strong); pointer-events: none; }
 .vv-daybars__axis { color: var(--ink-faint); font-family: var(--font-mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- chart marks */
+/* One property per mark, from its job. DayChart's series say theirs with `data-mark`; a model's part says its material. */
+:is(.vv-daychart, .vv-mixbar) [data-mark='ink'] { --vv-mark: var(--chart-ink); }
+:is(.vv-daychart, .vv-mixbar) [data-mark='pale'] { --vv-mark: var(--chart-pale); }
+:is(.vv-daychart, .vv-mixbar) [data-mark='warn'] { --vv-mark: var(--warn-dot); }
+:is(.vv-daychart, .vv-mixbar) [data-material='mercury'] { --vv-mark: var(--chart-mercury); }
+:is(.vv-daychart, .vv-mixbar) [data-material='tube'] { --vv-mark: var(--chart-tube); }
+:is(.vv-daychart, .vv-mixbar) [data-material='plasma'] { --vv-mark: var(--chart-plasma); }
+:is(.vv-daychart, .vv-mixbar) [data-material='wire'] { --vv-mark: var(--chart-wire); }
+
+/* ---------------------------------------------------------------- DayChart */
+/* The legend first, each series by its key (a square for a column, a short line for a line, dashed when pale), its word
+ * and its total. Then, for a finger only, the line that reads the tapped day (today's until one is tapped): a pointer
+ * that hovers gets the card instead, so the line is put away where hovering is how a reader points. Then the scale's
+ * words up the left and the plot: round steps ruled in the track's hairline, the zero in the strong border. */
+.vv-daychart { gap: 10px; }
+.vv-daychart__legend { gap: 2px 16px; color: var(--ink-muted); font-size: 12.5px; }
+.vv-daychart__series { gap: 6px; }
+.vv-daychart__key { flex: none; align-self: center; width: 9px; height: 9px; border-radius: 2px; background: var(--vv-mark); }
+.vv-daychart[data-form='lines'] .vv-daychart__key { width: 14px; height: 0; border-radius: 0; background: none; border-top: 2px solid var(--vv-mark); }
+.vv-daychart[data-form='lines'] .vv-daychart__key[data-mark='pale'] { border-top-style: dashed; }
+.vv-daychart__total { color: var(--ink); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 500; }
+.vv-daychart__readline { display: flex; min-height: 18px; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin: 0; color: var(--ink-muted); font-size: 12.5px; }
+.vv-daychart__readline .vv-daychart__when { color: var(--ink); font-weight: 500; }
+.vv-daychart__read { gap: 6px; font-variant-numeric: tabular-nums; }
+@media (hover: hover) and (pointer: fine) {
+  .vv-daychart__readline { display: none; }
+}
+.vv-daychart__frame { gap: 8px; }
+.vv-daychart__scale { position: relative; width: 34px; flex: none; }
+.vv-daychart__tick { position: absolute; right: 0; transform: translateY(50%); color: var(--ink-faint); font-family: var(--font-mono); font-size: 10px; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vv-daychart__plot { position: relative; touch-action: pan-y; }
+.vv-daychart__rule { position: absolute; right: 0; left: 0; height: 1px; background: var(--track); pointer-events: none; }
+.vv-daychart__rule[data-zero] { background: var(--border-strong); }
+/* A column stands on the zero; the parts of a stack keep the page's ground between them, and the top one's end is
+ * rounded. Today is marked under its column by a short rule, and a pointed day by the track's ground behind it. */
+.vv-daychart__days { position: absolute; inset: 0; gap: 4px; }
+.vv-daychart[data-dense] .vv-daychart__days { gap: 1px; }
+.vv-daychart__day { position: relative; }
+.vv-daychart__day[data-pointed] { background: var(--track); }
+.vv-daychart__day[data-today]::after { content: ''; position: absolute; right: 0; bottom: -6px; left: 0; height: 2px; border-radius: 1px; background: var(--ink-muted); }
+.vv-daychart__stack { gap: 2px; transform-origin: bottom; }
+.vv-daychart__part { display: block; width: 100%; background: var(--vv-mark); }
+.vv-daychart__part:last-child { border-radius: 3px 3px 0 0; }
+.vv-daychart[data-dense] .vv-daychart__part:last-child { border-radius: 1px 1px 0 0; }
+.vv-daychart__lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.vv-daychart__line { fill: none; stroke: var(--vv-mark); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.vv-daychart__line[data-mark='pale'] { stroke-dasharray: 4 4; }
+.vv-daychart__dot { position: absolute; width: 8px; height: 8px; margin: 0 0 -4px -4px; border-radius: 50%; background: var(--vv-mark); box-shadow: 0 0 0 2px var(--canvas); pointer-events: none; }
+/* The pointed day: a dashed hairline down it, and its card on the side with more room, gliding as the pointer moves. */
+.vv-daychart__hair { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--ink-faint); pointer-events: none; transition: left 120ms ease-out; }
+.vv-daychart__card { position: absolute; top: 4px; z-index: 2; display: flex; min-width: 180px; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--surface); box-shadow: var(--shadow-overlay); color: var(--ink-muted); font-size: 12.5px; pointer-events: none; transform: translateX(12px); transition: left 120ms ease-out; }
+.vv-daychart__card[data-side='before'] { transform: translateX(calc(-100% - 12px)); }
+.vv-daychart__card .vv-daychart__when { margin-bottom: 2px; color: var(--ink); font-weight: 500; }
+.vv-daychart__row { gap: 8px; }
+.vv-daychart__figure { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 500; }
+.vv-daychart__note { margin-top: 2px; padding-top: 6px; border-top: 1px solid var(--hairline); }
+.vv-daychart__axis { margin-top: 10px; color: var(--ink-faint); font-family: var(--font-mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+@media (max-width: 639px) {
+  .vv-daychart__days { gap: 2px; }
+}
+
+/* ---------------------------------------------------------------- MixBar */
+/* One bar of parts, each its share long in its model's colour, the page's ground between two; under it each part's dot,
+ * name and figure. */
+.vv-mixbar { gap: 8px; }
+.vv-mixbar__bar { height: 8px; gap: 2px; }
+.vv-mixbar__part { min-width: 2px; border-radius: 2px; background: var(--vv-mark, var(--chart-ink)); transform-origin: left; }
+.vv-mixbar__keys { gap: 2px 12px; color: var(--ink-muted); font-size: 12px; }
+.vv-mixbar__key { gap: 6px; }
+.vv-mixbar__dot { flex: none; align-self: center; width: 8px; height: 8px; border-radius: 50%; background: var(--vv-mark, var(--chart-ink)); }
+.vv-mixbar__name[data-mono] { font-family: var(--font-mono); font-size: 11.5px; overflow-wrap: anywhere; }
+.vv-mixbar__figure { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- arrivals */
+/* Columns rise from the zero one after another, lines draw from the left, a whole's parts grow out in turn. Nothing
+ * moves for a reader who asked for less motion. */
+@keyframes vv-chart-rise { from { transform: scaleY(0); } }
+@keyframes vv-chart-draw { from { clip-path: inset(0 100% 0 0); } }
+@keyframes vv-chart-grow { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: no-preference) {
+  .vv-daychart__stack { animation: vv-chart-rise 560ms var(--ease-enter) backwards; animation-delay: calc(var(--vv-daychart-at, 0) * 12ms); }
+  .vv-daychart__lines,
+  .vv-readout__trend { animation: vv-chart-draw 800ms var(--ease-enter) backwards; }
+  .vv-mixbar__part { animation: vv-chart-grow 520ms var(--ease-enter) backwards; animation-delay: calc(var(--vv-mixbar-at, 0) * 70ms); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vv-daychart__hair,
+  .vv-daychart__card { transition: none; }
+}

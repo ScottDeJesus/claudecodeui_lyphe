@@ -1,12 +1,14 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CodeModeAnalytics, CodeModeCause, CodeModeDay, CodeModeFaultTotals, CodeModeGroup, CodeModeKind } from '@/shared/analytics-types';
-import { Banner, EmptyState } from '@/shared/ui';
+import { Banner, EmptyState, SegmentedControl } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 import { AnalyticsSectionFrame } from '@/modules/analytics/AnalyticsSectionFrame';
 import { useAnalyticsSection } from '@/modules/analytics/hooks/useAnalyticsSection';
 import { CodeModeCauses } from '@/modules/analytics/sections/code-mode/CodeModeCauses';
 import { CodeModeCompare } from '@/modules/analytics/sections/code-mode/CodeModeCompare';
+import { CodeModeGlance } from '@/modules/analytics/sections/code-mode/CodeModeGlance';
 import { CodeModeOutcomes } from '@/modules/analytics/sections/code-mode/CodeModeOutcomes';
 import { CodeModeTrend } from '@/modules/analytics/sections/code-mode/CodeModeTrend';
 import { daysCovered } from '@/modules/analytics/sections/code-mode/codeModeFigures';
@@ -17,9 +19,11 @@ import { daysCovered } from '@/modules/analytics/sections/code-mode/codeModeFigu
  * ONE READ, DRAWN IN THE AREA'S FRAME. The frame owns reading, not answering, how old the numbers are and Refresh;
  * this folder owns what the answer says.
  *
- * ONE ANSWER, FOUR PARTS, in the order a reader asks: the comparison (with against without, per kind and per model),
- * how the scripts fared, what went wrong, and the days. Each part stands under its own `Rule`, is handed its slice of
- * the one answer, and fetches nothing.
+ * ONE ANSWER, ONE KIND AT A TIME, FIVE PARTS, in the order a reader asks: the glance (the median launch with Code Mode
+ * against without), the days, the comparison (per kind and per model), how the scripts fared, and what went wrong. The
+ * kind is the page's one filter, the kit's segmented control over the answer's own kinds, every kind on arrival and held
+ * for the visit; every part that can be read for one kind is. Each part stands under its own `Rule`, is handed its slice
+ * of the one answer, and fetches nothing.
  *
  * TWO LINES STAND OVER THE PARTS, and only while they are true. A history younger than the window asked for says so
  * first, as a banner, because it changes how every number under it is read. The kinds the house does not count are
@@ -39,12 +43,22 @@ export function CodeModeSection({ days }: { days: number }) {
   );
 }
 
+/** The kind filter's value for every kind together. The wire spells that null; a segmented control holds strings. */
+const ALL_KINDS = '*';
+
 /** The section as drawn from one answer: the frame's children, spaced by the frame. Rendered by the Body above, and by nothing else. */
 function CodeModeAnswer({ answer }: { answer: CodeModeAnalytics }) {
   const { t } = useTranslation('common');
+  // The kind the page shows, every kind on arrival. Held here for the visit, so a Refresh's newer answer keeps it.
+  const [chosenKind, setChosenKind] = useState(ALL_KINDS);
   const { days, kinds, uncounted, groups, rollups, series, faults, causes } = answer;
-  const covered = daysCovered({ firstDay: answer.first_day, today: answer.today, days });
+  const span = { firstDay: answer.first_day, today: answer.today, days };
+  const covered = daysCovered(span);
   const young = covered !== null && answer.first_day !== null;
+  // A kind a newer answer no longer carries falls back to every kind.
+  const shown = kinds.find((entry) => entry.kind === chosenKind) ?? null;
+  const kind = shown?.kind ?? null;
+  const kindLabel = shown?.label ?? t('analytics.codeMode.allKinds');
 
   return (
     <>
@@ -71,10 +85,22 @@ function CodeModeAnswer({ answer }: { answer: CodeModeAnalytics }) {
         )
       ) : (
         <>
+          {kinds.length > 0 && (
+            // A block of its own, so the control keeps its own width in the section's column.
+            <div data-code-mode-kind>
+              <SegmentedControl
+                label={t('analytics.codeMode.kind')}
+                options={[{ value: ALL_KINDS, label: t('analytics.codeMode.allKinds') }, ...kinds.map((entry) => ({ value: entry.kind, label: entry.label }))]}
+                value={kind ?? ALL_KINDS}
+                onChange={setChosenKind}
+              />
+            </div>
+          )}
+          <CodeModeGlance kind={kind} kindLabel={kindLabel} groups={groups} rollups={rollups} series={series} span={span} />
+          <CodeModeTrend series={series} kind={kind} kindLabel={kindLabel} span={span} />
           <CodeModeCompare kinds={kinds} groups={groups} rollups={rollups} />
           <CodeModeOutcomes kinds={kinds} rollups={rollups.filter((row) => row.code_mode && row.model === null)} days={days} />
           <CodeModeCauses causes={causes} faults={faults} kinds={kinds} />
-          <CodeModeTrend series={series} kinds={kinds} firstDay={answer.first_day} today={answer.today} days={days} />
         </>
       )}
     </>

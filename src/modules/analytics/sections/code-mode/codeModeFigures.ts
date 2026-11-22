@@ -1,4 +1,5 @@
-import type { CodeModeDay } from '@/shared/analytics-types';
+import type { CodeModeDay, CodeModeGroup } from '@/shared/analytics-types';
+import type { CompanionMaterial } from '@/shared/types';
 
 /**
  * THE SECTION'S ARITHMETIC, and nothing else: no React, no reading, no word of its own. Every number the section
@@ -12,20 +13,40 @@ import type { CodeModeDay } from '@/shared/analytics-types';
 /** A figure as words: a key under `analytics.codeMode.units` and the values it takes. */
 export type Worded = { key: string; values: Record<string, string | number> };
 
-/** A Code Mode figure against the same figure without: the signed share as words, and whether it is the worse way round. */
-export type Difference = { words: Worded; worse: boolean };
-
-/** What the trend can draw. `failures` is the one measure that is not with against without. */
-export type TrendMeasure = 'launches' | 'turns' | 'tokens' | 'seconds' | 'failures';
+/** A Code Mode figure against the same figure without: the signed share as words, and which way round it is, if either. */
+export type Difference = { words: Worded; worse: boolean; better: boolean };
 
 /**
- * One day of the plot. `figures` are the day's own two numbers, which the table and a bar's title say as words;
- * `values` are the same two in the plot's unit (`PLOT_UNIT`), whole, which the bars and the legend's totals are drawn from.
+ * What a day list can hold. Launches are counted; `ok` is the share of the day's launches that ended ok; turns, tokens (in
+ * plus out) and seconds are the day's own median launch, as the verb printed it. `failures` is the one measure that is
+ * not with against without: it reads the Code Mode launches alone.
  */
-export type TrendDay = { day: string; values: [number, number]; figures: [number, number] };
+export type TrendMeasure = 'launches' | 'ok' | 'turns' | 'tokens' | 'seconds' | 'failures';
+
+/**
+ * One day of the plot: its two figures, with first and without second (for failures: scripts that threw first, actions
+ * refused or failed second). A side with no launch that day has no share and no median launch, and is null; a count is
+ * never null, only zero.
+ */
+export type TrendDay = { day: string; figures: [number | null, number | null] };
 
 /** The window as the answer states it: `first_day`, `today` and `days`. */
 export type TrendSpan = { firstDay: string | null; today: string; days: number };
+
+/** One model's launches over the kinds asked for, with Code Mode first and without second: counts, which add up across kinds. */
+export type ModelLaunches = {
+  /** The model as the verb printed it; "" is a launch with no model named. */
+  model: string;
+  launches: [number, number];
+  /** Of those launches, how many ended ok. */
+  ok: [number, number];
+  /** Scripts run with Code Mode, and how many of them went wrong: threw, or had an action refused or failed. */
+  scripts: number;
+  failures: number;
+};
+
+/** The order the chats' materials stand in when models are listed: Fable's chrome, then Opus's tube, Sonnet's plasma, Haiku's wire. */
+const MATERIAL_ORDER: CompanionMaterial[] = ['mercury', 'tube', 'plasma', 'wire'];
 
 const UNITS = 'analytics.codeMode.units.';
 
@@ -53,9 +74,8 @@ const SCALED_BELOW = 1_000;
 // The reader's own grouping and decimal mark: `undefined` is the browser's locale.
 const WHOLE = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 const ONE_DECIMAL = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-
-/** How many of a measure's own unit one step of the plot stands for: tokens are drawn in thousands, time in minutes. */
-export const PLOT_UNIT: Record<TrendMeasure, number> = { launches: 1, turns: 1, tokens: 1000, seconds: 60, failures: 1 };
+/** A count that may fall between two whole ones (a day's median turns, 9.5): its tenth only when it has one. */
+const UP_TO_A_TENTH = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
 
 /** A part's share of a whole as words ("2.9%"), or null when there is no whole to be a share of. */
 export function shareWords(part: number, whole: number): Worded | null {
@@ -78,8 +98,8 @@ export function ratio(part: number, whole: number): number | null {
 export function difference(withFigure: number | null, withoutFigure: number | null): Difference | null {
   if (withFigure === null || withoutFigure === null || withoutFigure === 0) return null;
   const share = Math.round(((withFigure - withoutFigure) / withoutFigure) * 100);
-  if (share === 0) return { words: { key: UNITS + 'same', values: {} }, worse: false };
-  return { words: { key: UNITS + (share > 0 ? 'more' : 'fewer'), values: { value: WHOLE.format(Math.abs(share)) } }, worse: share > 0 };
+  if (share === 0) return { words: { key: UNITS + 'same', values: {} }, worse: false, better: false };
+  return { words: { key: UNITS + (share > 0 ? 'more' : 'fewer'), values: { value: WHOLE.format(Math.abs(share)) } }, worse: share > 0, better: share < 0 };
 }
 
 /**
@@ -90,10 +110,10 @@ export function pointsDifference(withRate: number | null, withoutRate: number | 
   if (withRate === null || withoutRate === null) return null;
   // Tenths are rounded again: 9.6 − 3.2 must say 6.4, never 6.399999.
   const points = Math.round((drawnPercent(withRate) - drawnPercent(withoutRate)) * 10) / 10;
-  if (points === 0) return { words: { key: UNITS + 'pointsSame', values: {} }, worse: false };
+  if (points === 0) return { words: { key: UNITS + 'pointsSame', values: {} }, worse: false, better: false };
   const size = Math.abs(points);
   const value = Number.isInteger(size) ? WHOLE.format(size) : ONE_DECIMAL.format(size);
-  return { words: { key: UNITS + (points > 0 ? 'pointsMore' : 'pointsFewer'), values: { value } }, worse: points < 0 };
+  return { words: { key: UNITS + (points > 0 ? 'pointsMore' : 'pointsFewer'), values: { value } }, worse: points < 0, better: points > 0 };
 }
 
 /** Seconds as words: "48s", "6m 12s", "1h 4m". */
@@ -118,17 +138,18 @@ export function tokenWords(tokens: number): Worded {
   return { key: UNITS + scale.key, values: { value: threeFigures(tokens / scale.size) } };
 }
 
-/** One of a day's two figures as words, by the measure drawn: a token count, a duration, or a plain count with the reader's grouping. */
+/** One figure as words, by the measure it is a figure of: a share, a token count, a duration, or a count with the reader's grouping. */
 export function measureWords(measure: TrendMeasure, figure: number): Worded {
+  if (measure === 'ok') return shareWords(figure, 1) ?? { key: UNITS + 'count', values: { value: '0' } };
   if (measure === 'tokens') return tokenWords(figure);
   if (measure === 'seconds') return durationWords(figure);
-  return { key: UNITS + 'count', values: { value: WHOLE.format(figure) } };
+  return { key: UNITS + 'count', values: { value: UP_TO_A_TENTH.format(figure) } };
 }
 
 /**
- * The plot's days for one kind (null is every kind) and one measure, oldest first. Launches are counted; turns, tokens
- * (in plus out) and seconds are the day's sums, so the legend's totals are the window's. `failures` reads the Code Mode
- * row alone: scripts thrown first, actions refused or failed second. Every other measure is with first, without second.
+ * The plot's days for one kind (null is every kind) and one measure, oldest first: with first, without second, or for
+ * `failures` the Code Mode row alone, scripts thrown first and actions refused or failed second. A count of a day with no
+ * row is zero; a share or a median launch of a side with no launch that day is null.
  */
 export function dayList(series: CodeModeDay[], kind: string | null, measure: TrendMeasure, span: TrendSpan): TrendDay[] {
   const rowOf = new Map<string, CodeModeDay>();
@@ -138,12 +159,36 @@ export function dayList(series: CodeModeDay[], kind: string | null, measure: Tre
   return plotDays(span).map((day) => {
     const withRow = rowOf.get(rowKey(day, true));
     const withoutRow = rowOf.get(rowKey(day, false));
-    const figures: [number, number] =
+    const figures: [number | null, number | null] =
       measure === 'failures'
         ? [withRow?.thrown ?? 0, (withRow?.refused ?? 0) + (withRow?.failed ?? 0)]
         : [dayFigure(withRow, measure), dayFigure(withoutRow, measure)];
-    return { day, figures, values: [Math.round(figures[0] / PLOT_UNIT[measure]), Math.round(figures[1] / PLOT_UNIT[measure])] };
+    return { day, figures };
   });
+}
+
+/**
+ * Each model's launches for one kind (null is every kind, its rows added up across kinds), in the chats' order of their
+ * materials and, within one material, the busiest first; a launch with no model named comes last. `materialOf` is the
+ * app's one colour coding for models, handed in so this file stays arithmetic.
+ */
+export function modelLaunches(groups: CodeModeGroup[], kind: string | null, materialOf: (model: string) => CompanionMaterial): ModelLaunches[] {
+  const byModel = new Map<string, ModelLaunches>();
+  for (const row of groups) {
+    if (kind !== null && row.kind !== kind) continue;
+    const model = row.model ?? '';
+    const entry = byModel.get(model) ?? { model, launches: [0, 0], ok: [0, 0], scripts: 0, failures: 0 };
+    const side = row.code_mode ? 0 : 1;
+    entry.launches[side] += row.launches;
+    entry.ok[side] += row.ok;
+    if (row.code_mode) {
+      entry.scripts += row.scripts;
+      entry.failures += row.thrown + row.refused + row.failed;
+    }
+    byModel.set(model, entry);
+  }
+  const rank = (model: string) => (model === '' ? MATERIAL_ORDER.length : MATERIAL_ORDER.indexOf(materialOf(model)));
+  return [...byModel.values()].sort((one, other) => rank(one.model) - rank(other.model) || other.launches[0] - one.launches[0] || one.model.localeCompare(other.model));
 }
 
 /** How many days of the window the history covers, today and its first day both counted; null when it covers them all, or has not begun. */
@@ -175,18 +220,19 @@ function threeFigures(scaled: number): string {
   return tenths < 10 ? ONE_DECIMAL.format(tenths) : WHOLE.format(scaled);
 }
 
-/** One day's figure of one side, by the measure: launches are counted, the rest are the day's sums. */
-function dayFigure(row: CodeModeDay | undefined, measure: Exclude<TrendMeasure, 'failures'>): number {
-  if (row === undefined) return 0;
+/** One day's figure of one side, by the measure: launches are counted, a share is the day's own, the rest are its median launch's. */
+function dayFigure(row: CodeModeDay | undefined, measure: Exclude<TrendMeasure, 'failures'>): number | null {
+  if (measure === 'launches') return row?.launches ?? 0;
+  if (row === undefined || row.launches === 0) return null;
   switch (measure) {
-    case 'launches':
-      return row.launches;
+    case 'ok':
+      return ratio(row.ok, row.launches);
     case 'turns':
-      return row.turns_total;
+      return row.turns;
     case 'tokens':
-      return row.tokens_in_total + row.tokens_out_total;
+      return row.tokens;
     case 'seconds':
-      return row.seconds_total;
+      return row.seconds;
     default: {
       const unhandled: never = measure;
       return unhandled;
