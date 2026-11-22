@@ -5437,11 +5437,8 @@
       },
       "outcomes": {
         "title": "How the scripts fared",
-        "scripts": "Scripts run",
-        "scriptsNote_one": "in {{count, number}} launch with Code Mode",
-        "scriptsNote_other": "in {{count, number}} launches with Code Mode",
         "none": "No launch ran with Code Mode in the last {{days}} days, so there is no script to count.",
-        "about": "Refused and failed count the actions inside a script. The last three rows count the edits a script handed to the merger.",
+        "about": "Refused and failed count the actions inside a script. Merged and declined count the edits a script handed to the merger.",
         "thrown": "Threw",
         "resent": "Sent again",
         "refused": "Refused",
@@ -5449,9 +5446,11 @@
         "mergesAsked": "To merger",
         "mergesMerged": "Merged",
         "declined": "Declined",
-        "ofScripts": "{{share}} of scripts",
-        "thrownOfScripts": "{{share}} of scripts, {{timedOut}} timed out",
-        "byKind": "By kind",
+        "byKindTable": "The kinds as a table",
+        "run": "{{scripts}} run",
+        "ofMerger": "of {{whole}} handed over",
+        "failuresTitle": "Failures each day",
+        "failuresPlot": "Scripts that threw and actions refused or failed each day, launches with Code Mode, {{kind}}, the last {{days}} days.",
         "tableLabel": "Script outcomes by kind, for launches with Code Mode",
         "columns": {
           "kind": "Kind",
@@ -5491,7 +5490,8 @@
         },
         "showRest_one": "Show {{count}} rarer kind of failure",
         "showRest_other": "Show {{count}} rarer kinds of failure",
-        "showFirst": "Show only the commonest {{count}}"
+        "showFirst": "Show only the commonest {{count}}",
+        "everyKind": "These count every kind; each row names its own."
       },
       "trend": {
         "title": "Day by day",
@@ -5509,11 +5509,8 @@
           "ok": "The share of each day’s launches that ended ok.",
           "turns": "Each day’s median launch: its turns.",
           "tokens": "Each day’s median launch: its tokens in and out, in thousands.",
-          "seconds": "Each day’s median launch: its time, in minutes.",
-          "failures": "Launches with Code Mode only: scripts that threw, and actions refused or failed."
+          "seconds": "Each day’s median launch: its time, in minutes."
         },
-        "thrown": "Scripts that threw",
-        "refusedOrFailed": "Actions refused or failed",
         "plot": "{{about}} {{kind}}, the last {{days}} days.",
         "today": "Today",
         "shareOfDay_one": "{{share}} of the day’s one launch",
@@ -5524,9 +5521,7 @@
         "tableLabel": "{{measure}} per day: {{above}}, and {{below}}",
         "quietLeftOut": "Days with nothing to count are left out.",
         "columns": {
-          "day": "Day",
-          "thrown": "Threw",
-          "refusedOrFailed": "Refused or failed"
+          "day": "Day"
         }
       }
     }

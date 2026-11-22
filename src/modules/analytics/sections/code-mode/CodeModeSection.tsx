@@ -99,8 +99,8 @@ function CodeModeAnswer({ answer }: { answer: CodeModeAnalytics }) {
           <CodeModeGlance kind={kind} kindLabel={kindLabel} groups={groups} rollups={rollups} series={series} span={span} />
           <CodeModeTrend series={series} kind={kind} kindLabel={kindLabel} span={span} />
           <CodeModeCompare kinds={kinds} groups={groups} rollups={rollups} kind={kind} />
-          <CodeModeOutcomes kinds={kinds} rollups={rollups.filter((row) => row.code_mode && row.model === null)} days={days} />
-          <CodeModeCauses causes={causes} faults={faults} kinds={kinds} />
+          <CodeModeOutcomes kinds={kinds} rollups={rollups.filter((row) => row.code_mode && row.model === null)} series={series} kind={kind} kindLabel={kindLabel} span={span} />
+          <CodeModeCauses causes={causes} faults={faults} kinds={kinds} kind={kind} />
         </>
       )}
     </>

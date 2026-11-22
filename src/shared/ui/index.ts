@@ -173,6 +173,9 @@ export { Meter } from '@/shared/ui/Meter';
 // One whole in its parts, as one bar in the models' chart colours with each part named under it. The analytics module's
 // Code Mode glance splits its launches by model with it; it is the design system's, beside DayChart.
 export { MixBar } from '@/shared/ui/MixBar';
+// A share as a length on the track, Astrolabe's meter without its words, for a list whose figures stand beside it. The
+// analytics module's Code Mode section ranks the scripts' faults and the families of failures with it.
+export { ShareBar } from '@/shared/ui/ShareBar';
 // The design system's Opening (Astrolabe's "what a deliberate click opened, hung from the mark it came out of") and Track ("one
 // thing's course"), ported from its bundle, beside its Hoop above: the kanban module's bug board is the first screen built on
 // them, and every screen redrawn to the design system after it is meant to reach for them before anything else.

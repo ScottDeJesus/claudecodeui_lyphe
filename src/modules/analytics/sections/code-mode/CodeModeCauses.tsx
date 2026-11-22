@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CodeModeCause, CodeModeFaultTotals, CodeModeKind } from '@/shared/analytics-types';
-import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, FoldChevron, Rule } from '@/shared/ui';
+import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, FoldChevron, Rule, ShareBar } from '@/shared/ui';
 import { restOf } from '@/modules/analytics/sections/code-mode/codeModeFigures';
 
 /**
@@ -11,7 +11,8 @@ import { restOf } from '@/modules/analytics/sections/code-mode/codeModeFigures';
  *
  * A FAMILY IS A ROW THAT OPENS. Closed, it says what failed (the fault in the locale's word for it, as the two parts
  * above say it, or the raw kind for one the verb adds later; then the helper it was in and the rule that spoke, the
- * journals' own, in the mono face), how often, in how many launches and of which kinds. Open, it shows the sentences
+ * journals' own, in the mono face), how often, in how many launches and of which kinds, and how it stands against the
+ * commonest family as a bar in the warn gold. Open, it shows the sentences
  * it was most often said in, each with its count, and how many more were worded another way. The first family is open on
  * arrival: the commonest cause is what the reader came for, and one open row shows what a row holds.
  *
@@ -22,6 +23,9 @@ import { restOf } from '@/modules/analytics/sections/code-mode/codeModeFigures';
  *
  * NOTHING FAILED is a sentence, and no heading figure. The verb lists 25 families at most; what falls outside them is
  * said in a last line once every family is drawn, so the rows then add up to the heading.
+ *
+ * THE FAMILIES ARE EVERY KIND'S: the verb counts a family across kinds, so a kind picked for the page changes nothing
+ * here, and a line under the heading says so while one is; each row names its own kinds.
  */
 
 type CodeModeCausesProps = {
@@ -31,13 +35,15 @@ type CodeModeCausesProps = {
   faults: CodeModeFaultTotals;
   /** The kinds the verb counts: a family names its kinds by their labels. */
   kinds: CodeModeKind[];
+  /** The kind the page is showing; null (or none given) is every kind. */
+  kind?: string | null;
 };
 
 /** How many families are drawn on arrival; the rest are one press away. */
 const FIRST_FAMILIES = 8;
 
 /** One family: the row, and under it its commonest sentences. */
-function CauseFamily({ cause, kinds, startsOpen }: { cause: CodeModeCause; kinds: string; startsOpen: boolean }) {
+function CauseFamily({ cause, kinds, share, startsOpen }: { cause: CodeModeCause; kinds: string; share: number; startsOpen: boolean }) {
   const { t } = useTranslation('common');
   // Open or closed, held here for the visit.
   const [open, setOpen] = useState(startsOpen);
@@ -62,6 +68,9 @@ function CauseFamily({ cause, kinds, startsOpen }: { cause: CodeModeCause; kinds
                 ? t('analytics.codeMode.causes.where', { launches, ended: t('analytics.codeMode.causes.endedScript', { count: cause.threw }), kinds })
                 : t('analytics.codeMode.causes.whereQuiet', { launches, kinds })}
             </span>
+            <span className="mt-1.5 block max-w-xs">
+              <ShareBar share={share} tone="warn" />
+            </span>
           </span>
           <span className="flex-none text-sm font-medium tabular-nums text-foreground">{cause.count.toLocaleString()}</span>
         </CollapsibleTrigger>
@@ -82,7 +91,7 @@ function CauseFamily({ cause, kinds, startsOpen }: { cause: CodeModeCause; kinds
 }
 
 /** Rendered by CodeModeSection, third. Nothing else mounts it. */
-export function CodeModeCauses({ causes, faults, kinds }: CodeModeCausesProps) {
+export function CodeModeCauses({ causes, faults, kinds, kind = null }: CodeModeCausesProps) {
   const { t } = useTranslation('common');
   const headingId = useId();
   const labelOf = (kind: string) => kinds.find((entry) => entry.kind === kind)?.label ?? kind;
@@ -91,6 +100,7 @@ export function CodeModeCauses({ causes, faults, kinds }: CodeModeCausesProps) {
   // The first families only, or every one; the first on arrival, held here for the visit.
   const [allShown, setAllShown] = useState(false);
   const shown = allShown ? causes : causes.slice(0, FIRST_FAMILIES);
+  const commonest = Math.max(1, ...causes.map((cause) => cause.count));
 
   return (
     <section className="flex min-w-0 flex-col gap-3" aria-labelledby={headingId} data-code-mode-causes>
@@ -103,12 +113,14 @@ export function CodeModeCauses({ causes, faults, kinds }: CodeModeCausesProps) {
       ) : (
         <>
           <p className="text-sm text-muted-foreground">{t('analytics.codeMode.causes.head', { count: faults.total })}</p>
+          {kind !== null && <p className="text-xs text-muted-foreground">{t('analytics.codeMode.causes.everyKind')}</p>}
           <ol id={listId} className="flex flex-col divide-y divide-border">
             {shown.map((cause, at) => (
               <CauseFamily
                 key={JSON.stringify([cause.fault, cause.helper, cause.hook])}
                 cause={cause}
                 kinds={cause.kinds.map(labelOf).join(t('analytics.codeMode.listSeparator'))}
+                share={cause.count / commonest}
                 startsOpen={at === 0}
               />
             ))}

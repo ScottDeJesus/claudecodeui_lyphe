@@ -1,7 +1,7 @@
 /* Verve readings paint — the rules for the pieces a number is read FROM: Readout (one figure and its name,
  * Astrolabe's Readout and ReadoutRow), DayBars (one or two series over named days, mirrored), DayChart (a measure over
- * named days on a scale: stacked columns or lines), MixBar (one whole in its parts) and Dumbbell (two marks a row on one
- * scale, a figure and its companion).
+ * named days on a scale: stacked columns or lines), MixBar (one whole in its parts), Dumbbell (two marks a row on one
+ * scale, a figure and its companion) and ShareBar (a share as a length).
  *
  * THE CHART MARKS read one property, `--vv-mark`, set here from the mark's job: a model's colour by its material
  * (`--chart-<material>`, the chats' coding stepped for a chart), the full ink or its pale companion (`--chart-ink`,
@@ -122,6 +122,10 @@
 @media (hover: hover) and (pointer: fine) {
   .vv-daychart__readline { display: none; }
 }
+/* And a finger's tap is read in the line, so no card stands over the plot it is tapping. */
+@media (hover: none), (pointer: coarse) {
+  .vv-daychart .vv-daychart__card { display: none; }
+}
 .vv-daychart__frame { gap: 8px; }
 .vv-daychart__scale { position: relative; width: 34px; flex: none; }
 .vv-daychart__tick { position: absolute; right: 0; transform: translateY(50%); color: var(--ink-faint); font-family: var(--font-mono); font-size: 10px; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -201,6 +205,11 @@
 .vv-dumbbell__tick[data-anchor='start'] { transform: none; }
 .vv-dumbbell__tick[data-anchor='end'] { transform: translateX(-100%); }
 
+/* ---------------------------------------------------------------- ShareBar */
+/* A share as a length on the track, square-ended like Astrolabe's meter, in its tone's dot or the chart ink. */
+.vv-sharebar { display: block; height: 8px; overflow: hidden; background: var(--track); }
+.vv-sharebar__fill { display: block; width: 100%; height: 100%; background: var(--tone-dot, var(--chart-ink)); transform-origin: left; transition: transform var(--dur-move) var(--ease-enter); }
+
 /* ---------------------------------------------------------------- arrivals */
 /* Columns rise from the zero one after another, lines draw from the left, a whole's parts grow out in turn. Nothing
  * moves for a reader who asked for less motion. */
@@ -217,8 +226,10 @@
   .vv-dumbbell__dot,
   .vv-dumbbell__figure { animation: vv-dumbbell-travel 680ms var(--ease-enter) backwards; }
   .vv-dumbbell__bar { animation: vv-chart-grow 680ms var(--ease-enter) backwards; }
+  .vv-sharebar__fill { animation: vv-chart-grow 600ms var(--ease-enter) backwards; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vv-daychart__hair,
-  .vv-daychart__card { transition: none; }
+  .vv-daychart__card,
+  .vv-sharebar__fill { transition: none; }
 }
