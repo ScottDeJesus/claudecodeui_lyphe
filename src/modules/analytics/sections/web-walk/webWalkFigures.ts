@@ -1,4 +1,4 @@
-import type { WebWalkApp, WebWalkCheck, WebWalkDay, WebWalkScreen } from '@/shared/analytics-types';
+import type { WebWalkApp, WebWalkCheck, WebWalkDay, WebWalkScreen, WebWalkSettled } from '@/shared/analytics-types';
 
 // The Web walks section's arithmetic: shares as words, the plotted days, the tables' rows and their order.
 // No words of its own and nothing drawn: a sentence leaves here as a key and its values, for the caller's t.
@@ -14,6 +14,9 @@ export type LaunchDay = { day: string; walking: number; byHand: number };
 
 /** One app as its table row: its walks, how many of its screens were opened, how often a screen was not reached, and its screens. */
 export type AppRow = { app: string; walks: number; opened: number; unreached: number; screens: WebWalkScreen[] };
+
+/** One of the four bars that turn the nudge from warning to refusing, and whether it is met now. */
+export type NudgeBar = { key: 'launches' | 'share' | 'walks' | 'faults'; met: boolean };
 
 const UNITS = 'analytics.webWalk.units.';
 const PERCENT = 100;
@@ -72,6 +75,26 @@ export function appRows(apps: WebWalkApp[]): AppRow[] {
       screens: [...app.screens].sort((a, b) => b.unreached - a.unreached || b.opened - a.opened || a.screen.localeCompare(b.screen)),
     }))
     .sort((a, b) => b.walks - a.walks || a.app.localeCompare(b.app));
+}
+
+/**
+ * The four bars that turn warning to refusing, in the order they are said, each with whether it is met now. A share with
+ * nothing to be a share of (no launch, no walk) is not met.
+ */
+export function refusingBars(settled: WebWalkSettled): NudgeBar[] {
+  const { bars } = settled;
+  const launches = settled.launches_walking + settled.launches_by_hand;
+  return [
+    { key: 'launches', met: launches >= bars.min_launches },
+    { key: 'share', met: launches > 0 && settled.launches_walking / launches >= bars.share },
+    { key: 'walks', met: settled.walks >= bars.min_walks },
+    { key: 'faults', met: settled.walks > 0 && settled.faults / settled.walks <= bars.fault_share },
+  ];
+}
+
+/** The names of an app's screens that were not reached, in the row's own order. */
+export function unreachedScreens(row: AppRow): string[] {
+  return row.screens.filter((screen) => screen.unreached > 0).map((screen) => screen.screen);
 }
 
 /** An epoch-seconds moment as its YYYY-MM-DD in the reader's own zone, for the date formatter. */

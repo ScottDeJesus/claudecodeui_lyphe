@@ -30,7 +30,7 @@ const REGISTRY = "/home/lyphe/.claude/hooks/web_walk/apps.toml";
 const HEADER = /^\s*\[\[?\s*[^\]]+\]\]?\s*$/m;
 
 function withoutLandmark(text, screen) {
-  const at = text.search(new RegExp(`^\\s*\\[\\s*screen\\.(?:"${screen}"|${screen})\\s*\\]\\s*$`, "m"));
+  const at = text.search(new RegExp(`^[ \\t]*\\[\\s*screen\\.(?:"${screen}"|${screen})\\s*\\]\\s*$`, "m"));
   if (at < 0) return null;
   const headerEnd = text.indexOf("\n", at) + 1;
   const next = text.slice(headerEnd).search(HEADER);

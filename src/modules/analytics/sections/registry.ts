@@ -35,4 +35,11 @@ export const ANALYTICS_SECTIONS: AnalyticsSection[] = [
     defaultDays: 30,
     Body: lazy(() => import('@/modules/analytics/sections/web-walk/WebWalkSection').then((m) => ({ default: m.WebWalkSection }))),
   },
+  {
+    id: 'repeats',
+    titleKey: 'analytics.sections.repeats',
+    windows: [7, 30, 90],
+    defaultDays: 30,
+    Body: lazy(() => import('@/modules/analytics/sections/repeats/RepeatsSection').then((m) => ({ default: m.RepeatsSection }))),
+  },
 ];

@@ -1,14 +1,15 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WebWalkApp, WebWalkScreen } from '@/shared/analytics-types';
 import type { DataTableColumn } from '@/shared/types';
 import { DataTable, Rule } from '@/shared/ui';
 import { cn } from '@/shared/utils';
-// FILL: fake — this import goes with the fake open row below.
-import { FAKE_STATE, fakeOpen } from '@/modules/analytics/sections/web-walk/webWalkFake';
-import { appRows } from '@/modules/analytics/sections/web-walk/webWalkFigures';
+import { appRows, unreachedScreens } from '@/modules/analytics/sections/web-walk/webWalkFigures';
 import type { AppRow } from '@/modules/analytics/sections/web-walk/webWalkFigures';
+
+/** The most unreached screens the check-again command names. Past it the command names none, which checks every screen of the app. */
+const MOST_NAMED = 6;
 
 type WebWalkAppsProps = {
   /** One row per app the walks opened, with its screens. */
@@ -26,7 +27,8 @@ type WebWalkAppsProps = {
  *
  * A PRESSED APP OPENS ITS SCREENS UNDER ITSELF, the unreached ones first, each with how often it was opened and, only
  * where it happened, how often it was not reached. Under them, only when one was not reached, stands the command that
- * checks a screen again: the next step, beside the problem. One app is open at a time, none on arrival.
+ * checks those screens again, naming them so it runs as written: the next step, beside the problem. One app is open at a
+ * time, none on arrival. A screen's name breaks at a hyphen before it breaks mid-word, and never runs past its cell.
  * A window in which no walk opened an app says so in a line, where the table would stand.
  *
  * Rendered by WebWalkSection, last. Nothing else mounts it.
@@ -35,10 +37,16 @@ export function WebWalkApps({ apps, days }: WebWalkAppsProps) {
   const { t } = useTranslation('common');
   const headingId = useId();
   const rows = appRows(apps);
-  // FILL: expanded — useState<string | null>(null): the app open under itself; none on arrival.
-  const expanded = fakeOpen(FAKE_STATE).app;
-  const onExpand = () => {
-    // FILL: onExpand — keeps the pressed row's key as the open app, null to close it.
+  // None open on arrival.
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const onExpand = (key: string | null) => setExpanded(key);
+
+  /** The command that checks an app's unreached screens again, in the sentence that says why. */
+  const reachHint = (row: AppRow) => {
+    const missed = unreachedScreens(row);
+    return missed.length > MOST_NAMED
+      ? t('analytics.webWalk.apps.reachHintAll', { app: row.app })
+      : t('analytics.webWalk.apps.reachHint', { app: row.app, count: missed.length, screens: missed.join(' ') });
   };
 
   const columns: DataTableColumn<AppRow>[] = [
@@ -62,7 +70,7 @@ export function WebWalkApps({ apps, days }: WebWalkAppsProps) {
   ];
 
   const screenColumns: DataTableColumn<WebWalkScreen>[] = [
-    { key: 'screen', label: t('analytics.webWalk.apps.columns.screen'), render: (screen) => <span className="break-all">{screen.screen}</span> },
+    { key: 'screen', label: t('analytics.webWalk.apps.columns.screen'), render: (screen) => <span className="[overflow-wrap:anywhere]">{screen.screen}</span> },
     {
       key: 'opened',
       label: t('analytics.webWalk.apps.columns.opened'),
@@ -97,7 +105,7 @@ export function WebWalkApps({ apps, days }: WebWalkAppsProps) {
               ) : (
                 <div className="flex flex-col gap-2">
                   <DataTable rows={row.screens} columns={screenColumns} rowKey={(screen) => screen.screen} label={t('analytics.webWalk.apps.screensLabel', { app: row.app })} />
-                  {row.unreached > 0 && <p className="break-words text-xs text-muted-foreground">{t('analytics.webWalk.apps.reachHint', { app: row.app })}</p>}
+                  {row.unreached > 0 && <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{reachHint(row)}</p>}
                 </div>
               )
             }

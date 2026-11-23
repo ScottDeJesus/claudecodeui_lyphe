@@ -14,6 +14,12 @@ import { createAnalyticsReaders } from './sections/index.js';
  */
 const DEFAULT_CODE_MODE_BIN = path.join(os.homedir(), '.claude', 'scripts', 'code-mode');
 
+/** The house's web-walk command (its \`reading\` verb), read here for the same reason, through \`WEB_WALK_BIN\`. */
+const DEFAULT_WEB_WALK_BIN = path.join(os.homedir(), '.claude', 'scripts', 'web-walk');
+
+/** The house's heal-repeats command (its `reading` verb), read here for the same reason, through `HEAL_REPEATS_BIN`. */
+const DEFAULT_HEAL_REPEATS_BIN = path.join(os.homedir(), '.claude', 'scripts', 'heal-repeats');
+
 /** `~` expanded here, because `execFile` does not know the tilde and a path it cannot resolve never answers. */
 function expandHome(value: string): string {
   if (value === '~') return os.homedir();
@@ -28,6 +34,8 @@ export type AnalyticsModule = { router: Router };
  */
 export function createAnalyticsModule(): AnalyticsModule {
   const codeModeBin = expandHome(process.env.CODE_MODE_BIN || DEFAULT_CODE_MODE_BIN);
-  const service = createAnalyticsService(createAnalyticsReaders({ codeModeBin }));
+  const webWalkBin = expandHome(process.env.WEB_WALK_BIN || DEFAULT_WEB_WALK_BIN);
+  const healRepeatsBin = expandHome(process.env.HEAL_REPEATS_BIN || DEFAULT_HEAL_REPEATS_BIN);
+  const service = createAnalyticsService(createAnalyticsReaders({ codeModeBin, webWalkBin, healRepeatsBin }));
   return { router: createAnalyticsRouter(service) };
 }

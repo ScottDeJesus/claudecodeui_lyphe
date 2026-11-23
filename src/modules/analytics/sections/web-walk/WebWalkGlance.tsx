@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { WebWalkDoors, WebWalkSettled, WebWalkTotals } from '@/shared/analytics-types';
 import { Readout, Rule } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
-import { shareWords, sinceDay } from '@/modules/analytics/sections/web-walk/webWalkFigures';
+import { refusingBars, shareWords, sinceDay } from '@/modules/analytics/sections/web-walk/webWalkFigures';
 
 type WebWalkGlanceProps = {
   /** The window's sums. */
@@ -24,8 +24,12 @@ type WebWalkGlanceProps = {
  * the plot's, right under.
  *
  * UNDER THE FIGURES, THE NUDGE: whether a browser program written by hand is only warned about or refused, and the bars
- * that decide it with where each stands. It is counted over the nudge's own days, which the line says, since they are not
- * the window's.
+ * that decide it. While it warns, the bars still short come first, in the page's ink, since they are what it is waiting
+ * for; the ones met follow, quiet. It is counted over the nudge's own days, which the line says, since they are not the
+ * window's.
+ *
+ * A WINDOW WITH LAUNCHES BY HAND AND NO WALK YET says so under Walks and Custom steps, where a count of none would read
+ * "in 0 of 0 walks".
  *
  * Rendered by WebWalkSection, first. Nothing else mounts it.
  */
@@ -55,13 +59,17 @@ export function WebWalkGlance({ totals, doors, settled, days }: WebWalkGlancePro
         <Readout
           label={t('analytics.webWalk.glance.walks')}
           value={totals.walks}
-          note={t('analytics.webWalk.glance.walksNote', { execute: doors.execute.toLocaleString(), command: doors.command.toLocaleString() })}
+          note={totals.walks === 0 ? t('analytics.webWalk.glance.walksNoteNone') : t('analytics.webWalk.glance.walksNote', { execute: doors.execute.toLocaleString(), command: doors.command.toLocaleString() })}
           unknownLabel={unknown}
         />
         <Readout
           label={t('analytics.webWalk.glance.customSteps')}
           value={totals.custom_steps}
-          note={t('analytics.webWalk.glance.customStepsNote', { walks: totals.walks_with_custom.toLocaleString(), total: totals.walks.toLocaleString() })}
+          note={
+            totals.walks === 0
+              ? t('analytics.webWalk.glance.customStepsNoteNone')
+              : t('analytics.webWalk.glance.customStepsNote', { walks: totals.walks_with_custom.toLocaleString(), total: totals.walks.toLocaleString() })
+          }
           unknownLabel={unknown}
         />
       </div>
@@ -71,29 +79,39 @@ export function WebWalkGlance({ totals, doors, settled, days }: WebWalkGlancePro
   );
 }
 
-/** The nudge's state in one sentence, and under it the bars it is held to with where each stands now. */
+/** The nudge's state in one sentence, and under it the bars it is held to: while it warns, the ones still short first, then the ones met. */
 function WebWalkNudge({ settled }: { settled: WebWalkSettled }) {
   const { t } = useTranslation('common');
   const { bars } = settled;
   const launches = settled.launches_walking + settled.launches_by_hand;
   const share = (part: number, whole: number) => {
     const words = shareWords(part, whole);
-    return words === null ? t('analytics.webWalk.nudge.none') : t(words.key, words.values);
+    return words === null ? null : t(words.key, words.values);
   };
+  /** Where a share stands now, or the words for having nothing to be a share of yet. */
+  const now = (value: string | null, none: 'noLaunch' | 'noWalk') => (value === null ? t('analytics.webWalk.nudge.' + none) : t('analytics.webWalk.nudge.now', { value }));
   const since = settled.since === null ? null : sinceDay(settled.since);
   const standing = {
     windowDays: settled.window_days,
     launches: launches.toLocaleString(),
     minLaunches: bars.min_launches.toLocaleString(),
-    share: share(settled.launches_walking, launches),
-    minShare: share(bars.share, 1),
+    shareNow: now(share(settled.launches_walking, launches), 'noLaunch'),
+    minShare: share(bars.share, 1) ?? '',
     walks: settled.walks.toLocaleString(),
     minWalks: bars.min_walks.toLocaleString(),
-    faults: share(settled.faults, settled.walks),
-    maxFaults: share(bars.fault_share, 1),
+    faultsNow: now(share(settled.faults, settled.walks), 'noWalk'),
+    maxFaults: share(bars.fault_share, 1) ?? '',
     releaseWalks: bars.release_min_walks.toLocaleString(),
-    releaseFaults: share(bars.release_fault_share, 1),
+    releaseFaults: share(bars.release_fault_share, 1) ?? '',
   };
+  const held = refusingBars(settled);
+  const said = (met: boolean) =>
+    held
+      .filter((bar) => bar.met === met)
+      .map((bar) => t('analytics.webWalk.nudge.bar.' + bar.key, standing))
+      .join(t('analytics.webWalk.listSeparator'));
+  const short = said(false);
+  const met = said(true);
 
   return (
     <div className="flex flex-col gap-1" data-web-walk-nudge={settled.refusing ? 'refusing' : 'warning'}>
@@ -104,7 +122,15 @@ function WebWalkNudge({ settled }: { settled: WebWalkSettled }) {
             : t('analytics.webWalk.nudge.refusingSince', { date: formatShortDate(since) ?? since })
           : t('analytics.webWalk.nudge.warning')}
       </p>
-      <p className="text-xs text-muted-foreground">{settled.refusing ? t('analytics.webWalk.nudge.barsRefusing', standing) : t('analytics.webWalk.nudge.barsWarning', standing)}</p>
+      {settled.refusing ? (
+        <p className="text-xs text-muted-foreground">{t('analytics.webWalk.nudge.barsRefusing', standing)}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground" data-web-walk-nudge-bars>
+          {short === '' ? t('analytics.webWalk.nudge.allMet', { bars: met }) : <span className="font-medium text-foreground">{t('analytics.webWalk.nudge.short', { bars: short })}</span>}
+          {short !== '' && met !== '' && ' ' + t('analytics.webWalk.nudge.met', { bars: met })}
+          {' ' + t('analytics.webWalk.nudge.counted', { windowDays: settled.window_days })}
+        </p>
+      )}
     </div>
   );
 }

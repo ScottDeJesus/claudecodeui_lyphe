@@ -1,12 +1,11 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { RepeatsDay } from '@/shared/analytics-types';
 import type { DataTableColumn } from '@/shared/types';
 import { Button, DataTable, DayChart, FoldChevron, Rule, SegmentedControl } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
-// FILL: repeatsFigures import — the figures' own import takes this line's place: '@/modules/analytics/sections/repeats/repeatsFigures'
-import { fakeBusyDays, fakeCharsWords, fakeChartDays, fakeChoice, fakeSeriesTotals, fakeTickWords } from '@/modules/analytics/sections/repeats/repeatsFake';
+import { busyDaysOf, charsWords, chartDaysOf, seriesTotalsOf, tickWordsOf } from '@/modules/analytics/sections/repeats/repeatsFigures';
 
 type RepeatsTrendProps = {
   /** One row per day of the window. */
@@ -36,25 +35,14 @@ export function RepeatsTrend({ series, days }: RepeatsTrendProps) {
   const headingId = useId();
   const tableId = useId();
 
-  // FILL: measure — useState<RepeatsMeasure>('chars'): which measure the plot draws, held here for the visit
-  const measure: RepeatsMeasure = fakeChoice().measure;
-  // FILL: onMeasure — that state's setter
-  const onMeasure: (next: RepeatsMeasure) => void = () => {};
-  // FILL: tableOpen — useState(false): whether the day table is open; closed on every mount, the plot is the answer
-  const tableOpen: boolean = fakeChoice().tableOpen;
-  // FILL: onToggleTable — flips that state
-  const onToggleTable: () => void = () => {};
+  const [measure, onMeasure] = useState<RepeatsMeasure>('chars');
+  const [tableOpen, setTableOpen] = useState(false);
+  const onToggleTable = () => setTableOpen((open) => !open);
 
-  // FILL: chartDays — repeatsFigures: the window's days, oldest first, each with the measure's values and their words
-  const chartDays = fakeChartDays(series, measure);
-  // FILL: seriesTotals — repeatsFigures: the window's sum of each drawn series, in words, for the legend
-  const seriesTotals = fakeSeriesTotals(series, measure);
-  // FILL: tickWords — repeatsFigures: a tick of the scale in the measure's words (thousands of characters, or a count)
-  const tickWords = fakeTickWords(measure);
-  // FILL: busyDays — repeatsFigures: the days that had anything written by hand, newest first
-  const busyDays = fakeBusyDays(series);
-  // FILL: charsWords — repeatsFigures: a count of characters in short words ("412k")
-  const charsWords = fakeCharsWords;
+  const chartDays = chartDaysOf(series, measure);
+  const seriesTotals = seriesTotalsOf(series, measure);
+  const tickWords = tickWordsOf(measure);
+  const busyDays = busyDaysOf(series);
 
   const split = measure === 'chars';
   const about = t('analytics.repeats.trend.about.' + measure);

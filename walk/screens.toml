@@ -1,7 +1,9 @@
 # CloudCLI's screens for the house's walk library (hooks/web_walk; SEAM 3). A change that moves a screen updates this file
-# in the same change. Names follow PlaceId (src/shared/types.ts) and SettingsMainTab; every target is a name, never a
-# position; no entry sends a chat turn. The views are reached through the Places menu (its Menu button, then the place),
-# which every layout draws: the Views rail is set aside while a chat holds the workspace. Addresses live in the house registry (hooks/web_walk/apps.toml), never here.
+# in the same change. Names follow PlaceId (src/shared/types.ts), SettingsMainTab and the Analytics section registry; every
+# target is a name, never a position; no entry sends a chat turn. The views and Settings are reached through the Places
+# menu (its Menu button, then the place), which every layout draws: the Views rail is set aside while a chat holds the
+# workspace. Headings are matched with exact = false, case-blind, since the app sets many in capitals by CSS. Addresses
+# live in the house registry (hooks/web_walk/apps.toml), never here.
 
 [app]
 theme = "light"
@@ -12,15 +14,15 @@ path = "/home"
 landmark = { role = "heading", name = "Home" }
 
 [screen.station]
-says = "The station: what each running chat needs."
+says = "The station: the companion's page, with what is in flight."
 path = "/station"
-landmark = { role = "heading", name = "Station" }
+landmark = { role = "slider", name = "In flight" }
 
 [screen.session]
 says = "One chat, by its session id."
 path = "/session/{session}"
 needs = ["session"]
-landmark = { role = "textbox" }
+landmark = { role = "button", name = "Attach a file" }
 
 [screen.roadmap]
 says = "The roadmap: the house's plans and their phases."
@@ -30,7 +32,7 @@ landmark = { role = "heading", name = "Roadmap" }
 [screen.bugs]
 says = "The bug board: filed tickets by state."
 steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Bugs", in = { role = "menu", name = "Places" } } }]
-landmark = { role = "heading", name = "Bugs" }
+landmark = { role = "tab", name = "Board" }
 
 [screen.rnd]
 says = "Research and development: the ideas in flight."
@@ -45,7 +47,7 @@ landmark = { role = "heading", name = "Cerberus" }
 [screen.analytics]
 says = "The Analytics area: the house's measured figures by section."
 steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Analytics", in = { role = "menu", name = "Places" } } }]
-landmark = { role = "heading", name = "Analytics" }
+landmark = { role = "radio", name = "Code Mode" }
 
 [screen.inbox]
 says = "The inbox: what waits on the operator."
@@ -68,78 +70,90 @@ steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "men
 landmark = { role = "heading", name = "Schedules" }
 
 [screen.settings]
-says = "Settings, opened from the Places menu."
+says = "Settings, opened from the Places menu; it opens on Agents."
 steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Settings", in = { role = "menu", name = "Places" } } }]
-landmark = { role = "dialog" }
+landmark = { role = "heading", name = "Settings" }
 
 [screen.settings-agents]
 says = "Settings, the Agents tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "Agents", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "Agents" }
+steps = [{ click = { role = "button", name = "Agents" } }]
+landmark = { role = "tablist", name = "Agent settings" }
 
 [screen.settings-appearance]
 says = "Settings, the Appearance tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "Appearance", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "Appearance" }
+steps = [{ click = { role = "button", name = "Appearance" } }]
+landmark = { role = "heading", name = "Dark mode", exact = false }
 
 [screen.settings-git]
 says = "Settings, the Git tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "Git", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "Git" }
+steps = [{ click = { role = "button", name = "Git" } }]
+landmark = { role = "heading", name = "Git configuration", exact = false }
 
 [screen.settings-api]
 says = "Settings, the API & Tokens tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "API & Tokens", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "API & Tokens" }
+steps = [{ click = { role = "button", name = "API & Tokens" } }]
+landmark = { role = "heading", name = "API keys", exact = false }
 
 [screen.settings-voice]
 says = "Settings, the Voice tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "Voice", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "Voice" }
+steps = [{ click = { role = "button", name = "Voice" } }]
+landmark = { role = "heading", name = "Transcripts", exact = false }
 
 [screen.settings-tasks]
 says = "Settings, the Tasks tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "Tasks", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "Tasks" }
+steps = [{ click = { role = "button", name = "Tasks" } }]
+landmark = { role = "heading", name = "Tasks", exact = false }
 
 [screen.settings-browser]
 says = "Settings, the Browser tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "Browser", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "Browser" }
+steps = [{ click = { role = "button", name = "Browser" } }]
+landmark = { role = "heading", name = "Browser", exact = false }
 
 [screen.settings-notifications]
 says = "Settings, the Notifications tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "Notifications", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "Notifications" }
+steps = [{ click = { role = "button", name = "Notifications" } }]
+landmark = { role = "heading", name = "Phone push", exact = false }
 
 [screen.settings-plugins]
 says = "Settings, the Plugins tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "Plugins", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "Plugins" }
+steps = [{ click = { role = "button", name = "Plugins" } }]
+landmark = { role = "heading", name = "Official plugins", exact = false }
 
 [screen.settings-updates]
 says = "Settings, the Updates tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "Updates", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "Updates" }
+steps = [{ click = { role = "button", name = "Updates" } }]
+landmark = { role = "heading", name = "Claude updates", exact = false }
 
 [screen.settings-about]
 says = "Settings, the About tab."
 from = "settings"
-steps = [{ click = { role = "button", name = "About", in = { role = "dialog" } } }]
-landmark = { role = "heading", name = "About" }
+steps = [{ click = { role = "button", name = "About" } }]
+landmark = { role = "heading", name = "CloudCLI Pro features", exact = false }
 
 [screen.analytics-code-mode]
 says = "Analytics, the Code Mode section."
 from = "analytics"
-steps = [{ click = "Code Mode" }]
-landmark = { role = "heading", name = "Code Mode" }
+steps = [{ click = { role = "radio", name = "Code Mode" } }]
+landmark = { role = "heading", name = "Day by day", exact = false }
+
+[screen.analytics-web-walk]
+says = "Analytics, the Web walks section."
+from = "analytics"
+steps = [{ click = { role = "radio", name = "Web walks" } }]
+landmark = { role = "heading", name = "Launches each day", exact = false }
+
+[screen.analytics-repeats]
+says = "Analytics, the Repeats section: the work launches keep writing by hand, read as families."
+from = "analytics"
+steps = [{ click = { role = "radio", name = "Repeats" } }]
+landmark = { role = "heading", name = "Families", exact = true }

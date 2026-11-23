@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { RepeatsAnalytics } from '@/shared/analytics-types';
 import { Readout, Rule } from '@/shared/ui';
-// FILL: repeatsFigures import — the figures' own import takes this line's place: '@/modules/analytics/sections/repeats/repeatsFigures'
-import { fakeCharsWords, fakeDayLine, fakeRaisedCount, fakeShareLine, fakeShareWords } from '@/modules/analytics/sections/repeats/repeatsFake';
+import { charsWords, dayLine, raisedCountOf, shareLineOf, shareWordsOf } from '@/modules/analytics/sections/repeats/repeatsFigures';
 
 type RepeatsGlanceProps = {
   /** Every family found, raised or not. */
@@ -36,20 +35,13 @@ export function RepeatsGlance({ families, totals, steps, series, days }: Repeats
   const unknownLabel = t('analytics.repeats.unknown');
   const found = families.length;
 
-  // FILL: raisedCount — repeatsFigures: how many of the families are raised
-  const raisedCount = fakeRaisedCount(families);
-  // FILL: charsInFamilies — repeatsFigures: the characters a family holds, in short words ("412k")
-  const charsInFamilies = fakeCharsWords(totals.chars_in_families);
-  // FILL: charsByHand — repeatsFigures: every character written by hand in the window, in short words
-  const charsByHand = fakeCharsWords(totals.chars);
-  // FILL: share — repeatsFigures: the families' share of the characters written by hand ("38%"); null when none was written
-  const share = fakeShareWords(totals);
-  // FILL: launchesLine — repeatsFigures: the launches writing by hand, day by day, for the figure's line
-  const launchesLine = fakeDayLine(series, 'launches_writing');
-  // FILL: charsLine — repeatsFigures: the characters a family holds, day by day, for the figure's line
-  const charsLine = fakeDayLine(series, 'chars_in_families');
-  // FILL: shareLine — repeatsFigures: each day's share, null on a day with nothing written, for the figure's line
-  const shareLine = fakeShareLine(series);
+  const raisedCount = raisedCountOf(families);
+  const charsInFamilies = charsWords(totals.chars_in_families);
+  const charsByHand = charsWords(totals.chars);
+  const share = shareWordsOf(totals);
+  const launchesLine = dayLine(series, 'launches_writing');
+  const charsLine = dayLine(series, 'chars_in_families');
+  const shareLine = shareLineOf(series);
 
   const raisedNote =
     raisedCount > 0

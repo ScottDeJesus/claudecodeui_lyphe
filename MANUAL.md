@@ -16903,7 +16903,7 @@ section: src/modules/analytics/ — the client frame: AnalyticsPanel, AnalyticsS
 | `AnalyticsPanel.tsx` | `AnalyticsPanel()`: `Rule` level 2 (`analytics.title`), then the head, then the chosen section's `Body` in a `Suspense`. Head = two `SegmentedControl`s on one wrapping row: sections (one option per `ANALYTICS_SECTIONS` row) and windows (the chosen row's `windows`, `analytics.head.days`). The head sits outside the `Suspense` and the frame, so both controls stand in every state. Suspense fallback = `Spinner` with `analytics.frame.reading`, `data-analytics-frame="opening"`. Root `section[data-analytics-panel=<id>]`. |
 | `AnalyticsSectionFrame.tsx` | `AnalyticsSectionFrame<T>({ reading, refresh, takenAt, children })`; `children: (data: T) => ReactNode`, `takenAt: (data) => epoch seconds`. Draws the four states below. |
 | `types.ts` | `AnalyticsReading<T>` = `{status:'loading'}` \| `{status:'unreachable'}` \| `{status:'ready', data: T, stale: boolean}`; `AnalyticsChoice` = `{ section: string; days: number }`. |
-| `sections/registry.ts` | `AnalyticsSection` = `{ id, titleKey, windows, defaultDays, Body }` (`Body` is `lazy`, takes `{ days }`); `ANALYTICS_SECTIONS`, one row today: `'code-mode'`, windows 7/30/90, default 30, title key `analytics.sections.codeMode`. |
+| `sections/registry.ts` | `AnalyticsSection` = `{ id, titleKey, windows, defaultDays, Body }` (`Body` is `lazy`, takes `{ days }`); `ANALYTICS_SECTIONS`, three rows: `'code-mode'` (title key `analytics.sections.codeMode`), `'web-walk'` (`analytics.sections.webWalk`, `Body` = `WebWalkSection`) and `'repeats'` (`analytics.sections.repeats`, MAN-10134), each windows 7/30/90, default 30. |
 | `sections/code-mode/CodeModeSection.tsx` | `CodeModeSection({ days })`: reads `useAnalyticsSection<CodeModeAnalytics>('code-mode', days, narrow)` once (`narrow`, beside it, checks the top-level keys by type and carries the rows as the verb printed them), wraps the answer in the frame with `takenAt = answer.generated_at`. Inside, `CodeModeAnswer` draws, in order: the notes (`div[data-code-mode-notes]`, only when one is true: an info `Banner` `analytics.codeMode.historyStarts` while `daysCovered` is under the window; the `uncounted` kinds' labels in muted ink), then the four parts. `groups` empty ⇒ one `EmptyState` and no part: `analytics.codeMode.empty.noHistory*` when `first_day` is null, else `analytics.codeMode.empty.title`/`message`. |
 | `sections/code-mode/CodeModeCompare.tsx` | `CodeModeCompare({ kinds, groups, rollups })`, `[data-code-mode-compare]`: four `Readout`s (ended ok, turns, tokens, time of the median launch with Code Mode, each with the figure without and the signed share), then a `DataTable` of with/without pairs (all kinds, then each kind). Toggles: Median \| Total, All models \| Each model. |
 | `sections/code-mode/CodeModeOutcomes.tsx` | `CodeModeOutcomes({ kinds, rollups, days })`, `[data-code-mode-outcomes]`: scripts as a `Readout`; threw, sent again, refused, failed, to merger, merged, declined as `KeyValueList` rows with their share of scripts; per kind in a `DataTable`. `rollups` = the Code Mode rows with `model === null`. |
@@ -17011,3 +17011,63 @@ The R&D place: a panel of candidates (things the scout found) in four views, an 
 | Settings sheet focus: Remove → Undo takes focus; Undo → that source's Remove (found by `data-rnd-source`); line closed → the Add field (`data-rnd-add-source`); a refused removal moves nothing | focus never falls to the page |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/PlacesContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/places/PlacesWheel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/AdoptDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/CandidateOpening.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/CandidateRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndEpics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndSeen.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRnd.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/lazyRndTab.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RejectDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndSettingsSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/rndWire.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/rndWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/startSpikeChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/weeklyWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/rnd-types.ts
+
+## MAN-10134 — src/modules/analytics/sections/repeats/ — the Repeats section scaffold: files, FILL markers, what the fill adds
+
+## src/modules/analytics/sections/repeats/ — the Repeats section scaffold
+
+The Repeats section of the Analytics area (MAN-10105 is the frame): the work launches keep writing by hand, read as families. Its read is `GET /api/analytics/repeats?days=N` (the answer of `heal-repeats reading`), typed `RepeatsAnalytics` in BOTH `analytics-types.ts` files (MAN-10102).
+
+### State: live
+| fact | value |
+|---|---|
+| registered in `sections/registry.ts` | yes: `{ id: 'repeats', titleKey: 'analytics.sections.repeats', windows: [7, 30, 90], defaultDays: 30 }`, third on the strip |
+| server reader | `server/modules/analytics/sections/repeats.ts`, row `repeats` of the reader table (MAN-10102), running `heal-repeats reading --days N` (`HEAL_REPEATS_BIN`) |
+| read | `useAnalyticsSection<RepeatsAnalytics>('repeats', days, narrowRepeats)`: fetched on open and on Refresh, no timer |
+| `repeatsFigures.ts` | the arithmetic: `narrowRepeats` (never throws), `raisedCountOf`, `charsWords`, `shareWordsOf`, `dayLine`, `shareLineOf`, `chartDaysOf`, `seriesTotalsOf`, `tickWordsOf`, `busyDaysOf`, `familyWords`, `familyTrend`, `dateWords`, `likenessWords`, `familyDaysOf`, `familyDaysTotalOf`. The verb's `series` runs day by day from its first day to today; a family's `series` holds only the days it was written, so `familyDaysOf` lays the quiet days in as 0 from its first sighting (or the window's start) to today, and `familyTrend` is null until a family is two weeks old |
+
+### Files
+| file | draws |
+|---|---|
+| `RepeatsSection.tsx` | the Body inside `AnalyticsSectionFrame`; whole-section `EmptyState` when no launch was read |
+| `RepeatsGlance.tsx` | readouts; "Families raised" is the one large figure, warn gold only while >0; heading "By hand again · {{days}} days" |
+| `RepeatsFamilies.tsx` | `DataTable` of families, largest first, in a `[container-type:inline-size]` wrapper; the opened family is sticky `w-[calc(100cqi-34px)]`, two columns from `@container(min-width:840px)` — no `100vw`, no `lg:` |
+| `RepeatsTrend.tsx` | the day plot (measure switch, closed day table) |
+
+### Family row and opened family
+- Row: what repeats (cut from the sentence, so no two rows start alike); one line of standing (Raised / Back after its cure — the only red / Cured <date> / Watching), `trendMark`, id, kind; then Launches, Programs, Characters (a step family: "N uses / N worked").
+- Under 580 px of table the three weight columns hide and one `aria-hidden` line under the words carries them.
+- A family with no trend draws no trend badge.
+- Opened: sentence whole, first seen, since its cure; Already does this (a step family with nothing on the shelf says the helper's premade set lacks it), What repeats, File names, Examples, Its days, the `heal-repeats show <id>` command. Examples and the command wrap at spaces; `break-all` is for paths only.
+- Frame states: loading and unreachable (the frame's), no launch read, no family yet (glance and days stay), data, newer answer on its way (`?repeats=stale`).
+
+### Words
+`analytics.sections.repeats` and `analytics.repeats.*` in `src/modules/i18n/locales/en/common.json`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/repeats/RepeatsFamilies.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/repeats/repeatsFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/repeats/RepeatsGlance.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/repeats/RepeatsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/repeats/RepeatsTrend.tsx
+
+## MAN-10135 — src/modules/analytics/sections/web-walk/ — the Web walks section: the live read of /api/analytics/web-walk, its files and figures
+
+Client half of the Analytics `web-walk` section: whether the house drives its running apps through the web-walk helper or writes browser programs by hand. Registered in `sections/registry.ts` as id `'web-walk'` (MAN-10106). Words: `analytics.sections.webWalk` ("Web walks") and the `analytics.webWalk.*` block of en/common.json.
+
+## State today
+- `WebWalkSection` reads `GET /api/analytics/web-walk?days=N` through `useAnalyticsSection<WebWalkAnalytics>('web-walk', days, narrow)`; `narrow` checks the top-level keys (numbers, `first_day` a string or null, `settled` with a boolean `refusing` and numeric `bars`, `totals` and `doors` all numbers, three lists) and carries the rows as printed. The server reader is `server/modules/analytics/sections/web-walk.ts` (MAN-10102) over `~/.claude/scripts/web-walk reading --days N`.
+- The two folds are the components' own state: `WebWalkTrend`'s day table (`useState(false)`, closed on every mount) and `WebWalkApps`' open app (`useState<string | null>(null)`, none on arrival).
+
+## Files — `src/modules/analytics/sections/web-walk/`
+| file | what |
+|---|---|
+| `WebWalkSection.tsx` | `WebWalkSection({ days })` in `AnalyticsSectionFrame`, `takenAt = answer.generated_at`. an info `Banner` `historyStarts` while `daysCovered` is under the window; quiet (`totals.walks === 0 && totals.launches_by_hand === 0`) ⇒ one `EmptyState` (`empty.noHistory*` when `first_day` is null, else `empty.title`/`message`); else Glance, Trend, then Checks and Apps side by side from `xl`. |
+| `WebWalkGlance.tsx` | `WebWalkGlance({ totals, doors, settled, days })`: the share on the helper as the one large `Readout`; launches walking / by hand; walks (by door) and custom steps, with `walksNoteNone` / `customStepsNoteNone` for a window with no walk; `WebWalkNudge`: the nudge's state in one sentence (warning, refusing, since) with its bars and where each stands. |
+| `WebWalkTrend.tsx` | `WebWalkTrend({ series, totals, span })`: `DayChart` of launches walking vs by hand; the days as a folded `DataTable` (Day by day) under the plot, closed on every mount. |
+| `WebWalkChecks.tsx` | `WebWalkChecks({ checks, days })`: premade checks ranked by answered false. |
+| `WebWalkApps.tsx` | `WebWalkApps({ apps, days })`: table App / Walks / Unreached (three columns for a 390px screen); a row opens to Screen / Opened, "N unreached" only where it happened, and the re-check sentence naming up to `MOST_NAMED = 6` unreached screens, past it the app alone. Wraps with `[overflow-wrap:anywhere]`. |
+| `webWalkFigures.ts` | pure seam: `shareWords`, `daysCovered`, `launchDays`, `rankedChecks`, `appRows`, `refusingBars(settled): NudgeBar[]`, `unreachedScreens(row)`, `sinceDay`; types `Worded`, `WalkSpan`, `LaunchDay`, `AppRow`, `NudgeBar`. |
+
+
+## Rules
+- `settled.bars` keys are `min_launches`, `share`, `min_walks`, `fault_share`, `release_min_walks`, `release_fault_share`: chosen by the client, `web_walk/settled.py` was not on disk. Rename in `WebWalkBars` (both type files) and the standing object in `WebWalkGlance` together.
+- `WebWalkAnalytics` is typed in both `analytics-types.ts` files, identical blocks.
+- Astrolabe components only (`Readout`, `Rule`, `DayChart`, `DataTable`, `Banner`, `EmptyState`, `Button`, `FoldChevron`); every file under 150 lines.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkApps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkChecks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/webWalkFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkGlance.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkTrend.tsx

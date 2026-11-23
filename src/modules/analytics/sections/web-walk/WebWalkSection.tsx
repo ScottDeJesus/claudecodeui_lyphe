@@ -1,17 +1,15 @@
 import { useTranslation } from 'react-i18next';
 
-import type { WebWalkAnalytics } from '@/shared/analytics-types';
+import type { WebWalkAnalytics, WebWalkApp, WebWalkCheck, WebWalkDay, WebWalkDoors, WebWalkSettled, WebWalkTotals } from '@/shared/analytics-types';
 import { Banner, EmptyState } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 import { AnalyticsSectionFrame } from '@/modules/analytics/AnalyticsSectionFrame';
+import { useAnalyticsSection } from '@/modules/analytics/hooks/useAnalyticsSection';
 import { WebWalkApps } from '@/modules/analytics/sections/web-walk/WebWalkApps';
 import { WebWalkChecks } from '@/modules/analytics/sections/web-walk/WebWalkChecks';
 import { WebWalkGlance } from '@/modules/analytics/sections/web-walk/WebWalkGlance';
 import { WebWalkTrend } from '@/modules/analytics/sections/web-walk/WebWalkTrend';
-// FILL: fake — this import goes with the fake reading below.
-import { FAKE_STATE, fakeReading } from '@/modules/analytics/sections/web-walk/webWalkFake';
 import { daysCovered } from '@/modules/analytics/sections/web-walk/webWalkFigures';
-import type { AnalyticsReading } from '@/modules/analytics/types';
 
 /**
  * THE WEB WALKS SECTION: whether the house drives its running apps through the web-walk helper or still writes browser
@@ -27,11 +25,7 @@ import type { AnalyticsReading } from '@/modules/analytics/types';
  * younger than the window, and the full page.
  */
 export function WebWalkSection({ days }: { days: number }) {
-  // FILL: reading — the section's one read: useAnalyticsSection<WebWalkAnalytics>('web-walk', days, narrow), with a narrow that checks the answer key by key as CodeModeSection's does. It answers reading and refresh.
-  const reading: AnalyticsReading<WebWalkAnalytics> = fakeReading(FAKE_STATE, days);
-  const refresh = () => {
-    // FILL: refresh — the read's own refresh: Try again's press when the route did not answer, Refresh's when it did.
-  };
+  const { reading, refresh } = useAnalyticsSection<WebWalkAnalytics>('web-walk', days, narrow);
 
   return (
     <AnalyticsSectionFrame reading={reading} refresh={refresh} takenAt={(answer) => answer.generated_at}>
@@ -52,9 +46,6 @@ function WebWalkAnswer({ answer }: { answer: WebWalkAnalytics }) {
 
   return (
     <>
-      {/* FILL: sample — this notice goes with the fake reading, and its word analytics.webWalk.sample with it. */}
-      <Banner tone="info">{t('analytics.webWalk.sample')}</Banner>
-
       {young && (
         <Banner tone="info">
           {t('analytics.webWalk.historyStarts', { date: formatShortDate(answer.first_day) ?? answer.first_day, count: covered, days })}
@@ -80,4 +71,39 @@ function WebWalkAnswer({ answer }: { answer: WebWalkAnalytics }) {
       )}
     </>
   );
+}
+
+/**
+ * The answer as the route carried it, checked key by key at the top: a key missing or of another type is no answer.
+ * The rows are carried as the command printed them: the server's reader narrowed the same keys, and the command is the
+ * one writer of their shape.
+ */
+function narrow(data: unknown): WebWalkAnalytics | null {
+  if (!isRecord(data)) return null;
+  const { days, generated_at, today, first_day, settled, totals, series, checks, doors, apps } = data;
+  if (typeof days !== 'number' || typeof generated_at !== 'number' || typeof today !== 'string') return null;
+  const firstDay = typeof first_day === 'string' ? first_day : null;
+  if (first_day !== null && firstDay === null) return null;
+  if (!isSettled(settled) || !isFigures<WebWalkTotals>(totals) || !isFigures<WebWalkDoors>(doors)) return null;
+  if (!isList<WebWalkDay>(series) || !isList<WebWalkCheck>(checks) || !isList<WebWalkApp>(apps)) return null;
+  return { days, generated_at, today, first_day: firstDay, settled, totals, series, checks, doors, apps };
+}
+
+/** A JSON object: not null, not an array. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** A list, its rows taken as the command printed them (see `narrow`). */
+function isList<Row>(value: unknown): value is Row[] {
+  return Array.isArray(value);
+}
+
+/** An object of counts: every value a number. */
+function isFigures<Figures>(value: unknown): value is Figures {
+  return isRecord(value) && Object.values(value).every((figure) => typeof figure === 'number');
+}
+
+function isSettled(value: unknown): value is WebWalkSettled {
+  return isRecord(value) && typeof value.refusing === 'boolean' && isFigures<WebWalkSettled['bars']>(value.bars);
 }

@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { RepeatsAnalytics } from '@/shared/analytics-types';
 import { EmptyState } from '@/shared/ui';
 import { AnalyticsSectionFrame } from '@/modules/analytics/AnalyticsSectionFrame';
-// FILL: useAnalyticsSection import — the hook's own import takes this line's place: '@/modules/analytics/hooks/useAnalyticsSection'
-import { fakeRepeatsSection } from '@/modules/analytics/sections/repeats/repeatsFake';
+import { useAnalyticsSection } from '@/modules/analytics/hooks/useAnalyticsSection';
+import { narrowRepeats } from '@/modules/analytics/sections/repeats/repeatsFigures';
 import { RepeatsFamilies } from '@/modules/analytics/sections/repeats/RepeatsFamilies';
 import { RepeatsGlance } from '@/modules/analytics/sections/repeats/RepeatsGlance';
 import { RepeatsTrend } from '@/modules/analytics/sections/repeats/RepeatsTrend';
@@ -21,10 +21,8 @@ import { RepeatsTrend } from '@/modules/analytics/sections/repeats/RepeatsTrend'
  * A window with no launch read says so and draws nothing else. A window with launches and no family keeps the glance and
  * the days, which are true without one, and the families' place says that none has formed yet.
  */
-// FILL: registry — the row { id: 'repeats', titleKey: 'analytics.sections.repeats', windows: [7, 30, 90], defaultDays: 30 } in sections/registry.ts mounts this Body
 export function RepeatsSection({ days }: { days: number }) {
-  // FILL: useAnalyticsSection — useAnalyticsSection<RepeatsAnalytics>('repeats', days, narrow), with a narrow that never throws
-  const { reading, refresh } = fakeRepeatsSection(days);
+  const { reading, refresh } = useAnalyticsSection<RepeatsAnalytics>('repeats', days, narrowRepeats);
 
   return (
     <AnalyticsSectionFrame reading={reading} refresh={refresh} takenAt={(answer) => answer.generated_at}>

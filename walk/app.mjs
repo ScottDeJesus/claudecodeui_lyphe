@@ -102,10 +102,12 @@ async function waitFor(locator, state, why) {
 }
 
 /**
- * On a phone the navigation is in the sidebar drawer: open it by its Open menu button. When the Places menu or the docked
- * Views rail is already on screen, nothing is pressed.
+ * Makes the navigation reachable: the Settings panel a previous screen left open is closed (it stands over the Places
+ * menu), and on a phone the sidebar drawer is opened by its Open menu button. When the Places menu or the docked Views
+ * rail is already on screen, nothing is pressed.
  */
 export async function unfold(page) {
+  await closeSettings(page);
   const views = page.getByRole('navigation', { name: 'Views', exact: true }).filter({ visible: true });
   if (await views.count() || await placesMenu(page).filter({ visible: true }).count()) return;
   const menu = page.getByRole('button', { name: 'Open menu', exact: true }).filter({ visible: true });
@@ -141,6 +143,14 @@ async function signIn(api, user) {
     throw faulted('sign-in', `${api}/api/auth/login answered ${response.status} with no token for ${user.username}`);
   }
   return body.token;
+}
+
+/** Closes the Settings panel when it shows (its heading "Settings"), by its own close button (Settings.tsx, settings close). */
+async function closeSettings(page) {
+  const panel = page.getByRole('heading', { name: 'Settings', exact: true }).filter({ visible: true });
+  if (!(await panel.count())) return;
+  await page.getByRole('button', { name: "Close", exact: true }).filter({ visible: true }).first().click();
+  await panel.first().waitFor({ state: 'hidden', timeout: UNFOLD_LIMIT_MS });
 }
 
 /** The Places menu's button (PlacesMenu.tsx, places.menu), which brings up the wheel of places. */

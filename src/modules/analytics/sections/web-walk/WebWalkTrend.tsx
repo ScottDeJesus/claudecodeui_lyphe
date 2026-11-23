@@ -1,12 +1,10 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WebWalkDay, WebWalkTotals } from '@/shared/analytics-types';
 import type { DataTableColumn } from '@/shared/types';
 import { Button, DataTable, DayChart, FoldChevron, Rule } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
-// FILL: fake — this import goes with the fake fold below.
-import { FAKE_STATE, fakeOpen } from '@/modules/analytics/sections/web-walk/webWalkFake';
 import { launchDays, shareWords } from '@/modules/analytics/sections/web-walk/webWalkFigures';
 import type { LaunchDay, WalkSpan } from '@/modules/analytics/sections/web-walk/webWalkFigures';
 
@@ -33,11 +31,9 @@ export function WebWalkTrend({ series, totals, span }: WebWalkTrendProps) {
   const { t } = useTranslation('common');
   const headingId = useId();
   const tableId = useId();
-  // FILL: tableOpen — useState(false): whether the day-by-day table is open. Closed on every mount: the plot is the answer.
-  const tableOpen = fakeOpen(FAKE_STATE).days;
-  const onToggleTable = () => {
-    // FILL: onToggleTable — flips tableOpen.
-  };
+  // Closed on every mount: the plot is the answer.
+  const [tableOpen, setTableOpen] = useState(false);
+  const onToggleTable = () => setTableOpen((open) => !open);
 
   const above = t('analytics.webWalk.trend.walking');
   const below = t('analytics.webWalk.trend.byHand');

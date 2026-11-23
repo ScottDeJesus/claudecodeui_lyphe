@@ -1,21 +1,11 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { RepeatsAnalytics, RepeatsFamily } from '@/shared/analytics-types';
 import { trendMark } from '@/shared/trend';
 import type { DataTableColumn, Tone } from '@/shared/types';
 import { Badge, DataTable, DayChart, EmptyState, Rule } from '@/shared/ui';
-// FILL: repeatsFigures import — the figures' own import takes this line's place: '@/modules/analytics/sections/repeats/repeatsFigures'
-import {
-  fakeCharsWords,
-  fakeChoice,
-  fakeDateWords,
-  fakeFamilyDays,
-  fakeFamilyDaysTotal,
-  fakeFamilyTrend,
-  fakeFamilyWords,
-  fakeLikenessWords,
-} from '@/modules/analytics/sections/repeats/repeatsFake';
+import { charsWords, dateWords, familyDaysOf, familyDaysTotalOf, familyTrend, familyWords, likenessWords } from '@/modules/analytics/sections/repeats/repeatsFigures';
 
 type RepeatsFamiliesProps = {
   /** Every family found, the most characters first, as the answer orders them. */
@@ -33,12 +23,15 @@ type RepeatsFamiliesProps = {
  * family's sentence so that no two rows start alike, and under it the family's standing in one of four words, its trend
  * (the heal tab's own mark and words), its id as the heal tab spells it, and what kind of work it is. Red is kept for the
  * one standing that is a regression: a family raised again after its cure. Then the three counts it is weighed in; a
- * family of custom steps says its uses, and how many worked, where the others say characters.
+ * family of custom steps says its uses, and how many worked, where the others say characters. Where the table's window
+ * is too narrow to show those counts at rest (under 580 px) they also stand in one line under what repeats. A family
+ * with no trend yet wears no trend mark.
  *
  * A PRESSED ROW OPENS UNDER ITSELF on what a healer asks next, in that order: the sentence whole, what already does this
  * work (so the cure is to teach it, not to build it), what repeats, the file names, a few launches to read, and its days.
- * The opening keeps to the screen's own width and stays in view while the table is pushed sideways, so on a phone it is
- * read down, never across.
+ * The opening is as wide as the table's own window (the pane's width, whatever stands beside it, less the cell's padding
+ * and the frame's border) and stays in view while the table is pushed sideways, so it is read down, never across. It
+ * splits in two columns only from 840 px of table.
  *
  * With no family, the heading stays and its place says what a family is and that none has formed.
  *
@@ -49,18 +42,7 @@ export function RepeatsFamilies({ families, thresholds, windowDays, days }: Repe
   const headingId = useId();
   const count = (figure: number) => figure.toLocaleString();
 
-  // FILL: openFamily — useState<string | null>(null): the family open under its row, held here for the visit
-  const openFamily: string | null = fakeChoice().openFamily;
-  // FILL: onOpenFamily — that state's setter
-  const onOpenFamily: (id: string | null) => void = () => {};
-  // FILL: familyWords — repeatsFigures: what repeats, cut from the sentence (its features, or a step's place and features)
-  const familyWords = fakeFamilyWords;
-  // FILL: familyTrend — repeatsFigures: the family's last seven days against the seven before, as trendMark takes it
-  const familyTrend = fakeFamilyTrend;
-  // FILL: charsWords — repeatsFigures: a count of characters in short words ("412k")
-  const charsWords = fakeCharsWords;
-  // FILL: dateWords — repeatsFigures: a moment's day in short words ("Nov 14")
-  const dateWords = fakeDateWords;
+  const [openFamily, onOpenFamily] = useState<string | null>(null);
 
   if (families.length === 0) {
     return (
@@ -88,17 +70,25 @@ export function RepeatsFamilies({ families, thresholds, windowDays, days }: Repe
       label: t('analytics.repeats.families.columns.family'),
       render: (family) => {
         const standing = standingOf(family);
-        const trend = trendMark(familyTrend(family));
+        const course = familyTrend(family, days);
+        const trend = course === null ? null : trendMark(course);
         return (
           <div className="flex min-w-44 flex-col gap-1.5 whitespace-normal" data-repeats-family={family.id}>
             <span className="line-clamp-2 break-words font-mono text-sm">{familyWords(family)}</span>
+            <span className="text-xs tabular-nums text-muted-foreground [@container(min-width:580px)]:hidden" aria-hidden="true">
+              {family.tool === 'step'
+                ? t('analytics.repeats.families.weightStep', { launches: count(family.launches), uses: count(family.uses ?? 0), worked: count(family.worked ?? 0) })
+                : t('analytics.repeats.families.weight', { launches: count(family.launches), programs: count(family.programs), chars: charsWords(family.chars) })}
+            </span>
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               <Badge as="span" tone={standing.tone}>
                 {standing.word}
               </Badge>
-              <Badge as="span" tone={trend.tone} title={t('analytics.repeats.families.trendTitle')}>
-                <span aria-hidden="true">{trend.glyph}</span>&nbsp;{trend.word}
-              </Badge>
+              {trend !== null && (
+                <Badge as="span" tone={trend.tone} title={t('analytics.repeats.families.trendTitle')}>
+                  <span aria-hidden="true">{trend.glyph}</span>&nbsp;{trend.word}
+                </Badge>
+              )}
               <span className="font-mono">{family.id}</span>
               <span>{t('analytics.repeats.families.tool.' + family.tool)}</span>
             </span>
@@ -143,15 +133,19 @@ export function RepeatsFamilies({ families, thresholds, windowDays, days }: Repe
         {t('analytics.repeats.families.about', { launches: thresholds.launches, chars: count(thresholds.chars), window: windowDays })}
       </p>
 
-      <DataTable
-        rows={families}
-        columns={columns}
-        rowKey={(family) => family.id}
-        label={t('analytics.repeats.families.tableLabel', { days })}
-        expanded={openFamily}
-        onExpand={onOpenFamily}
-        renderExpanded={(family) => <FamilyOpened family={family} days={days} />}
-      />
+      {/* THE TABLE'S WINDOW IS THE MEASURE: a row's weight line and an opened family size themselves by this width, never by
+          the screen's, so they hold beside a sidebar of any width. */}
+      <div className="min-w-0 [container-type:inline-size]">
+        <DataTable
+          rows={families}
+          columns={columns}
+          rowKey={(family) => family.id}
+          label={t('analytics.repeats.families.tableLabel', { days })}
+          expanded={openFamily}
+          onExpand={onOpenFamily}
+          renderExpanded={(family) => <FamilyOpened family={family} days={days} />}
+        />
+      </div>
     </section>
   );
 }
@@ -164,19 +158,11 @@ function FamilyOpened({ family, days }: { family: RepeatsFamily; days: number })
   const step = family.tool === 'step';
   const command = 'heal-repeats show ' + family.id;
 
-  // FILL: charsWords — repeatsFigures: a count of characters in short words ("412k")
-  const charsWords = fakeCharsWords;
-  // FILL: dateWords — repeatsFigures: a moment's day in short words ("Nov 14")
-  const dateWords = fakeDateWords;
-  // FILL: likenessWords — repeatsFigures: a likeness as a share ("63%")
-  const likenessWords = fakeLikenessWords;
-  // FILL: familyDays — repeatsFigures: the family's days for its plot, oldest first: the launches that wrote it each day
-  const familyDays = fakeFamilyDays(family);
-  // FILL: familyDaysTotal — repeatsFigures: those launches summed over the window, in words, for the legend
-  const familyDaysTotal = fakeFamilyDaysTotal(family);
+  const familyDays = familyDaysOf(family, days);
+  const familyDaysTotal = familyDaysTotalOf(family, days);
 
   return (
-    <div className="sticky left-0 flex min-w-0 max-w-[calc(100vw-5rem)] flex-col gap-5 whitespace-normal py-2" data-repeats-family-opened={family.id}>
+    <div className="sticky left-4 flex w-[calc(100cqi-34px)] min-w-0 flex-col gap-5 whitespace-normal py-2" data-repeats-family-opened={family.id}>
       <div className="flex min-w-0 flex-col gap-1">
         <p className="max-w-prose break-words text-sm">{family.sentence}</p>
         <p className="text-xs text-muted-foreground">{t('analytics.repeats.families.opened.firstSeen', { date: dateWords(family.first_seen) })}</p>
@@ -192,14 +178,14 @@ function FamilyOpened({ family, days }: { family: RepeatsFamily; days: number })
         )}
       </div>
 
-      <div className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-5 [@container(min-width:840px)]:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-5">
           <section className="flex min-w-0 flex-col gap-2" aria-labelledby={id + 'shelf'}>
             <Rule level={4} id={id + 'shelf'}>
               {t('analytics.repeats.families.opened.shelf')}
             </Rule>
             {family.existing.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('analytics.repeats.families.opened.shelfNone')}</p>
+              <p className="text-sm text-muted-foreground">{t(step ? 'analytics.repeats.families.opened.shelfNoneStep' : 'analytics.repeats.families.opened.shelfNone')}</p>
             ) : (
               <ul className="flex min-w-0 flex-col gap-2">
                 {family.existing.map((entry) => {
@@ -259,7 +245,7 @@ function FamilyOpened({ family, days }: { family: RepeatsFamily; days: number })
               {family.examples.map((example) => (
                 <li key={example.owner + '|' + example.path} className="flex min-w-0 flex-col gap-0.5">
                   <span className="break-all font-mono text-sm">{example.path}</span>
-                  <span className="break-all text-xs text-muted-foreground">
+                  <span className="break-words text-xs text-muted-foreground">
                     {t('analytics.repeats.families.opened.exampleLine', { owner: example.owner, chars: count(example.chars) })}
                   </span>
                 </li>
@@ -285,7 +271,7 @@ function FamilyOpened({ family, days }: { family: RepeatsFamily; days: number })
 
       <p className="text-xs text-muted-foreground">
         {t(step ? 'analytics.repeats.families.opened.moreStep' : 'analytics.repeats.families.opened.more')}{' '}
-        <code className="break-all font-mono text-foreground">{command}</code>
+        <code className="break-words font-mono text-foreground">{command}</code>
       </p>
     </div>
   );

@@ -5360,16 +5360,16 @@
         "message": "Repeats are read from what each launch writes by hand. They show here once a launch has ended."
       },
       "glance": {
-        "title": "Written by hand again · last {{days}} days",
+        "title": "By hand again · {{days}} days",
         "raised": "Families raised",
         "raisedNote": "of {{found}} found · waiting in the heal tab",
         "raisedNone": "none of the {{found}} found is past the line",
         "raisedNoFamily": "no family found yet",
-        "launches": "Launches writing",
-        "launchesNote_one": "of {{all}} launches · {{programs}} program by hand",
-        "launchesNote_other": "of {{all}} launches · {{programs}} programs by hand",
-        "chars": "In families",
-        "charsNote": "characters a family already names",
+        "launches": "Launches by hand",
+        "launchesNote_one": "of {{all}} launches · {{programs}} program",
+        "launchesNote_other": "of {{all}} launches · {{programs}} programs",
+        "chars": "Characters repeated",
+        "charsNote": "written by hand in a family’s work",
         "share": "Share repeated",
         "shareNote": "of {{all}} characters by hand",
         "steps": "Custom steps kept",
@@ -5402,6 +5402,8 @@
         "uses_one": "{{uses}} use",
         "uses_other": "{{uses}} uses",
         "worked": "{{worked}} worked",
+        "weight": "{{launches}} launches · {{programs}} programs · {{chars}} characters",
+        "weightStep": "{{launches}} launches · {{uses}} uses · {{worked}} worked",
         "empty": {
           "title": "No family yet",
           "message": "A family is the same work written by hand in {{launches}} launches or more within {{window}} days. Nothing in the last {{days}} days has come that close."
@@ -5413,6 +5415,7 @@
           "shelfTool": "built-in tool",
           "shelfLine": "{{likeness}} alike · used by {{count}} of these launches",
           "shelfNone": "Nothing on the shelf does this yet. A shared script is the cure.",
+          "shelfNoneStep": "The helper’s premade set does not hold this yet. Adding it there is the cure.",
           "features": "What repeats",
           "names": "File names",
           "namesNone": "No file carries it: it was written in the launch each time.",
@@ -5649,7 +5652,6 @@
       }
     },
     "webWalk": {
-      "sample": "Sample numbers. This section's reading is not connected yet, so nothing below is measured.",
       "unknown": "not known",
       "historyStarts_one": "Walks have been counted since {{date}}: {{count}} day of the last {{days}}.",
       "historyStarts_other": "Walks have been counted since {{date}}: {{count}} days of the last {{days}}.",
@@ -5675,15 +5677,28 @@
         "walks": "Walks",
         "walksNote": "{{execute}} from scripts, {{command}} from the command",
         "customSteps": "Custom steps",
-        "customStepsNote": "in {{walks}} of {{total}} walks"
+        "customStepsNote": "in {{walks}} of {{total}} walks",
+        "walksNoteNone": "no walk ran in this window",
+        "customStepsNoteNone": "no walk to carry one"
       },
       "nudge": {
         "warning": "The nudge warns: a browser program written by hand still runs, with a pointer to the helper.",
         "refusing": "The nudge refuses a browser program written by hand.",
         "refusingSince": "The nudge refuses a browser program written by hand, since {{date}}.",
-        "barsWarning": "It starts refusing at {{minLaunches}} launches ({{launches}} now), {{minShare}} of them on the helper ({{share}} now), {{minWalks}} walks ({{walks}} now) and faults in at most {{maxFaults}} of walks ({{faults}} now), counted over the last {{windowDays}} days.",
-        "barsRefusing": "It goes back to warning when faults pass {{releaseFaults}} of walks ({{faults}} now) over at least {{releaseWalks}} walks ({{walks}} now), counted over the last {{windowDays}} days.",
-        "none": "none yet"
+        "short": "Still short of refusing: {{bars}}.",
+        "met": "Met: {{bars}}.",
+        "allMet": "Every bar for refusing is met: {{bars}}.",
+        "counted": "Counted over the last {{windowDays}} days.",
+        "bar": {
+          "launches": "{{minLaunches}} launches ({{launches}} now)",
+          "share": "{{minShare}} of launches on the helper ({{shareNow}})",
+          "walks": "{{minWalks}} walks ({{walks}} now)",
+          "faults": "faults in at most {{maxFaults}} of walks ({{faultsNow}})"
+        },
+        "now": "{{value}} now",
+        "noLaunch": "no launch yet",
+        "noWalk": "no walk yet",
+        "barsRefusing": "It goes back to warning when faults pass {{releaseFaults}} of walks ({{faultsNow}}) over at least {{releaseWalks}} walks ({{walks}} now), counted over the last {{windowDays}} days."
       },
       "trend": {
         "title": "Launches each day",
@@ -5730,8 +5745,11 @@
           "screen": "Screen",
           "opened": "Opened"
         },
-        "reachHint": "An unreached screen's entry in {{app}}'s dictionary needs a look. Check one again: ~/.claude/scripts/web-walk reach {{app}} <screen>"
-      }
+        "reachHint_one": "The unreached screen's entry in {{app}}'s dictionary needs a look. Check it again: ~/.claude/scripts/web-walk reach {{app}} {{screens}}",
+        "reachHint_other": "The unreached screens' entries in {{app}}'s dictionary need a look. Check them again: ~/.claude/scripts/web-walk reach {{app}} {{screens}}",
+        "reachHintAll": "The unreached screens' entries in {{app}}'s dictionary need a look. Check every screen again: ~/.claude/scripts/web-walk reach {{app}}"
+      },
+      "listSeparator": ", "
     }
   }
 }
