@@ -17071,3 +17071,18 @@ Client half of the Analytics `web-walk` section: whether the house drives its ru
 - Astrolabe components only (`Readout`, `Rule`, `DayChart`, `DataTable`, `Banner`, `EmptyState`, `Button`, `FoldChevron`); every file under 150 lines.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkApps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkChecks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/webWalkFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkGlance.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkTrend.tsx
+
+## MAN-10150 — cases/lib/web_walk.mjs — webWalk: a case runs the web-walk command without blocking the loop
+
+Shared door for a CloudCLI case that walks an app through `~/.claude/scripts/web-walk`: `cases/lib/web_walk.mjs`.
+
+**API.** `webWalk(args, {input?, env?, timeoutMs?})` → `{error, status, stdout, stderr, answer}`. `WEB_WALK` is the command's path.
+- `error`: set only when the command did not end (timeout, spawn failure); `status`: its exit code; `answer`: stdout's last line as JSON, else null.
+- `timeoutMs` default 110000; a case whose walk runs longer passes its own (the house suite's `timeout_s` is 240).
+- `WEB_WALK_OUT`, `WEB_WALK_PICTURE_BYTES`, `WEB_WALK_APPS` of the caller are dropped unless `env` names them again.
+
+**Rule.** A case runs a walk through `webWalk`, never `spawnSync`/`execFileSync`: a sync call blocks the event loop for the whole walk, and the next request on a signed-in door's kept-alive socket the server closed meanwhile fails UND_ERR_SOCKET.
+
+**Users.** The cases under `cases/walk/` that run a walk: the light/dark fan-out, and the Restorly reach, adapter, dictionary and light/dark cases.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/cases/lib/web_walk.mjs
