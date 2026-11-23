@@ -1,6 +1,7 @@
 # CloudCLI's screens for the house's walk library (hooks/web_walk; SEAM 3). A change that moves a screen updates this file
 # in the same change. Names follow PlaceId (src/shared/types.ts) and SettingsMainTab; every target is a name, never a
-# position; no entry sends a chat turn. Addresses live in the house registry (hooks/web_walk/apps.toml), never here.
+# position; no entry sends a chat turn. The views are reached through the Places menu (its Menu button, then the place),
+# which every layout draws: the Views rail is set aside while a chat holds the workspace. Addresses live in the house registry (hooks/web_walk/apps.toml), never here.
 
 [app]
 theme = "light"
@@ -23,52 +24,52 @@ landmark = { role = "textbox" }
 
 [screen.roadmap]
 says = "The roadmap: the house's plans and their phases."
-steps = [{ click = { role = "button", name = "Roadmap", in = { role = "navigation", name = "Views" } } }]
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Roadmap", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "Roadmap" }
 
 [screen.bugs]
 says = "The bug board: filed tickets by state."
-steps = [{ click = { role = "button", name = "Bugs", in = { role = "navigation", name = "Views" } } }]
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Bugs", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "Bugs" }
 
 [screen.rnd]
 says = "Research and development: the ideas in flight."
-steps = [{ click = { role = "button", name = "R&D", in = { role = "navigation", name = "Views" } } }]
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "R&D", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "R&D" }
 
 [screen.cerberus]
 says = "Cerberus: the fleet's health."
-steps = [{ click = { role = "button", name = "Cerberus", in = { role = "navigation", name = "Views" } } }]
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Cerberus", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "Cerberus" }
 
 [screen.analytics]
 says = "The Analytics area: the house's measured figures by section."
-steps = [{ click = { role = "button", name = "Analytics", in = { role = "navigation", name = "Views" } } }]
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Analytics", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "Analytics" }
 
 [screen.inbox]
 says = "The inbox: what waits on the operator."
-steps = [{ click = { role = "button", name = "Inbox", in = { role = "navigation", name = "Views" } } }]
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Inbox", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "Inbox" }
 
 [screen.api]
 says = "The API view: the app's own routes and keys."
-steps = [{ click = { role = "button", name = "API", in = { role = "navigation", name = "Views" } } }]
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "API", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "API" }
 
 [screen.universe]
 says = "The universe view: every project at once."
-steps = [{ click = { role = "button", name = "Universe", in = { role = "navigation", name = "Views" } } }]
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Universe", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "Universe" }
 
 [screen.schedules]
 says = "The schedules: the timed jobs of this box."
-steps = [{ click = { role = "button", name = "Schedules", in = { role = "navigation", name = "Views" } } }]
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Schedules", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "Schedules" }
 
 [screen.settings]
-says = "Settings, opened from the Views rail."
-steps = [{ click = { role = "button", name = "Settings", in = { role = "navigation", name = "Views" } } }]
+says = "Settings, opened from the Places menu."
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Settings", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "dialog" }
 
 [screen.settings-agents]

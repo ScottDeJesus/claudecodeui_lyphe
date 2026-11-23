@@ -77,13 +77,17 @@ export async function theme(browserContext, name) {
  * workspace itself on screen. Throws fault "sign-in" when the sign-in form shows, "app-down" when the app draws nothing.
  */
 export async function ready(page, env) {
+  // The rail is in the page from the first render, hidden while the home covers the workspace: the shell is drawn once it is attached.
+  const shell = page.getByRole('navigation', { name: 'Views', exact: true, includeHidden: true });
   const rail = page.getByRole('navigation', { name: 'Views', exact: true });
   const signInForm = page.locator('input[type="password"]');
-  await waitFor(rail.or(signInForm).first(), 'attached', `the app drew no shell within ${READY_LIMIT_MS} ms at ${env.base}`);
+  await waitFor(shell.or(signInForm).first(), 'attached', `the app drew no shell within ${READY_LIMIT_MS} ms at ${env.base}`);
   if (await signInForm.filter({ visible: true }).count()) {
     throw faulted('sign-in', `${env.base} drew its sign-in form: the dev user's token was not taken`);
   }
-  if (new URL(page.url()).pathname === SESSIONS_HOME_PATH) await page.goto(new URL(WORKSPACE_ADDRESS, env.base).href);
+  const at = new URL(page.url());
+  // The home's address follows the landing by a replace in an effect, so the page may still stand at the bare root.
+  if ((at.pathname === '/' && at.search === '') || at.pathname === SESSIONS_HOME_PATH) await page.goto(new URL(WORKSPACE_ADDRESS, env.base).href);
   const workspace = rail.or(page.getByRole('button', { name: 'Open menu', exact: true })).filter({ visible: true }).first();
   await waitFor(workspace, 'visible', `the workspace did not show within ${READY_LIMIT_MS} ms at ${env.base}`);
 }
