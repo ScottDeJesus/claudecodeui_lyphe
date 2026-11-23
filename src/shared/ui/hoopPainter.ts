@@ -284,11 +284,21 @@ export function createHoopPainter(canvas: HTMLCanvasElement) {
         // Failed: the square in the danger ink, still.
         fillSquare(square, colors.danger, 0.62, shade);
       } else {
-        ctx.fillStyle = rgba(colors.tone, 0.2 * shade);
-        ctx.fill(square);
-        ctx.strokeStyle = rgba(colors.tone, 0.5 * shade);
-        ctx.lineWidth = 1;
-        ctx.stroke(square);
+        if (slot.state === 'working') {
+          // At work: the square in the bright ink, breathing, so the card in hand is found at a glance.
+          const pulse = still ? 1 : 0.5 + 0.5 * Math.sin((now / 1000) * TAU / 1.6);
+          ctx.fillStyle = rgba(colors.ink, lerp(0.35, 0.8, pulse) * lerp(0.75, 1, shade));
+          ctx.fill(square);
+          ctx.strokeStyle = rgba(colors.ink, lerp(0.8, 1, shade));
+          ctx.lineWidth = 1.5;
+          ctx.stroke(square);
+        } else {
+          ctx.fillStyle = rgba(colors.tone, 0.2 * shade);
+          ctx.fill(square);
+          ctx.strokeStyle = rgba(colors.tone, 0.5 * shade);
+          ctx.lineWidth = 1;
+          ctx.stroke(square);
+        }
         if (slot.state === 'working') {
           // At work: twelve accent dashes round a hairline track, lying on the band's face, once round every 2.4 s.
           const span = high - low;

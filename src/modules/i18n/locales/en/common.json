@@ -886,7 +886,7 @@
       "boardSource": "Board",
       "needsYou": "Needs you",
       "held": "Held",
-      "inHand": "In hand",
+      "inHand": "Working now",
       "failed": "Failed",
       "more": "{{count}} more",
       "further": "{{count}} more",

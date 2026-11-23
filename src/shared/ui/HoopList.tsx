@@ -200,7 +200,19 @@ function ListRow({ slot, open, onOpen }: { slot: HoopSlot; open: boolean; onOpen
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={cn('line-clamp-2 break-words text-sm leading-[18px]', titleTone, open && 'font-medium')}>{slot.title}</span>
         {slot.words !== '' && (
-          <span className="truncate font-mono text-[10px] uppercase leading-[14px] tracking-[0.04em] text-muted-foreground">{slot.words}</span>
+          <span
+            data-hoop-row-working={slot.state === 'working' ? '' : undefined}
+            className={cn(
+              'flex min-w-0 items-center gap-1.5 font-mono text-[10px] uppercase leading-[14px] tracking-[0.04em]',
+              slot.state !== 'working' && 'text-muted-foreground',
+            )}
+            style={slot.state === 'working' ? { color: 'var(--accent)' } : undefined}
+          >
+            {slot.state === 'working' && (
+              <span aria-hidden="true" className="size-1.5 flex-none rounded-full motion-safe:animate-[vv-pulse_2.4s_ease-in-out_infinite]" style={{ background: 'var(--accent)' }} />
+            )}
+            <span className="truncate">{slot.words}</span>
+          </span>
         )}
       </span>
     </button>
