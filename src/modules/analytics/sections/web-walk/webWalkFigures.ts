@@ -27,18 +27,17 @@ const MS_PER_SECOND = 1_000;
 const ISO_DAY_LENGTH = 10;
 const TWO_DIGITS = 2;
 
-const WHOLE = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-const ONE_DECIMAL = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** A share's digits: its tenth when it has one ("0.8", "6.8"), none when it is whole ("2", "71"). */
+const UP_TO_A_TENTH = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
 
-/** A part's share of a whole as words ("71%", "4.5%", "under 0.1%"), or null when there is no whole to be a share of. */
+/** A part's share of a whole as words ("71%", "4.5%", "2%", "under 0.1%"), or null when there is no whole to be a share of. */
 export function shareWords(part: number, whole: number): Worded | null {
   if (whole <= 0) return null;
   const rate = part / whole;
   const tenths = Math.round(rate * PERCENT * TENTHS) / TENTHS;
   const percent = tenths < TENTHS_BELOW_PERCENT ? tenths : Math.round(rate * PERCENT);
-  if (percent === 0 && part > 0) return { key: UNITS + 'shareUnder', values: { value: ONE_DECIMAL.format(SMALLEST_DRAWN_PERCENT) } };
-  const tenthDrawn = percent > 0 && percent < TENTHS_BELOW_PERCENT;
-  return { key: UNITS + 'share', values: { value: tenthDrawn ? ONE_DECIMAL.format(percent) : WHOLE.format(percent) } };
+  if (percent === 0 && part > 0) return { key: UNITS + 'shareUnder', values: { value: UP_TO_A_TENTH.format(SMALLEST_DRAWN_PERCENT) } };
+  return { key: UNITS + 'share', values: { value: UP_TO_A_TENTH.format(percent) } };
 }
 
 /** How many days of the window the history covers, today and its first day both counted; null when it covers them all, or has not begun. */
@@ -54,15 +53,6 @@ export function launchDays(series: WebWalkDay[], span: WalkSpan): LaunchDay[] {
   return plotDays(span).map((day) => {
     const row = rows.get(day);
     return { day, walking: row?.launches_walking ?? 0, byHand: row?.launches_by_hand ?? 0 };
-  });
-}
-
-/** One figure of every plotted day, oldest first: a readout's line. A day with no row counts zero. */
-export function dayFigures(series: WebWalkDay[], span: WalkSpan, pick: (row: WebWalkDay) => number): number[] {
-  const rows = new Map(series.map((row) => [row.day, row]));
-  return plotDays(span).map((day) => {
-    const row = rows.get(day);
-    return row === undefined ? 0 : pick(row);
   });
 }
 

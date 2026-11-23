@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { WebWalkCheck } from '@/shared/analytics-types';
 import type { DataTableColumn } from '@/shared/types';
 import { DataTable, Rule } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 import { rankedChecks, shareWords } from '@/modules/analytics/sections/web-walk/webWalkFigures';
 
 type WebWalkChecksProps = {
@@ -15,7 +16,8 @@ type WebWalkChecksProps = {
 
 /**
  * WHAT THE PREMADE CHECKS FOUND: one row per check, the one that answered false most first, since that is the one to look
- * at. A false count says its share of the check's own runs beside it, so 11 is read against 40 and not against nothing.
+ * at. A false count says its share of the check's own runs beside it, so 11 is read against 40 and not against nothing;
+ * a zero is drawn quiet, so a count stands out.
  * A window in which no walk ran a check says so in a line, where the table would stand.
  *
  * Rendered by WebWalkSection, third. Nothing else mounts it.
@@ -35,7 +37,7 @@ export function WebWalkChecks({ checks, days }: WebWalkChecksProps) {
       render: (row) => {
         const share = row.false > 0 ? shareWords(row.false, row.ran) : null;
         return (
-          <span className="whitespace-nowrap tabular-nums">
+          <span className={cn('whitespace-nowrap tabular-nums', row.false === 0 && 'text-muted-foreground')}>
             {row.false.toLocaleString()}
             {share !== null && <span className="ml-2 text-xs text-muted-foreground">{t('analytics.webWalk.checks.falseShare', { share: t(share.key, share.values) })}</span>}
           </span>

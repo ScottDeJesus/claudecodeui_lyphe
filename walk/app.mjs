@@ -79,7 +79,6 @@ export async function theme(browserContext, name) {
 export async function ready(page, env) {
   // The rail is in the page from the first render, hidden while the home covers the workspace: the shell is drawn once it is attached.
   const shell = page.getByRole('navigation', { name: 'Views', exact: true, includeHidden: true });
-  const rail = page.getByRole('navigation', { name: 'Views', exact: true });
   const signInForm = page.locator('input[type="password"]');
   await waitFor(shell.or(signInForm).first(), 'attached', `the app drew no shell within ${READY_LIMIT_MS} ms at ${env.base}`);
   if (await signInForm.filter({ visible: true }).count()) {
@@ -88,7 +87,8 @@ export async function ready(page, env) {
   const at = new URL(page.url());
   // The home's address follows the landing by a replace in an effect, so the page may still stand at the bare root.
   if ((at.pathname === '/' && at.search === '') || at.pathname === SESSIONS_HOME_PATH) await page.goto(new URL(WORKSPACE_ADDRESS, env.base).href);
-  const workspace = rail.or(page.getByRole('button', { name: 'Open menu', exact: true })).filter({ visible: true }).first();
+  // The Places menu's button is drawn over every layout (the rail is set aside while a chat holds the workspace).
+  const workspace = placesMenu(page).or(page.getByRole('button', { name: 'Open menu', exact: true })).filter({ visible: true }).first();
   await waitFor(workspace, 'visible', `the workspace did not show within ${READY_LIMIT_MS} ms at ${env.base}`);
 }
 
@@ -101,10 +101,13 @@ async function waitFor(locator, state, why) {
   }
 }
 
-/** On a phone the Views rail is in the sidebar drawer: open it by its Open menu button. Docked, nothing is pressed. */
+/**
+ * On a phone the navigation is in the sidebar drawer: open it by its Open menu button. When the Places menu or the docked
+ * Views rail is already on screen, nothing is pressed.
+ */
 export async function unfold(page) {
   const views = page.getByRole('navigation', { name: 'Views', exact: true }).filter({ visible: true });
-  if (await views.count()) return;
+  if (await views.count() || await placesMenu(page).filter({ visible: true }).count()) return;
   const menu = page.getByRole('button', { name: 'Open menu', exact: true }).filter({ visible: true });
   if (!(await menu.count())) return;
   await menu.first().click();
@@ -138,6 +141,11 @@ async function signIn(api, user) {
     throw faulted('sign-in', `${api}/api/auth/login answered ${response.status} with no token for ${user.username}`);
   }
   return body.token;
+}
+
+/** The Places menu's button (PlacesMenu.tsx, places.menu), which brings up the wheel of places. */
+function placesMenu(page) {
+  return page.getByRole('button', { name: 'Menu', exact: true });
 }
 
 function faulted(fault, why) {

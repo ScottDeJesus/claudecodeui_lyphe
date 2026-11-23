@@ -69,10 +69,13 @@ function WebWalkAnswer({ answer }: { answer: WebWalkAnalytics }) {
         )
       ) : (
         <>
-          <WebWalkGlance totals={totals} doors={doors} settled={settled} series={series} span={span} />
+          <WebWalkGlance totals={totals} doors={doors} settled={settled} days={days} />
           <WebWalkTrend series={series} totals={totals} span={span} />
-          <WebWalkChecks checks={checks} days={days} />
-          <WebWalkApps apps={apps} days={days} />
+          {/* Side by side on a wide desk, so what the checks found and where the walks went are read together. */}
+          <div className="grid min-w-0 grid-cols-1 items-start gap-9 xl:grid-cols-2 xl:gap-8">
+            <WebWalkChecks checks={checks} days={days} />
+            <WebWalkApps apps={apps} days={days} />
+          </div>
         </>
       )}
     </>

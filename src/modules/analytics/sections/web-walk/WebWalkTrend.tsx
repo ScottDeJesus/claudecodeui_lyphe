@@ -90,7 +90,7 @@ export function WebWalkTrend({ series, totals, span }: WebWalkTrendProps) {
           </Button>
           <div id={tableId}>
             {tableOpen && (
-              <div className="flex flex-col gap-2">
+              <div className="flex max-w-xl flex-col gap-2">
                 <DataTable rows={busyDays} columns={columns} rowKey={(day) => day.day} label={t('analytics.webWalk.trend.tableLabel', { days: span.days })} />
                 <p className="text-xs text-muted-foreground">{t('analytics.webWalk.trend.quietLeftOut')}</p>
               </div>
