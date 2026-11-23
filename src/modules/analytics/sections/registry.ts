@@ -28,4 +28,11 @@ export const ANALYTICS_SECTIONS: AnalyticsSection[] = [
     defaultDays: 30,
     Body: lazy(() => import('@/modules/analytics/sections/code-mode/CodeModeSection').then((m) => ({ default: m.CodeModeSection }))),
   },
+  {
+    id: 'web-walk',
+    titleKey: 'analytics.sections.webWalk',
+    windows: [7, 30, 90],
+    defaultDays: 30,
+    Body: lazy(() => import('@/modules/analytics/sections/web-walk/WebWalkSection').then((m) => ({ default: m.WebWalkSection }))),
+  },
 ];
