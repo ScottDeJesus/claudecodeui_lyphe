@@ -1,10 +1,11 @@
 // protects: /opt/eis-app/walk/screens.toml, /opt/eis-app/walk/app.mjs
 // writes: none
 //
-// Each schedule variant of Restorly's walk dictionary loads #sched=<variant> and clicks the Schedule tab; its landmark is
-// the Schedule mark, which the plain schedule draws too. One fresh walk per entry reads the visible data-screen-label
-// marks and the pressed/selected/checked controls: a variant that reads exactly what the plain schedule reads was not
-// drawn, though the entry answered reached.
+// Each schedule variant of Restorly's walk dictionary is a full load of /?sched=<v>#sched=<v>, so the schedule mounts with the
+// seed in place. One fresh walk per entry, a real job given, reads the visible data-screen-label marks, the pressed/selected/
+// checked controls, the headings and the schedule's eyebrow (its first line, up to the first ·): a variant reading exactly
+// what the plain schedule reads was not drawn. focus is exempt (the app marks it only when the open job has a visit in the
+// shown week, which no fixed job promises); agenda must also read something day does not.
 import { execFile } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -34,13 +35,16 @@ async function walkOne(out, screen, extra, probe) {
 }
 
 const VARIANTS = ["day", "agenda", "all", "empty", "subs", "focus", "map"];
-const PROBE = "async ({page}) => { await page.waitForTimeout(1500); return await page.evaluate(() => { const vis = (e) => !!e.offsetParent; return { marks: [...document.querySelectorAll('[data-screen-label]')].filter(vis).map((e) => e.getAttribute('data-screen-label')).sort(), on: [...document.querySelectorAll('[aria-pressed=\"true\"],[aria-selected=\"true\"],[aria-checked=\"true\"]')].filter(vis).map((e) => (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 30)) }; }); }";
+const PROBE = "async ({page}) => { await page.waitForTimeout(1500); return await page.evaluate(() => { const vis = (e) => !!e.offsetParent; const m = document.querySelector('[data-screen-label=\"Schedule\"]'); return { marks: [...document.querySelectorAll('[data-screen-label]')].filter(vis).map((e) => e.getAttribute('data-screen-label')).sort(), on: [...document.querySelectorAll('[aria-pressed=\"true\"],[aria-selected=\"true\"],[aria-checked=\"true\"]')].filter(vis).map((e) => (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 30)), heads: [...document.querySelectorAll('h1,h2,h3,h4,[role=heading]')].filter(vis).map((e) => e.textContent.trim().slice(0, 30)), eyebrow: m ? m.innerText.trim().split('\\n')[0].split('·')[0].trim().slice(0, 40) : null }; }); }";
 
 runCase(async () => {
+  const jobs = await run(RCURL, ["/api/eis/jobs"], process.env, 30000);
+  const job = (jobs.stdout.match(UUID) || [])[0];
+  if (!job) return cannotRun("rcurl.sh /api/eis/jobs listed no job: " + firstLine(jobs.stderr || jobs.stdout));
   const out = mkdtempSync(path.join(os.tmpdir(), "case-restorly-sched-variants-"));
   try {
     const all = ["schedule", ...VARIANTS];
-    const answers = await Promise.all(all.map((s) => walkOne(out, s, {}, PROBE)));
+    const answers = await Promise.all(all.map((s) => walkOne(out, s, { with: { job } }, PROBE)));
     for (let i = 0; i < all.length; i++) {
       const a = answers[i];
       if (a.fault && (a.fault.kind === "app-down" || a.fault.kind === "sign-in")) return cannotRun(all[i] + ": " + a.fault.kind + " — " + firstLine(a.fault.why));
@@ -51,10 +55,12 @@ runCase(async () => {
     for (let i = 1; i < all.length; i++) {
       const a = answers[i];
       if (!a.ok) { wrong.push(all[i] + " failed: " + firstLine(JSON.stringify(a.failed || a.fault))); continue; }
-      if (JSON.stringify(a.read.seen) === plain) wrong.push(all[i]);
+      if (all[i] !== "focus" && JSON.stringify(a.read.seen) === plain) wrong.push(all[i]);
     }
+    const day = answers[all.indexOf("day")], agenda = answers[all.indexOf("agenda")];
+    if (day.ok && agenda.ok && JSON.stringify(day.read.seen) === JSON.stringify(agenda.read.seen)) wrong.push("agenda reads exactly what day reads");
     if (wrong.length) return broken("these variants answered reached yet read exactly what the plain schedule reads (" + plain.slice(0, 160) + "): " + wrong.join(", "));
-    return held("each of the seven variants drew a mark or a pressed control the plain schedule does not");
+    return held("job " + job + ": every variant answered ok; day, agenda, all, empty, subs and map each read something the plain schedule does not, and agenda something day does not");
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
