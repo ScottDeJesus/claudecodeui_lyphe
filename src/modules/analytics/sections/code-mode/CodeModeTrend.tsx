@@ -1,26 +1,29 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { CodeModeDay, CodeModeKind } from '@/shared/analytics-types';
+import type { CodeModeDay } from '@/shared/analytics-types';
 import type { DataTableColumn } from '@/shared/types';
-import { Button, DataTable, DayBars, FoldChevron, Rule, SegmentedControl, Select } from '@/shared/ui';
+import { Button, DataTable, DayChart, FoldChevron, Rule, SegmentedControl } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 import { dayList, measureWords } from '@/modules/analytics/sections/code-mode/codeModeFigures';
-import type { TrendDay, TrendMeasure, Worded } from '@/modules/analytics/sections/code-mode/codeModeFigures';
+import type { TrendDay, TrendMeasure, TrendSpan, Worded } from '@/modules/analytics/sections/code-mode/codeModeFigures';
 
 /**
- * THE DAYS: with Code Mode above the rule and without hanging below it, on one scale, so a window where Code Mode
- * took over is top-heavy at a glance. One measure at a time (launches, turns, tokens, time), for every kind or one.
+ * THE DAYS, for the kind the page is showing: one measure at a time, with against without, on a scale with its steps named.
  *
- * FAILURES IS THE ONE MEASURE THAT IS NOT WITH AGAINST WITHOUT. It reads the Code Mode launches alone: scripts that
- * threw above the rule, actions refused or failed below it, and the upper series takes the warn ink. The line under
- * the two pickers always says what the bars are, and in what unit: tokens are drawn in thousands and time in minutes,
- * because the legend's totals are the bars' own sums.
+ * LAUNCHES ARE COLUMNS, Code Mode's standing on the zero in the full ink and without's on top of them in the pale one, so
+ * a window where Code Mode took over is dark at the foot and a column's height is the day's every launch. THE OTHER
+ * MEASURES ARE THE DAY'S OWN — the share that ended ok, and the median launch's turns, tokens and time — as two lines,
+ * Code Mode's full and without's pale and dashed, each broken on a day its side had no launch. The line under the picker
+ * says what the marks are. (The failures, which are not with against without, have a chart of their own beside how the
+ * scripts fared.)
  *
- * A BAR'S FIGURES ARE NEVER ONLY ITS TITLE (DayBars's own rule). Every day's two numbers are also a table, one press
- * away under the plot, newest first, as the Bugs dashboard draws its own. It lists the days that hold something and
- * says it left the quiet ones out. It is folded on arrival: the picture is the signal, the table the detail. Under
- * Failures its heads are the short names, so three columns never scroll sideways on a phone.
+ * A POINTED DAY SAYS ITS FIGURES on the chart's own card (a finger's tap, in its line), and a day's launches add the share
+ * of them that ran with Code Mode.
+ *
+ * A MARK'S FIGURES ARE NEVER ONLY ITS PAINT (DayBars's rule, kept by DayChart). Every day's two numbers are also a table,
+ * one press away under the plot, newest first. It lists the days that hold something and says it left the quiet ones out.
+ * It is folded on arrival: the picture is the signal, the table the detail.
  *
  * A KIND WITH NOTHING IN THE WINDOW still draws its baseline, with the sentence that says so.
  */
@@ -28,92 +31,101 @@ import type { TrendDay, TrendMeasure, Worded } from '@/modules/analytics/section
 type CodeModeTrendProps = {
   /** One row per (day, kind, code_mode) that held a launch, and per (day, code_mode) across kinds. */
   series: CodeModeDay[];
-  /** The kinds the verb counts, in its order: the picker's rows after "All kinds". */
-  kinds: CodeModeKind[];
-  /** The history's first day, null while there is none. */
-  firstDay: string | null;
-  /** Today, as the box that answered names it. */
-  today: string;
-  /** The window, in days. */
-  days: number;
+  /** The kind the page is showing; null is every kind. */
+  kind: string | null;
+  /** That kind's label, or the words for every kind. */
+  kindLabel: string;
+  /** The window as the answer states it. */
+  span: TrendSpan;
 };
 
-const MEASURES: TrendMeasure[] = ['launches', 'turns', 'tokens', 'seconds', 'failures'];
-/** The picker's value for every kind together. The wire spells that null; a `Select` holds strings. */
-const ALL_KINDS = '*';
+/** The measures the picker offers: every one that is with against without. */
+type DayMeasure = Exclude<TrendMeasure, 'failures'>;
 
-/** Rendered by CodeModeSection, last. Nothing else mounts it. */
-export function CodeModeTrend({ series, kinds, firstDay, today, days }: CodeModeTrendProps) {
+const MEASURES: DayMeasure[] = ['launches', 'ok', 'turns', 'tokens', 'seconds'];
+/** How many of a measure's own unit one step of the scale stands for: tokens are drawn in thousands, time in minutes. */
+const PLOT_UNIT: Record<DayMeasure, number> = { launches: 1, ok: 1, turns: 1, tokens: 1000, seconds: 60 };
+/** The share's scale ends at the whole. */
+const WHOLE_SHARE = 1;
+
+/** Rendered by CodeModeSection, second. Nothing else mounts it. */
+export function CodeModeTrend({ series, kind, kindLabel, span }: CodeModeTrendProps) {
   const { t } = useTranslation('common');
   const headingId = useId();
   const tableId = useId();
   // Which measure the plot draws, held here for the visit.
-  const [measure, setMeasure] = useState<TrendMeasure>('launches');
-  // Which kind the plot draws, every kind on arrival, held here for the visit.
-  const [kind, setKind] = useState(ALL_KINDS);
+  const [measure, setMeasure] = useState<DayMeasure>('launches');
   // Whether the day-by-day table is open. Closed on every mount: the plot is the answer.
   const [tableOpen, setTableOpen] = useState(false);
 
   const say = (words: Worded) => t(words.key, words.values);
+  const figureWords = (figure: number | null) => (figure === null ? null : say(measureWords(measure, figure)));
   const dateOf = (day: string) => formatShortDate(day) ?? day;
-  const failures = measure === 'failures';
-  const above = t(failures ? 'analytics.codeMode.trend.thrown' : 'analytics.codeMode.with');
-  const below = t(failures ? 'analytics.codeMode.trend.refusedOrFailed' : 'analytics.codeMode.without');
+  const counted = measure === 'launches';
+  const above = t('analytics.codeMode.with');
+  const below = t('analytics.codeMode.without');
   const about = t('analytics.codeMode.trend.about.' + measure);
-  const kindLabel = kind === ALL_KINDS ? t('analytics.codeMode.allKinds') : (kinds.find((entry) => entry.kind === kind)?.label ?? kind);
 
-  const plotted = dayList(series, kind === ALL_KINDS ? null : kind, measure, { firstDay, today, days });
-  const busyDays = plotted.filter((day) => day.figures[0] > 0 || day.figures[1] > 0).reverse();
+  const plotted = dayList(series, kind, measure, span);
+  const busyDays = plotted.filter((day) => (counted ? (day.figures[0] ?? 0) + (day.figures[1] ?? 0) > 0 : day.figures[0] !== null || day.figures[1] !== null)).reverse();
+  const total = (side: 0 | 1) => plotted.reduce((sum, day) => sum + (day.figures[side] ?? 0), 0);
+
+  /** A tick of the scale in the measure's words: thousands of tokens, minutes, a share, or a count. */
+  const tickWords = (value: number) => {
+    if (value === 0) return '0';
+    if (measure === 'tokens') return t('analytics.codeMode.units.thousand', { value: value.toLocaleString() });
+    if (measure === 'seconds') return t('analytics.codeMode.units.minutesShort', { value: value.toLocaleString() });
+    if (measure === 'ok') return t('analytics.codeMode.units.share', { value: Math.round(value * 100).toLocaleString() });
+    return value.toLocaleString();
+  };
+
+  const chartDays = plotted.map((day) => {
+    const [withFigure, withoutFigure] = day.figures;
+    const launches = (withFigure ?? 0) + (withoutFigure ?? 0);
+    return {
+      day: day.day,
+      values: day.figures.map((figure) => (figure === null ? null : figure / PLOT_UNIT[measure])),
+      figures: [figureWords(withFigure), figureWords(withoutFigure)],
+      note: counted && launches > 0 ? t('analytics.codeMode.trend.shareOfDay', { share: say(measureWords('ok', (withFigure ?? 0) / launches)), count: launches }) : undefined,
+    };
+  });
 
   const columns: DataTableColumn<TrendDay>[] = [
     { key: 'day', label: t('analytics.codeMode.trend.columns.day'), render: (day) => <span className="whitespace-nowrap">{dateOf(day.day)}</span> },
-    { key: 'above', label: failures ? t('analytics.codeMode.trend.columns.thrown') : above, align: 'end', render: (day) => <span className="tabular-nums">{say(measureWords(measure, day.figures[0]))}</span> },
-    { key: 'below', label: failures ? t('analytics.codeMode.trend.columns.refusedOrFailed') : below, align: 'end', render: (day) => <span className="tabular-nums">{say(measureWords(measure, day.figures[1]))}</span> },
+    { key: 'above', label: above, align: 'end', render: (day) => <span className="tabular-nums">{figureWords(day.figures[0]) ?? '—'}</span> },
+    { key: 'below', label: below, align: 'end', render: (day) => <span className="tabular-nums">{figureWords(day.figures[1]) ?? '—'}</span> },
   ];
 
   return (
     <section className="flex min-w-0 flex-col gap-3" aria-labelledby={headingId} data-code-mode-trend>
       <Rule id={headingId}>{t('analytics.codeMode.trend.title')}</Rule>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div>
         <SegmentedControl
           label={t('analytics.codeMode.trend.measure')}
           options={MEASURES.map((value) => ({ value, label: t('analytics.codeMode.trend.measures.' + value) }))}
           value={measure}
           onChange={setMeasure}
         />
-        <Select
-          ariaLabel={t('analytics.codeMode.trend.kind')}
-          size="sm"
-          options={[{ value: ALL_KINDS, label: t('analytics.codeMode.allKinds') }, ...kinds.map((entry) => ({ value: entry.kind, label: entry.label }))]}
-          value={kind}
-          onChange={setKind}
-        />
       </div>
       <p className="text-xs text-muted-foreground">{about}</p>
 
-      <DayBars
-        label={t('analytics.codeMode.trend.plot', { about, kind: kindLabel, days })}
+      <DayChart
+        key={measure + '|' + (kind ?? '')}
+        form={counted ? 'columns' : 'lines'}
         series={[
-          { label: above, tone: failures ? 'warn' : 'info' },
-          { label: below, tone: 'neutral' },
+          { label: above, total: counted ? total(0).toLocaleString() : undefined, mark: 'ink' },
+          { label: below, total: counted ? total(1).toLocaleString() : undefined, mark: 'pale' },
         ]}
-        days={plotted.map((day) => ({
-          day: day.day,
-          values: day.values,
-          title: t('analytics.codeMode.trend.barTitle', {
-            date: dateOf(day.day),
-            above: say(measureWords(measure, day.figures[0])),
-            aboveLabel: above,
-            below: say(measureWords(measure, day.figures[1])),
-            belowLabel: below,
-          }),
-        }))}
-        peakLabel={(peak) => t('analytics.codeMode.trend.peak.' + measure, { peak: peak.toLocaleString() })}
+        days={chartDays}
+        label={t('analytics.codeMode.trend.plot', { about, kind: kindLabel, days: span.days })}
+        tickWords={tickWords}
+        ceiling={measure === 'ok' ? WHOLE_SHARE : undefined}
+        todayLabel={t('analytics.codeMode.trend.today')}
       />
 
       {busyDays.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('analytics.codeMode.trend.quiet', { kind: kindLabel, days })}</p>
+        <p className="text-sm text-muted-foreground">{t('analytics.codeMode.trend.quiet', { kind: kindLabel, days: span.days })}</p>
       ) : (
         <div className="flex flex-col gap-2">
           <Button

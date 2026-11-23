@@ -116,6 +116,13 @@ export { DataTable } from '@/shared/ui/DataTable';
 // Lifted from the API view's two spend plots, which stay their own. The kanban module's bug dashboard draws cards opened
 // and fixed per day with it.
 export { DayBars } from '@/shared/ui/DayBars';
+// A measure over named days on a scale you can read: stacked columns or lines, a ruled zero, round steps with their words,
+// the pointed day's figures on a card (or in a line, for a finger). The analytics module's Code Mode section draws its days
+// and its failures each day with it. It is the design system's chart, so it stands here with one module drawing it.
+export { DayChart } from '@/shared/ui/DayChart';
+// Two marks a row on one scale, a figure and its companion, with the bar between them read as the change. The analytics
+// module's Code Mode comparison draws with and without Code Mode by kind and by model with it; the design system's chart.
+export { Dumbbell } from '@/shared/ui/Dumbbell';
 export { AppLogo } from '@/shared/ui/AppLogo';
 export { default as DeepSeekLogo } from '@/shared/ui/DeepSeekLogo';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
@@ -163,6 +170,12 @@ export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';
 export { Menu } from '@/shared/ui/Menu';
 export { KeyValueList } from '@/shared/ui/KeyValueList';
 export { Meter } from '@/shared/ui/Meter';
+// One whole in its parts, as one bar in the models' chart colours with each part named under it. The analytics module's
+// Code Mode glance splits its launches by model with it; it is the design system's, beside DayChart.
+export { MixBar } from '@/shared/ui/MixBar';
+// A share as a length on the track, Astrolabe's meter without its words, for a list whose figures stand beside it. The
+// analytics module's Code Mode section ranks the scripts' faults and the families of failures with it.
+export { ShareBar } from '@/shared/ui/ShareBar';
 // The design system's Opening (Astrolabe's "what a deliberate click opened, hung from the mark it came out of") and Track ("one
 // thing's course"), ported from its bundle, beside its Hoop above: the kanban module's bug board is the first screen built on
 // them, and every screen redrawn to the design system after it is meant to reach for them before anything else.

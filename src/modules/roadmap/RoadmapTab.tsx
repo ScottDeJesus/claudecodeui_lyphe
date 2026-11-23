@@ -6,7 +6,9 @@ import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
 import { RoadmapStackFace } from '@/modules/roadmap/RoadmapStackFace';
 import { RoadmapTreeFace } from '@/modules/roadmap/RoadmapTreeFace';
 import { RunnerPanel } from '@/modules/runner-tab';
+import { SCREEN_FRAME } from '@/shared/constants';
 import { Spinner, Tabs } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /** The tab's three faces: the roadmap as a tree from its goal, the ring of its features (finished, being built, ready to start), and the live cards of what is in flight. */
 type Face = 'path' | 'stack' | 'inFlight';
@@ -122,23 +124,27 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-roadmap-tab={face}>
-      <div className="flex shrink-0 items-center border-b border-border px-4 py-2.5 lg:px-6">
-        <Tabs
-          ariaLabel={t('roadmap.faces.label')}
-          tabs={[
-            { id: 'path', label: t('roadmap.faces.path') },
-            { id: 'stack', label: t('roadmap.faces.stack') },
-            {
-              id: 'inFlight',
-              label: t('roadmap.faces.inFlight'),
-              // No pill at zero, and the amber (with its sentence) only while a prompt waits on the operator.
-              count: count > 0 ? count : undefined,
-              attention: waiting > 0 ? t('runner.waiting', { count: waiting }) : undefined,
-            },
-          ]}
-          active={face}
-          onChange={showFace}
-        />
+      {/* The switch's rule runs the window's width; the switch keeps to the page's frame (`SCREEN_FRAME`), under the head that
+          does. The tree and the ring under it stand in the middle of the window, as the frame does. */}
+      <div className="shrink-0 border-b border-border">
+        <div className={cn(SCREEN_FRAME, 'flex items-center py-2.5')}>
+          <Tabs
+            ariaLabel={t('roadmap.faces.label')}
+            tabs={[
+              { id: 'path', label: t('roadmap.faces.path') },
+              { id: 'stack', label: t('roadmap.faces.stack') },
+              {
+                id: 'inFlight',
+                label: t('roadmap.faces.inFlight'),
+                // No pill at zero, and the amber (with its sentence) only while a prompt waits on the operator.
+                count: count > 0 ? count : undefined,
+                attention: waiting > 0 ? t('runner.waiting', { count: waiting }) : undefined,
+              },
+            ]}
+            active={face}
+            onChange={showFace}
+          />
+        </div>
       </div>
 
       <div className="min-h-0 flex-1">

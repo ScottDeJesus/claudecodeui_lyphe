@@ -29,6 +29,7 @@ import type { FleetGroupId } from '@/modules/cerberus/utils/fleetHoop';
 import { SchedulingView } from '@/modules/scheduling-report';
 import { UploadsView } from '@/modules/upload-runs';
 import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
+import { SCREEN_FRAME } from '@/shared/constants';
 import { HeadTools } from '@/shared/context/HeadToolsContext';
 import { useHoopView } from '@/shared/hooks/useHoopView';
 import type { AstrolabePoint, CerberusSheetTarget, CerberusView, FleetDoing, HoopHandle, HoopView, InstrumentMeasure, ProjectChoice } from '@/shared/types';
@@ -49,6 +50,12 @@ const VIEW_ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTimingFu
 
 /** The gutter every block of a face keeps, from the panel's own width (`cqi`), as the prototype's do. */
 const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
+
+/**
+ * The page's frame (`SCREEN_FRAME`), the one the screen's head keeps to, without its gutter: each face keeps its own (`GUTTER`). So at a
+ * wide desk the faces stand under the head, not at the window's left with the head's Menu at its right.
+ */
+const FACE_FRAME = cn(SCREEN_FRAME, 'px-0 lg:px-0');
 
 /** What hangs from the core or a run rather than from a machine: the fleet itself, or a run's further machines. */
 type OtherOpening = { kind: 'fleet' } | { kind: 'more'; groupId: FleetGroupId };
@@ -231,21 +238,25 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
         {/* THE SCENE: the instrument at home, or the face chosen as the work. Every Opening is drawn inside it and measures its room here. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
           {overview === null ? (
-            unreachable ? (
-              <div key={attempt} className={cn('max-w-xl pt-[clamp(20px,5cqi,28px)]', GUTTER, VIEW_ENTER)}>
-                <UnreachableBanner onRetry={onRetry} />
-              </div>
-            ) : (
-              <p role="status" className={cn('animate-[vv-fade_200ms_ease_150ms_both] py-7 text-[13.5px] text-muted-foreground', GUTTER)}>
-                {t('cerberus.loading')}
-              </p>
-            )
+            <div className={FACE_FRAME}>
+              {unreachable ? (
+                <div key={attempt} className={cn('max-w-xl pt-[clamp(20px,5cqi,28px)]', GUTTER, VIEW_ENTER)}>
+                  <UnreachableBanner onRetry={onRetry} />
+                </div>
+              ) : (
+                <p role="status" className={cn('animate-[vv-fade_200ms_ease_150ms_both] py-7 text-[13.5px] text-muted-foreground', GUTTER)}>
+                  {t('cerberus.loading')}
+                </p>
+              )}
+            </div>
           ) : (
             <>
               {stale && (
                 // The fleet below is the last answer center gave, not this minute's.
-                <div key={attempt} className={cn('flex-none pt-3', GUTTER, VIEW_ENTER)}>
-                  <UnreachableBanner onRetry={onRetry} detail={t('cerberus.errors.lastAnswer')} />
+                <div key={attempt} className={cn(FACE_FRAME, 'flex-none')}>
+                  <div className={cn('pt-3', GUTTER, VIEW_ENTER)}>
+                    <UnreachableBanner onRetry={onRetry} detail={t('cerberus.errors.lastAnswer')} />
+                  </div>
                 </div>
               )}
               <div ref={homeRef} className="relative min-h-0 flex-1">
@@ -254,30 +265,33 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
                     {instrument(false)}
                   </div>
                 )}
-                {/* The other faces scroll here; kept faces stay mounted, hidden, while the fleet is shown. */}
+                {/* The other faces scroll here, the scroller the window's width and the faces in the page's frame; kept faces stay
+                    mounted, hidden, while the fleet is shown. */}
                 <ScrollArea ref={scrollerRef} className={cn('h-full', view === 'fleet' && 'hidden')}>
-                  {view === 'catalog' && (
-                    <div role="tabpanel" aria-label={t('cerberus.catalog.tab')} className={VIEW_ENTER}>
-                      <CatalogView />
-                    </div>
-                  )}
-                  {view === 'history' && (
-                    <div role="tabpanel" aria-label={t('cerberus.fleet.tabs.history')} className={VIEW_ENTER}>
-                      <HistoryView />
-                    </div>
-                  )}
-                  <KeptView id="tours" view={view} shownOnce={shownOnce} label={t('cerberus.tours.tab')}>
-                    <AffectedAreasView />
-                  </KeptView>
-                  <KeptView id="bulletins" view={view} shownOnce={shownOnce} label={t('cerberus.bulletins.tab')}>
-                    <BulletinsView />
-                  </KeptView>
-                  <KeptView id="uploads" view={view} shownOnce={shownOnce} label={t('cerberus.uploads.tab')}>
-                    <UploadsView shown={view === 'uploads'} />
-                  </KeptView>
-                  <KeptView id="scheduling" view={view} shownOnce={shownOnce} label={t('cerberus.scheduling.tab')}>
-                    <SchedulingView shown={view === 'scheduling'} />
-                  </KeptView>
+                  <div className={FACE_FRAME}>
+                    {view === 'catalog' && (
+                      <div role="tabpanel" aria-label={t('cerberus.catalog.tab')} className={VIEW_ENTER}>
+                        <CatalogView />
+                      </div>
+                    )}
+                    {view === 'history' && (
+                      <div role="tabpanel" aria-label={t('cerberus.fleet.tabs.history')} className={VIEW_ENTER}>
+                        <HistoryView />
+                      </div>
+                    )}
+                    <KeptView id="tours" view={view} shownOnce={shownOnce} label={t('cerberus.tours.tab')}>
+                      <AffectedAreasView />
+                    </KeptView>
+                    <KeptView id="bulletins" view={view} shownOnce={shownOnce} label={t('cerberus.bulletins.tab')}>
+                      <BulletinsView />
+                    </KeptView>
+                    <KeptView id="uploads" view={view} shownOnce={shownOnce} label={t('cerberus.uploads.tab')}>
+                      <UploadsView shown={view === 'uploads'} />
+                    </KeptView>
+                    <KeptView id="scheduling" view={view} shownOnce={shownOnce} label={t('cerberus.scheduling.tab')}>
+                      <SchedulingView shown={view === 'scheduling'} />
+                    </KeptView>
+                  </div>
                 </ScrollArea>
               </div>
 

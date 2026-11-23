@@ -6,9 +6,11 @@ import type { TFunction } from 'i18next';
 import { askHeadline, askIdentity } from '@/modules/dispatcher/askState';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { KindTag } from '@/modules/dispatcher/LaneCardHead';
+import { INBOX_MEASURE, SCREEN_FRAME } from '@/shared/constants';
 import { useRevealCard } from '@/shared/hooks/useRevealCard';
 import type { DispatcherAsk, DispatcherPlan, Kind } from '@/shared/types';
 import { Badge, Button, Card, EmptyState, ScrollArea } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /** The two words of a drawn plan a row reads: its name, the feature it is, and its arc, the epic it belongs to. */
 type AskPlan = Pick<DispatcherPlan, 'name' | 'arc'>;
@@ -112,7 +114,8 @@ function AskRow({ group, onAnswer }: { group: AskGroup; onAnswer: (plan: string)
  *
  * Two states and no third: the lane has no loading reading to show (`useDispatcherPlans` collapses "nothing retained
  * yet" into an empty lane on purpose), so an empty list is the one answer before the first frame and after the last
- * word. The column is the Memory section's measure, so flipping between the two keeps the rows where the eye left them.
+ * word. The column is the Memory section's measure (`INBOX_MEASURE`, at the start of the page's frame), so flipping between the
+ * two keeps the rows where the eye left them.
  */
 function WaitingAsksList({ groups, onAnswer }: { groups: AskGroup[]; onAnswer: (plan: string) => void }) {
   const { t } = useTranslation();
@@ -124,26 +127,31 @@ function WaitingAsksList({ groups, onAnswer }: { groups: AskGroup[]; onAnswer: (
           frame, and the Roadmap section prints the count its tab carries. The Roadmap's glyph, because Answer lands
           there; the card's own words for an ask, because that is where the answer is given. No figure at zero: the
           empty state says it. */}
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
-          <Route className="h-4 w-4" aria-hidden="true" />
-        </span>
-        <h2 className="text-sm font-medium">{t('dispatcher.ask.waiting')}</h2>
-        {groups.length > 0 && <Badge tone="neutral">{groups.length}</Badge>}
+      <header className="shrink-0 border-b border-border">
+        <div className={cn(SCREEN_FRAME, 'flex h-12 items-center gap-2')}>
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
+            <Route className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <h2 className="text-sm font-medium">{t('dispatcher.ask.waiting')}</h2>
+          {groups.length > 0 && <Badge tone="neutral">{groups.length}</Badge>}
+        </div>
       </header>
 
       <ScrollArea className="min-h-0 flex-1">
-        {groups.length === 0 ? (
-          <div className="flex items-center justify-center px-4 py-10">
-            <EmptyState icon={Route} title={t('inbox.asks.empty')} message={t('inbox.asks.emptyMessage')} />
-          </div>
-        ) : (
-          <ul className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 py-5">
-            {groups.map((group) => (
-              <AskRow key={askIdentity(group.ask)} group={group} onAnswer={onAnswer} />
-            ))}
-          </ul>
-        )}
+        {/* The Memory section's column, at the start of the page's frame: the rows, or the empty state in their place. */}
+        <div className={SCREEN_FRAME}>
+          {groups.length === 0 ? (
+            <div className={cn(INBOX_MEASURE, 'flex items-center justify-center py-10')}>
+              <EmptyState icon={Route} title={t('inbox.asks.empty')} message={t('inbox.asks.emptyMessage')} />
+            </div>
+          ) : (
+            <ul className={cn(INBOX_MEASURE, 'flex flex-col gap-3 py-5')}>
+              {groups.map((group) => (
+                <AskRow key={askIdentity(group.ask)} group={group} onAnswer={onAnswer} />
+              ))}
+            </ul>
+          )}
+        </div>
       </ScrollArea>
     </div>
   );

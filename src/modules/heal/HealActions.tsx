@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { HealModelSwitch } from '@/modules/heal/HealModelSwitch';
 import { HealStartStopButton } from '@/modules/heal/HealStartStopButton';
 import type { HealSummary } from '@/modules/heal/healTypes';
+import { SCREEN_FRAME } from '@/shared/constants';
 import { cn } from '@/shared/utils';
 
 /**
@@ -41,22 +42,26 @@ export function HealActions({ summary }: { summary: HealSummary }) {
       : t('heal.cycles.startCaption', { defaultValue: 'Chiron ranks the live friction, then heals walk his list' });
 
   return (
-    <div
-      role="toolbar"
-      aria-label={t('heal.actions.label', { defaultValue: 'Heal actions' })}
-      className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2.5 [@container(min-width:48rem)]:grid [@container(min-width:48rem)]:grid-cols-2 [@container(min-width:48rem)]:items-start [@container(min-width:48rem)]:gap-x-8 [@container(min-width:48rem)]:px-6 [@container(min-width:48rem)]:py-3"
-      data-heal-actions
-    >
-      <ActionCell caption={modelCaption}>
-        <HealModelSwitch model={model} />
-      </ActionCell>
-      {/* Start keeps the far end: it is the one press a reader arrives for, where three seconds lands. */}
-      <ActionCell
-        className="ml-auto [@container(min-width:48rem)]:items-end [@container(min-width:48rem)]:justify-self-end [@container(min-width:48rem)]:text-right"
-        caption={cycleCaption}
+    // The rule runs the window's width; the two controls keep to the page's frame (`SCREEN_FRAME`), so Start's far end is the
+    // frame's, under the Menu.
+    <div role="toolbar" aria-label={t('heal.actions.label', { defaultValue: 'Heal actions' })} className="shrink-0 border-b border-border" data-heal-actions>
+      <div
+        className={cn(
+          SCREEN_FRAME,
+          'flex flex-wrap items-center gap-2 py-2.5 [@container(min-width:48rem)]:grid [@container(min-width:48rem)]:grid-cols-2 [@container(min-width:48rem)]:items-start [@container(min-width:48rem)]:gap-x-8 [@container(min-width:48rem)]:py-3',
+        )}
       >
-        <HealStartStopButton master={master} cycleOpen={cycleOpen} />
-      </ActionCell>
+        <ActionCell caption={modelCaption}>
+          <HealModelSwitch model={model} />
+        </ActionCell>
+        {/* Start keeps the far end: it is the one press a reader arrives for, where three seconds lands. */}
+        <ActionCell
+          className="ml-auto [@container(min-width:48rem)]:items-end [@container(min-width:48rem)]:justify-self-end [@container(min-width:48rem)]:text-right"
+          caption={cycleCaption}
+        >
+          <HealStartStopButton master={master} cycleOpen={cycleOpen} />
+        </ActionCell>
+      </div>
     </div>
   );
 }

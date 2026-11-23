@@ -11,8 +11,9 @@ const HeadToolsContext = createStableContext<HeadToolsValue | null>(import.meta.
 
 /**
  * A SCREEN'S OWN PRESSES IN THE SCREEN HEAD. The head drawn over a screen (`ScreenHead`) knows nothing of the screen under it; a
- * screen with a press of its own for the head (Cerberus's switch between its fleet's hoop and its list) draws it into the head's place
- * for one (`HeadTools`), just before the menu, for as long as the screen stands and the press means something there.
+ * screen with a press of its own for the head (Cerberus's switch between its fleet's hoop and its list, R&D's Scout now) draws it into
+ * the head's place for one (`HeadTools`), just before the menu, for as long as the screen stands and the press means something there.
+ * So a page's presses stand together on one line with the way back and the Menu, not at a corner of the page under them.
  *
  * Rendered by project-workspace's `ProjectWorkspaceShell` round every page.
  */
@@ -37,7 +38,8 @@ export function HeadToolsPlace() {
 /**
  * A screen's own presses, drawn in the screen head's place for them; nothing where no head is drawn.
  *
- * Used by the cerberus module's `CerberusPanel` (its switch between the fleet's hoop and its list).
+ * Used by the cerberus module's `CerberusPanel` (its switch between the fleet's hoop and its list), the rnd module's `RndPanel`
+ * (Scout now and the settings) and the schedules module's `SchedulesPanel` (Refresh).
  */
 export function HeadTools({ children }: { children: ReactNode }) {
   const tools = useContext(HeadToolsContext);

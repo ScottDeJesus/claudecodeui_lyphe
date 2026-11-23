@@ -2,7 +2,9 @@ import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { SCREEN_FRAME } from '@/shared/constants';
 import { Button, Tabs } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /** The view's three faces: the board (the instrument at home, turned to its lanes), its numbers, and the features proposed from it
  *  (the instrument at home, turned to its proposals). */
@@ -38,7 +40,15 @@ export function BugFoot({ face, onFace, openHigh, openProposals, openHighProposa
   return (
     // Three columns: the docked instrument at the start, the controls in the middle, and the same room again at the end, so the
     // controls stand in the middle of the foot whatever the start holds.
-    <footer data-bug-foot="" className="grid h-[84px] flex-none grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 pb-[var(--safe-area-inset-bottom)] md:h-[100px] md:gap-3 md:px-7">
+    // In the page's frame (`SCREEN_FRAME`), as the head over the board is: at a wide desk the docked instrument stands under the way
+    // back, not at the window's corner.
+    <footer
+      data-bug-foot=""
+      className={cn(
+        SCREEN_FRAME,
+        'grid h-[84px] flex-none grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 pb-[var(--safe-area-inset-bottom)] md:h-[100px] md:gap-3 md:px-7 lg:px-6',
+      )}
+    >
       <div className="flex min-w-0 items-center">
         {face !== 'board' && (
           <button

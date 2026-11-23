@@ -4,6 +4,8 @@ import { LAST_RUN_CELL, SCHEDULE_CELL, ScheduleRow, WHERE_CELL } from '@/modules
 import { useMinuteTick } from '@/modules/schedules/hooks/useMinuteTick';
 import { useSchedules } from '@/modules/schedules/hooks/useSchedules';
 import { needsLook, syncFreshness } from '@/modules/schedules/scheduleReadings';
+import { HEAD_WORD_PRESS, SCREEN_FRAME } from '@/shared/constants';
+import { HeadTools } from '@/shared/context/HeadToolsContext';
 import type { CronJob } from '@/shared/types';
 import { Badge, Banner, Button, EmptyState, ScrollArea, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -26,7 +28,8 @@ function byAttention(a: CronJob, b: CronJob): number {
  * the header saying the rows may be stale. A dead sync must never look like confident rows.
  *
  * READ-ONLY. Refresh is the one control, and it runs a sync: there is no run-now or pause here,
- * because a control the backend cannot serve is a promise the app breaks.
+ * because a control the backend cannot serve is a promise the app breaks. It stands in the screen's
+ * head, before the Menu (`HeadTools`), and the rows are read in the page's frame (`SCREEN_FRAME`).
  */
 export function SchedulesPanel() {
   const { snapshot, loading, syncing, error, refresh } = useSchedules();
@@ -43,11 +46,20 @@ export function SchedulesPanel() {
 
   return (
     <section aria-label="Schedules" className="flex h-full min-h-0 flex-col">
-      {/* The screen's own head names it (`ScreenHead`); this row is what the registry's sync says and its Refresh. */}
-      <header className="flex flex-none flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b border-border px-4 py-3">
-        {/* The sync's age and its counts travel together, and wrap under themselves before they push Refresh off its line. */}
-        {freshness && (
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1">
+      {/* The screen's own head names it (`ScreenHead`) and holds its one press, Refresh, before the Menu: its word at a desk, its
+          mark under a finger with the word kept as its name. */}
+      <HeadTools>
+        <Button variant="outline" size="sm" className={HEAD_WORD_PRESS} disabled={syncing || loading} onClick={onRefresh} title={syncing ? 'Syncing…' : 'Refresh'}>
+          <RefreshCw className={cn(syncing && 'animate-spin')} aria-hidden="true" />
+          <span className="finger:sr-only">{syncing ? 'Syncing…' : 'Refresh'}</span>
+        </Button>
+      </HeadTools>
+
+      {/* This row is what the registry's sync says, in the page's frame: its age and its counts travel together, and wrap under
+          themselves on a narrow screen. */}
+      {freshness && (
+        <header className="flex-none border-b border-border">
+          <div className={cn(SCREEN_FRAME, 'flex flex-wrap items-center gap-x-2.5 gap-y-1 py-3')}>
             <Badge as="span" tone={freshness.tone} title={lastSync ? `${lastSync.ranAt} · took ${lastSync.ms} ms` : undefined}>
               {freshness.label}
             </Badge>
@@ -57,17 +69,13 @@ export function SchedulesPanel() {
               </span>
             )}
           </div>
-        )}
-        <Button variant="outline" size="sm" className="ml-auto" disabled={syncing || loading} onClick={onRefresh}>
-          <RefreshCw className={cn(syncing && 'animate-spin')} aria-hidden="true" />
-          {syncing ? 'Syncing…' : 'Refresh'}
-        </Button>
-      </header>
+        </header>
+      )}
 
       {/* Above the rows and beside them, never instead of them: a failed refresh leaves the last
           good read on screen, and a stale sync is said over the rows it cannot vouch for. */}
       {(error || (freshness?.warning && jobs.length > 0)) && (
-        <div className="flex flex-none flex-col gap-2 px-4 py-3">
+        <div className={cn(SCREEN_FRAME, 'flex flex-none flex-col gap-2 py-3')}>
           {error && (
             <Banner tone="warn">
               {!snapshot && `The registry could not be read — ${error}. Refresh tries again.`}
@@ -100,26 +108,31 @@ export function SchedulesPanel() {
 
       {jobs.length > 0 && (
         <ScrollArea className="min-h-0 flex-1">
-          <div className="sticky top-0 z-10 hidden items-center gap-3 border-b border-border bg-background px-3.5 py-2 text-xs uppercase tracking-[0.14em] text-ink-faint lg:flex">
-            <span className="min-w-0 flex-1">Name</span>
-            <span className={SCHEDULE_CELL}>Schedule</span>
-            <span className={LAST_RUN_CELL}>Last run</span>
-            <span className={WHERE_CELL}>Where</span>
+          {/* The table in the page's frame, standing a cell's inset out into the gutter, so its words start under the sync's. */}
+          <div className={SCREEN_FRAME}>
+            <div className="-mx-3.5">
+              <div className="sticky top-0 z-10 hidden items-center gap-3 border-b border-border bg-background px-3.5 py-2 text-xs uppercase tracking-[0.14em] text-ink-faint lg:flex">
+                <span className="min-w-0 flex-1">Name</span>
+                <span className={SCHEDULE_CELL}>Schedule</span>
+                <span className={LAST_RUN_CELL}>Last run</span>
+                <span className={WHERE_CELL}>Where</span>
+              </div>
+              <section aria-label={GROUP_TITLE}>
+                <h3 className="flex items-baseline gap-2 border-b border-border bg-muted/60 px-3.5 py-1.5 text-[12px] font-medium text-muted-foreground">
+                  <span>{GROUP_TITLE}</span>
+                  <span className="tabular-nums text-ink-faint">{sorted.length}</span>
+                  {attention > 0 && (
+                    <span className="text-warn-ink">▲ {attention} {attention === 1 ? 'needs' : 'need'} a look</span>
+                  )}
+                </h3>
+                <ul>
+                  {sorted.map((job) => (
+                    <ScheduleRow key={job.id} job={job} />
+                  ))}
+                </ul>
+              </section>
+            </div>
           </div>
-          <section aria-label={GROUP_TITLE}>
-            <h3 className="flex items-baseline gap-2 border-b border-border bg-muted/60 px-3.5 py-1.5 text-[12px] font-medium text-muted-foreground">
-              <span>{GROUP_TITLE}</span>
-              <span className="tabular-nums text-ink-faint">{sorted.length}</span>
-              {attention > 0 && (
-                <span className="text-warn-ink">▲ {attention} {attention === 1 ? 'needs' : 'need'} a look</span>
-              )}
-            </h3>
-            <ul>
-              {sorted.map((job) => (
-                <ScheduleRow key={job.id} job={job} />
-              ))}
-            </ul>
-          </section>
         </ScrollArea>
       )}
     </section>

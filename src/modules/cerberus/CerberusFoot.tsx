@@ -2,8 +2,10 @@ import { BookOpen, CalendarClock, CloudUpload, History, Map as MapIcon, Newspape
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { SCREEN_FRAME } from '@/shared/constants';
 import type { CerberusView } from '@/shared/types';
 import { Button, Tabs } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /** The faces in the strip's old order, each with its name, its mark and what it holds (its hover title, after its name). */
 const FACES = [
@@ -42,7 +44,15 @@ export function CerberusFoot({ face, onFace, needs, onEnroll, docked }: Cerberus
   const enroll = t('cerberus.header.enroll');
 
   return (
-    <footer data-cerberus-foot="" className="grid h-[72px] flex-none grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,1fr)] items-center gap-0 px-3 pb-safe-area-inset-bottom max-sm:px-2 md:h-[100px] md:gap-3 md:px-7">
+    // In the page's frame (`SCREEN_FRAME`), as the head over the screen is: at a wide desk the docked instrument stands under the
+    // way back, not at the window's corner.
+    <footer
+      data-cerberus-foot=""
+      className={cn(
+        SCREEN_FRAME,
+        'grid h-[72px] flex-none grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,1fr)] items-center gap-0 px-3 pb-safe-area-inset-bottom max-sm:px-2 md:h-[100px] md:gap-3 md:px-7 lg:px-6',
+      )}
+    >
       <div className="flex min-w-0 items-center">
         {face !== 'fleet' && (
           <button

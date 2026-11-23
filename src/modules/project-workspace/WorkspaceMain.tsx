@@ -77,6 +77,15 @@ const MAX_PREVIEW_READS = 64;
 const MAX_PREVIEW_CACHE_BYTES = 150 * 1024 * 1024;
 
 /**
+ * The pages that are read, whose head keeps to the page's frame (`ScreenHead`'s `framed`) as their blocks do (`SCREEN_FRAME`): lists,
+ * tables and dashboards. Roadmap is one for its In flight; its tree and its ring stand in the middle of the window under the same head.
+ * Cerberus is one for its six faces of words; its fleet's hoop stands in the middle too. Bugs is not listed because it draws its own head
+ * (`BugHead`), which keeps to the same frame. The rest fill the window: the sky, the files, the terminal, git, the browser, the tasks and
+ * a plugin's own pane.
+ */
+const FRAMED_VIEWS: ReadonlySet<AppTab> = new Set<AppTab>(['rnd', 'analytics', 'schedules', 'api', 'inbox', 'notes', 'runner', 'cerberus']);
+
+/**
  * A response's body, refused once it passes `cap` bytes. For a response with no `Content-Length` —
  * a compressing proxy strips it — where the size is only known by counting what arrives.
  */
@@ -360,9 +369,11 @@ function WorkspaceMain({
     <SessionPanelProvider sessionId={activeTab === 'chat' && !floating ? (selectedSession?.id ?? null) : null} followupsApart={chatSide > 0}>
     <div className="flex h-full flex-col">
       {/* EVERY VIEW STANDS ALONE, at every width: a head with the way back, the view's name and the menu to every other place, and no
-          old sidebar, rail or phone's strip round it. Every head is drawn in one row (`HEAD_ROW`), the full width of the screen, so the
-          way back and the menu stand on the same spot on every page: the chat's (`ChatHead`, over its pane and the column beside it), the
-          Bugs view's own (`BugHead`, in its panel) and every other view's (`ScreenHead`). The phone's strip stays only for the Chat view
+          old sidebar, rail or phone's strip round it. Every head is drawn in one row (`HEAD_ROW`): the chat's (`ChatHead`, over its pane
+          and the column beside it), the Bugs view's own (`BugHead`, in its panel) and every other view's (`ScreenHead`). A head stands
+          over what it heads: over a page that is read (`FRAMED_VIEWS`) it keeps to the page's frame (`SCREEN_FRAME`), the same frame on
+          every such page, so at a wide desk the arrow and the Menu stand on the page's edges and on the same spots from one such page to
+          the next; over an instrument that fills the window it runs the window's width. The phone's strip stays only for the Chat view
           while its chat floats. */}
       {activeTab === 'chat' && floating && (
         <WorkspaceHeader
@@ -376,7 +387,7 @@ function WorkspaceMain({
       )}
       {activeTab !== 'chat' && activeTab !== 'kanban' && (
         // A plugin's view while the plugin list loads has no name in the list yet: its own id stands in.
-        <ScreenHead name={viewLabel ?? activeTab.replace('plugin:', '')} />
+        <ScreenHead name={viewLabel ?? activeTab.replace('plugin:', '')} framed={FRAMED_VIEWS.has(activeTab)} />
       )}
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">

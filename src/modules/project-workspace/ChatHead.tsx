@@ -34,7 +34,8 @@ type ChatHeadProps = {
  * home is the list of chats now, and the other views are reached from its menu. `pwa-header-safe` keeps it clear of a phone's status bar.
  *
  * IT IS EVERY SCREEN'S HEAD (`HEAD_ROW`): the full width of the screen, over the chat and, at a desk, over the column beside it too,
- * so the way back and the menu stand on the same spot as on every other page. Under a finger it is one line: the words side by side,
+ * as the chat's desk is the window's width, so the way back and the menu stand on the same spot as on every page that fills the window
+ * (a page that is read keeps its head to its frame, `ScreenHead`'s `framed`). Under a finger it is one line: the words side by side,
  * the title in the small size, the arrow and the menu drawn 28 px and still caught at 44 (`HEAD_PRESS`).
  *
  * Drawn by `WorkspaceMain`, over the chat's pane (`ChatDesk`).
@@ -75,7 +76,7 @@ export default function ChatHead({ selectedProject, selectedSession, newSessionL
       <SessionFollowupsSwitch />
       {/* The chat's panel is a place switched to from here; with no panel this draws nothing. */}
       <SessionPanelSwitch />
-      {/* The way to every other place, last in the head: the same menu in the same corner as on every page. */}
+      {/* The way to every other place, last in the head: the same menu at the same end as on every page's head. */}
       <PlacesMenu />
     </header>
   );
