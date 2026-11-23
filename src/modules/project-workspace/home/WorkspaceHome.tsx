@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCurrentApplication } from '@/modules/app-switcher';
@@ -8,9 +8,10 @@ import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
 import { RoadmapCircle } from '@/modules/roadmap';
 import { SessionsBoard } from '@/modules/sidebar';
 import { openStation } from '@/shared/cloudcliDoors';
-import { HEAD_ROW, HOLDS_PLACES, ROADMAP_CIRCLE_AT_DESK, ROADMAP_CIRCLE_ON_PHONE } from '@/shared/constants';
+import { HEAD_ROW, HOLDS_PLACES, ROADMAP_CIRCLE_AT_DESK, ROADMAP_CIRCLE_ON_PHONE, SCREEN_FRAME } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { Project, RecentConversationListItem, RoadmapStackRest } from '@/shared/types';
+import { cn, frameStartIn } from '@/shared/utils';
 
 /** The side of the square Kaylee's docked core is drawn in, in px: on a phone, and larger at a desk, where the foot has the room. */
 const CORE_SIZE = 60;
@@ -18,7 +19,8 @@ const CORE_SIZE_AT_DESK = 76;
 
 /**
  * Where the roadmap's circle rests at the head, in the home's own pixels, at a desk and on a phone: its middle on the line Kaylee's core stands on at the
- * foot, so the two are one above the other. The head is as tall as the circle needs; the menu stands in its corner, as on every page.
+ * foot, so the two are one above the other. At a desk it is measured from the start of the home's frame (`frameStartIn`). The head is as tall as the
+ * circle needs; the menu stands at its end.
  */
 const CIRCLE_AT_DESK: RoadmapStackRest = ROADMAP_CIRCLE_AT_DESK;
 const CIRCLE_ON_PHONE: RoadmapStackRest = ROADMAP_CIRCLE_ON_PHONE;
@@ -35,15 +37,18 @@ type WorkspaceHomeProps = {
  * THE SESSIONS HOME, the page `/home` shows: his chats laid out by folder across the page (`SessionsBoard`, the sidebar's simple list in another form), with
  * three marks at its corners. It is drawn over the held workspace and holds no state of its own: every press is one the workspace already has.
  *
+ * ONE FRAME AT A DESK. The board stands in the middle of the window (1,180 px at most), and the head and the foot keep to the page's frame round it
+ * (`SCREEN_FRAME`, 80rem), with the roadmap's circle at the frame's start: the four stand as one block, as they do in a window 1,280 px wide, never the
+ * circle and the core at the window's left corners and the menu at its right with the board between them.
+ *
  * - A CHAT, pressed, is brought forward in the workspace (`openChatInWorkspace`, the door Kaylee's own order to open a chat goes through). New chat is the
  *   workspace's new-chat screen; a chat closed or deleted here is let go of by the workspace as if its own list had removed it.
  * - KAYLEE'S CORE, docked at the foot on the start side, live as it is everywhere and drawn as a chat's core is (`CompanionCore`): the
  *   body with her conversation's context and the account's week as two rings on it. A press on the core opens the station; a press
  *   on the outer ring's band opens the account switcher; a long press brings up the wheel of places, held (`HOLDS_PLACES`).
- * - THE MENU, in the head's corner on the end side, is the one way to every other place (`PlacesMenu`): it brings up the wheel of places
- *   (the screens, the station, the last chat, Settings, and the applications' acts under it). It is the same press, in the same row
- *   (`HEAD_ROW`), that every screen's head and the station carry, so the way out of any page that fills the window is on one spot (a
- *   page that is read keeps it at its frame's end).
+ * - THE MENU, at the head's end, is the one way to every other place (`PlacesMenu`): it brings up the wheel of places (the screens, the
+ *   station, the last chat, Settings, and the applications' acts under it). It is the same press, in the same row (`HEAD_ROW`) kept to
+ *   the same frame (`SCREEN_FRAME`) as a page that is read, so it stands on the spot it has on R&D, Analytics and the rest.
  * - THE ROADMAP'S CIRCLE, at the head on the start side, over Kaylee's core: small until pressed, then the whole stack over the home (`RoadmapCircle`,
  *   which lies over the home's box and takes no press but the circle's while it is small).
  *
@@ -56,7 +61,19 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
   const { t } = useTranslation();
   const { sidebarSharedProps } = useProjectSidebarState();
   const { projects, onNewSession, onSessionDelete, isMobile } = sidebarSharedProps;
-  const circle = isMobile ? CIRCLE_ON_PHONE : CIRCLE_AT_DESK;
+  // The home's width, for where its frame starts at a desk: the roadmap's circle is placed in px and keeps its place in the frame.
+  const homeRef = useRef<HTMLDivElement>(null);
+  const [homeWidth, setHomeWidth] = useState(0);
+  useLayoutEffect(() => {
+    const box = homeRef.current;
+    if (box === null) return undefined;
+    const measure = () => setHomeWidth(Math.round(box.getBoundingClientRect().width));
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(box);
+    return () => observer?.disconnect();
+  }, []);
+  const circle = isMobile ? CIRCLE_ON_PHONE : { ...CIRCLE_AT_DESK, cx: CIRCLE_AT_DESK.cx + frameStartIn(homeWidth) };
   const coreSize = isMobile ? CORE_SIZE : CORE_SIZE_AT_DESK;
   const doors = useStationDoors();
   // How many times the reader has come back from the station with its roadmap standing: the circle lies down from standing each time (`RoadmapCircle`).
@@ -87,12 +104,14 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
 
   return (
     <div
+      ref={homeRef}
       data-workspace-home=""
       className="pwa-status-clear fixed inset-0 flex flex-col bg-background text-foreground"
       style={{ bottom: 'var(--keyboard-height, 0px)' }}
     >
-      {/* As tall as the roadmap's circle needs (it lies over this corner, `RoadmapCircle` below), the menu in every head's corner. */}
-      <header className={`${HEAD_ROW} justify-end`} style={{ height: circle.cy + circle.radius + HEAD_BELOW_CIRCLE }}>
+      {/* As tall as the roadmap's circle needs (it lies over the frame's start, `RoadmapCircle` below), the menu at its end: the row of every
+          head, kept to the page's frame. */}
+      <header className={cn(HEAD_ROW, SCREEN_FRAME, 'justify-end')} style={{ height: circle.cy + circle.radius + HEAD_BELOW_CIRCLE }}>
         <PlacesMenu />
       </header>
 
@@ -101,8 +120,9 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
         <SessionsBoard projects={projects} enabled={visited} onOpenChat={openChat} onNewChat={newChat} onSessionRemoved={sessionRemoved} />
       </main>
 
-      {/* At a desk the foot is taller for the larger core, which keeps its middle under the roadmap's circle (66 px in). */}
-      <footer className="flex h-[84px] flex-none items-center justify-between px-3 pb-[var(--safe-area-inset-bottom)] md:h-[100px] md:pl-7 md:pr-11">
+      {/* At a desk the foot is taller for the larger core, which keeps its middle under the roadmap's circle (66 px into the frame): the foot
+          keeps to the page's frame as the head does. */}
+      <footer className="mx-auto flex h-[84px] w-full max-w-7xl flex-none items-center justify-between px-3 pb-[var(--safe-area-inset-bottom)] md:h-[100px] md:pl-7 md:pr-11">
         {/* The inner ring is a reading here (the conversation is the station's): the core's press takes its band, and only the outer
             ring's band, outside it, opens the account switcher. */}
         <CompanionCore

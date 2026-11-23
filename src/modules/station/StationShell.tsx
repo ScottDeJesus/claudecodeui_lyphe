@@ -22,6 +22,7 @@ import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { RoadmapStackRest, StationArrangement } from '@/shared/types';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
+import { frameStartIn } from '@/shared/utils';
 
 /** The companion's column beside the panel, in px, where the screen has room for two columns: the panel keeps the rest, about two thirds. */
 const KAYLEE_COLUMN: Record<'wide' | 'laptop', number> = { wide: 420, laptop: 340 };
@@ -245,6 +246,11 @@ export function StationShell() {
     return () => hostWindow.removeEventListener('keydown', onKeyDown, true);
   }, [staged, canGoBack, back, hostWindow, isPageHeld, doors, setFocus, goHome]);
 
+  // Where the sessions home's circle stands in this window (its place in the home's frame), for the stack to arrive from it.
+  const homeCircle = { ...ROADMAP_CIRCLE_AT_DESK, cx: ROADMAP_CIRCLE_AT_DESK.cx + frameStartIn(hostWindow.innerWidth) };
+  // The block the companion's column and the panel make at a desk, at its widest: the menu keeps to it, at rest as with a thing on the panel.
+  const block = arrangement === 'wide' || arrangement === 'laptop' ? KAYLEE_COLUMN[arrangement] + STAGE_TRACK_MAX : undefined;
+
   return (
     <StationShellView
       arrangement={arrangement}
@@ -253,11 +259,11 @@ export function StationShell() {
       scene={{
         stage: <StationStage />,
         kaylee: (form, haloWidth) => <StationKaylee form={form} haloWidth={haloWidth} onHome={goHome} />,
-        road: <RoadmapStanding arriveFrom={ROADMAP_CIRCLE_AT_DESK} arrivals={arrivals} />,
+        road: <RoadmapStanding arriveFrom={homeCircle} arrivals={arrivals} />,
         circle: (rest) => <RoadmapCircle rest={rest} />,
         action: <StationHeldAction />,
         talk: <StationTalk tier={tier} density="full" part="box" />,
-        corner: <PlacesCorner />,
+        corner: <PlacesCorner frame={block} />,
       }}
     />
   );
