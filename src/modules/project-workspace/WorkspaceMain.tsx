@@ -373,8 +373,8 @@ function WorkspaceMain({
           and the column beside it), the Bugs view's own (`BugHead`, in its panel) and every other view's (`ScreenHead`). A head stands
           over what it heads: over a page that is read (`FRAMED_VIEWS`) it keeps to the page's frame (`SCREEN_FRAME`), the same frame on
           every such page, so at a wide desk the arrow and the Menu stand on the page's edges and on the same spots from one such page to
-          the next; over an instrument that fills the window it runs the window's width. The phone's strip stays only for the Chat view
-          while its chat floats. */}
+          the next; over a chat it keeps to the desk's block (`ChatHead`'s `side`); over an instrument that fills the window it runs the
+          window's width. The phone's strip stays only for the Chat view while its chat floats. */}
       {activeTab === 'chat' && floating && (
         <WorkspaceHeader
           selectedProject={selectedProject}
@@ -392,7 +392,7 @@ function WorkspaceMain({
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
         <div className={`h-full flex-col ${activeTab === 'chat' ? 'flex' : 'hidden'}`}>
-          {!floating && <ChatHead selectedProject={selectedProject} selectedSession={selectedSession} newSessionLabel={t('mainContent.newSession')} />}
+          {!floating && <ChatHead selectedProject={selectedProject} selectedSession={selectedSession} newSessionLabel={t('mainContent.newSession')} side={chatSide} />}
           <div className="min-h-0 flex-1">
           <ChatDesk side={chatSide} sessionId={selectedSession?.id ?? null}>
           {selectedProject ? (

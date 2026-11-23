@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
-import { CORE_GAUGE_GAPS } from '@/shared/constants';
+import { CORE_GAUGE_GAPS, SCREEN_FRAME_PX } from '@/shared/constants';
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
 import { playSound } from '@/shared/sounds';
 import type { AffectedAreasTrouble, ChatAttachment, DispatcherModelWord, Project, ProjectSession, SlashCommand, SoundName } from '@/shared/types';
@@ -837,4 +837,18 @@ export function coreGaugeRadius(bodyRadius: number, index: 0 | 1): number {
  */
 export function coreContextTone(filled: number): 'quiet' | 'warn' | 'danger' {
   return filled >= 0.95 ? 'danger' : filled >= 0.8 ? 'warn' : 'quiet';
+}
+
+// ---------------------------
+
+//----------------- THE FRAME OF A PAGE ------------
+
+/**
+ * Where the page's frame starts in a window `width` px wide (`SCREEN_FRAME`, at most `SCREEN_FRAME_PX` wide in the middle of the window):
+ * 0 until the window is wider than the frame, then half of what the frame leaves. A piece placed in the page's own pixels is moved this
+ * far to keep its place in the frame: the sessions home's roadmap circle. Read by project-workspace's `WorkspaceHome`, which draws the
+ * circle there, and the station's `StationShell`, whose roadmap stack arrives from that circle.
+ */
+export function frameStartIn(width: number): number {
+  return Math.max(0, Math.round((width - SCREEN_FRAME_PX) / 2));
 }

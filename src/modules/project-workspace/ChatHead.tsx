@@ -1,4 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PlacesMenu } from '@/modules/project-workspace/PlacesMenu';
@@ -18,6 +19,8 @@ type ChatHeadProps = {
   selectedSession: ProjectSession | null;
   /** What a chat not yet begun is called. */
   newSessionLabel: string;
+  /** The width of the desk's column beside the chat, in px (`ChatDesk`'s `side`); 0 where the chat has none (a narrow window, a phone). */
+  side?: number;
 };
 
 /**
@@ -33,14 +36,15 @@ type ChatHeadProps = {
  * It stands in place of the sidebar, the rail and the phone's header strip while the Chat view is on screen, at every width: the sessions
  * home is the list of chats now, and the other views are reached from its menu. `pwa-header-safe` keeps it clear of a phone's status bar.
  *
- * IT IS EVERY SCREEN'S HEAD (`HEAD_ROW`): the full width of the screen, over the chat and, at a desk, over the column beside it too,
- * as the chat's desk is the window's width, so the way back and the menu stand on the same spot as on every page that fills the window
- * (a page that is read keeps its head to its frame, `ScreenHead`'s `framed`). Under a finger it is one line: the words side by side,
+ * IT IS EVERY SCREEN'S HEAD (`HEAD_ROW`), AND IT STANDS OVER THE DESK. At a desk the chat and the column beside it are one block in the
+ * middle of the window (`ChatDesk`), and the head keeps to that block (`data-chat-head-desk`, `chatDesk.css`): the way back stands over
+ * the column's start and the menu over the end of the chat's surface, never at the window's corners with the block between them. In a
+ * window no wider than the block, and with no column (a narrow window, a phone), it is the window's width. Under a finger it is one line: the words side by side,
  * the title in the small size, the arrow and the menu drawn 28 px and still caught at 44 (`HEAD_PRESS`).
  *
  * Drawn by `WorkspaceMain`, over the chat's pane (`ChatDesk`).
  */
-export default function ChatHead({ selectedProject, selectedSession, newSessionLabel }: ChatHeadProps) {
+export default function ChatHead({ selectedProject, selectedSession, newSessionLabel, side = 0 }: ChatHeadProps) {
   const { t } = useTranslation();
   const doors = useStationDoors();
   const title = selectedSession ? getSessionTitle(selectedSession) : newSessionLabel;
@@ -48,7 +52,12 @@ export default function ChatHead({ selectedProject, selectedSession, newSessionL
   const back = toStation ? t('station.title', { defaultValue: 'Kaylee Station' }) : t('home.title', { defaultValue: 'Home' });
 
   return (
-    <header data-chat-head="" className={HEAD_ROW}>
+    <header
+      data-chat-head=""
+      data-chat-head-desk={side > 0 ? '' : undefined}
+      className={HEAD_ROW}
+      style={side > 0 ? ({ '--chat-side': `${side}px` } as CSSProperties) : undefined}
+    >
       <Button
         data-chat-head-back=""
         {...WAY_BACK}

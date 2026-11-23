@@ -779,8 +779,10 @@ export const SESSIONS_HOME_PATH = '/home';
 
 /**
  * Where the roadmap's small circle rests on the sessions home, in the page's own pixels: its middle and its radius, at a desk and on a phone.
- * Read by project-workspace's `WorkspaceHome` (which draws the circle there) and the station's `StationShell` (which draws the circle at the
- * same place on a phone, and has the stack arrive from it at a desk), so the roadmap does not move between the two pages.
+ * At a desk its middle is this far from the start of the home's frame, which stands in the middle of a window wider than the frame
+ * (`frameStartIn`), so the circle stays over Kaylee's core and by the board at any width. Read by project-workspace's `WorkspaceHome` (which
+ * draws the circle there) and the station's `StationShell` (which draws the circle at the same place on a phone, and has the stack arrive
+ * from it at a desk), so the roadmap does not move between the two pages.
  */
 export const ROADMAP_CIRCLE_AT_DESK = { cx: 66, cy: 78, radius: 33 } as const;
 export const ROADMAP_CIRCLE_ON_PHONE = { cx: 42, cy: 51, radius: 27 } as const;
@@ -849,9 +851,10 @@ export const HOLDS_PLACES = { 'data-holds-places': '' } as const;
 
 /**
  * The row a page's head is drawn in: 12 px of air over a 36 px line at a desk, 4 px over a 28 px line under a finger, and 16 px (12
- * under a finger) in from each side, so the way back and the Menu stand on the same spot of every page that fills the window. A page
- * that is read draws the same row inside its frame instead (`ScreenHead`'s `framed`, `SCREEN_FRAME`), on the same spot of every such
- * page. Its presses stand at its top (`items-start`); what names the page sits between them (`HEAD_NAME`). The paddings are
+ * under a finger) in from each side of what it heads, so the way back and the Menu stand over the page's own edges: the window, for a
+ * page that fills it (the sky, a terminal); the page's frame, for a page that is read and the sessions home (`ScreenHead`'s `framed`,
+ * `SCREEN_FRAME`); the desk's block, for a chat (`ChatHead`); the station's block, for its Menu (`PlacesCorner`). Never the window's
+ * corners with the page in the middle between them. Its presses stand at its top (`items-start`); what names the page sits between them (`HEAD_NAME`). The paddings are
  * `!important` under a finger because `pwa-header-safe` sets the top padding in plain CSS. Drawn by project-workspace's `ScreenHead`
  * and `ChatHead`, the kanban module's `BugHead`, and as the corner the sessions home (`WorkspaceHome`) and the station
  * (`PlacesCorner`) keep the Menu in.
@@ -902,12 +905,19 @@ export const HEAD_WORD_PRESS = "relative h-9 flex-none finger:size-7 finger:px-0
  * of the window, the page's gutter inside it (16 px, 24 from `lg`). Its head stands over it (`ScreenHead`'s `framed`), so the way
  * back stands over the page's first word and the Menu over its last press, and nothing is left at a corner of a wide window. Under
  * 80rem it is the window. A scroller, or a rule meant to run from edge to edge, stays outside it and holds it, so the wheel scrolls
- * anywhere on the page. Instruments that fill the window (the sky, a terminal, the files, the chat's desk) are not framed.
- * Used by project-workspace's `ScreenHead` and by the pages `WorkspaceMain` frames: the rnd, analytics, schedules, api-tab, jev,
+ * anywhere on the page. Instruments that fill the window (the sky, a terminal, the files) are not framed; the chat and the station keep
+ * their heads to blocks of their own (`ChatHead`, `PlacesCorner`). Used by project-workspace's `ScreenHead` and `WorkspaceHome` (the
+ * sessions home's head and foot), and by the pages `WorkspaceMain` frames: the rnd, analytics, schedules, api-tab, jev,
  * deepseek-spend, inbox, memory-intake, heal, dispatcher (`WaitingAsks`), notes, roadmap, runner-tab and cerberus modules; and by the
  * kanban module, whose Bugs view draws its own head (`BugHead`), its dashboard and its foot in it.
  */
 export const SCREEN_FRAME = 'mx-auto w-full max-w-7xl px-4 lg:px-6';
+
+/**
+ * The page's frame at most, in px (`SCREEN_FRAME`'s `max-w-7xl`, 80rem): for what is placed in px rather than drawn in it. Read by the
+ * shared `frameStartIn`.
+ */
+export const SCREEN_FRAME_PX = 1280;
 
 /**
  * THE INBOX'S MEASURE: the column a stack of short cards is read in (42rem), inside the page's frame (`SCREEN_FRAME`) at its start, so
