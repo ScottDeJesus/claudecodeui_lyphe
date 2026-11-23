@@ -72,7 +72,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
   const { picture, failure, retry: onRetry } = useRnd();
   const writes = useRndWrites();
   const { busy, refusal, dismiss: onDismissRefusal, scoutNow: onScoutNow, adopt: onAdopt, reject: onReject, reopen: onReopen } = writes;
-  const { addSource: onAddSource, removeSource: onRemoveSource, webSearch: onWebSearch } = writes;
+  const { addSource: onAddSource, removeSource: onRemoveSource, webSearch: onWebSearch, scoutsRun: onScoutsRun } = writes;
   const { sendMessage } = useWebSocket();
   // The wheel's goChat: the station's "Open the chat" door, the one every open of a chat goes through.
   const onOpenChat = useStationDoors().openChatInWorkspace;
@@ -178,6 +178,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
           {scout.out && <SignalLoop state="working" signal="secondary" />}
           {scout.trouble !== null && <Badge as="span" tone="warn">{scout.trouble}</Badge>}
           <span>{scout.line}</span>
+          {scout.scouts !== null && <span data-rnd-scouts="">{scout.scouts}</span>}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">{scout.weekly}</p>
       </header>
@@ -262,6 +263,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
         onAddSource={onAddSource}
         onRemoveSource={onRemoveSource}
         onWebSearch={onWebSearch}
+        onScoutsRun={onScoutsRun}
         onLaunch={onLaunch}
       />
     </div>

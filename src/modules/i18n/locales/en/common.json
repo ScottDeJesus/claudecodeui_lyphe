@@ -473,9 +473,20 @@
     "settingsOpen": "R&D settings",
     "scout": {
       "now": "Scout now",
-      "out": "A scout is out · started {{ago}}",
+      "outRun": "A scout is out · started {{ago}} — {{read}} of {{total}} sources read",
       "lastFiled": "Last scout {{ago}} · {{filed}} filed",
       "lastNothing": "Last scout {{ago}} · nothing new",
+      "source": "{{source}}: {{word}}",
+      "ranker": "ranker: {{word}}",
+      "state": {
+        "waiting": "waiting",
+        "out": "out",
+        "ended": "ended",
+        "done": "done",
+        "failed": "failed",
+        "lost": "lost",
+        "skipped": "not needed"
+      },
       "lastTrouble": "Last scout {{ago}} ended without an answer",
       "never": "No scout has gone out yet",
       "noSources": "No sources yet, so a scout has nothing to read",
@@ -604,6 +615,10 @@
       "effortLabel": "{{who}} effort",
       "web": "Web search",
       "webOn": "On. The scout and a spike may search the web.",
+      "scoutsRun": "Scouts run",
+      "scoutsRunOne": "One at a time",
+      "scoutsRunAll": "All at once",
+      "scoutsRunAbout": "Each source has its own scout. One at a time sends the next when the last one ends; all at once sends every one together.",
       "webOff": "Off. They read the sources and named public downloads only."
     }
   },

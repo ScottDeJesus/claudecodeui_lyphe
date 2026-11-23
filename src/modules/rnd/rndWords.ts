@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 
-import type { RndCandidate, RndPicture, RndWord } from '@/shared/rnd-types';
+import type { RndCandidate, RndPicture, RndWord, RndScoutOut } from '@/shared/rnd-types';
 import { formatRelativeTime } from '@/shared/utils';
 
 /** The place's four views. Verdicts holds two words: what a spike proved, then what was adopted from it. */
@@ -54,33 +54,48 @@ export function countOf(picture: RndPicture, view: RndView): number {
   return picture.standing[VIEW_WORDS[view][0]];
 }
 
-/** The header's two lines about the scout: what it is doing or last did, and when it next goes out by itself. */
+/** The header's lines about the scout: what its run is doing or last did, each source's scout, and when it next goes out by itself. */
 export type ScoutLine = {
-  /** One is out now: the line wears the loop and Scout now waits. */
+  /** A run is out now: the line wears the loop and Scout now waits. */
   out: boolean;
   line: string;
-  /** The last scout's outcome when it ended without an answer, as one word for a badge; null otherwise. */
+  /** The last run's outcome when it ended without an answer, as one word for a badge; null otherwise. */
   trouble: string | null;
+  /** The run's source scouts and its ranker, each with its state (an ended one with its outcome); null before a run of them. */
+  scouts: string | null;
   weekly: string;
 };
 
 /**
- * THE SCOUT'S LINE, the first that holds: one is out; there is nothing for one to read; none has gone out; the last one ended
- * without an answer; the last one filed something; the last one found nothing new. weeklyWords says a cron expression as a day
- * and a time.
+ * THE SCOUT'S LINE, the first that holds: a run is out (how many of its sources are read); there is nothing for one to read;
+ * none has gone out; the last one ended without an answer; the last one filed something; the last one found nothing new.
+ * Beside it, the run's source scouts and its ranker. weeklyWords says a cron expression as a day and a time.
  */
 export function scoutLine(picture: RndPicture, t: TFunction, weeklyWords: (expression: string) => string): ScoutLine {
   const { out, last } = picture.scout;
   const weekly = picture.settings.weekly === null
     ? t('rnd.scout.noWeekly')
     : t('rnd.scout.weekly', { when: weeklyWords(picture.settings.weekly) });
-  if (out !== null) return { out: true, line: t('rnd.scout.out', { ago: formatRelativeTime(out.started_at) }), trouble: null, weekly };
-  if (picture.settings.sources.length === 0) return { out: false, line: t('rnd.scout.noSources'), trouble: null, weekly };
-  if (last === null) return { out: false, line: t('rnd.scout.never'), trouble: null, weekly };
+  const run = out ?? last;
+  const scouts = run === null || run.scouts.length === 0 ? null : runWords(run, t);
+  if (out !== null) {
+    const read = out.scouts.filter((one) => one.state === 'ended').length;
+    const line = t('rnd.scout.outRun', { ago: formatRelativeTime(out.started_at), read, total: out.scouts.length });
+    return { out: true, line, trouble: null, scouts, weekly };
+  }
+  if (picture.settings.sources.length === 0) return { out: false, line: t('rnd.scout.noSources'), trouble: null, scouts, weekly };
+  if (last === null) return { out: false, line: t('rnd.scout.never'), trouble: null, scouts, weekly };
   const ago = formatRelativeTime(last.ended_at ?? last.started_at);
   if (last.outcome === 'failed' || last.outcome === 'lost') {
-    return { out: false, line: t('rnd.scout.lastTrouble', { ago }), trouble: t('rnd.scout.outcome.' + last.outcome), weekly };
+    return { out: false, line: t('rnd.scout.lastTrouble', { ago }), trouble: t('rnd.scout.outcome.' + last.outcome), scouts, weekly };
   }
   const line = last.filed > 0 ? t('rnd.scout.lastFiled', { ago, filed: last.filed }) : t('rnd.scout.lastNothing', { ago });
-  return { out: false, line, trouble: null, weekly };
+  return { out: false, line, trouble: null, scouts, weekly };
+}
+
+/** Each source scout of a run with its state (an ended one with its outcome), then its ranker's, as one line. */
+function runWords(run: RndScoutOut, t: TFunction): string {
+  const sources = run.scouts.map((one) => t('rnd.scout.source', { source: hostOf(one.source), word: t('rnd.scout.state.' + (one.outcome ?? one.state)) }));
+  const ranker = t('rnd.scout.ranker', { word: t('rnd.scout.state.' + (run.ranker.outcome ?? run.ranker.state)) });
+  return [...sources, ranker].join(' · ');
 }

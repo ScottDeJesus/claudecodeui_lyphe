@@ -20,9 +20,34 @@ export type RndWord = (typeof RND_WORDS)[number];
 const VERDICT_WORDS = ['yes', 'no', 'unsettled'] as const;
 const SCOUT_TRIGGERS = ['weekly', 'now'] as const;
 const SCOUT_OUTCOMES = ['done', 'failed', 'lost'] as const;
+const SCOUTS_RUN = ['one_at_a_time', 'all_at_once'] as const;
+const SOURCE_SCOUT_STATES = ['waiting', 'out', 'ended'] as const;
+const RANKER_STATES = ['waiting', 'out', 'ended', 'skipped'] as const;
 
 export type RndSource = { url: string; label: string | null; added_at: string | null };
-export type RndScoutOut = { id: number; launch: string | null; trigger: (typeof SCOUT_TRIGGERS)[number]; started_at: string };
+/** One source's scout in a run, and the run's ranker (the dispatcher's rnd_report). */
+export type RndSourceScout = {
+  id: number;
+  source: string;
+  state: (typeof SOURCE_SCOUT_STATES)[number];
+  outcome: (typeof SCOUT_OUTCOMES)[number] | null;
+  launch: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  suggested: number;
+  read: number;
+};
+export type RndRanker = {
+  state: (typeof RANKER_STATES)[number];
+  launch: string | null;
+  outcome: (typeof SCOUT_OUTCOMES)[number] | null;
+  suggestions: number;
+  filed: number;
+  declined: number;
+};
+export type RndScoutOut = {
+  scouts: RndSourceScout[];
+  ranker: RndRanker; id: number; launch: string | null; trigger: (typeof SCOUT_TRIGGERS)[number]; started_at: string };
 export type RndScoutLast = RndScoutOut & {
   ended_at: string | null;
   outcome: (typeof SCOUT_OUTCOMES)[number] | null;
@@ -48,7 +73,7 @@ export type RndCandidate = {
 };
 export type RndPicture = {
   generated_at: string;
-  settings: { web_search: boolean; weekly: string | null; sources: RndSource[] };
+  settings: { web_search: boolean; weekly: string | null; scouts_run: (typeof SCOUTS_RUN)[number]; sources: RndSource[] };
   scout: { out: RndScoutOut | null; last: RndScoutLast | null };
   standing: Record<RndWord, number>;
   candidates: RndCandidate[];
@@ -71,6 +96,7 @@ function readPicture(value: unknown): RndPicture {
     settings: {
       web_search: flag(settings['web_search'], 'settings.web_search'),
       weekly: textOrNull(settings['weekly'], 'settings.weekly'),
+      scouts_run: oneOf(settings['scouts_run'], SCOUTS_RUN, 'settings.scouts_run'),
       sources: list(settings['sources'], 'settings.sources').map((source, at) => readSource(source, `settings.sources[${at}]`)),
     },
     scout: {
@@ -104,6 +130,8 @@ function readScoutOut(value: unknown, path: string): RndScoutOut {
     launch: textOrNull(scout['launch'], `${path}.launch`),
     trigger: oneOf(scout['trigger'], SCOUT_TRIGGERS, `${path}.trigger`),
     started_at: text(scout['started_at'], `${path}.started_at`),
+    scouts: list(scout['scouts'], `${path}.scouts`).map((one, index) => readSourceScout(one, `${path}.scouts[${index}]`)),
+    ranker: readRanker(scout['ranker'], `${path}.ranker`),
   };
 }
 
@@ -114,6 +142,33 @@ function readScoutLast(value: unknown, path: string): RndScoutLast {
     ended_at: textOrNull(scout['ended_at'], `${path}.ended_at`),
     outcome: orNull(scout['outcome'], `${path}.outcome`, (word, at) => oneOf(word, SCOUT_OUTCOMES, at)),
     filed: count(scout['filed'], `${path}.filed`),
+  };
+}
+
+function readSourceScout(value: unknown, path: string): RndSourceScout {
+  const scout = record(value, path);
+  return {
+    id: count(scout['id'], `${path}.id`),
+    source: text(scout['source'], `${path}.source`),
+    state: oneOf(scout['state'], SOURCE_SCOUT_STATES, `${path}.state`),
+    outcome: orNull(scout['outcome'], `${path}.outcome`, (word, at) => oneOf(word, SCOUT_OUTCOMES, at)),
+    launch: textOrNull(scout['launch'], `${path}.launch`),
+    started_at: textOrNull(scout['started_at'], `${path}.started_at`),
+    ended_at: textOrNull(scout['ended_at'], `${path}.ended_at`),
+    suggested: count(scout['suggested'], `${path}.suggested`),
+    read: count(scout['read'], `${path}.read`),
+  };
+}
+
+function readRanker(value: unknown, path: string): RndRanker {
+  const ranker = record(value, path);
+  return {
+    state: oneOf(ranker['state'], RANKER_STATES, `${path}.state`),
+    launch: textOrNull(ranker['launch'], `${path}.launch`),
+    outcome: orNull(ranker['outcome'], `${path}.outcome`, (word, at) => oneOf(word, SCOUT_OUTCOMES, at)),
+    suggestions: count(ranker['suggestions'], `${path}.suggestions`),
+    filed: count(ranker['filed'], `${path}.filed`),
+    declined: count(ranker['declined'], `${path}.declined`),
   };
 }
 

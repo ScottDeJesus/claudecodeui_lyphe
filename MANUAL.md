@@ -16969,14 +16969,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsP
 
 ## MAN-10115 — The R&D place — the panel, its views, dialogs and settings sheet: where each piece lives, the contracts the fill feeds
 
-The R&D place: a panel of candidates (things the scout found) in four views, an Opening for the open one, two dialogs and a settings sheet. Composed from the kit (`src/shared/ui`) and `AgentLaunchChoice` (MAN-7420); no component kind of its own. Shape types: `src/shared/rnd-types.ts` (`RndPicture`, `RndCandidate`, `RndWord`, `RndSettings`, `RndSource`, `RndScoutOut`, `RndScoutLast`, `RndStanding`).
+The R&D place: a panel of candidates (things the scout found) in four views, an Opening for the open one, two dialogs and a settings sheet. Composed from the kit (`src/shared/ui`) and `AgentLaunchChoice` (MAN-7420); no component kind of its own. Shape types: `src/shared/rnd-types.ts` (`RndPicture`, `RndCandidate`, `RndWord`, `RndSettings`, `RndSource`, `RndScoutsRun`, `RndSourceScout`, `RndRanker`, `RndScoutOut`, `RndScoutLast`, `RndStanding`).
 
 ## where each piece lives — `src/modules/rnd/`
 | file | role |
 |---|---|
 | `RndPanel.tsx` | the wired root, `RndPanel({ projectPath })`: reads `useRnd`, `useRndWrites`, `useRndLaunch`, `useRndEpics`; Open chat and the spike's landing are `useStationDoors().openChatInWorkspace` (the wheel's goChat); stamps `rnd.lastSeenAt` at each new picture while shown |
 | `CandidateRow.tsx`, `CandidateOpening.tsx`, `AdoptDialog.tsx`, `RejectDialog.tsx`, `RndSettingsSheet.tsx` | pure views: props in, no hooks of their own to the server |
-| `rndWords.ts` | `RND_VIEWS`, `RndView`, `WORD_TONE`, `rowsOf`, `countOf`, `scoutLine`, `hostOf`, `OPENING_WIDTH_PX` (440), `OPENING_BESIDE_PX` |
+| `rndWords.ts` | `RND_VIEWS`, `RndView`, `WORD_TONE`, `rowsOf`, `countOf`, `scoutLine` (the line, its trouble word, the run's source scouts and ranker as `scouts`, the weekly words), `hostOf`, `OPENING_WIDTH_PX` (440), `OPENING_BESIDE_PX` |
 | `RndFeed.tsx` | the lane's feed, mounted once in `App.tsx` inside `RoadmapFeed`: seeds from `GET /api/rnd`, takes `rnd_state` frames, re-seeds on `websocket_reconnected` (RoadmapFeed's rule), publishes `rnd:all` (`RND_ALL_TOPIC`, live-bus topics.ts); a failed read is said through `useRnd`'s failure, and the next frame or read takes it back |
 | `hooks/useRnd.ts` | the picture off the bus, the feed's failure sentence, Try again (the feed's own read) |
 | `hooks/useRndWrites.ts` | every press, one `api.rnd` call each (src/shared/api.ts); `busy` and `refusal {where, sentence}`; a landed write's dispatcher line is a toast; nothing optimistic, the frame redraws |
@@ -16996,6 +16996,8 @@ The R&D place: a panel of candidates (things the scout found) in four views, an 
 - A dialog closes itself when its candidate's word moves on; the Opening closes when its candidate leaves the view. No handler closes anything.
 - `RndLaunch` (`RndSettingsSheet.tsx`) = `Record<'scout'|'spike', {model, effort}>`, each an `RndLaunchSlot` `{choices, current, pinned, defaultWord}`.
 - `RndEpicChoice` (`AdoptDialog.tsx`) = `{name, title, milestone}`.
+- Settings sheet "Scouts run": a `SegmentedControl<RndScoutsRun>` (`one_at_a_time` "One at a time", `all_at_once` "All at once") between the launch slots and Web search; its section carries `data-rnd-scouts-run`. A press while `busy`, or on the value already set, is ignored; the control is never shown disabled. `useRndWrites.scoutsRun(next)` is a `'settings'` press, `api.rnd.settings({ scoutsRun })`.
+- A run is `RndScoutOut`: `scouts` (`RndSourceScout[]`, one per source: `waiting`/`out`/`ended`, `suggested`, `read`) and `ranker` (`RndRanker`: `waiting`/`out`/`ended`/`skipped`, `suggestions`, `filed`, `declined`). While one is out the scout line reads `rnd.scout.outRun`: source scouts ended of the total.
 - Ages: `formatRelativeTime`; the weekly time in words is `sayWeekly` (`weeklyWords.ts`).
 
 ## rules that bite
