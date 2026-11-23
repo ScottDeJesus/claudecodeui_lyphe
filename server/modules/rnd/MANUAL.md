@@ -18,7 +18,7 @@ THE ROUTES. Every write runs over the bug hunters' relay (`runVerb`, `relayJson`
 | route | body | dispatcher |
 |---|---|---|
 | GET / | | the lane's picture |
-| PUT /settings | `{webSearch: boolean}` | `rnd config --web-search on\|off --json` — answers the settings as they now stand |
+| PUT /settings | `{webSearch?: boolean, scoutsRun?: 'one_at_a_time'\|'all_at_once'}`, at least one | `rnd config [--web-search on\|off] [--scouts-run one-at-a-time\|all-at-once] --json` — answers the settings as they now stand |
 | POST /sources | `{url, label?}` | `rnd source add <url> [--label=<words>]` |
 | DELETE /sources | `{url}` | `rnd source remove <url>` |
 | POST /scout | | `rnd scout --now` |

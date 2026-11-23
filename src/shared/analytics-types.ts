@@ -88,3 +88,118 @@ export type CodeModeAnalytics = {
   faults: CodeModeFaultTotals;
   causes: CodeModeCause[];
 };
+
+/** The nudge's bars, as web_walk/settled.py holds them: what turns warning to refusing, and what turns it back. Shares are 0 to 1. */
+export type WebWalkBars = {
+  min_launches: number;
+  share: number;
+  min_walks: number;
+  fault_share: number;
+  release_min_walks: number;
+  release_fault_share: number;
+};
+
+/** The nudge's verdict over its own window_days. since is epoch seconds, null while it has never refused; share is null with no launch. */
+export type WebWalkSettled = {
+  refusing: boolean;
+  since: number | null;
+  window_days: number;
+  launches_walking: number;
+  launches_by_hand: number;
+  share: number | null;
+  walks: number;
+  faults: number;
+  bars: WebWalkBars;
+};
+
+/** The window's sums. A launch is one owner: a soul's run or a chat. */
+export type WebWalkTotals = {
+  walks: number;
+  launches_walking: number;
+  launches_by_hand: number;
+  custom_steps: number;
+  walks_with_custom: number;
+  checks_false: number;
+  faults: number;
+  unreached: number;
+};
+
+/** One day of series that held a walk or a launch by hand. day is YYYY-MM-DD, box-local. */
+export type WebWalkDay = { day: string; walks: number; launches_walking: number; launches_by_hand: number; custom_steps: number; faults: number };
+
+/** One premade check: how many times it ran, and how many of those it answered false. */
+export type WebWalkCheck = { check: string; ran: number; false: number };
+
+/** The walks by the door they came through: web() in a Code Mode script, or the command. */
+export type WebWalkDoors = { execute: number; command: number };
+
+/** One screen of an app: how many times it was opened, and how many times its landmark never showed. */
+export type WebWalkScreen = { screen: string; opened: number; unreached: number };
+
+/** One app the walks opened, with its screens. */
+export type WebWalkApp = { app: string; walks: number; screens: WebWalkScreen[] };
+
+/** The whole answer of web-walk reading --days N. Dates are YYYY-MM-DD in the box's zone. */
+export type WebWalkAnalytics = {
+  days: number;
+  generated_at: number;
+  today: string;
+  first_day: string | null;
+  settled: WebWalkSettled;
+  totals: WebWalkTotals;
+  series: WebWalkDay[];
+  checks: WebWalkCheck[];
+  doors: WebWalkDoors;
+  apps: WebWalkApp[];
+};
+
+/** One day of the Repeats answer: the launches that wrote a program by hand, their programs and characters, and the characters a family holds. `day` is YYYY-MM-DD, box-local. */
+export type RepeatsDay = { day: string; launches_writing: number; programs: number; chars: number; chars_in_families: number };
+
+/** One day of one family. */
+export type RepeatsFamilyDay = { day: string; launches: number; programs: number; chars: number };
+
+/** What already does a family's work: a shared file on the shelf (`path`) or a built-in tool (`tool`), how alike it is (0 to 1), and how many of the family's launches used it. */
+export type RepeatsExisting = { path?: string; tool?: string; likeness: number; used_by: number };
+
+/**
+ * One family: the same work written by hand in many launches. `raised` is the filing predicate (it is an item in the heal
+ * tab); `cured_at` is when its newest landed heal ended, and `since_cure` what was written after it. A step family
+ * (`tool` "step") counts `uses` and how many `worked`; every other family has both null.
+ */
+export type RepeatsFamily = {
+  id: string;
+  sentence: string;
+  tool: 'program' | 'commands' | 'step';
+  features: string[];
+  first_seen: number;
+  cured_at: number | null;
+  raised: boolean;
+  launches: number;
+  programs: number;
+  chars: number;
+  uses: number | null;
+  worked: number | null;
+  since_cure: { launches: number; programs: number; chars: number } | null;
+  names: { name: string; count: number }[];
+  examples: { owner: string; path: string; chars: number }[];
+  existing: RepeatsExisting[];
+  series: RepeatsFamilyDay[];
+};
+
+/** The custom steps one shared helper sent. */
+export type RepeatsStepHelper = { helper: string; uses: number; worked: number; launches: number };
+
+/** The whole answer of `heal-repeats reading --days N`. Dates are YYYY-MM-DD in the box's zone; moments are epoch seconds. Families are ordered by characters. */
+export type RepeatsAnalytics = {
+  days: number;
+  generated_at: number;
+  today: string;
+  first_day: string | null;
+  window_days: number;
+  thresholds: { launches: number; chars: number };
+  totals: { launches: number; launches_writing: number; programs: number; chars: number; chars_in_families: number };
+  steps: { uses: number; worked: number; launches: number; by_helper: RepeatsStepHelper[] };
+  series: RepeatsDay[];
+  families: RepeatsFamily[];
+};

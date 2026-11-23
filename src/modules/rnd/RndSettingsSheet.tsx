@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 
 import { AgentLaunchChoice } from '@/modules/agent-launch';
 import { hostOf } from '@/modules/rnd/rndWords';
-import type { RndSettings, RndSource } from '@/shared/rnd-types';
-import { Banner, Button, EmptyState, Field, Input, Rule, Sheet, Spinner, Switch } from '@/shared/ui';
+import type { RndScoutsRun, RndSettings, RndSource } from '@/shared/rnd-types';
+import { Banner, Button, EmptyState, Field, Input, Rule, SegmentedControl, Sheet, Spinner, Switch } from '@/shared/ui';
 
 /** The two launches the place owns: the weekly scout, and the chat that spikes one candidate. */
 export type RndLaunchKind = 'scout' | 'spike';
@@ -32,6 +32,8 @@ type RndSettingsSheetProps = {
   onAddSource: (url: string, label?: string | null) => void;
   onRemoveSource: (url: string) => void;
   onWebSearch: (next: boolean) => void;
+  /** One at a time (the default) or all at once: how a run's source scouts go out. */
+  onScoutsRun: (next: RndScoutsRun) => void;
   /** A word pins the slot; null clears the pin. */
   onLaunch: (kind: RndLaunchKind, slot: 'model' | 'effort', next: string | null) => void;
 };
@@ -96,11 +98,12 @@ function AddSource({ busy, onAdd }: { busy: boolean; onAdd: (url: string) => voi
  *
  * Rendered by RndPanel.
  */
-export function RndSettingsSheet({ open, onClose, settings, launch, launchFailure, busy, refusal, onDismissRefusal, onAddSource, onRemoveSource, onWebSearch, onLaunch }: RndSettingsSheetProps) {
+export function RndSettingsSheet({ open, onClose, settings, launch, launchFailure, busy, refusal, onDismissRefusal, onAddSource, onRemoveSource, onWebSearch, onScoutsRun, onLaunch }: RndSettingsSheetProps) {
   const { t } = useTranslation();
   const sourcesId = useId();
   const launchId = useId();
   const webId = useId();
+  const scoutsRunId = useId();
   const kinds: readonly RndLaunchKind[] = ['scout', 'spike'];
   // The source Remove was last pressed on, until it is put back or the line is closed: what Undo restores, label and all.
   const [removed, setRemoved] = useState<RndSource | null>(null);
@@ -222,6 +225,22 @@ export function RndSettingsSheet({ open, onClose, settings, launch, launchFailur
             </div>
           </section>
         ))}
+
+        <section aria-labelledby={scoutsRunId} className="flex flex-col gap-3" data-rnd-scouts-run={settings.scouts_run}>
+          <Rule id={scoutsRunId}>{t('rnd.settings.scoutsRun')}</Rule>
+          <p className="text-xs leading-relaxed text-muted-foreground">{t('rnd.settings.scoutsRunAbout')}</p>
+          <SegmentedControl<RndScoutsRun>
+            label={t('rnd.settings.scoutsRun')}
+            options={[
+              { value: 'one_at_a_time', label: t('rnd.settings.scoutsRunOne') },
+              { value: 'all_at_once', label: t('rnd.settings.scoutsRunAll') },
+            ]}
+            value={settings.scouts_run}
+            onChange={(next) => {
+              if (!busy && next !== settings.scouts_run) onScoutsRun(next);
+            }}
+          />
+        </section>
 
         <section aria-labelledby={webId} className="flex flex-col gap-3">
           <Rule id={webId}>{t('rnd.settings.web')}</Rule>

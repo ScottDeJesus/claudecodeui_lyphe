@@ -15,8 +15,13 @@
 .chat-desk[data-chat-desk='side'] {
   --chat-measure: 68.75rem;
   --chat-column: none;
+}
+/* The block, and the chat's head over it (`ChatHead` at a desk), which keeps to it so the way back stands over the column's start and the
+ * menu over the surface's end. As wide as the column, then the surface: the measure, the rail's 28 px, 1rem at each side, the surface's
+ * two hairlines and its 16 px of air; in the middle of the window. */
+.chat-desk[data-chat-desk='side'],
+[data-chat-head][data-chat-head-desk] {
   width: 100%;
-  /* The column, then the surface: the measure, the rail's 28 px, 1rem at each side, the surface's two hairlines and its 16 px of air. */
   max-width: calc(var(--chat-side) + 68.75rem + 28px + 2rem + 2px + 16px);
   margin-inline: auto;
 }

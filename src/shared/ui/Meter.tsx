@@ -34,6 +34,11 @@ type MeterProps = {
    */
   tickAt?: number | null;
   /**
+   * The tick's words when it is not a ceiling ("78% without", the same rate somewhere else): said after the value in the
+   * ceiling's place. Left off, the tick is a ceiling and is said as one.
+   */
+  tickLabel?: string;
+  /**
    * The projected end, in percent, as a mark on the track — drawn only when given, on the same rule.
    * A projected end past the ceiling, or past 100, is drawn AS IT IS: its mark sits at the track's
    * end and the words still say the real figure.
@@ -46,8 +51,10 @@ type MeterProps = {
  * `variant="dial"`, one large dial.
  * Used by the accounts module (Phase 13) for the usage windows on the signed-in account (the dials in its panel, and the
  * ring at the foot of the project-workspace rail), by the file manager for an upload in flight, by
- * TaskMaster's task card for its subtask progress, and by the companion module's face card in Settings for the frames made
- * so far of each look of hers being made; all of them need the same treatment of a figure nobody has yet.
+ * TaskMaster's task card for its subtask progress, by the companion module's face card in Settings for the frames made
+ * so far of each of the companion's looks being made, and by the analytics module's Code Mode glance for the share of launches that
+ * ended ok, as a dial with the share without Code Mode as its tick; all of them need the same treatment of a figure nobody
+ * has yet.
  *
  * THE RING takes its arc's colour from `--tone-dot`, which the nearest `data-tone` container hands down (README rule 4:
  * tone is a token swap), and names no colour of its own: with no container it falls back to the meter's own accent, or
@@ -73,7 +80,7 @@ type MeterProps = {
  * are paint and nothing else. A meter given neither is the same DOM and the same rendering as before
  * they existed.
  */
-export function Meter({ percent, tone = 'accent', label, ariaLabel, value, sub, variant = 'stacked', tickAt, markAt }: MeterProps) {
+export function Meter({ percent, tone = 'accent', label, ariaLabel, value, sub, variant = 'stacked', tickAt, tickLabel, markAt }: MeterProps) {
   const { t } = useTranslation();
   const known = percent !== null;
   const clamped = known ? Math.min(100, Math.max(0, percent)) : 0;
@@ -115,7 +122,7 @@ export function Meter({ percent, tone = 'accent', label, ariaLabel, value, sub, 
   // A mark is paint; its figure is put in the meter's words. The order is the reading order a
   // sighted reader takes off the bar: the value, the ceiling, then where the work is heading.
   const markWords: string[] = [];
-  if (tickAt != null) markWords.push(t('usage.pace.ceiling', { percent: Math.round(tickAt), defaultValue: 'ceiling {{percent}}%' }));
+  if (tickAt != null) markWords.push(tickLabel ?? t('usage.pace.ceiling', { percent: Math.round(tickAt), defaultValue: 'ceiling {{percent}}%' }));
   if (markAt != null) markWords.push(t('usage.pace.projected', { percent: Math.round(markAt), defaultValue: '{{percent}}% projected' }));
   const valueWords = known ? value : 'unknown';
 

@@ -6,9 +6,11 @@ import { useMemoryIntake } from '@/modules/memory-intake/context/MemoryIntakeCon
 import { useMemoryReview } from '@/modules/memory-intake/hooks/useMemoryReview';
 import { LessonReviewList } from '@/modules/memory-intake/LessonReviewList';
 import { MemoryCandidateRow } from '@/modules/memory-intake/MemoryCandidateRow';
+import { INBOX_MEASURE, SCREEN_FRAME } from '@/shared/constants';
 import { useToast } from '@/shared/context/ToastContext';
 import type { MemoryReviewOutcome, ToastRequest } from '@/shared/types';
 import { Badge, EmptyState, ScrollArea, Spinner } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 /**
  * What one review is worth saying out loud.
@@ -59,61 +61,68 @@ export function MemoryIntakePanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
-          <BrainIcon className="h-4 w-4" aria-hidden="true" />
-        </span>
-        <h2 className="text-sm font-medium">{t('memory.title')}</h2>
-        {/* A queue nobody could read has no count. Stating "0 pending" over the unreachable
-            line would have the panel contradict itself in two adjacent lines. */}
-        {pending?.reachable === true && (
-          <Badge tone="neutral">{t('memory.pending', { count: pendingCount })}</Badge>
-        )}
+      {/* The rule runs the window's width; the section's name keeps to the page's frame (`SCREEN_FRAME`), under the Inbox's strip. */}
+      <div className="border-b border-border">
+        <div className={cn(SCREEN_FRAME, 'flex items-center gap-2 py-3')}>
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
+            <BrainIcon className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <h2 className="text-sm font-medium">{t('memory.title')}</h2>
+          {/* A queue nobody could read has no count. Stating "0 pending" over the unreachable
+              line would have the panel contradict itself in two adjacent lines. */}
+          {pending?.reachable === true && (
+            <Badge tone="neutral">{t('memory.pending', { count: pendingCount })}</Badge>
+          )}
+        </div>
       </div>
 
       {/* ONE scroll for the whole tab, two sections inside it: the memory queue, then the lessons
-          under their own heading. The queue's three non-list states are blocks of their own height
-          rather than the pane's — a state that filled the pane would push the lessons below the
-          fold on the very visit where the queue has nothing to show and they are all there is. */}
+          under their own heading, both in one measured column at the start of the page's frame
+          (`SCREEN_FRAME`, `INBOX_MEASURE`), under the section's name. The queue's three non-list
+          states are blocks of their own height rather than the pane's — a state that filled the
+          pane would push the lessons below the fold on the very visit where the queue has nothing
+          to show and they are all there is — and they stand in the column, over the lessons. */}
       <ScrollArea className="flex-1">
-        {pending === null ? (
-          // Not asked yet — a different fact from an empty queue, and never "All filed".
-          <div className="flex items-center justify-center px-4 py-10">
-            <Spinner label={t('memory.reading')} />
-          </div>
-        ) : !pending.reachable ? (
-          <div className="flex items-center justify-center px-4 py-10">
-            <EmptyState icon={PlugZapIcon} title={t('memory.unreachable')} />
-          </div>
-        ) : pendingCount === 0 ? (
-          <div className="flex items-center justify-center px-4 py-10">
-            <EmptyState icon={InboxIcon} title={t('memory.empty.title')} message={t('memory.empty.message')} />
-          </div>
-        ) : (
-          // A measured column, centred: the queue is a stack of short cards, and letting them
-          // run the full width of a desktop workspace leaves each one a line of text stranded
-          // in a field of empty surface.
-          <ul className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 py-5">
-            {pending.candidates.map((candidate) => (
-              <MemoryCandidateRow
-                key={candidate.id}
-                candidate={candidate}
-                // This tab's freshest refusal wins; the row's own copy is what every other tab
-                // sees once the server has recorded it.
-                refusal={refusals[candidate.id] ?? candidate.refusal}
-                // Every row, not just the one being written: `busyId` holds ONE id because the
-                // design writes one at a time, so painting only that row leaves the other five
-                // looking pressable and turns a refused press into a press that vanished.
-                busy={busyId !== null}
-                onReview={onReview}
-              />
-            ))}
-          </ul>
-        )}
+        <div className={SCREEN_FRAME}>
+          {pending === null ? (
+            // Not asked yet — a different fact from an empty queue, and never "All filed".
+            <div className={cn(INBOX_MEASURE, 'flex items-center justify-center py-10')}>
+              <Spinner label={t('memory.reading')} />
+            </div>
+          ) : !pending.reachable ? (
+            <div className={cn(INBOX_MEASURE, 'flex items-center justify-center py-10')}>
+              <EmptyState icon={PlugZapIcon} title={t('memory.unreachable')} />
+            </div>
+          ) : pendingCount === 0 ? (
+            <div className={cn(INBOX_MEASURE, 'flex items-center justify-center py-10')}>
+              <EmptyState icon={InboxIcon} title={t('memory.empty.title')} message={t('memory.empty.message')} />
+            </div>
+          ) : (
+            // A measured column: the queue is a stack of short cards, and letting them run the full
+            // width of a desktop workspace leaves each one a line of text stranded in a field of
+            // empty surface.
+            <ul className={cn(INBOX_MEASURE, 'flex flex-col gap-3 py-5')}>
+              {pending.candidates.map((candidate) => (
+                <MemoryCandidateRow
+                  key={candidate.id}
+                  candidate={candidate}
+                  // This tab's freshest refusal wins; the row's own copy is what every other tab
+                  // sees once the server has recorded it.
+                  refusal={refusals[candidate.id] ?? candidate.refusal}
+                  // Every row, not just the one being written: `busyId` holds ONE id because the
+                  // design writes one at a time, so painting only that row leaves the other five
+                  // looking pressable and turns a refused press into a press that vanished.
+                  busy={busyId !== null}
+                  onReview={onReview}
+                />
+              ))}
+            </ul>
+          )}
 
-        {/* The second section of the same review habit — not a tab, and not a provider: it reads
-            and writes through its own hook and shares nothing with the queue above but the pane. */}
-        <LessonReviewList />
+          {/* The second section of the same review habit — not a tab, and not a provider: it reads
+              and writes through its own hook and shares nothing with the queue above but the pane. */}
+          <LessonReviewList />
+        </div>
       </ScrollArea>
     </div>
   );

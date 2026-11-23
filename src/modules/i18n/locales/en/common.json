@@ -457,7 +457,6 @@
     "subtabsLabel": "API services"
   },
   "rnd": {
-    "title": "R&D",
     "mark": "{{count}} new or proved",
     "spikeNoProject": "Open a project first: a spike's chat opens in the project that is open.",
     "launchMissing": "The launch table has no rnd.scout or rnd.spike row yet.",
@@ -473,9 +472,20 @@
     "settingsOpen": "R&D settings",
     "scout": {
       "now": "Scout now",
-      "out": "A scout is out · started {{ago}}",
+      "outRun": "A scout is out · started {{ago}} — {{read}} of {{total}} sources read",
       "lastFiled": "Last scout {{ago}} · {{filed}} filed",
       "lastNothing": "Last scout {{ago}} · nothing new",
+      "source": "{{source}}: {{word}}",
+      "ranker": "ranker: {{word}}",
+      "state": {
+        "waiting": "waiting",
+        "out": "out",
+        "ended": "ended",
+        "done": "done",
+        "failed": "failed",
+        "lost": "lost",
+        "skipped": "not needed"
+      },
       "lastTrouble": "Last scout {{ago}} ended without an answer",
       "never": "No scout has gone out yet",
       "noSources": "No sources yet, so a scout has nothing to read",
@@ -604,6 +614,10 @@
       "effortLabel": "{{who}} effort",
       "web": "Web search",
       "webOn": "On. The scout and a spike may search the web.",
+      "scoutsRun": "Scouts run",
+      "scoutsRunOne": "One at a time",
+      "scoutsRunAll": "All at once",
+      "scoutsRunAbout": "Each source has its own scout. One at a time sends the next when the last one ends; all at once sends every one together.",
       "webOff": "Off. They read the sources and named public downloads only."
     }
   },
@@ -5328,7 +5342,9 @@
       "days": "{{days}} days"
     },
     "sections": {
-      "codeMode": "Code Mode"
+      "codeMode": "Code Mode",
+      "repeats": "Repeats",
+      "webWalk": "Web walks"
     },
     "frame": {
       "reading": "Reading the numbers…",
@@ -5339,9 +5355,120 @@
       "newer": "Reading newer numbers…",
       "refresh": "Refresh"
     },
+"repeats": {
+      "unknown": "not known",
+      "empty": {
+        "title": "No launch read in the last {{days}} days",
+        "message": "Repeats are read from what each launch writes by hand. They show here once a launch has ended."
+      },
+      "glance": {
+        "title": "By hand again · {{days}} days",
+        "raised": "Families raised",
+        "raisedNote": "of {{found}} found · waiting in the heal tab",
+        "raisedNone": "none of the {{found}} found is past the line",
+        "raisedNoFamily": "no family found yet",
+        "launches": "Launches by hand",
+        "launchesNote_one": "of {{all}} launches · {{programs}} program",
+        "launchesNote_other": "of {{all}} launches · {{programs}} programs",
+        "chars": "Characters repeated",
+        "charsNote": "written by hand in a family’s work",
+        "share": "Share repeated",
+        "shareNote": "of {{all}} characters by hand",
+        "steps": "Custom steps kept",
+        "stepsNote_one": "{{worked}} worked · in {{launches}} launch",
+        "stepsNote_other": "{{worked}} worked · in {{launches}} launches",
+        "stepsNone": "no helper has sent one yet"
+      },
+      "families": {
+        "title": "Families",
+        "about": "The same work, written by hand in many launches. A family is raised at {{launches}} launches and {{chars}} characters within {{window}} days. Press one to see what it is and what already does it.",
+        "tableLabel": "Families of work written by hand again, the last {{days}} days",
+        "columns": {
+          "family": "Family",
+          "launches": "Launches",
+          "programs": "Programs",
+          "chars": "Characters"
+        },
+        "status": {
+          "raised": "Raised",
+          "back": "Back after its cure",
+          "cured": "Cured {{date}}",
+          "watching": "Watching"
+        },
+        "tool": {
+          "program": "program",
+          "commands": "command run",
+          "step": "custom step"
+        },
+        "trendTitle": "Its launches, the last 7 days against the 7 before",
+        "uses_one": "{{uses}} use",
+        "uses_other": "{{uses}} uses",
+        "worked": "{{worked}} worked",
+        "weight": "{{launches}} launches · {{programs}} programs · {{chars}} characters",
+        "weightStep": "{{launches}} launches · {{uses}} uses · {{worked}} worked",
+        "empty": {
+          "title": "No family yet",
+          "message": "A family is the same work written by hand in {{launches}} launches or more within {{window}} days. Nothing in the last {{days}} days has come that close."
+        },
+        "opened": {
+          "firstSeen": "First seen {{date}}",
+          "sinceCure": "Cured {{date}}. Since then: launches {{launches}}, programs {{programs}}, characters {{chars}}.",
+          "shelf": "Already does this",
+          "shelfTool": "built-in tool",
+          "shelfLine": "{{likeness}} alike · used by {{count}} of these launches",
+          "shelfNone": "Nothing on the shelf does this yet. A shared script is the cure.",
+          "shelfNoneStep": "The helper’s premade set does not hold this yet. Adding it there is the cure.",
+          "features": "What repeats",
+          "names": "File names",
+          "namesNone": "No file carries it: it was written in the launch each time.",
+          "nameCount": "× {{count}}",
+          "examples": "Examples",
+          "exampleLine": "{{owner}} · {{chars}} characters",
+          "days": "Its days",
+          "daysSeries": "Launches",
+          "daysPlot": "Launches that wrote this family each day, the last {{days}} days",
+          "more": "The whole family:",
+          "moreStep": "Each step’s code, whole:"
+        }
+      },
+      "trend": {
+        "title": "Day by day",
+        "measure": "Measure",
+        "measures": {
+          "chars": "Characters",
+          "programs": "Programs",
+          "launches": "Launches"
+        },
+        "about": {
+          "chars": "Characters written by hand each day: those a family holds on the line, the rest on top of them.",
+          "programs": "Programs written by hand each day.",
+          "launches": "Launches that wrote a program by hand each day."
+        },
+        "series": {
+          "inFamilies": "In a family",
+          "rest": "Not in a family",
+          "programs": "Programs",
+          "launches": "Launches writing"
+        },
+        "plot": "{{about}} The last {{days}} days.",
+        "today": "Today",
+        "quiet": "Nothing was written by hand in the last {{days}} days.",
+        "byDay": "Each day’s figures",
+        "tableLabel": "Work written by hand, day by day",
+        "columns": {
+          "day": "Day",
+          "launches": "Launches writing",
+          "programs": "Programs",
+          "chars": "Characters",
+          "inFamilies": "In a family"
+        },
+        "quietLeftOut": "Days with nothing written by hand are left out."
+      }
+    },
     "codeMode": {
       "unknown": "not known",
       "allKinds": "All kinds",
+      "kind": "Kind",
       "with": "With Code Mode",
       "without": "Without",
       "listSeparator": ", ",
@@ -5370,20 +5497,46 @@
         "pointsSame": "±0 pts",
         "shareUnder": "under {{value}}%",
         "days": "{{days}}d {{hours}}h",
-        "billion": "{{value}}B"
+        "billion": "{{value}}B",
+        "minutesShort": "{{value}}m"
+      },
+      "glance": {
+        "title": "With Code Mode, the last {{days}} days",
+        "titleKind": "{{kind}} with Code Mode, the last {{days}} days",
+        "launches": "Launches",
+        "launchesNote": "{{share}} of all {{all}} · {{without}} without",
+        "launchesEvery": "All {{all}} launches",
+        "launchesNone": "{{without}} ran without",
+        "mix": "Launches with Code Mode by model: {{parts}}",
+        "okValue": "{{share}} ended ok",
+        "okTick": "{{share}} without",
+        "okNote": "{{change}} · {{without}} without"
       },
       "compare": {
-        "title": "With and without Code Mode",
-        "lead": "Launches with Code Mode: {{with}}. Without: {{without}}. The median launch with it, across every kind:",
-        "leadOnlyWith": "Launches with Code Mode: {{with}}, and none without to measure them against. The median launch, across every kind:",
-        "leadOnlyWithout": "No launch ran with Code Mode in this window. Without: {{without}}.",
+        "byKind": "By kind",
+        "byModel": "By model",
+        "kindMeasure": "Compare the kinds by",
+        "modelMeasure": "Compare the models by",
+        "measures": {
+          "turns": "Turns",
+          "tokens": "Tokens",
+          "time": "Time",
+          "ok": "Ended ok",
+          "launches": "Launches",
+          "failures": "Failures"
+        },
+        "kindChart": "By kind, {{measure}}: with Code Mode against without",
+        "modelChart": "By model, {{measure}}: with Code Mode against without",
+        "shareWith": "{{share}} with",
+        "failuresOf": "{{failures}} of {{scripts}} scripts",
+        "noModels": "No launch here names its model.",
+        "byTable": "The figures as a table",
         "headline": {
           "ok": "Ended ok",
           "turns": "Turns",
           "tokens": "Tokens, in and out",
           "time": "Time"
         },
-        "noteAgainst": "{{without}} without · {{change}}",
         "noteWithout": "{{without}} without",
         "noteAlone": "nothing ran without",
         "mode": "Figures shown",
@@ -5412,11 +5565,8 @@
       },
       "outcomes": {
         "title": "How the scripts fared",
-        "scripts": "Scripts run",
-        "scriptsNote_one": "in {{count, number}} launch with Code Mode",
-        "scriptsNote_other": "in {{count, number}} launches with Code Mode",
         "none": "No launch ran with Code Mode in the last {{days}} days, so there is no script to count.",
-        "about": "Refused and failed count the actions inside a script. The last three rows count the edits a script handed to the merger.",
+        "about": "Refused and failed count the actions inside a script. Merged and declined count the edits a script handed to the merger.",
         "thrown": "Threw",
         "resent": "Sent again",
         "refused": "Refused",
@@ -5424,9 +5574,11 @@
         "mergesAsked": "To merger",
         "mergesMerged": "Merged",
         "declined": "Declined",
-        "ofScripts": "{{share}} of scripts",
-        "thrownOfScripts": "{{share}} of scripts, {{timedOut}} timed out",
-        "byKind": "By kind",
+        "byKindTable": "The kinds as a table",
+        "run": "{{scripts}} run",
+        "ofMerger": "of {{whole}} handed over",
+        "failuresTitle": "Failures each day",
+        "failuresPlot": "Scripts that threw and actions refused or failed each day, launches with Code Mode, {{kind}}, the last {{days}} days.",
         "tableLabel": "Script outcomes by kind, for launches with Code Mode",
         "columns": {
           "kind": "Kind",
@@ -5466,47 +5618,140 @@
         },
         "showRest_one": "Show {{count}} rarer kind of failure",
         "showRest_other": "Show {{count}} rarer kinds of failure",
-        "showFirst": "Show only the commonest {{count}}"
+        "showFirst": "Show only the commonest {{count}}",
+        "everyKind": "These count every kind; each row names its own."
       },
       "trend": {
         "title": "Day by day",
         "measure": "Measure",
-        "kind": "Kind",
         "measures": {
           "launches": "Launches",
+          "ok": "Ended ok",
           "turns": "Turns",
           "tokens": "Tokens",
           "seconds": "Time",
           "failures": "Failures"
         },
         "about": {
-          "launches": "Launches that ended each day.",
-          "turns": "Turns taken each day, summed over the day’s launches.",
-          "tokens": "Tokens in and out each day, in thousands.",
-          "seconds": "Time spent each day, in minutes.",
-          "failures": "Launches with Code Mode only: scripts that threw above the line, actions refused or failed below it."
+          "launches": "Launches that ended each day, those with Code Mode on the line and those without on top of them.",
+          "ok": "The share of each day’s launches that ended ok.",
+          "turns": "Each day’s median launch: its turns.",
+          "tokens": "Each day’s median launch: its tokens in and out, in thousands.",
+          "seconds": "Each day’s median launch: its time, in minutes."
         },
-        "thrown": "Scripts that threw",
-        "refusedOrFailed": "Actions refused or failed",
         "plot": "{{about}} {{kind}}, the last {{days}} days.",
-        "peak": {
-          "launches": "Tallest bar: {{peak}} launches in a day",
-          "turns": "Tallest bar: {{peak}} turns in a day",
-          "tokens": "Tallest bar: {{peak}} thousand tokens in a day",
-          "seconds": "Tallest bar: {{peak}} minutes in a day",
-          "failures": "Tallest bar: {{peak}} in a day"
-        },
-        "barTitle": "{{date}} · {{above}} {{aboveLabel}} · {{below}} {{belowLabel}}",
+        "today": "Today",
+        "shareOfDay_one": "{{share}} of the day’s one launch",
+        "shareOfDay_other": "{{share}} of the day’s {{count}} launches",
+        "failuresNote": "{{thrown}} threw · {{refusedOrFailed}} refused or failed",
         "quiet": "Nothing to draw for {{kind}} in the last {{days}} days.",
         "byDay": "The days as a table",
         "tableLabel": "{{measure}} per day: {{above}}, and {{below}}",
         "quietLeftOut": "Days with nothing to count are left out.",
         "columns": {
-          "day": "Day",
-          "thrown": "Threw",
-          "refusedOrFailed": "Refused or failed"
+          "day": "Day"
         }
       }
+    },
+    "webWalk": {
+      "unknown": "not known",
+      "historyStarts_one": "Walks have been counted since {{date}}: {{count}} day of the last {{days}}.",
+      "historyStarts_other": "Walks have been counted since {{date}}: {{count}} days of the last {{days}}.",
+      "empty": {
+        "noHistoryTitle": "No walk has been counted yet",
+        "noHistoryMessage": "A walk is counted when a soul drives a running app with web() in a Code Mode script, or with ~/.claude/scripts/web-walk run.",
+        "title": "Nothing drove a browser in the last {{days}} days",
+        "message": "No walk ran and no browser program was written by hand. A longer window may hold some."
+      },
+      "units": {
+        "share": "{{value}}%",
+        "shareUnder": "under {{value}}%"
+      },
+      "glance": {
+        "title": "The last {{days}} days",
+        "share": "Share on the helper",
+        "shareNote_one": "{{walking}} of {{count}} launch that drove a browser",
+        "shareNote_other": "{{walking}} of {{count}} launches that drove a browser",
+        "walking": "On the helper",
+        "walkingNote": "launches that ran a walk",
+        "byHand": "By hand",
+        "byHandNote": "launches that ran their own browser program",
+        "walks": "Walks",
+        "walksNote": "{{execute}} from scripts, {{command}} from the command",
+        "customSteps": "Custom steps",
+        "customStepsNote": "in {{walks}} of {{total}} walks",
+        "walksNoteNone": "no walk ran in this window",
+        "customStepsNoteNone": "no walk to carry one"
+      },
+      "nudge": {
+        "warning": "The nudge warns: a browser program written by hand still runs, with a pointer to the helper.",
+        "refusing": "The nudge refuses a browser program written by hand.",
+        "refusingSince": "The nudge refuses a browser program written by hand, since {{date}}.",
+        "short": "Still short of refusing: {{bars}}.",
+        "met": "Met: {{bars}}.",
+        "allMet": "Every bar for refusing is met: {{bars}}.",
+        "counted": "Counted over the last {{windowDays}} days.",
+        "bar": {
+          "launches": "{{minLaunches}} launches ({{launches}} now)",
+          "share": "{{minShare}} of launches on the helper ({{shareNow}})",
+          "walks": "{{minWalks}} walks ({{walks}} now)",
+          "faults": "faults in at most {{maxFaults}} of walks ({{faultsNow}})"
+        },
+        "now": "{{value}} now",
+        "noLaunch": "no launch yet",
+        "noWalk": "no walk yet",
+        "barsRefusing": "It goes back to warning when faults pass {{releaseFaults}} of walks ({{faultsNow}}) over at least {{releaseWalks}} walks ({{walks}} now), counted over the last {{windowDays}} days."
+      },
+      "trend": {
+        "title": "Launches each day",
+        "about": "Launches that drove a browser each day: on the helper, and with a browser program written by hand.",
+        "walking": "On the helper",
+        "byHand": "By hand",
+        "plot": "Launches that drove a browser each day, on the helper and by hand, the last {{days}} days",
+        "today": "Today",
+        "shareOfDay": "{{share}} of the day's {{count}} on the helper",
+        "quiet": "No launch drove a browser in the last {{days}} days.",
+        "byDay": "Day by day",
+        "tableLabel": "Launches each day, on the helper and by hand, the last {{days}} days",
+        "quietLeftOut": "Days with no launch are left out.",
+        "columns": {
+          "day": "Day"
+        }
+      },
+      "checks": {
+        "title": "Checks",
+        "about": "Each premade check a walk ran: how many times, and how many of those it answered false.",
+        "tableLabel": "Checks the walks ran in the last {{days}} days",
+        "quiet": "No walk ran a check in the last {{days}} days.",
+        "falseShare": "{{share}} of runs",
+        "columns": {
+          "check": "Check",
+          "ran": "Ran",
+          "false": "Answered false"
+        }
+      },
+      "apps": {
+        "title": "Apps and screens",
+        "about": "Unreached counts the times a screen's landmark never showed. Press an app for its screens.",
+        "tableLabel": "Apps the walks opened in the last {{days}} days",
+        "screensLabel": "Screens of {{app}}",
+        "screensOpened_one": "{{count}} screen opened",
+        "screensOpened_other": "{{count}} screens opened",
+        "unreachedNote": "{{count}} unreached",
+        "quiet": "No walk opened an app in the last {{days}} days.",
+        "noScreens": "No walk opened a named screen of this app.",
+        "columns": {
+          "app": "App",
+          "walks": "Walks",
+          "unreached": "Unreached",
+          "screen": "Screen",
+          "opened": "Opened"
+        },
+        "reachHint_one": "The unreached screen's entry in {{app}}'s dictionary needs a look. Check it again: ~/.claude/scripts/web-walk reach {{app}} {{screens}}",
+        "reachHint_other": "The unreached screens' entries in {{app}}'s dictionary need a look. Check them again: ~/.claude/scripts/web-walk reach {{app}} {{screens}}",
+        "reachHintAll": "The unreached screens' entries in {{app}}'s dictionary need a look. Check every screen again: ~/.claude/scripts/web-walk reach {{app}}"
+      },
+      "listSeparator": ", "
     }
   }
 }

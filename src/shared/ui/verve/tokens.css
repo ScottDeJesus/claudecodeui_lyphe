@@ -86,6 +86,16 @@
   --chart-3:#2f8f6a;
   --chart-4:#8c939b;
   --chart-5:#6a5aa8;
+  /* a model as a mark on a chart: the chats' material hues, stepped so that all four stand apart on either ground and
+     for every eye (every pair checked for contrast, colour blindness and plain likeness). Mercury is chrome in a chat,
+     and a grey on a chart reads as "less", so on a chart it is cobalt */
+  --chart-mercury:#0b56a9;
+  --chart-tube:#c97405;
+  --chart-plasma:#7e6ed3;
+  --chart-wire:#0090a2;
+  /* a measure against its companion when no model is named: the full mark and its pale one */
+  --chart-ink:#3a4148;
+  --chart-pale:#838a91;
   /* semantic aliases */
   --text-heading:var(--ink);
   --text-body-color:var(--ink-mid);
@@ -148,6 +158,12 @@
   --chart-3:#6fd6ab;
   --chart-4:#8c939b;
   --chart-5:#b4a8d8;
+  --chart-mercury:#2267bc;
+  --chart-tube:#cf7700;
+  --chart-plasma:#8c7ee5;
+  --chart-wire:#099bae;
+  --chart-ink:#d3d8dd;
+  --chart-pale:#5d646c;
 
   --ink-strong:#ffffff;
   --hairline:rgba(255, 255, 255, 0.14);

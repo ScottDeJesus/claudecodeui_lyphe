@@ -2,7 +2,8 @@
 // holding one hunt row with a model and four without: the five rows `hunt.security` … `hunt.code` come
 // right after the tweak row, each `kind: "hunt"` with its soul, the model and effort `resolve` answers for it,
 // a boolean `model_pinned`, and ONE lane `hunt` whose note is the read-only sentence; `choices.hunt_souls` is
-// every generated shim the census draws as a soul row, less the two planners. A second scratch table whose
+// every generated shim the census draws as a soul row, less the two planners and any shim whose own `tools:`
+// line grants no Bash (a hunt's ending teaches `bash()`), read here from the shim files themselves. A second scratch table whose
 // `[hunt.behaviour]` names a well-formed soul no shim carries must draw a sentence in `problems` naming that
 // row, as a pin with no shim does: the reader cannot know it, so the census is where it is said.
 //
@@ -11,6 +12,7 @@
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { broken, held, runCase } from "../lib/case.mjs";
@@ -22,6 +24,17 @@ const KINDS = ["security", "behaviour", "ui", "data", "code"];
 const SOULS = { security: "argus", behaviour: "athena", ui: "iris", data: "sherlock", code: "daedalus" };
 const NOTE = "a Claude child launched read-only: the DeepSeek switch does not reach it";
 const PLANNERS = ["eupalinos", "odysseus"];
+
+// Whether a shim's own top-level `tools:` line grants Bash; a shim with no such line inherits every tool.
+function grantsBash(name) {
+  const text = fs.readFileSync(path.join(os.homedir(), ".claude", "agents", `${name}.md`), "utf8");
+  if (!text.startsWith("---\n")) return true;
+  const end = text.indexOf("\n---\n", 4);
+  if (end === -1) return true;
+  const line = text.slice(4, end).split("\n").find((each) => /^tools:/.test(each));
+  if (line === undefined) return true;
+  return line.slice("tools:".length).split(",").map((each) => each.trim()).includes("Bash");
+}
 
 const TABLE = `version = 1
 
@@ -94,10 +107,11 @@ runCase(async (t) => {
 
   const shims = census.rows.filter((row) => row.kind === "soul").map((row) => row.name).sort();
   const choices = census.choices && Array.isArray(census.choices.hunt_souls) ? [...census.choices.hunt_souls].sort() : null;
-  const expected = shims.filter((name) => !PLANNERS.includes(name));
+  const bashless = shims.filter((name) => !grantsBash(name));
+  const expected = shims.filter((name) => !PLANNERS.includes(name) && !bashless.includes(name));
   if (!choices) wrong.push("choices.hunt_souls is missing");
   else if (JSON.stringify(choices) !== JSON.stringify(expected)) {
-    wrong.push(`choices.hunt_souls is ${JSON.stringify(choices)}, not every shim but the planners ${JSON.stringify(expected)}`);
+    wrong.push(`choices.hunt_souls is ${JSON.stringify(choices)}, not every shim but the planners and the Bash-less ${JSON.stringify(bashless)}: ${JSON.stringify(expected)}`);
   }
   if (!shims.includes("eupalinos")) wrong.push("the census drew no eupalinos soul row, so the planner check proves nothing");
 
@@ -109,5 +123,5 @@ runCase(async (t) => {
   if (said.length === 0) wrong.push(`a hunt row naming a soul no shim carries drew no sentence: ${JSON.stringify(lost.problems)}`);
 
   if (wrong.length > 0) return broken(wrong.join("; "));
-  return held(`five hunt rows follow the tweak's with one read-only hunt lane each; hunt_souls holds ${expected.length} shims, no planner`);
+  return held(`five hunt rows follow the tweak's with one read-only hunt lane each; hunt_souls holds ${expected.length} shims, no planner and none of the ${bashless.length} Bash-less`);
 });

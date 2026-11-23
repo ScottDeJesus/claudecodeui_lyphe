@@ -9,7 +9,7 @@ import { HEAD_PRESS } from '@/shared/constants';
 import { cn } from '@/shared/utils';
 
 /**
- * THE ONE WAY TO EVERY OTHER PLACE, the same press in the same corner of every page: the wheel of places folded small (`PlacesDial`),
+ * THE ONE WAY TO EVERY OTHER PLACE, the same press at the end of every page's head: the wheel of places folded small (`PlacesDial`),
  * which brings the wheel up (`PlacesWheel`, through `PlacesProvider`) and is seen to grow into it. It comes up AS THE PRESS GOES DOWN,
  * so the press that summoned it can slide on to a place and let go there; let go anywhere else, it stays up to be pressed. A press by
  * key (Enter, Space) brings it up too. Which place is here is the provider's to know, not the page's.

@@ -12,10 +12,11 @@ import { DashboardWaysIn } from '@/modules/kanban/dashboard/DashboardWaysIn';
 import { useBugDashboard } from '@/modules/kanban/dashboard/useBugDashboard';
 import { plainSentence, readDispatcherAnswer } from '@/modules/kanban/utils/dispatcherAnswer';
 import { api } from '@/shared/api';
+import { SCREEN_FRAME } from '@/shared/constants';
 import { useToast } from '@/shared/context/ToastContext';
 import type { BugDashboardView, HuntSkippedUnit } from '@/shared/types';
 import { Banner, EmptyState, SegmentedControl, Spinner } from '@/shared/ui';
-import { copyTextToClipboard } from '@/shared/utils';
+import { cn, copyTextToClipboard } from '@/shared/utils';
 
 /**
  * THE BUGS VIEW'S DASHBOARD FACE: how the board stands, in the order a person asks it. How many are open and how bad;
@@ -216,7 +217,8 @@ export function BugDashboard({ boardId, view, onView, onOpenCard }: BugDashboard
       data-bug-dashboard={reading.status}
       aria-busy={reading.status === 'loading' || (reading.status === 'ready' && reading.stale)}
     >
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-9 p-4 lg:p-6">
+      {/* The page's frame, the one the Bugs head keeps to: at a wide desk the dashboard is as wide as the head over it. */}
+      <div className={cn(SCREEN_FRAME, 'flex flex-col gap-9 py-4 lg:py-6')}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SegmentedControl
             label={t('kanban.dashboard.scope.label')}

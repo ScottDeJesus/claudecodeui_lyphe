@@ -188,24 +188,6 @@ probe-key: 7af96a83507289dd58e94a442f418157ba125f76
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx
 
-## INV-7124 — probe — `WhatHappenedCard.tsx` (outside the 7 paths): two lines of one run in one millisecond share a row key, and the second row opens the first
-
-`WhatHappenedCard.tsx` (outside the 7 paths): two lines of one run in one millisecond share a row key, and the second row opens the first
-
-```probe
-D=$(mktemp -d)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/state/pipeline-reviews/cerberus--fixes--fixes-fill/probes && timeout 120 node same-ms-activity.mjs
-EOF
-bash "$D/p.sh"
-expect: `same-ms-activity: pressed-row=1 opened-row0=0 opened-row1=1` once cured; today opened-row0=1 opened-row1=0
-```
-
-measured 2026-10-07 by chain chain-cerberus--fixes--fixes-fill-20261006-234909-a012, finding L6, LOW
-probe-key: e5be42987bc3ef10100496cf5c0c1304da7a1500
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/WhatHappenedCard.tsx
-
 ## INV-7125 — probe — `/tmp/heph-fixes-report.mjs`: the replay step needs a run under an hour old, and fails with a Playwright timeout when there is none
 
 `/tmp/heph-fixes-report.mjs`: the replay step needs a run under an hour old, and fails with a Playwright timeout when there is none

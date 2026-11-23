@@ -779,8 +779,10 @@ export const SESSIONS_HOME_PATH = '/home';
 
 /**
  * Where the roadmap's small circle rests on the sessions home, in the page's own pixels: its middle and its radius, at a desk and on a phone.
- * Read by project-workspace's `WorkspaceHome` (which draws the circle there) and the station's `StationShell` (which draws the circle at the
- * same place on a phone, and has the stack arrive from it at a desk), so the roadmap does not move between the two pages.
+ * At a desk its middle is this far from the start of the home's frame, which stands in the middle of a window wider than the frame
+ * (`frameStartIn`), so the circle stays over Kaylee's core and by the board at any width. Read by project-workspace's `WorkspaceHome` (which
+ * draws the circle there) and the station's `StationShell` (which draws the circle at the same place on a phone, and has the stack arrive
+ * from it at a desk), so the roadmap does not move between the two pages.
  */
 export const ROADMAP_CIRCLE_AT_DESK = { cx: 66, cy: 78, radius: 33 } as const;
 export const ROADMAP_CIRCLE_ON_PHONE = { cx: 42, cy: 51, radius: 27 } as const;
@@ -849,16 +851,20 @@ export const HOLDS_PLACES = { 'data-holds-places': '' } as const;
 
 /**
  * The row a page's head is drawn in: 12 px of air over a 36 px line at a desk, 4 px over a 28 px line under a finger, and 16 px (12
- * under a finger) in from each side, so the way back and the Menu stand on the same spot of every page. Its presses stand at its top
- * (`items-start`); what names the page sits between them (`HEAD_NAME`). The paddings are `!important` under a finger because
- * `pwa-header-safe` sets the top padding in plain CSS. Drawn by project-workspace's `ScreenHead` and `ChatHead`, the kanban module's
- * `BugHead`, and as the corner the sessions home (`WorkspaceHome`) and the station (`PlacesCorner`) keep the Menu in.
+ * under a finger) in from each side of what it heads, so the way back and the Menu stand over the page's own edges: the window, for a
+ * page that fills it (the sky, a terminal); the page's frame, for a page that is read and the sessions home (`ScreenHead`'s `framed`,
+ * `SCREEN_FRAME`); the desk's block, for a chat (`ChatHead`); the station's block, for its Menu (`PlacesCorner`). Never the window's
+ * corners with the page in the middle between them. Its presses stand at its top (`items-start`); what names the page sits between them (`HEAD_NAME`). The paddings are
+ * `!important` under a finger because `pwa-header-safe` sets the top padding in plain CSS. Drawn by project-workspace's `ScreenHead`
+ * and `ChatHead`, the kanban module's `BugHead`, and as the corner the sessions home (`WorkspaceHome`) and the station
+ * (`PlacesCorner`) keep the Menu in.
  */
 export const HEAD_ROW = 'pwa-header-safe flex flex-none items-start gap-3 px-4 py-3 finger:gap-2 finger:px-3 finger:!pb-1 finger:!pt-1';
 
 /**
- * A press in a page's head, the way back or the Menu: 36 px at a desk; drawn 28 px under a finger and still caught at 44 there by a
- * transparent area grown 8 px past its box (the touch law's own way, which moves none of its neighbours). Used with `HEAD_ROW`.
+ * A press in a page's head, the way back or the Menu, or a mark-only press of the page's own drawn there (`HeadTools`: Cerberus's
+ * list switch, R&D's settings): 36 px at a desk; drawn 28 px under a finger and still caught at 44 there by a transparent area grown
+ * 8 px past its box (the touch law's own way, which moves none of its neighbours). Used with `HEAD_ROW`.
  */
 export const HEAD_PRESS = "relative size-9 flex-none finger:size-7 finger:before:absolute finger:before:-inset-2 finger:before:content-['']";
 
@@ -867,6 +873,59 @@ export const HEAD_PRESS = "relative size-9 flex-none finger:size-7 finger:before
  * taller (the Bugs view's picker) without moving the presses, which stand at the row's top. Used with `HEAD_ROW`.
  */
 export const HEAD_NAME = 'flex min-h-9 min-w-0 flex-1 items-center finger:min-h-7';
+
+/**
+ * A framed head's band (`HEAD_ROW` in two, for a page that is read): the row's air above and below, across the window, and no sides.
+ * Its row stands inside it in the page's frame (`HEAD_FRAMED_ROW` with `SCREEN_FRAME`). Used by project-workspace's `ScreenHead` (its
+ * `framed`) and the kanban module's `BugHead`.
+ */
+export const HEAD_BAND = 'pwa-header-safe flex-none py-3 finger:!pb-1 finger:!pt-1';
+
+/**
+ * A framed head's row, inside its band (`HEAD_BAND`) and drawn with the page's frame (`SCREEN_FRAME`), which gives it its sides: the
+ * row's presses and gaps, and under a finger its 12 px in from each side. Used by project-workspace's `ScreenHead` and the kanban
+ * module's `BugHead`.
+ */
+export const HEAD_FRAMED_ROW = 'flex items-start gap-3 finger:gap-2 finger:px-3';
+
+/**
+ * A press with a word in a page's head, one of the page's own presses drawn there before the Menu (`HeadTools`): a press tall at a
+ * desk, its mark and its word; under a finger the head's square press (`HEAD_PRESS`: 28 px, caught at 44) with its mark alone, the
+ * word kept as its name in a `finger:sr-only` span. Used with the kit's Button at `size="sm"`, by the rnd module's `RndPanel` (Scout
+ * now) and the schedules module's `SchedulesPanel` (Refresh).
+ */
+export const HEAD_WORD_PRESS = "relative h-9 flex-none finger:size-7 finger:px-0 finger:before:absolute finger:before:-inset-2 finger:before:content-['']";
+
+// ---------------------------
+
+//----------------- THE FRAME OF A PAGE ------------
+
+/**
+ * THE FRAME OF A PAGE THAT IS READ: the one column a reading page's head and its blocks share, at most 80rem wide and in the middle
+ * of the window, the page's gutter inside it (16 px, 24 from `lg`). Its head stands over it (`ScreenHead`'s `framed`), so the way
+ * back stands over the page's first word and the Menu over its last press, and nothing is left at a corner of a wide window. Under
+ * 80rem it is the window. A scroller, or a rule meant to run from edge to edge, stays outside it and holds it, so the wheel scrolls
+ * anywhere on the page. Instruments that fill the window (the sky, a terminal, the files) are not framed; the chat and the station keep
+ * their heads to blocks of their own (`ChatHead`, `PlacesCorner`). Used by project-workspace's `ScreenHead` and `WorkspaceHome` (the
+ * sessions home's head and foot), and by the pages `WorkspaceMain` frames: the rnd, analytics, schedules, api-tab, jev,
+ * deepseek-spend, inbox, memory-intake, heal, dispatcher (`WaitingAsks`), notes, roadmap, runner-tab and cerberus modules; and by the
+ * kanban module, whose Bugs view draws its own head (`BugHead`), its dashboard and its foot in it.
+ */
+export const SCREEN_FRAME = 'mx-auto w-full max-w-7xl px-4 lg:px-6';
+
+/**
+ * The page's frame at most, in px (`SCREEN_FRAME`'s `max-w-7xl`, 80rem): for what is placed in px rather than drawn in it. Read by the
+ * shared `frameStartIn`.
+ */
+export const SCREEN_FRAME_PX = 1280;
+
+/**
+ * THE INBOX'S MEASURE: the column a stack of short cards is read in (42rem), inside the page's frame (`SCREEN_FRAME`) at its start, so
+ * the cards start under the section's name and a card's line never runs the frame's whole width. One measure for the sections that are
+ * stacks, so flipping between them keeps the cards where the eye left them. Used by the memory-intake module's `MemoryIntakePanel` and
+ * `LessonReviewList` (the Inbox's Memory) and the dispatcher module's `WaitingAsks` (its Roadmap).
+ */
+export const INBOX_MEASURE = 'w-full max-w-2xl';
 
 // ---------------------------
 

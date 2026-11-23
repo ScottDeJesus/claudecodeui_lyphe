@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 
 import { DeepseekUsagePanel } from '@/modules/deepseek-spend';
 import { JevPanel } from '@/modules/jev';
+import { SCREEN_FRAME } from '@/shared/constants';
 import { Spinner, Tabs } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 type ApiSubTab = 'jev' | 'deepseek';
 
@@ -51,8 +53,11 @@ export function ApiPanel() {
 
   return (
     <div className="flex h-full flex-col bg-background" data-api-panel>
-      <div className="flex-none border-b border-border px-2 pt-2 sm:px-4">
-        <Tabs tabs={tabs} active={subTab} onChange={onChange} ariaLabel={t('api.subtabsLabel')} variant="underline" />
+      {/* The strip's rule runs the window's width; its tabs keep to the page's frame, under the head that does. */}
+      <div className="flex-none border-b border-border">
+        <div className={cn(SCREEN_FRAME, 'pt-2')}>
+          <Tabs tabs={tabs} active={subTab} onChange={onChange} ariaLabel={t('api.subtabsLabel')} variant="underline" />
+        </div>
       </div>
       <div className="min-h-0 flex-1" data-api-subtab={subTab}>
         <Suspense

@@ -28,6 +28,8 @@ const BODY_NOT_OBJECT = 'the body must be a JSON object';
 const NAME_NOT_ARG = 'the candidate name must be text that does not begin with a dash';
 /** The longest free text a route passes on: the store's own longest field (evidence) is 4000 characters. */
 const FREE_TEXT_MAX = 4000;
+/** The settings' scoutsRun word (the store's own) and the dispatcher flag value that sets it. */
+const SCOUTS_RUN_FLAGS = new Map<string, string>([['one_at_a_time', 'one-at-a-time'], ['all_at_once', 'all-at-once']]);
 /** Not a picture, so no client draws an empty R&D place from it; the first landing's frame fills the screen. */
 const NOT_READ_YET = { error: 'the R&D picture has not been read yet' } as const;
 
@@ -75,9 +77,17 @@ export function createRndRouter(dependencies: RndRouterDependencies): express.Ro
 
   // The dispatcher prints the settings after the write, so the answer is the settings as they now stand.
   router.put('/settings', relayWrite(relayJson, (body) => {
-    const { webSearch } = body;
-    if (typeof webSearch !== 'boolean') return { error: 'webSearch must be true or false' };
-    return ['rnd', 'config', '--web-search', webSearch ? 'on' : 'off', '--json'];
+    const { webSearch, scoutsRun } = body;
+    if (webSearch === undefined && scoutsRun === undefined) return { error: 'the body sets webSearch, scoutsRun or both' };
+    if (webSearch !== undefined && typeof webSearch !== 'boolean') return { error: 'webSearch must be true or false' };
+    const scoutsRunFlag = typeof scoutsRun === 'string' ? SCOUTS_RUN_FLAGS.get(scoutsRun) : undefined;
+    if (scoutsRun !== undefined && scoutsRunFlag === undefined) return { error: 'scoutsRun must be one_at_a_time or all_at_once' };
+    return [
+      'rnd', 'config',
+      ...(webSearch === undefined ? [] : ['--web-search', webSearch ? 'on' : 'off']),
+      ...(scoutsRunFlag === undefined ? [] : ['--scouts-run', scoutsRunFlag]),
+      '--json',
+    ];
   }));
 
   router.post('/sources', relayWrite(relayLine, (body) => {

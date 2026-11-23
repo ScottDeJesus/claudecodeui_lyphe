@@ -5,6 +5,7 @@ import { readBody, sentenceOf } from '@/modules/rnd/rndWire';
 import { SpikeRefusal, startSpikeChat } from '@/modules/rnd/startSpikeChat';
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
+import type { RndScoutsRun } from '@/shared/rnd-types';
 
 /** The dispatcher's sentence for a press it refused, and where that press was made: 'scout', 'settings' or a candidate's name. */
 export type RndRefusal = { where: string; sentence: string };
@@ -22,6 +23,7 @@ export type RndWrites = {
   addSource: (url: string, label?: string | null) => void;
   removeSource: (url: string) => void;
   webSearch: (next: boolean) => void;
+  scoutsRun: (next: RndScoutsRun) => void;
   /** A launch row's save, made from the settings sheet (useRndLaunch's save). */
   saveLaunch: (save: () => Promise<Response>) => void;
 };
@@ -95,6 +97,7 @@ export function useRndWrites(): RndWrites {
     addSource: (url, label) => press('settings', () => api.rnd.addSource(label ? { url, label } : { url })),
     removeSource: (url) => press('settings', () => api.rnd.removeSource({ url })),
     webSearch: (next) => press('settings', () => api.rnd.settings({ webSearch: next })),
+    scoutsRun: (next) => press('settings', () => api.rnd.settings({ scoutsRun: next })),
     saveLaunch: (save) => press('settings', save),
   }), [busy, refusal, press, spike]);
 }

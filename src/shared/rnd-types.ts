@@ -21,13 +21,49 @@ export type RndSource = { url: string; label: string | null; added_at: string };
 
 export type RndSettings = {
   web_search: boolean;
+  /** Whether a run's source scouts go out one after another (the default) or all together. */
+  scouts_run: RndScoutsRun;
   /** The cron expression of the weekly scout, or null when none is installed. */
   weekly: string | null;
   sources: RndSource[];
 };
 
-/** A scout that is out now. */
-export type RndScoutOut = { id: number; launch: string | null; trigger: 'weekly' | 'now'; started_at: string };
+/** How a run's source scouts go out: one after another (the default), or all together. */
+export type RndScoutsRun = 'one_at_a_time' | 'all_at_once';
+
+/** One source's scout in a run: waiting its turn, out, or ended with its outcome. */
+export type RndSourceScout = {
+  id: number;
+  source: string;
+  state: 'waiting' | 'out' | 'ended';
+  outcome: 'done' | 'failed' | 'lost' | null;
+  launch: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  /** The finds it recorded, and the pages it put on the read record. */
+  suggested: number;
+  read: number;
+};
+
+/** A run's ranker: waiting for its scouts, out, ended with the run's outcome, or skipped when no suggestion arrived. */
+export type RndRanker = {
+  state: 'waiting' | 'out' | 'ended' | 'skipped';
+  launch: string | null;
+  outcome: 'done' | 'failed' | 'lost' | null;
+  suggestions: number;
+  filed: number;
+  declined: number;
+};
+
+/** A scout run that is out now: one scout per source, then its ranker. */
+export type RndScoutOut = {
+  id: number;
+  launch: string | null;
+  trigger: 'weekly' | 'now';
+  started_at: string;
+  scouts: RndSourceScout[];
+  ranker: RndRanker;
+};
 
 /** The last scout that ended, with how many candidates it filed. */
 export type RndScoutLast = RndScoutOut & {
