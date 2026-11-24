@@ -187,7 +187,9 @@ runCase(async (t: { defer: (cleanup: () => unknown) => void }) => {
       return `not JSON: ${text.slice(0, 60)}`;
     }
   };
-  if ((await calls()).some((c) => c.argv[1] === "told")) wrong.push("a note applied as the dispatcher was told back to it (card told ran)");
+  // The start's catch-up tells each live To Do card of a self-running board as `board-on --by cloudcli`: not a note told back.
+  const toldBack = (await calls()).find((c) => c.argv[1] === "told" && !(c.argv[3] === "board-on" && c.argv[5] === "cloudcli"));
+  if (toldBack) wrong.push(`a note applied as the dispatcher was told back to it (card told ${toldBack.argv.slice(2).join(" ")})`);
 
   const detail = cards.getCard(walked.id);
   const texts = detail.checklist.map((item: any) => item.text);
