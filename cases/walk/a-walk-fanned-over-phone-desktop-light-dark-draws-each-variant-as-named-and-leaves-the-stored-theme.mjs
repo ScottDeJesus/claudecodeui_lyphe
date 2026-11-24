@@ -8,7 +8,6 @@
 // protects: walk/app.mjs, /home/lyphe/.claude/hooks/web_walk/node/, /home/lyphe/.claude/hooks/web_walk/apps.toml, src/shared/context/ThemeContext.tsx
 // writes: none
 
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,18 +15,13 @@ import { fileURLToPath } from "node:url";
 import { api } from "../lib/app.mjs";
 import { broken, cannotRun, held, runCase } from "../lib/case.mjs";
 import { scratchDir } from "../lib/scratch.mjs";
+import { WEB_WALK, webWalk } from "../lib/web_walk.mjs";
 
-const WEB_WALK = "/home/lyphe/.claude/scripts/web-walk";
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const DICTIONARY = path.join(REPO, "walk", "screens.toml");
 const lastLine = (text) => text.split("\n").map((l) => l.trim()).filter(Boolean).pop() ?? "";
 const parse = (line) => { try { return JSON.parse(line); } catch { return null; } };
 const firstLine = (text) => (text ?? "").trim().split("\n")[0] ?? "";
-const walkWith = (args, { input, env = {} } = {}) => {
-  const base = { ...process.env };
-  delete base.WEB_WALK_OUT; delete base.WEB_WALK_PICTURE_BYTES; delete base.WEB_WALK_APPS;
-  return spawnSync(WEB_WALK, args, { input, encoding: "utf8", env: { ...base, ...env }, timeout: 110000, maxBuffer: 64 << 20 });
-};
 
 const VARIANTS = ["desktop/dark", "desktop/light", "phone/dark", "phone/light"];
 const PICTURE_BYTES = 1500000;
@@ -52,7 +46,7 @@ runCase(async (t) => {
   let before;
   try { before = await themeOf(); } catch (e) { return cannotRun(e.message); }
   const out = await scratchDir(t, "walk-fan");
-  const ran = walkWith(["run", "-", "--out", out], { input: JSON.stringify(WALK) });
+  const ran = await webWalk(["run", "-", "--out", out], { input: JSON.stringify(WALK) });
   if (ran.error) return broken(`web-walk run did not end: ${ran.error.message}`);
   const answer = parse(lastLine(ran.stdout));
   if (ran.status !== 0 || !answer) return broken(`exit ${ran.status}, last line not an answer: ${lastLine(ran.stdout).slice(0, 160) || firstLine(ran.stderr)}`);

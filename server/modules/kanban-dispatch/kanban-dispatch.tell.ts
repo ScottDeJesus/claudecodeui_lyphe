@@ -5,6 +5,7 @@ import { AppError } from '@/shared/utils.js';
 
 import { DISPATCHER_ACTOR } from './kanban-dispatch.cards.js';
 import { isPlacedTicketCreation } from './kanban-dispatch.tickets.js';
+import { selfRunningBoards, todoCardIdsOf } from './kanban-dispatch.todo.js';
 
 /**
  * The longest text field the dispatcher takes; it refuses a longer one as `card_told.TEXT_MAX`.
@@ -17,15 +18,15 @@ const EXIT_REFUSED = 2;
 /** The card fields whose change the dispatcher is told about. */
 const TOLD_FIELDS: readonly string[] = ['title', 'description', 'body', 'priority'];
 
-export type TellEvent = 'created' | 'queued' | 'updated' | 'answered' | 'stopped' | 'board-off';
+export type TellEvent = 'created' | 'queued' | 'updated' | 'answered' | 'stopped' | 'board-off' | 'board-on';
 
 /**
- * The four tells that start or change work need the switch on both at the write and at the send, so a
+ * The five tells that start or change work (board-on among them) need the switch on both at the write and at the send, so a
  * switch turned off while one waits in its chain withdraws it. `stopped` and `board-off` are not here:
  * they are told whatever the switch reads, because a stop is always safe and is the board's only way to
  * halt a walk already out once the switch is off.
  */
-const NEEDS_AUTONOMY_AT_SEND: ReadonlySet<TellEvent> = new Set(['created', 'queued', 'updated', 'answered']);
+const NEEDS_AUTONOMY_AT_SEND: ReadonlySet<TellEvent> = new Set(['created', 'queued', 'updated', 'answered', 'board-on']);
 
 /** A tell to send. Only board-off concerns the board alone; every other tell names its card too. */
 type Tell =
@@ -61,7 +62,7 @@ function touchesToldField(payload: Record<string, unknown>): boolean {
 }
 
 /**
- * THE SEAM'S TABLE — the one place the six mappings live. Each row quotes the seam line it mirrors,
+ * THE SEAM'S TABLE — the one place the seven mappings live. Each row quotes the seam line it mirrors,
  * so a change to the seam is a change to exactly one row here.
  */
 const TELLS: readonly { event: TellEvent; when: (write: KanbanWriteEvent) => boolean }[] = [
@@ -88,6 +89,10 @@ const TELLS: readonly { event: TellEvent; when: (write: KanbanWriteEvent) => boo
       write.kind === 'card.archived',
   }, // card.moved to not_ready or done by a person; card.archived -> stopped
   {
+    event: 'board-on',
+    when: (write) => write.kind === 'board.updated' && write.payload.autonomy === true,
+  }, // board.updated turning autonomy on -> board-on, once for each live card in To Do
+  {
     event: 'board-off',
     when: (write) => (write.kind === 'board.updated' || write.kind === 'board.archived') && write.payload.autonomy === false,
   }, // board.updated turning autonomy off, or board.archived of a board that ran itself -> board-off
@@ -107,54 +112,84 @@ export type CardTellerDependencies = {
   logError: (line: string) => void;
 };
 
-/**
- * The listener the dispatch module subscribes to `onKanbanWrite`. It decides synchronously whether a
- * write is one to tell and queues that tell, then returns: the write has already committed and must
- * not wait for the dispatcher.
- */
-export function createCardTeller(dependencies: CardTellerDependencies): (write: KanbanWriteEvent) => void {
+/** What the dispatch module holds of the teller: the write listener and the start's catch-up. */
+export type CardTeller = {
+  /**
+   * The listener subscribed to `onKanbanWrite`. It decides synchronously whether a write is one to tell
+   * and queues those tells, then returns: the write has already committed and must not wait for the
+   * dispatcher.
+   */
+  onWrite: (write: KanbanWriteEvent) => void;
+  /**
+   * Queues board-on for every live To Do card of every self-running board and answers how many. It is
+   * the catch-up for cards no switch-on reached (they entered To Do while the board was off): the
+   * dispatcher queues only a card it holds withdrawn or has never heard of, so a second run queues none.
+   */
+  tellSelfRunningTodo: (actor: string) => number;
+};
+
+export function createCardTeller(dependencies: CardTellerDependencies): CardTeller {
   const chains = new Map<string, Promise<void>>();
-  return (write) => {
-    try {
-      const tell = tellFor(write);
-      if (tell !== null) {
-        queueTell(tell, chains, dependencies);
-      }
-    } catch (error) {
-      dependencies.logError(`[kanban-dispatch] could not queue a tell for ${write.kind}: ${errorMessage(error)}`);
+  const queueAll = (tells: readonly Tell[]): number => {
+    for (const tell of tells) {
+      queueTell(tell, chains, dependencies);
     }
+    return tells.length;
+  };
+  return {
+    onWrite: (write) => {
+      try {
+        queueAll(tellsFor(write));
+      } catch (error) {
+        dependencies.logError(`[kanban-dispatch] could not queue a tell for ${write.kind}: ${errorMessage(error)}`);
+      }
+    },
+    tellSelfRunningTodo: (actor) =>
+      selfRunningBoards().reduce((told, board) => told + queueAll(boardOnTells(board.id, actor)), 0),
   };
 }
 
 /**
- * The tell a write should send, or null when it is not one to tell. The dispatcher's own notes are
- * never told back to it, and a write with no board has nothing to dispatch. A card a bug ticket placed
- * is never told `created`: the placing stamp already wrote its row.
+ * The tells a write earns: none, one, or for a switch turned on one board-on per live card in the
+ * board's To Do. A write by the dispatcher itself, a write with no board and a card a ticket placed are
+ * never told, and the tells that start work need the board's switch on at the write.
  */
-function tellFor(write: KanbanWriteEvent): Tell | null {
+function tellsFor(write: KanbanWriteEvent): Tell[] {
   if (write.actor === DISPATCHER_ACTOR || write.boardId === null || isPlacedTicketCreation(write)) {
-    return null;
+    return [];
   }
   const event = tellEventOf(write);
   if (event === null) {
-    return null;
+    return [];
   }
   const board = kanbanBoardsService.getBoard(write.boardId);
   if (board === null || (NEEDS_AUTONOMY_AT_SEND.has(event) && !board.autonomy)) {
-    return null;
+    return [];
   }
   if (event === 'board-off') {
-    return { event, boardId: write.boardId, actor: write.actor };
+    return [{ event, boardId: write.boardId, actor: write.actor }];
+  }
+  if (event === 'board-on') {
+    return boardOnTells(write.boardId, write.actor);
   }
   if (write.cardId === null) {
-    return null;
+    return [];
   }
-  return { event, boardId: write.boardId, cardId: write.cardId, actor: write.actor };
+  return [{ event, boardId: write.boardId, cardId: write.cardId, actor: write.actor }];
 }
 
-/** The chain a tell queues on: one per card, and one per board for board-off. */
+/** One board-on tell per live card in the board's To Do, in the lane's order: each is work a person approved by putting it there. */
+function boardOnTells(boardId: string, actor: string): CardTell[] {
+  return todoCardIdsOf(boardId).map((cardId): CardTell => ({ event: 'board-on', boardId, cardId, actor }));
+}
+
+/**
+ * The chain a tell queues on: one per card, and one per board for board-off and board-on. A board's
+ * board-on tells share its chain, so they go out one at a time in the lane's order and a switch turned
+ * off after it was turned on is told after them.
+ */
 function chainKeyOf(tell: Tell): string {
-  return tell.event === 'board-off' ? `board ${tell.boardId}` : `card ${tell.cardId}`;
+  return tell.event === 'board-off' || tell.event === 'board-on' ? `board ${tell.boardId}` : `card ${tell.cardId}`;
 }
 
 /** The subject a log line names: `<board>/<card>`, or `board <board>` for board-off. */

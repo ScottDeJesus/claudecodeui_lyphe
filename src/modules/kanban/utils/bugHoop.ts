@@ -72,8 +72,11 @@ type CardDoing = 'idle' | 'working' | 'waiting' | 'done' | 'failed';
 
 function doingOf(summary: KanbanCardSummary, walk: KanbanWalk | null): CardDoing {
   if (summary.status === 'done') return 'done';
-  if (summary.status === 'questions' || summary.openQuestions > 0) return 'waiting';
-  if (walk?.stages.some((stage) => stage.status === 'failed') && summary.status === 'active' && !walk.stages.some(stageRunning)) return 'failed';
+  // A stage running now is the card in hand, whatever else waits on it.
+  if (walk?.stages.some(stageRunning)) return 'working';
+  // Needs you only while a question is open: an answered card keeps the status word until its walk resumes.
+  if (summary.openQuestions > 0) return 'waiting';
+  if (walk?.stages.some((stage) => stage.status === 'failed') && summary.status === 'active') return 'failed';
   if (summary.status === 'active') return 'working';
   return 'idle';
 }
@@ -82,7 +85,7 @@ function doingOf(summary: KanbanCardSummary, walk: KanbanWalk | null): CardDoing
 export function bugStatusOf(summary: KanbanCardSummary, walk: KanbanWalk | null, t: TFunction): { word: string; tone: 'info' | 'positive' | 'warn' | 'danger' | 'neutral' } | null {
   const doing = doingOf(summary, walk);
   if (doing === 'waiting') return { word: t('kanban.ring.needsYou', { defaultValue: 'Needs you' }), tone: 'warn' };
-  if (doing === 'working') return { word: t('kanban.ring.inHand', { defaultValue: 'In hand' }), tone: 'info' };
+  if (doing === 'working') return { word: t('kanban.ring.inHand', { defaultValue: 'Working now' }), tone: 'info' };
   if (doing === 'done') return { word: t('kanban.lanes.done'), tone: 'positive' };
   if (doing === 'failed') return { word: t('kanban.ring.failed', { defaultValue: 'Failed' }), tone: 'danger' };
   if (walk !== null && walk.hold.length > 0) return { word: t('kanban.ring.held', { defaultValue: 'Held' }), tone: 'neutral' };

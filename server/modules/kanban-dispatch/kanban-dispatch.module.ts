@@ -10,6 +10,9 @@ import { createNoteApplier } from './kanban-dispatch.apply.js';
 import { createKanbanDispatchRouter } from './kanban-dispatch.routes.js';
 import { createCardTeller } from './kanban-dispatch.tell.js';
 
+/** The actor the start's catch-up tells as: no person pressed anything, CloudCLI itself is telling. */
+const START_ACTOR = 'cloudcli';
+
 /**
  * Ceiling for `card notes`, `card applied`, and `card config`. Each is one
  * store read or one write, so anything near this limit is a hang. It is also
@@ -68,7 +71,7 @@ export function createKanbanDispatchModule(
   // Subscribed at construction, not in start: a write can reach the board from
   // the moment the server listens, before start runs in the listen callback,
   // and a person's card created in that gap must still be told.
-  let unsubscribe: (() => void) | null = onKanbanWrite(teller);
+  let unsubscribe: (() => void) | null = onKanbanWrite(teller.onWrite);
   const applier = createNoteApplier({ commands, ticketStampCommands: { ...commands, timeoutMs: TELL_TIMEOUT_MS }, log: (line) => console.error(line) });
   // The placing pass's wake for a ticket waiting on a board (an event, never a sweep).
   let unsubscribeBoards: (() => void) | null = onKanbanWrite((write) => {
@@ -88,6 +91,21 @@ export function createKanbanDispatchModule(
   function start(): void {
     detach ??= storeWatch.attach('status', () => applier.poke());
     applier.pokeWithUnplaced();
+    tellApprovedTodo();
+  }
+
+  /**
+   * The start's catch-up: a self-running board's To Do cards that no switch-on reached are approved work
+   * (operator, 11-18), so each is told board-on. A failure is logged and never stops the start.
+   */
+  function tellApprovedTodo(): void {
+    try {
+      const told = teller.tellSelfRunningTodo(START_ACTOR);
+      console.log(`[kanban-dispatch] start: board-on told for ${told} To Do card(s) of the self-running boards`);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error(`[kanban-dispatch] start: could not tell the self-running boards' To Do cards: ${reason}`);
+    }
   }
 
   /**

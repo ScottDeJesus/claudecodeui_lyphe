@@ -6,6 +6,9 @@
 # live in the house registry (hooks/web_walk/apps.toml), never here.
 
 [app]
+# HoopList's rows (the bug board's and the other boards'): data-hoop-row reads a row's id, data-hoop-row-state its state
+# (working, ...), so {mark = "working"} or {mark = "<a ticket id>"} finds a row by name.
+mark = ["data-hoop-row", "data-hoop-row-state"]
 theme = "light"
 
 [screen.home]

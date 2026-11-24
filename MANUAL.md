@@ -16679,8 +16679,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.
 | part | fact |
 |---|---|
 | `createKanbanDispatchModule(storeWatch)` | `server/index.ts` builds it with the dispatcher's store watch, mounts `router` at `/api/kanban-dispatch` behind `authenticateToken`, calls `start()` after `listen` and `stop()` on shutdown |
-| teller | `onKanbanWrite(teller)` subscribed at CONSTRUCTION, not in `start()`: a card created in the gap before `start()` is still told |
+| teller | `onKanbanWrite(teller.onWrite)` subscribed at CONSTRUCTION, not in `start()`: a card created in the gap before `start()` is still told |
 | applier | `storeWatch.attach('status', poke)` in `start()` plus one `pokeWithUnplaced` at start (notes written, and tickets left unplaced, while the server was down) |
+| catch-up | `start()` tells `board-on` for every live To Do card of every self-running board (`teller.tellSelfRunningTodo('cloudcli')`, `kanban-dispatch.todo.ts`) and logs `start: board-on told for N To Do card(s)`: cards that entered To Do while the board was off are approved work; the dispatcher queues only a `withdrawn` or unknown card, so every later start queues 0 |
 | board listener | a second `onKanbanWrite` listener pokes `pokeWithUnplaced` for `board.created` and a `board.updated` whose `fields` hold `repos` or `archived` (MAN-10050) |
 | `stop()` | unsubscribes both listeners, detaches, then stops the applier |
 | timeouts | `card told` and `bug placed` 180 s (each sorts first: Jev, then maybe one tool-less Haiku); `notes`, `applied`, `config`, `bug pending` 20 s |
@@ -16694,9 +16695,10 @@ One `TELLS` table, first match wins; `write.actor === 'dispatcher'` (`DISPATCHER
 | `card.updated` whose payload `fields` hold `title`, `description`, `body` or `priority` | `updated` |
 | `question.answered` leaving `card.openQuestions === 0` | `answered` (record carries `answers`) |
 | `card.moved` to `not_ready` or `done`; `card.archived` | `stopped` |
+| `board.updated` with payload `autonomy === true` | `board-on`, one per live card in To Do, in the lane's order |
 | `board.updated` or `board.archived` with payload `autonomy === false` | `board-off` |
-- `created`, `queued`, `updated`, `answered` need `board.autonomy` on at the write AND at the send (`NEEDS_AUTONOMY_AT_SEND`); `stopped` and `board-off` are told whatever the switch reads. why: a stop is the only way to halt a walk once the switch is off.
-- The listener never blocks or throws into the write. One promise chain per card, one per board for `board-off`: tells of a subject go out in write order; a failed tell does not break the chain.
+- `created`, `queued`, `updated`, `answered`, `board-on` need `board.autonomy` on at the write AND at the send (`NEEDS_AUTONOMY_AT_SEND`); `stopped` and `board-off` are told whatever the switch reads. why: a stop is the only way to halt a walk once the switch is off.
+- The listener never blocks or throws into the write. One promise chain per card, one per board for `board-off` and `board-on` (a board's To Do is told one card at a time, in lane order, and an off after an on is told after it): tells of a subject go out in write order; a failed tell does not break the chain.
 - Card text (`title`, `description`, `body`, question texts) is cut at 20,000 code points (`TEXT_CHARS_MAX` = the dispatcher's `TEXT_MAX`); attachments go as absolute paths of the files they resolve to.
 - The told card carries `status` and `archived`, read when the tell is SENT, not at the write (`sendTell` reads the card then): a tell queued behind a later move or archive carries the card as it stands at the send. The dispatcher's `stopped` reads them to close the card's open ticket when it sits in Done or is archived.
 - Exit 0 logs the dispatcher's first line; exit 2 logs `the dispatcher refused <event> ...`; anything else logs `exited N` / `did not answer`.
@@ -16742,7 +16744,7 @@ One `TELLS` table, first match wins; `write.actor === 'dispatcher'` (`DISPATCHER
 
 `/api/kanban-dispatch/hunts` (`createHuntsRouter`: the hunters' settings, `night`, `stop`, `reopen`) and `/api/kanban-dispatch/proposals` (`createProposalsRouter`: the proposed features' listing and its promote, send-back, dismiss and priority) are mounted with `router.use`; their contract is MAN-10066.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.apply.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.cards.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.fields.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.notes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.tell.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.apply.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.cards.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.fields.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.notes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.tell.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-dispatch/kanban-dispatch.todo.ts
 
 ## MAN-10023 — Board roster read, addAttachmentFromPath's display name and DispatcherPicture.cards — the board-dispatch module's reads
 
@@ -17072,3 +17074,18 @@ Client half of the Analytics `web-walk` section: whether the house drives its ru
 - Astrolabe components only (`Readout`, `Rule`, `DayChart`, `DataTable`, `Banner`, `EmptyState`, `Button`, `FoldChevron`); every file under 150 lines.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkApps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkChecks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/webWalkFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkGlance.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/web-walk/WebWalkTrend.tsx
+
+## MAN-10150 — cases/lib/web_walk.mjs — webWalk: a case runs the web-walk command without blocking the loop
+
+Shared door for a CloudCLI case that walks an app through `~/.claude/scripts/web-walk`: `cases/lib/web_walk.mjs`.
+
+**API.** `webWalk(args, {input?, env?, timeoutMs?})` → `{error, status, stdout, stderr, answer}`. `WEB_WALK` is the command's path.
+- `error`: set only when the command did not end (timeout, spawn failure); `status`: its exit code; `answer`: stdout's last line as JSON, else null.
+- `timeoutMs` default 110000; a case whose walk runs longer passes its own (the house suite's `timeout_s` is 240).
+- `WEB_WALK_OUT`, `WEB_WALK_PICTURE_BYTES`, `WEB_WALK_APPS` of the caller are dropped unless `env` names them again.
+
+**Rule.** A case runs a walk through `webWalk`, never `spawnSync`/`execFileSync`: a sync call blocks the event loop for the whole walk, and the next request on a signed-in door's kept-alive socket the server closed meanwhile fails UND_ERR_SOCKET.
+
+**Users.** The cases under `cases/walk/` that run a walk: the light/dark fan-out, and the Restorly reach, adapter, dictionary and light/dark cases.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/cases/lib/web_walk.mjs
