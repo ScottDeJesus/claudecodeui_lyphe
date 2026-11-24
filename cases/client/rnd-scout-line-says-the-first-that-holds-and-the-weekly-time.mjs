@@ -1,12 +1,14 @@
 // The header's line about the scout (rnd-area phase 5, interface G: its last run, what it filed, the weekly time, a SignalLoop
 // while one is out). scoutLine says the first that holds: one is out; there is nothing for one to read; none has gone out; the
 // last one ended without an answer (lost or failed, said as a word for a badge); the last one filed something (with the count);
-// the last one found nothing new. Its weekly line says the installed expression through the caller's words, or that none is.
+// the last one found nothing new. The out line says how many of the run's source scouts are read (rnd.scout.outRun, read of
+// total); every run carries its source scouts and its ranker (the run shape since the scouts-run choice, 1f5ca56f).
+// Its weekly line says the installed expression through the caller's words, or that none is.
 // Every key it hands to t() is in the English words file.
 //
 // rndWords.ts is transpiled with the repo's TypeScript and run with formatRelativeTime stubbed and t() echoing its key.
 //
-// protects: src/modules/rnd/rndWords.ts, src/modules/i18n/locales/en/common.json
+// protects: src/modules/rnd/rndWords.ts, src/modules/i18n/locales/en/common.json, src/shared/rnd-types.ts
 // writes: none
 
 import { readFile } from "node:fs/promises";
@@ -34,8 +36,15 @@ const said = [];
 const t = (key, options) => { said.push(key); return options ? key + JSON.stringify(options) : key; };
 const weeklyWords = (expression) => "W(" + expression + ")";
 const SOURCE = { url: "https://example.org/feed", label: "feed", added_at: "2026-11-01T00:00:00Z" };
-const OUT = { id: 9, launch: "L9", trigger: "now", started_at: "2026-11-21T06:30:00Z" };
-const last = (outcome, filed) => ({ id: 8, launch: "L8", trigger: "weekly", started_at: "2026-11-17T06:30:00Z", ended_at: "2026-11-17T06:50:00Z", outcome, filed });
+const OUT = {
+  id: 9, launch: "L9", trigger: "now", started_at: "2026-11-21T06:30:00Z",
+  scouts: [
+    { source: "https://example.org/feed", state: "ended", outcome: "done" },
+    { source: "https://www.example.com/news", state: "waiting", outcome: null },
+  ],
+  ranker: { state: "waiting", outcome: null },
+};
+const last = (outcome, filed) => ({ id: 8, launch: "L8", trigger: "weekly", started_at: "2026-11-17T06:30:00Z", ended_at: "2026-11-17T06:50:00Z", scouts: [], ranker: { state: "ended", outcome }, outcome, filed });
 const picture = (out, sources, lastRun, weekly) => ({
   generated_at: "2026-11-21T07:00:00Z",
   settings: { web_search: true, weekly, sources },
@@ -64,7 +73,7 @@ runCase(async () => {
   if (typeof words.scoutLine !== "function") return broken("rndWords.ts exports no scoutLine");
   const wrong = [];
   const cases = [
-    ["one out", picture(OUT, [], last("done", 2), "30 6 * * 1"), "rnd.scout.out", true, null],
+    ["one out", picture(OUT, [], last("done", 2), "30 6 * * 1"), "rnd.scout.outRun", true, null],
     ["no sources", picture(null, [], last("done", 2), "30 6 * * 1"), "rnd.scout.noSources", false, null],
     ["never run", picture(null, [SOURCE], null, null), "rnd.scout.never", false, null],
     ["last lost", picture(null, [SOURCE], last("lost", 0), null), "rnd.scout.lastTrouble", false, "rnd.scout.outcome.lost"],
@@ -78,6 +87,9 @@ runCase(async () => {
     if (got.out !== out) wrong.push(label + " has out " + got.out);
     if (got.trouble !== trouble) wrong.push(label + " has trouble " + got.trouble);
     if (label === "filed three" && !String(got.line).includes('"filed":3')) wrong.push("the filed line carries no count of 3: " + got.line);
+    if (label === "one out" && !(String(got.line).includes('"read":1') && String(got.line).includes('"total":2'))) wrong.push("the out line does not say 1 of 2 sources read: " + got.line);
+    if (label === "one out" && typeof got.scouts !== "string") wrong.push("the out run's scouts are not said: " + got.scouts);
+    if (label !== "one out" && got.scouts !== null) wrong.push(label + " says scouts for a run with none: " + got.scouts);
     const weekly = pic.settings.weekly === null ? "rnd.scout.noWeekly" : 'rnd.scout.weekly{"when":"W(30 6 * * 1)"}';
     if (got.weekly !== weekly) wrong.push(label + " says the weekly as " + got.weekly);
   }
@@ -92,5 +104,5 @@ runCase(async () => {
     if (tree) for (const key of new Set(said)) if (lookup(tree, key) === undefined && lookup(tree, key + "_other") === undefined) wrong.push(key + " is not in the English words file");
   }
   if (wrong.length > 0) return broken(wrong.slice(0, 8).join("; "));
-  return held("out, no sources, never, lost/failed, filed 3, nothing new each said first in turn; the loop only while out; weekly said or none" + (EN ? "; " + new Set(said).size + " keys all in English" : ""));
+  return held("out (1 of 2 sources read), no sources, never, lost/failed, filed 3, nothing new each said first in turn; the loop only while out; weekly said or none" + (EN ? "; " + new Set(said).size + " keys all in English" : ""));
 });
