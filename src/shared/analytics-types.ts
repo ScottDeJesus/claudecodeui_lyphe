@@ -139,11 +139,16 @@ export type WebWalkScreen = { screen: string; opened: number; unreached: number 
 /** One app the walks opened, with its screens. */
 export type WebWalkApp = { app: string; walks: number; screens: WebWalkScreen[] };
 
-/** One entry of Autocorrect's table (hooks/web_walk/node/autocorrect.mjs) and how many steps it rewrote. */
-export type WebWalkAutocorrected = { entry: string; steps: number };
+/** One entry of Autocorrect's table (hooks/web_walk/node/autocorrect.mjs), its label in plain words as that table states it, and how many steps it rewrote. */
+export type WebWalkAutocorrected = { entry: string; label: string; steps: number };
 
-/** One step refusal Autocorrect did not rewrite (its step number gone, its quoted values blanked) and how many walks met it. */
-export type WebWalkUncorrected = { refusal: string; walks: number };
+/**
+ * One step refusal Autocorrect did not rewrite, one row per whole wording. `whole` is the wording with the step number gone and
+ * quoted values and numbers blanked. `refusal` is its first 120 characters, the kind's key the helper and heal share, which two
+ * rows can carry. `walks` is how many walks met it. `on_purpose` is the name of the helper's rule that refuses it deliberately
+ * and `reason` that rule's own plain words (node/refusals.json); both null when it is not one.
+ */
+export type WebWalkUncorrected = { refusal: string; whole: string; walks: number; on_purpose: string | null; reason: string | null };
 
 /** Autocorrect over the window: the steps it rewrote by entry, and the step refusals still met. */
 export type WebWalkAutocorrect = { corrected: WebWalkAutocorrected[]; refused: WebWalkUncorrected[] };

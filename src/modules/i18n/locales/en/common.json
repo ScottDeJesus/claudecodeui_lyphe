@@ -5749,6 +5749,40 @@
         "reachHint_other": "The unreached screens' entries in {{app}}'s dictionary need a look. Check them again: ~/.claude/scripts/web-walk reach {{app}} {{screens}}",
         "reachHintAll": "The unreached screens' entries in {{app}}'s dictionary need a look. Check every screen again: ~/.claude/scripts/web-walk reach {{app}}"
       },
+      "autocorrect": {
+        "title": "Autocorrect",
+        "about": "A step written wrongly whose meaning is plain is corrected, and the walk runs. One that could mean two things is refused before a browser opens.",
+        "quiet": "No step was corrected and no walk was refused over a step's wording in the last {{days}} days.",
+        "corrected": {
+          "figure": "Steps corrected",
+          "note_one": "{{count}} kind of mistake, last {{days}} days",
+          "note_other": "{{count}} kinds of mistake, last {{days}} days",
+          "noteNone": "in the last {{days}} days",
+          "quiet": "Autocorrect rewrote no step in this window.",
+          "tableLabel": "Steps Autocorrect corrected in the last {{days}} days, by mistake",
+          "columns": {
+            "mistake": "Mistake corrected",
+            "steps": "Steps"
+          }
+        },
+        "refused": {
+          "figure": "Walks still refused",
+          "note_one": "of {{walks}} walks, over {{count}} refusal",
+          "note_other": "of {{walks}} walks, over {{count}} refusals",
+          "noteNone": "of {{walks}} walks",
+          "quiet": "No walk was refused over how a step was written.",
+          "tableLabel": "Step refusals walks still met in the last {{days}} days. Press one for its whole wording.",
+          "columns": {
+            "refusal": "Refusal",
+            "walks": "Walks"
+          },
+          "onPurpose": "Refused on purpose",
+          "next": "If what was meant is plain, this is an entry to add to Autocorrect's table: ~/.claude/hooks/web_walk/node/autocorrect.mjs",
+          "nextOnPurpose": "The helper refuses this on purpose: {{reason}}. The step is the thing to change, written the way the refusal says.",
+          "showAll": "Show all {{count}} refusals",
+          "showFewer": "Show the {{count}} most met"
+        }
+      },
       "listSeparator": ", "
     }
   }

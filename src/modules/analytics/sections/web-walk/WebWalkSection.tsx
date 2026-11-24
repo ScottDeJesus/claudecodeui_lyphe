@@ -7,6 +7,7 @@ import { formatShortDate } from '@/shared/utils';
 import { AnalyticsSectionFrame } from '@/modules/analytics/AnalyticsSectionFrame';
 import { useAnalyticsSection } from '@/modules/analytics/hooks/useAnalyticsSection';
 import { WebWalkApps } from '@/modules/analytics/sections/web-walk/WebWalkApps';
+import { WebWalkAutocorrection } from '@/modules/analytics/sections/web-walk/WebWalkAutocorrection';
 import { WebWalkChecks } from '@/modules/analytics/sections/web-walk/WebWalkChecks';
 import { WebWalkGlance } from '@/modules/analytics/sections/web-walk/WebWalkGlance';
 import { WebWalkTrend } from '@/modules/analytics/sections/web-walk/WebWalkTrend';
@@ -20,7 +21,8 @@ import { daysCovered } from '@/modules/analytics/sections/web-walk/webWalkFigure
  * Under it, in the order a reader asks: how many launches on each side and how much walking that was (WebWalkGlance, with
  * the nudge's state and the bars it is held to), how the two sides moved day by day (WebWalkTrend), what the premade
  * checks found (WebWalkChecks), and which apps and screens were walked, with the screens that were not reached
- * (WebWalkApps).
+ * (WebWalkApps). Last, what Autocorrect made of the steps written wrongly: how many it corrected and by which entry of
+ * its table, and which refusals walks still met (WebWalkAutocorrection).
  *
  * THE FRAME DRAWS LOADING AND UNREACHABLE; this draws the rest: no history yet, a window with nothing in it, a history
  * younger than the window, and the full page.
@@ -38,7 +40,7 @@ export function WebWalkSection({ days }: { days: number }) {
 /** The section as drawn from one answer: the frame's children, spaced by the frame. Rendered by the Body above, and by nothing else. */
 function WebWalkAnswer({ answer }: { answer: WebWalkAnalytics }) {
   const { t } = useTranslation('common');
-  const { days, totals, settled, series, checks, doors, apps } = answer;
+  const { days, totals, settled, series, checks, doors, apps, autocorrect } = answer;
   const span = { firstDay: answer.first_day, today: answer.today, days };
   const covered = daysCovered(span);
   const young = covered !== null && answer.first_day !== null;
@@ -68,6 +70,7 @@ function WebWalkAnswer({ answer }: { answer: WebWalkAnalytics }) {
             <WebWalkChecks checks={checks} days={days} />
             <WebWalkApps apps={apps} days={days} />
           </div>
+          <WebWalkAutocorrection autocorrect={autocorrect} walks={totals.walks} days={days} />
         </>
       )}
     </>
