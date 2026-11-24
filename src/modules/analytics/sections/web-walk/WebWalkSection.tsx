@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
-import type { WebWalkAnalytics, WebWalkApp, WebWalkCheck, WebWalkDay, WebWalkDoors, WebWalkSettled, WebWalkTotals } from '@/shared/analytics-types';
+import type { WebWalkAnalytics, WebWalkApp,
+  WebWalkAutocorrect, WebWalkCheck, WebWalkDay, WebWalkDoors, WebWalkSettled, WebWalkTotals } from '@/shared/analytics-types';
 import { Banner, EmptyState } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 import { AnalyticsSectionFrame } from '@/modules/analytics/AnalyticsSectionFrame';
@@ -80,13 +81,19 @@ function WebWalkAnswer({ answer }: { answer: WebWalkAnalytics }) {
  */
 function narrow(data: unknown): WebWalkAnalytics | null {
   if (!isRecord(data)) return null;
-  const { days, generated_at, today, first_day, settled, totals, series, checks, doors, apps } = data;
+  const { days, generated_at, today, first_day, settled, totals, series, checks, doors, apps, autocorrect } = data;
   if (typeof days !== 'number' || typeof generated_at !== 'number' || typeof today !== 'string') return null;
   const firstDay = typeof first_day === 'string' ? first_day : null;
   if (first_day !== null && firstDay === null) return null;
   if (!isSettled(settled) || !isFigures<WebWalkTotals>(totals) || !isFigures<WebWalkDoors>(doors)) return null;
   if (!isList<WebWalkDay>(series) || !isList<WebWalkCheck>(checks) || !isList<WebWalkApp>(apps)) return null;
-  return { days, generated_at, today, first_day: firstDay, settled, totals, series, checks, doors, apps };
+  if (!isAutocorrect(autocorrect)) return null;
+  return { days, generated_at, today, first_day: firstDay, settled, totals, series, checks, doors, apps, autocorrect };
+}
+
+/** Autocorrect's two lists, their rows taken as the command printed them (see `narrow`). */
+function isAutocorrect(value: unknown): value is WebWalkAutocorrect {
+  return isRecord(value) && isList(value.corrected) && isList(value.refused);
 }
 
 /** A JSON object: not null, not an array. */

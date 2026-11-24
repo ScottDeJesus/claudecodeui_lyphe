@@ -139,6 +139,15 @@ export type WebWalkScreen = { screen: string; opened: number; unreached: number 
 /** One app the walks opened, with its screens. */
 export type WebWalkApp = { app: string; walks: number; screens: WebWalkScreen[] };
 
+/** One entry of Autocorrect's table (hooks/web_walk/node/autocorrect.mjs) and how many steps it rewrote. */
+export type WebWalkAutocorrected = { entry: string; steps: number };
+
+/** One step refusal Autocorrect did not rewrite (its step number gone, its quoted values blanked) and how many walks met it. */
+export type WebWalkUncorrected = { refusal: string; walks: number };
+
+/** Autocorrect over the window: the steps it rewrote by entry, and the step refusals still met. */
+export type WebWalkAutocorrect = { corrected: WebWalkAutocorrected[]; refused: WebWalkUncorrected[] };
+
 /** The whole answer of web-walk reading --days N. Dates are YYYY-MM-DD in the box's zone. */
 export type WebWalkAnalytics = {
   days: number;
@@ -151,6 +160,7 @@ export type WebWalkAnalytics = {
   checks: WebWalkCheck[];
   doors: WebWalkDoors;
   apps: WebWalkApp[];
+  autocorrect: WebWalkAutocorrect;
 };
 
 /** One day of the Repeats answer: the launches that wrote a program by hand, their programs and characters, and the characters a family holds. `day` is YYYY-MM-DD, box-local. */

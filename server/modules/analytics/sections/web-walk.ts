@@ -1,5 +1,6 @@
 import type {
   WebWalkAnalytics,
+  WebWalkAutocorrect,
   WebWalkBars,
   WebWalkDoors,
   WebWalkSettled,
@@ -15,8 +16,8 @@ const WEB_WALK_WORDS: VerbWords = { verb: 'web-walk', command: 'web-walk reading
  * The Web walks section: the house command's `web-walk reading --days N` (hooks/web_walk/answer.py), carried as printed.
  *
  * The command holds every number; this reader computes none. It builds the three small objects (`settled` with its
- * `bars`, `totals`, `doors`) key by key, so a key the screen reads that went missing is a sentence here, and carries
- * the rows of `series`, `checks` and `apps` untouched. Every failure throws one sentence.
+ * `bars`, `totals`, `doors`, and `autocorrect`'s two lists) key by key, so a key the screen reads that went missing is a
+ * sentence here, and carries the rows of `series`, `checks`, `apps` and Autocorrect's lists untouched. Every failure throws one sentence.
  */
 export function createWebWalkReader(bin: string): (days: number) => Promise<WebWalkAnalytics> {
   return async (days) => narrowAnswer(await runVerbForJson(bin, ['reading', '--days', String(days)], WEB_WALK_WORDS));
@@ -107,6 +108,11 @@ function doorsOf(answer: Answer): WebWalkDoors {
   return { execute: numberAt(doors, 'execute'), command: numberAt(doors, 'command') };
 }
 
+function autocorrectOf(answer: Answer): WebWalkAutocorrect {
+  const autocorrect = recordAt(answer, 'autocorrect');
+  return { corrected: rowsAt(autocorrect, 'corrected'), refused: rowsAt(autocorrect, 'refused') };
+}
+
 function narrowAnswer(answer: unknown): WebWalkAnalytics {
   if (!isRecord(answer)) throw new Error('web-walk reading answered something other than one JSON object');
   const firstDay = answer.first_day;
@@ -124,5 +130,6 @@ function narrowAnswer(answer: unknown): WebWalkAnalytics {
     checks: rowsAt(answer, 'checks'),
     doors: doorsOf(answer),
     apps: rowsAt(answer, 'apps'),
+    autocorrect: autocorrectOf(answer),
   };
 }
