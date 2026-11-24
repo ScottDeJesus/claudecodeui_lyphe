@@ -113,34 +113,32 @@ function repeatsWeekly(key: string): boolean {
 }
 
 /**
- * THE ONE RULE FOR A WINDOW PAST ITS RESET: it reads as the window that began at that reset — 0% used.
+ * THE ONE RULE FOR A WINDOW PAST ITS RESET: it reads as the window that began at that reset, figure unknown.
  *
- * A figure moves only when something uses the account, and a window that has reset since the last reading
- * has been used by nothing the reading could have seen: the old figure describes a closed window, and
- * drawing it (or "was N%") would put last week's number on this week. So the figure is 0, and the reset it
- * names is the next one:
+ * The old figure describes a closed window, and drawing it (or "was N%") would put last week's number on this
+ * week; drawing 0% would claim nothing used the account since, which nothing here knows (operator, 11-24: a row
+ * read 0% "this week" while the account was past 50%). So the figure is unknown (`null`, drawn "—") until a
+ * reading of the new window arrives, and the reset it names is the next one:
  *   - a weekly window's reset steps forward in whole 7-day steps to the first still ahead of `nowMs`;
  *   - any other window states NO reset (`resetsAt: null`) — it starts at first use or at a period nobody here
  *     knows, so after its reset there is no running window and no reset to count to, until a reading brings one.
  * The figure the window held before does not matter, and neither does the vendor's `severity`: it flagged the
- * closed window, so a carried window carries neither (a flag would keep a 0% bar amber).
+ * closed window, so a carried window carries neither.
  *
  * A window is past its reset when the server marked it `rolled` (its reading predates a reset that has
  * passed — `server/modules/accounts/usage-windows.ts`), or when its reset is at or before `nowMs` and fell AFTER
  * the reading was taken (`readAtMs`): the same test, for what the server did not mark — a door row's reading, or
  * a route body that has aged past its reset on this clock. A reading taken at or after the instant is
- * authoritative for the moment it answered, so clock skew never zeroes a fresh figure; a reset that names no
- * instant carries nothing. Neither does a window with NO figure (`windowPercent` answers `null`): there is no
- * closed window's number to protect, and a carried 0% would draw a window nobody measured as "nothing used".
+ * authoritative for the moment it answered, so clock skew never blanks a fresh figure; a reset that names no
+ * instant carries nothing, and neither does a window with NO figure (`windowPercent` answers `null`).
  *
  * Returns the SAME object when the window is not carried, so a caller can tell a carried window by
- * identity. The carried 0% is drawn, never filed: this is presentation, and the pacer never sees it.
+ * identity. The carried window is drawn, never filed: this is presentation, and the pacer never sees it.
  *
  * Used by this module's `accountInUseUsage` file, which applies it to every reading the meters, the rings and the
  * account rows draw.
  */
 export function windowPastReset(usageWindow: ClaudeUsageWindow, readAtMs: number, nowMs: number): ClaudeUsageWindow {
-  // Unknown is never zero: only a window that had a figure is carried to the 0% of the window that began at its reset.
   if (windowPercent(usageWindow) === null) return usageWindow;
   const resetMs = typeof usageWindow.resetsAt === 'string' ? resetInstant(usageWindow.resetsAt) : Number.NaN;
   const pastReset = usageWindow.rolled === true || (readAtMs < resetMs && resetMs <= nowMs);
@@ -154,7 +152,7 @@ export function windowPastReset(usageWindow: ClaudeUsageWindow, readAtMs: number
   return {
     key: usageWindow.key,
     label: usageWindow.label,
-    percent: 0,
+    percent: null,
     resetsAt: nextResetMs === null ? null : new Date(nextResetMs).toISOString(),
   };
 }

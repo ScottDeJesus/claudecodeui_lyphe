@@ -2,7 +2,7 @@ import { Check, KeyRound, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { UsageRing } from '@/modules/accounts/UsageRing';
-import { rowWeek } from '@/modules/accounts/utils/accountInUseUsage';
+import { readingAgeWords, rowWeek } from '@/modules/accounts/utils/accountInUseUsage';
 import { ActionMenu, Button } from '@/shared/ui';
 import type { ClaudeAccountRow } from '@/shared/types';
 import { cn, formatShortDate } from '@/shared/utils';
@@ -91,8 +91,10 @@ export function AccountRowView({ account, nowMs, busy, held, switched, onUse, on
   const canUse = account.token === 'saved' && !refused && !account.in_use;
   const needsSetup = account.token === 'none' || refused;
   // The week as every surface draws it: one whose reset has passed with no reading since is the week that began
-  // there — 0%, counting down to its next reset — so the ring never shows a closed week's figure.
+  // there — unknown, counting down to its next reset — so the ring never shows a closed week's figure.
   const week = rowWeek(account, nowMs);
+  // An old or unread figure says so; a recent one says nothing.
+  const ageWords = readingAgeWords(account, nowMs);
   // A refused token's saved expiry promises what the warn word denies: the row shows the wall, not the date.
   const tokenNotice = refused ? null : tokenNoticeInWords(account.expires_at, nowMs);
   // The in-use row says why it waits instead, so it does not repeat the same fact twice.
@@ -111,6 +113,9 @@ export function AccountRowView({ account, nowMs, busy, held, switched, onUse, on
         <div className="truncate text-[13px] font-medium leading-tight text-foreground" title={name}>{name}</div>
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           {account.in_use && <span className={cn(STATE_WORD_CLASS, 'text-accent-ink')} title={switched ?? undefined}>In use</span>}
+          {ageWords !== null && (
+            <span data-reading-age className={cn(STATE_WORD_CLASS, 'text-ink-faint')} title={account.reading ? `Last read by ${account.reading.source}` : undefined}>{ageWords}</span>
+          )}
           {canUse && (
             // A press still works on a full account — it chooses an account that waits for room (the held case) —
             // but the act says so rather than promising a switch that will not happen yet.
