@@ -31,7 +31,7 @@ type ChatHostFabProps = {
  *
  * IT STANDS AT 46, NOT THE KIT'S 60: one step over the panel (45), so the way to fold the chat is never under the panel, and
  * under the layer that portals to `body` at 50 (dialogs, menus, the command palette). The floating chat is mounted at the root,
- * beside the shell, where the kit's 60 would put this button over an open modal and let a press through to it.
+ * beside the shell, where the kit's 60 would put this button over an open modal and let a press through to it. It is clear: no fill and no ring, at rest, on hover or while open, because the core is the button's whole face and brings its own colour.
  */
 export function ChatHostFab({ position, onDragStart, onPositionChange }: ChatHostFabProps) {
   const { t } = useTranslation();
@@ -42,7 +42,7 @@ export function ChatHostFab({ position, onDragStart, onPositionChange }: ChatHos
   useEffect(() => () => reportAnchor(null), [reportAnchor]);
 
   return (
-    <div data-chat-host-fab={folded ? 'folded' : 'open'} className="contents [&_.vv-fab]:z-[46] [&_.vv-fab]:[--vv-fab-size:44px]">
+    <div data-chat-host-fab={folded ? 'folded' : 'open'} className="contents [&_.vv-fab]:z-[46] [&_.vv-fab]:[--vv-fab-size:44px] [&_.vv-fab]:bg-transparent [&_.vv-fab:hover]:bg-transparent [&_.vv-fab]:shadow-none [&_.vv-fab:hover]:shadow-none [&_.vv-fab]:text-foreground">
       <DockableFab
         label={folded
           ? t('chatHost.unfold', { defaultValue: 'Bring the chat back' })
