@@ -4995,6 +4995,9 @@
   },
   "chatHost": {
     "panelLabel": "Floating chat",
+    "popOut": "Pop out to its own window",
+    "fold": "Fold the chat down to its core",
+    "unfold": "Bring the chat back",
     "collapse": "Collapse chat",
     "resize": "Resize chat",
     "panelTitle": "Chat is in the floating panel",

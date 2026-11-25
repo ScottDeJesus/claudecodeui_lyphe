@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { AccountWeekRing, useAccountWeek } from '@/modules/accounts';
+import { ChatCoreButton } from '@/modules/chat/composer/ChatCoreButton';
 import { CoreRings } from '@/modules/chat/composer/CoreRings';
 import type { CoreRing } from '@/modules/chat/composer/CoreRings';
 import { replyMaterialOf } from '@/modules/chat/transcript/replyMark';
@@ -124,6 +125,9 @@ type ChatCoreProps = {
  * WHERE IT STANDS is the stylesheet's (`chatLine.css`): docked in the margin beside the line where the chat's column has one, so the line
  * and the talk above it keep one left edge, and at the line's start where it has none. Either way it stays level with the line's middle
  * as the line grows. Open, its disc stands over the talk at the column's start, clear of the line, so the line stays in use.
+ *
+ * ON THE FLOATING CHAT'S BUTTON IT IS DRAWN A SECOND TIME (`ChatCoreButton`): the same material, drive, form and gauges at the button's
+ * size, so a chat folded down to its button still says what it is doing. That drawing takes no press: the button is the host's.
  *
  * AT A DESK THE PAGE KEEPS A PLACE FOR IT BESIDE THE TALK (`useChatCorePlace`, project-workspace's `ChatDesk`): the core is drawn into
  * that box, larger, and its disc opens round it where it stands. It is still this one component under the composer, so what it reads
@@ -360,5 +364,14 @@ export function ChatCore({
       </div>
     </div>
   );
-  return place !== null ? createPortal(dock, place) : dock;
+  return (
+    <>
+      {place !== null ? createPortal(dock, place) : dock}
+      <ChatCoreButton
+        doing={state}
+        resting={state === 'idle' || state === 'waiting'}
+        drawing={{ material, state: FORM[state], drive, azimuth: TALK_FROM_DOCK, gauges }}
+      />
+    </>
+  );
 }

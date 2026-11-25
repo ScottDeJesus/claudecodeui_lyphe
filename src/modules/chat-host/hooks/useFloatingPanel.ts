@@ -1,10 +1,16 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 
 import { useChatHostMechanics } from '@/modules/chat-host/context/ChatHostContext';
 import { usePanelViewport } from '@/modules/chat-host/hooks/usePanelViewport';
-import { clampPanelSize, defaultPanelSize, panelPlacement } from '@/modules/chat-host/utils/panelGeometry';
+import { armOf, armedPlacement, carriedAnchor, clampPanelSize, defaultPanelSize, panelPlacement } from '@/modules/chat-host/utils/panelGeometry';
 import { readPanelSize, writePanelSize } from '@/modules/chat-host/utils/chatHostStorage';
+import { readFloatingPlace, writeFloatingPlace } from '@/modules/chat-host/utils/floatingPlaceStorage';
+import type { FloatingPlace } from '@/modules/chat-host/utils/floatingPlaceStorage';
 import { FAB_SIZE_PX } from '@/shared/constants';
+import type { PanelPlacement } from '@/shared/types';
+import type { DockableFabPosition } from '@/shared/ui';
+import { usePointerDrag } from '@/shared/ui/usePointerDrag';
 
 /** How far the kit's resting corner stands from the right and from the bottom (`RESTING_CORNER` in DockableFab). */
 const RESTING_RIGHT_PX = 16;
@@ -56,6 +62,13 @@ function anchorInsideViewport(
  * number would not move under the pointer until the pointer had travelled the difference back, and would store
  * a size the reader never saw.
  *
+ * THE PAIR MOVES AS ONE BODY. The button's point is the one anchor (`place.point`, stored). The panel stands beside it by the
+ * roomier-side rule until a drag forms the pair, and from then on by its hold on the button (`place.arm`, `armedPlacement`), so it
+ * comes back where the reader left it. A drag of the header carries the button's point by the pointer's delta, held where the panel
+ * or the button would leave the screen (`carriedAnchor`); a drag of the button is the kit's own, and the panel follows its rect.
+ * Where the hold would put the panel off screen (a button dragged to an edge, a smaller window) the roomier-side rule answers
+ * instead, and the next drag takes its hold from where the panel then stands.
+ *
  * THE BODY ADOPTS THE NODE in a layout effect, before the browser paints, so the chat is never drawn
  * between hosts. It does not give the node back: collapse carries it home while the panel is still mounted.
  */
@@ -69,7 +82,13 @@ export function useFloatingPanel() {
   const [chosenSize, setChosenSize] = useState(() => readPanelSize() ?? defaultPanelSize(viewport));
   const size = clampPanelSize(chosenSize, viewport);
   const anchorRect = anchorInsideViewport(anchor ?? restingAnchor(viewport), viewport);
-  const placement = panelPlacement(anchorRect, size, viewport);
+  // Where the pair stands: the button's point and the panel's hold on it, seeded from storage. State because both drags write it
+  // (the header's on every move, the button's at its press and its release) and the button and the panel are both drawn from it.
+  const [place, setPlace] = useState(readFloatingPlace);
+  const placed = (asked: { width: number; height: number }) => (
+    armedPlacement(anchorRect, place.arm, asked, viewport) ?? panelPlacement(anchorRect, asked, viewport)
+  );
+  const placement = placed(size);
 
   const bodyRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
@@ -87,13 +106,11 @@ export function useFloatingPanel() {
   function applyResize({ dx, dy }: { dx: number; dy: number }) {
     resizeBaseRef.current ??= { width: placement.width, height: placement.height };
     const base = resizeBaseRef.current;
-    const drawn = panelPlacement(
-      anchorRect,
+    const drawn = placed(
       {
         width: base.width + (placement.grip.endsWith('left') ? -dx : dx),
         height: base.height + (placement.grip.startsWith('top') ? -dy : dy),
       },
-      viewport,
     );
     const drawnSize = { width: drawn.width, height: drawn.height };
     setChosenSize(drawnSize);
@@ -109,5 +126,66 @@ export function useFloatingPanel() {
     resizeBaseRef.current = null;
   }
 
-  return { placement, bodyRef, onResize, onResizeEnd };
+  // The pair as it stood at the first move of the header's drag; null between drags. A ref because the drag's deltas are all
+  // measured from it and nothing draws from it.
+  const carryBaseRef = useRef<{ anchor: { left: number; top: number; width: number; height: number }; panel: PanelPlacement } | null>(null);
+  // Whether the last press on the header ended a drag. A ref because only the click that follows the release reads it: that click
+  // lands on whatever the header holds under the pointer (the conversation's picker), and a move is not a press on it.
+  const carriedRef = useRef(false);
+
+  function carried({ dx, dy }: { dx: number; dy: number }): FloatingPlace {
+    carryBaseRef.current ??= { anchor: anchorRect, panel: placement };
+    const { anchor: from, panel } = carryBaseRef.current;
+    const to = carriedAnchor(from, panel, { dx, dy }, viewport, ANCHOR_EDGE_PX);
+    return { point: { x: to.left, y: to.top }, arm: armOf(panel, from) };
+  }
+
+  // The header's drag: no hold on touch, so it starts with the first move; the pointer is captured only once it IS a drag, so a
+  // plain press still reaches the picker or the control it landed on. The header's two controls are never a handle.
+  const headerDrag = usePointerDrag({
+    kind: 'move',
+    accept: (event) => !(event.target instanceof Element && event.target.closest('[data-chat-host-acts]') !== null),
+    captureOnStart: (handle) => handle,
+    onMove: (point) => setPlace(carried(point)),
+    onEnd: (point) => {
+      if (point.moved) {
+        const dropped = carried(point);
+        setPlace(dropped);
+        writeFloatingPlace(dropped);
+        carriedRef.current = true;
+      }
+      carryBaseRef.current = null;
+    },
+  });
+
+  const moveHandle = {
+    onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
+      carriedRef.current = false;
+      headerDrag.onPointerDown(event);
+    },
+    onClickCapture: (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (event.detail === 0 || !carriedRef.current) return;
+      carriedRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+  };
+
+  // The button's place for the kit: the stored point, or the kit's own resting corner (docked with no dock) while it was never moved.
+  const fabPosition: DockableFabPosition = place.point === null ? { docked: true } : { docked: false, x: place.point.x, y: place.point.y };
+
+  // The button's drag forms the pair at its press, from the panel as it stands, so the panel travels with the button; at the
+  // release the hold is read again, since a panel that stepped to the roomier side on the way keeps the side it ended on.
+  function onFabDragStart() {
+    setPlace((before) => ({ point: before.point, arm: armOf(placement, anchorRect) }));
+  }
+
+  function onFabPositionChange(next: DockableFabPosition) {
+    if (next.docked) return;
+    const dropped: FloatingPlace = { point: { x: next.x, y: next.y }, arm: armOf(placement, anchorRect) };
+    setPlace(dropped);
+    writeFloatingPlace(dropped);
+  }
+
+  return { placement, bodyRef, onResize, onResizeEnd, moveHandle, fabPosition, onFabDragStart, onFabPositionChange };
 }

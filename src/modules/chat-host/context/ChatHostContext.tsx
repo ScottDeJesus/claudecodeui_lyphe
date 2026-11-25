@@ -14,10 +14,18 @@ type ChatHostValue = {
   pipWindow: Window | null;
   /** A reply landed in the chat's conversation while the chat was out of sight (the unread rule). */
   unread: boolean;
-  /** Floats the chat. MUST run inside the press. A press while a window is being opened does nothing, and neither does one while no chat is mounted. */
-  open: () => void;
+  /** Floats the chat: in a window of its own where the browser offers one, else in the panel; `'panel'` asks for the panel outright. MUST run inside the press. A chat already floating is brought forward (its window focused, its panel unfolded) and nothing else. A press while a window is being opened does nothing, and neither does one while no chat is mounted. */
+  open: (host?: 'window' | 'panel') => void;
   /** Brings the chat home: closes the window, whose `pagehide` moves the chat home, or takes the panel down. */
   collapse: () => void;
+  /** Whether this browser offers the picture-in-picture window: the panel's header draws the press for it only where it does. */
+  canPopOut: boolean;
+  /** Carries a chat floating in the panel out to a window of its own, the one host that can stand over another application. MUST run inside the press; a refusal puts the chat back in the panel. */
+  popOut: () => void;
+  /** Whether the panel is folded down to its button: the chat still floats, and only its core is drawn. */
+  folded: boolean;
+  /** The button's press: folds the panel down to the button, or brings it back. */
+  toggleFold: () => void;
   /** The FAB's drawn rect, which the panel stands beside and follows; null when there is none. */
   reportAnchor: (rect: DOMRect | null) => void;
   /** Whether an application covers the main region — a fact of the unread rule. */
@@ -51,6 +59,10 @@ type ChatHostMechanics = {
   comeHome: () => void;
   /** The FAB's rect, read by the floating panel alone through `useSyncExternalStore`. */
   anchorStore: AnchorStore;
+  /** The element on the floating chat's button that the chat's core is drawn into, or null while no button stands. The slot hands it to the chat. */
+  buttonPlace: HTMLElement | null;
+  /** The button's own registration of that element: a ref callback, so it clears when the button goes. */
+  setButtonPlace: (element: HTMLElement | null) => void;
 };
 
 /** The first-open size of the picture-in-picture window, in CSS pixels; the browser remembers the size the reader gives it after that, and code never positions the window. */
@@ -131,6 +143,17 @@ export function ChatHostProvider({ children }: { children: ReactNode }) {
   // draws in it; written together with `placement` ('window' exactly while this is set), never apart.
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
 
+  // Whether the panel is folded down to its button. State because the panel is held out of sight by it, the button draws its
+  // pressed wash by it, and the unread rule reads it: a folded chat is out of sight. True only while the placement is 'panel'.
+  const [folded, setFolded] = useState(false);
+
+  // The element on the button that the chat's core is drawn into. State because the chat re-renders its core into it the moment
+  // the button mounts, and stops when it goes.
+  const [buttonPlace, setButtonPlace] = useState<HTMLElement | null>(null);
+
+  // Whether the browser offers the window at all; a fact of the page's life, read once.
+  const [canPopOut] = useState(() => Boolean(documentPictureInPictureApi()));
+
   // What `collapse` and `open` read at the moment of a press, kept in refs: nothing draws from them. The
   // home element is where a floating chat goes home to; `mountedRef` is whether a chat exists to float,
   // held apart from `facts` so `open` keeps one identity for the provider's life. `placementRef` and
@@ -147,6 +170,7 @@ export function ChatHostProvider({ children }: { children: ReactNode }) {
   const changePlacement = useCallback((next: ChatPlacement) => {
     placementRef.current = next;
     setPlacement(next);
+    if (next !== 'panel') setFolded(false);
   }, []);
 
   const subscribeMove = useCallback((listener: (move: HostMove) => void) => {
@@ -205,14 +229,20 @@ export function ChatHostProvider({ children }: { children: ReactNode }) {
     changePlacement('home');
   }, [moveTo, changePlacement]);
 
-  const open = useCallback(() => {
+  const open = useCallback((host?: 'window' | 'panel') => {
     // A chat that is not mounted has nothing to float: the host would be a header over an empty body.
-    // Already floating, or a window on its way, means the press has nothing to add.
-    if (!mountedRef.current || placementRef.current !== 'home' || openingRef.current) return;
+    // A window on its way means the press has nothing to add. A chat already floating is brought forward: its window focused, its
+    // panel unfolded.
+    if (!mountedRef.current || openingRef.current) return;
+    if (placementRef.current !== 'home') {
+      pipRef.current?.focus();
+      setFolded(false);
+      return;
+    }
 
     // THE REQUEST IS THE FIRST THING THIS PRESS DOES, and it is made synchronously: it spends the press's
     // user activation, which nothing awaited ahead of it would still have.
-    const pictureInPicture = documentPictureInPictureApi();
+    const pictureInPicture = host === 'panel' ? null : documentPictureInPictureApi();
     if (!pictureInPicture) {
       changePlacement('panel');
       return;
@@ -275,6 +305,18 @@ export function ChatHostProvider({ children }: { children: ReactNode }) {
     comeHome();
   }, [comeHome]);
 
+  const popOut = useCallback(() => {
+    if (placementRef.current !== 'panel' || openingRef.current || !documentPictureInPictureApi()) return;
+    // The chat goes home first, in this same press and while the panel still stands, so its node is never left in a panel React
+    // is taking down. Then the window is asked for exactly as the door asks; a refusal answers with the panel again.
+    comeHome();
+    open();
+  }, [comeHome, open]);
+
+  const toggleFold = useCallback(() => {
+    if (placementRef.current === 'panel') setFolded((was) => !was);
+  }, []);
+
   // A provider that goes down takes the window with it; one still opening is closed when it arrives.
   useEffect(() => () => {
     if (openingRef.current) openingRef.current.abandoned = true;
@@ -288,19 +330,19 @@ export function ChatHostProvider({ children }: { children: ReactNode }) {
 
   const reportAnchor = anchorStore.set;
 
-  // On screen: floating, or home on the chat tab with no application over the main region. Derived, never
+  // On screen: floating and not folded down to its button, or home on the chat tab with no application over the main region. Derived, never
   // stored — it is the one question the unread rule asks of the placement, the slot and the cover.
-  const onScreen = placement !== 'home' || ((facts?.showing ?? false) && !covered);
+  const onScreen = (placement !== 'home' && !folded) || ((facts?.showing ?? false) && !covered);
   const unread = useUnreadReply({ sessionId: facts?.sessionId ?? null, onScreen });
 
   const value = useMemo<ChatHostValue>(
-    () => ({ placement, pipWindow, unread, open, collapse, reportAnchor, reportCovered: setCovered }),
-    [placement, pipWindow, unread, open, collapse, reportAnchor],
+    () => ({ placement, pipWindow, unread, open, collapse, canPopOut, popOut, folded, toggleFold, reportAnchor, reportCovered: setCovered }),
+    [placement, pipWindow, unread, open, collapse, canPopOut, popOut, folded, toggleFold, reportAnchor],
   );
 
   const mechanics = useMemo<ChatHostMechanics>(
-    () => ({ node, moveTo, subscribeMove, hostWindowValue, setHomeElement, publishFacts, comeHome, anchorStore }),
-    [node, moveTo, subscribeMove, hostWindowValue, setHomeElement, publishFacts, comeHome, anchorStore],
+    () => ({ node, moveTo, subscribeMove, hostWindowValue, setHomeElement, publishFacts, comeHome, anchorStore, buttonPlace, setButtonPlace }),
+    [node, moveTo, subscribeMove, hostWindowValue, setHomeElement, publishFacts, comeHome, anchorStore, buttonPlace],
   );
 
   return (

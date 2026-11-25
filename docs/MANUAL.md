@@ -1230,7 +1230,7 @@ standard asks for and what the ten contexts already in this repo do. The provide
 `ChatHostProvider` → `AppSwitcherProvider` → `AccountsProvider` → `CompanionHost` → `WorkspaceFrame`. The layer and the FAB are mounted by
 `src/modules/project-workspace/WorkspaceFrame.tsx`: it gives its main-region wrapper the `relative`
 the layer needs, renders the layer as that wrapper's last child and the FAB as the container's last child but one (Kaylee's disc, `CompanionFab`, is the last: MAN-9125), after the command
-palette and `ChatHostFloating` (MAN-7478) — outside the main region, so the button floats over an open application
+palette — outside the main region, so the button floats over an open application
 instead of being covered by it. It builds the one `door` (`useChatDoor`), hands it to the FAB and to `ProjectCommandPalette` as `chatDoor={door}` and to the hotkey as `door.toggle`, and reports `useCurrentApplication() !== null` to chat-host's `reportCovered` in a layout effect (MAN-7464).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
@@ -10432,7 +10432,7 @@ The module imports neither app-switcher nor project-workspace. project-workspace
 | placement | the chat is drawn in | host |
 |---|---|---|
 | `home` | the chat tab | `ChatHostSlot`'s home `div` |
-| `panel` | a fixed frame beside the FAB, in the page | `ChatHostPanel` (MAN-7491) |
+| `panel` | a fixed frame in the page, beside the chat's button | `ChatHostPanel` (MAN-7491) |
 | `window` | a Document Picture-in-Picture window | `ChatHostWindow` (MAN-7490) |
 
 - The placement is never stored: every load opens `home`. why: only furniture is remembered (the panel's size, MAN-7491).
@@ -10442,14 +10442,15 @@ The module imports neither app-switcher nor project-workspace. project-workspace
 ## `useChatHost()`
 | member | does |
 |---|---|
-| `placement`, `pipWindow`, `unread` | read |
-| `open()` | floats the chat. MUST run inside the press. Nothing when no chat is mounted, when the chat floats, or while a window is opening |
+| `placement`, `pipWindow`, `unread`, `canPopOut`, `folded` | read |
+| `open(host?)` | floats the chat; `'panel'` skips the window. MUST run inside the press. Nothing when no chat is mounted or while a window is opening; a chat already floating is brought forward (window focused, panel unfolded) |
+| `popOut()`, `toggleFold()` | panel → window; fold the panel down to its button and back — MAN-10247 |
 | `collapse()` | brings the chat home: closes the window (its `pagehide` moves the chat home), or moves the chat home from the panel. While a window is opening it abandons the request: the window is closed the moment it arrives |
 | `reportAnchor(rect \| null)` | the FAB's drawn rect; `null` when there is none |
 | `reportCovered(covered)` | whether an application covers the main region |
 
 `open()`, in order:
-1. `'documentPictureInPicture' in window` → `requestWindow({ width: 420, height: 680 })`, synchronously, first in the press. why: it spends the press's user activation.
+1. Unless `open('panel')`: `'documentPictureInPicture' in window` → `requestWindow({ width: 420, height: 680 })`, synchronously, first in the press. why: it spends the press's user activation.
 2. No API, a refusal, a throw, or a resolve with no window → placement `panel` (unless a `collapse` abandoned the request).
 3. A window that arrives after a `collapse`, after the chat unmounted, or already closed is closed, not adopted.
 
@@ -10518,11 +10519,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostWi
 
 ## MAN-7491 — The chat host — the panel: geometry, stacking, storage
 
-The chat's `panel` placement: a frame beside the FAB, in the page, over an application. Files in `src/modules/chat-host/`: `ChatHostPanel.tsx`, `ChatHostHeader.tsx`, `ChatHostPlaceholder.tsx`, `hooks/useFloatingPanel.ts`, `hooks/usePanelViewport.ts`, `utils/panelGeometry.ts`, `utils/anchorStore.ts`, `utils/chatHostStorage.ts`. Placements and the node: MAN-7489. Per-file rules and probes: MAN-7467, MAN-7478, MAN-7446.
+The chat's `panel` placement: a frame in the page, over every page, beside the chat's button (MAN-10247). Files in `src/modules/chat-host/`: `ChatHostPanel.tsx`, `ChatHostHeader.tsx`, `ChatHostPlaceholder.tsx`, `hooks/useFloatingPanel.ts`, `hooks/usePanelViewport.ts`, `utils/panelGeometry.ts`, `utils/anchorStore.ts`, `utils/chatHostStorage.ts`. Placements and the node: MAN-7489. Per-file rules and probes: MAN-7467, MAN-7478, MAN-7446.
 
 ## Stacking
-- `position: fixed`, at `z-[45]`, rendered by `ChatHostFloating`, which `WorkspaceFrame` places in the shell's fixed container just before the FAB.
-- Above the application layer (z-40). Below the FAB and the radial (60), and below the mobile sidebar drawer (z-50).
+- `position: fixed`, at `z-[45]`, rendered by `ChatHostFloating`, which `WorkspaceFrame` mounts beside `HeldWorkspace`, outside the shell's container.
+- Compared at the root: over every page and everything inside the shell (application layer, mobile sidebar drawer); under the button (46) and under the layer portalled to `body` at 50.
 - Dialogs and menus stay above it: they portal to `body`.
 - Frame: the kit's `Card`, `border-input`, `--shadow-lift`. Parts, top to bottom: `ChatHostHeader`, the body the chat's node is adopted into (`moveTo(body, true)` in a layout effect), the kit's `ResizeGrip`.
 
@@ -10561,10 +10562,10 @@ The chat's `panel` placement: a frame beside the FAB, in the page, over an appli
 ## Storage — `utils/chatHostStorage.ts`
 - `localStorage` key `'chat-host'`, value `{ panel: { width, height } }`. Per browser, never the server.
 - `readPanelSize()` → size or null. `writePanelSize(size)` refuses a non-size. Neither throws; a bad or absent record means the default size.
-- Never stored: the placement, and the panel's position (the FAB answers it).
+- Never stored: the placement. The pair's place (the button's point and the panel's hold on it) is stored under `'chat-host-place'` by `utils/floatingPlaceStorage.ts` (MAN-10247).
 
 ## Header and placeholder
-- `ChatHostHeader({ header, onCollapse })`: one 40 px row. The `header` slot fills it (project-workspace's `FloatingChatHeader`: MAN-7493), then a 32 px collapse button with a 40 px hit area. The panel and the window share it.
+- `ChatHostHeader({ header, onCollapse, onPopOut?, moveHandle? })`: one 40 px row. The `header` slot fills it (project-workspace's `FloatingChatHeader`: MAN-7493), then a 32 px pop-out button (panel only, where the browser has the window) and a 32 px collapse button, each with a 40 px hit area. In the panel the row is the move handle. The panel and the window share it.
 - `ChatHostPlaceholder({ placement, onBringBack })`: the chat tab's stand-in while the chat floats: an `EmptyState` naming the host, and Bring it back. Words: the `chatHost` block of `src/modules/i18n/locales/<lang>/common.json`, all eleven locales.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePanelViewport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/anchorStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chatHostStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/panelGeometry.ts

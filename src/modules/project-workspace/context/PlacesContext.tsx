@@ -144,7 +144,8 @@ export function usePlaces(): PlacesValue {
  *
  * EVERY GO IS A DOOR THE APP ALREADY HAS: a page is `openHome` or `openStation`; a screen is the workspace's view brought forward at
  * the address it held (an application over the workspace stepped back first, as Kaylee's own opens do); a chat is the station's
- * "Open the chat" door (`openChatInWorkspace`), the one her orders use; Settings is the workspace's dialog.
+ * "Open the chat" door (`openChatInWorkspace`), the one her orders use; the last chat is the chat's own host floating it in its panel
+ * (`useChatHost().open`), over whatever page is on screen; Settings is the workspace's dialog.
  *
  * WHAT WAITS AT A PLACE IS MARKED ON IT (`Place.mark`), each figure the one its own screen already reads, so a mark and the screen it
  * leads to never tell two stories: other chats waiting on an answer (the home), Kaylee's draft (the station), the roadmap's asks or its
@@ -206,7 +207,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
   const cerberusNeeds = useCerberusNeeds();
   const { total: inboxWaiting } = useInboxWaiting();
   const { waiting: roadmapWaiting, tone: roadmapTone } = useDispatcherPlans();
-  const { unread: chatUnread } = useChatHost();
+  const { unread: chatUnread, open: floatChat } = useChatHost();
   const awaitingInput = useAwaitingInputSessionIdSet();
   const { picture } = useCompanion();
   const claudeUpdate = useClaudeUpdateLine();
@@ -269,6 +270,17 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     doors.navigate(doors.workspacePath());
   }, [covered, backToWorkspace, setActiveTab, doors]);
   const goChat = useCallback((id: string) => doors.openChatInWorkspace(id), [doors]);
+  // THE LAST CHAT POPS OUT: the chat's own host floats it in its panel over whatever the reader is on, and he stays there. The chat the
+  // workspace holds floats as it is. Another one is the route's to bring first (the view stays the one on screen), which a page over
+  // the workspace would be left by: there, and where the workspace holds no chat to float, the chat is gone to instead.
+  const popChat = useCallback((id: string) => {
+    if (sessionId === null || (id !== sessionId && (stationShowing || homeShowing))) {
+      doors.openChatInWorkspace(id);
+      return;
+    }
+    if (id !== sessionId) doors.navigate(`/session/${id}`);
+    floatChat('panel');
+  }, [sessionId, stationShowing, homeShowing, doors, floatChat]);
   const { toggleSwitcher } = useAccountsContext();
   // The wheel has no button to stand beside: the switcher opens from the middle of the window.
   const openAccounts = useCallback(() => {
@@ -305,7 +317,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         here: where === 'chat',
         keywords: 'last chat conversation session',
         mark: marks.chat ?? null,
-        go: () => goChat(lastChatId),
+        go: () => popChat(lastChatId),
       }]),
       ...pick('rnd'),
       ...pick('cerberus'),
@@ -323,7 +335,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         mark: marks.settings ?? null, go: () => openSettings(settingsTab ?? undefined),
       },
     ];
-  }, [stationShowing, homeShowing, activeTab, lastChatId, lastChatTitle, sessionId, views, homeName, stationName, marks, settingsTab, t, goHome, goStation, goScreen, goChat, openSettings, openAccounts]);
+  }, [stationShowing, homeShowing, activeTab, lastChatId, lastChatTitle, sessionId, views, homeName, stationName, marks, settingsTab, t, goHome, goStation, goScreen, popChat, openSettings, openAccounts]);
 
   const waiting = useMemo(
     () => places.filter((place) => place.mark !== null && !place.here && !(place.id === 'settings' && settingsQuiet)),

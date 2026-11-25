@@ -66,10 +66,11 @@ const BODY_CLEARANCE: Record<PanelPlacement['grip'], string> = {
  * panel over a dark application still has an edge, and the scale's lift rung, `shadow-lift` (`--shadow-lift`, the
  * rung between a menu and a modal), so it reads as an object standing over the application and not as a pane of it.
  *
- * `z-[45]` is set against the shell's stacking context: above the application layer (z-40) so the panel is
- * never covered by the app it floats over, below the FAB (60) so the reader's way out is always on top of it,
- * and below the mobile sidebar drawer (z-50), which still slides in over everything. Dialogs and menus stay
- * above it because they portal to `body`.
+ * `z-[45]` is compared at the ROOT: ChatHostFloating is mounted beside the shell, not in it, so the panel
+ * stands over every page of the app (the shell whole, with its application layer and anything else inside it, the
+ * sessions home, the station) and under the layer that portals to `body` at z-50: dialogs, menus, the command
+ * palette. Its button stands one step above it (46, `ChatHostFab`), so the way to fold the chat is never under
+ * the panel, and under that same layer, so nothing of the floating chat is pressed through a modal.
  *
  * THE BODY is a column that takes what the header leaves (`min-h-0`, so a tall transcript scrolls inside it and
  * never pushes the frame; on a phone, a grip in a bottom corner gets its own 20px band under the composer). It

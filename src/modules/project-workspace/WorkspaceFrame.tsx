@@ -43,16 +43,18 @@ function HeldWorkspace({ children }: { children: ReactNode }) {
 /**
  * Rendered by ProjectWorkspaceShell inside its providers (the chat's host, the application switcher and Kaylee's picture): the fixed container that lays out the sidebar, main region and global overlays, where the pieces that read those providers are wired together.
  *
- * NOTHING FLOATS OVER THE PAGE. The applications' floating button and Kaylee's are gone from this app: the applications' acts are
+ * ONE THING FLOATS OVER THE PAGE: THE CHAT. The applications' floating button and Kaylee's are gone from this app: the applications' acts are
  * the sessions home's menu's and the command palette's, the list of applications (`AppSwitcherDrawer`) is mounted here so it can
  * open with no application up, and Kaylee is at the station (her panel is still the rail's door's and the palette's). The floating
- * chat is mounted here too, above the application layer; with no button to stand beside it rests in its own corner. The chat's
- * door (`useChatDoor`) is built once here and pressed from two places: the hotkey, wherever the reader's keys land (this tab or
- * the chat's picture-in-picture window), and the command palette's Applications group.
+ * chat (`ChatHostFloating`: its panel, and the button that is the chat's own core) is mounted here beside the frame, not inside it.
+ * The chat's door (`useChatDoor`) is built once here and pressed from two places: the hotkey, wherever the reader's keys land (this tab or
+ * the chat's picture-in-picture window), and the command palette's Applications group. The Places menu's "last chat" floats it too.
  *
- * THE FRAME IS HELD WHILE THE STATION OR THE SESSIONS HOME IS THE PAGE ON SCREEN (`HeldWorkspace`): it stays mounted with everything it keeps, and nothing of it, her button and
- * her panel included, is seen, focused or pressed. The chat under it is out of sight, which `CoverReporter` tells the chat's host, and the hotkey of the chat's
- * door stands down: it opens the chat of a page that is on screen.
+ * THE FRAME IS HELD WHILE THE STATION OR THE SESSIONS HOME IS THE PAGE ON SCREEN (`HeldWorkspace`): it stays mounted with everything it keeps, and nothing of it, her
+ * panel included, is seen, focused or pressed. The chat's tab under it is out of sight, which `CoverReporter` tells the chat's host. THE FLOATING CHAT STANDS
+ * OUTSIDE THAT HOLD: once floated it stays up over every page of the app, the station and the home included, until the reader sends it home. The hotkey of the
+ * chat's door stands down while one of those pages is on screen and the chat is home (it opens the chat of a page that is on screen), and still sends home a chat
+ * that floats there.
  */
 export default function WorkspaceFrame({
   isMobile,
@@ -64,39 +66,41 @@ export default function WorkspaceFrame({
   const { pipWindow } = useChatHost();
   const doors = useStationDoors();
   const toggleChatWhileOnScreen = useCallback(() => {
-    if (!doors.showing() && !doors.homeShowing()) door.toggle();
+    if (door.floating || (!doors.showing() && !doors.homeShowing())) door.toggle();
   }, [door, doors]);
   useChatHotkey(toggleChatWhileOnScreen, pipWindow);
 
   return (
-    <HeldWorkspace>
-      <CoverReporter />
-      {/* `pwa-status-clear` is the frame's opt-in to the status-bar offset in a standalone PWA
-          (see src/index.css): this shell and the drawer it holds are the only layers whose
-          persistent chrome has to clear the iOS status bar. Overlays must NOT take it — they
-          cover the whole screen and pad their own content. */}
-      <div
-        className="pwa-status-clear fixed inset-0 flex bg-background"
-        style={{ bottom: 'var(--keyboard-height, 0px)' }}
-      >
-        <ProjectEffects navigate={navigate} />
-        <ProjectSidebarRegion isMobile={isMobile} />
+    <>
+      <HeldWorkspace>
+        <CoverReporter />
+        {/* `pwa-status-clear` is the frame's opt-in to the status-bar offset in a standalone PWA
+            (see src/index.css): this shell and the drawer it holds are the only layers whose
+            persistent chrome has to clear the iOS status bar. Overlays must NOT take it — they
+            cover the whole screen and pad their own content. */}
+        <div
+          className="pwa-status-clear fixed inset-0 flex bg-background"
+          style={{ bottom: 'var(--keyboard-height, 0px)' }}
+        >
+          <ProjectEffects navigate={navigate} />
+          <ProjectSidebarRegion isMobile={isMobile} />
 
-        <div className="relative flex min-w-0 flex-1 flex-col">
-          <ProjectMainRegion
-            isMobile={isMobile}
-            ws={ws}
-            sendMessage={sendMessage}
-            navigate={navigate}
-          />
-          <AppSwitcherLayer />
+          <div className="relative flex min-w-0 flex-1 flex-col">
+            <ProjectMainRegion
+              isMobile={isMobile}
+              ws={ws}
+              sendMessage={sendMessage}
+              navigate={navigate}
+            />
+            <AppSwitcherLayer />
+          </div>
+
+          <ProjectCommandPalette chatDoor={door} />
+          <CompanionPanel />
+          <AppSwitcherDrawer />
         </div>
-
-        <ProjectCommandPalette chatDoor={door} />
-        <ChatHostFloating header={<FloatingChatHeader />} />
-        <CompanionPanel />
-        <AppSwitcherDrawer />
-      </div>
-    </HeldWorkspace>
+      </HeldWorkspace>
+      <ChatHostFloating header={<FloatingChatHeader />} />
+    </>
   );
 }
