@@ -81,6 +81,9 @@ const DIAL_OUTER_R = 44;
 /** How far round its ring the place on screen is lit on the dial either side of its bearing, in degrees: about a sector's width. */
 const DIAL_HERE_HALF = { inner: 20, outer: 12 } as const;
 
+/** How long after the wheel comes up a click is still the opening touch's own, not a choice. */
+const OPENING_CLICK_MS = 350;
+
 /**
  * THE WHEEL, FOLDED: the menu's face (`PlacesMenu`), the wheel itself drawn small, so the press says three things before it is
  * pressed. Its two rings, with a tick for every place at the bearing it has on the wheel; the place on screen lit along its ring; and
@@ -209,6 +212,12 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
   const [holding, setHolding] = useState(held !== null);
   // Whether a place has been chosen: a release and the click after it are one choice, never two goes.
   const chosenRef = useRef(false);
+  // When it came up, and whether a point is still on the press that brought it up: that press opens the wheel and never chooses from it.
+  const openedAtRef = useRef(performance.now());
+  const onOpeningPress = useCallback(
+    (x: number, y: number) => from !== null && Math.max(Math.abs(x - from.x), Math.abs(y - from.y)) <= from.size / 2 + 8,
+    [from],
+  );
 
   const choose = useCallback((place: Place) => {
     if (chosenRef.current) return;
@@ -221,6 +230,12 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
     onClose(false);
     place.go();
   }, [onClose]);
+
+  // A press on a place. The click a touch sends after its own release lands on whatever unfolded there, so one inside the first moments is not a choice.
+  const chooseByClick = useCallback((place: Place) => {
+    if (performance.now() - openedAtRef.current < OPENING_CLICK_MS) return;
+    choose(place);
+  }, [choose]);
 
   // The focus comes into it, so its keys are heard here and a reader of the screen is told what opened.
   useEffect(() => {
@@ -236,6 +251,8 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
     const onUp = (event: PointerEvent) => {
       if (event.pointerId !== held) return;
       setHolding(false);
+      // Let go where it was pressed: a tap, which opens the wheel and goes nowhere, whatever has unfolded under the finger.
+      if (onOpeningPress(event.clientX, event.clientY)) return;
       const id = placeAt(event.clientX, event.clientY);
       const place = places.find((each) => each.id === id);
       if (place !== undefined) choose(place);
@@ -251,7 +268,7 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
       document.removeEventListener('pointerup', onUp, true);
       document.removeEventListener('pointercancel', onCancel, true);
     };
-  }, [holding, held, places, choose]);
+  }, [holding, held, places, choose, onOpeningPress]);
 
   // ITS KEYS, on the window's capture ahead of the page's own: Escape, the inner ring's numbers, the arrows round, Tab kept inside.
   useEffect(() => {
@@ -346,7 +363,7 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
               data-over={over === place.id ? 'true' : 'false'}
               d={sectorPath(cx, cy, ring.r0, ring.r1, mid - ring.half + GAP, mid + ring.half - GAP)}
               style={{ '--i': index, transformOrigin: `${cx}px ${cy}px` } as CSSProperties}
-              onClick={() => choose(place)}
+              onClick={() => chooseByClick(place)}
             />
           );
         })}
@@ -377,7 +394,7 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
               className="places-wheel-name"
               style={{ left: x, top: y, '--i': index } as CSSProperties}
               onFocus={() => setOver(place.id)}
-              onClick={() => choose(place)}
+              onClick={() => chooseByClick(place)}
             >
               <span className="places-wheel-glyph-box">
                 <Icon className="places-wheel-glyph" strokeWidth={inner ? 1.4 : 1.5} aria-hidden="true" />
@@ -431,6 +448,8 @@ export function PlacesWheel({ places, acts, from, held, leaving, onClose }: Plac
                 aria-label={act.label}
                 title={act.label}
                 onClick={() => {
+                  // The opening touch's own click is not a press on an act.
+                  if (performance.now() - openedAtRef.current < OPENING_CLICK_MS) return;
                   onClose(false);
                   act.run();
                 }}
