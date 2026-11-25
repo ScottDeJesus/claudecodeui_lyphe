@@ -108,14 +108,14 @@ type LaneForwardedRoute = LaneRowBase & {
 type LaneStreamRoute = LaneRowBase & { method: 'get'; expect: 'stream'; body: 'none' };
 
 /**
- * One row of a lane's allowlist. Consumers: the `affected-areas`, `carrier-bulletins`, `scheduling-report` and
+ * One row of a lane's allowlist. Consumers: the `affected-areas`, `carrier-bulletins`, `gemini-usage`, `scheduling-report` and
  * `upload-runs` routes, each of which declares its whole contract as a list of these.
  */
 export type LaneRoute = LaneForwardedRoute | LaneStreamRoute;
 
 /**
  * What a lane's routes file hands `createLaneRouter`. Consumers: `affected-areas.routes.ts`,
- * `carrier-bulletins.routes.ts`, `scheduling-report.routes.ts` and `upload-runs.routes.ts`.
+ * `carrier-bulletins.routes.ts`, `gemini-usage.routes.ts`, `scheduling-report.routes.ts` and `upload-runs.routes.ts`.
  */
 export type LaneRouterDefinition = {
   /** The lane's name in its own 404 sentence: `not a route of the <lane> lane`. */

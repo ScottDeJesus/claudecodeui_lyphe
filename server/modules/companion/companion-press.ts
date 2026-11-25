@@ -44,7 +44,7 @@ import { readCompanionSettings } from './companion-settings.js';
  *
  * A hearing that is refused or fails does not wake her. Nothing is pushed; a system line "I could not hear that: <sentence>"
  * goes into her log, and the press answers an `AppError` carrying that sentence — 409 `COMPANION_SPEECH_REFUSED` for
- * `no_key` and `refused`, 502 `COMPANION_SPEECH_FAILED` for `failed`. The sentence names both transcribers once the home
+ * `off`, `no_key` and `refused`, 502 `COMPANION_SPEECH_FAILED` for `failed`. The sentence names both transcribers once the home
  * server was tried and holds no key. A clip Gemini heard because the home server could not is heard like any other, and its
  * line in her log is followed by a system line saying so ("Home server didn't answer; Gemini transcribed this"), so he knows
  * the box is down. A transcript past `MESSAGE_TEXT_MAX` characters, the limit of a typed line, is refused the same way (400

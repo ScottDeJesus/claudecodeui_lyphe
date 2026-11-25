@@ -452,9 +452,113 @@
   "api": {
     "subtabs": {
       "jev": "Jev",
-      "deepseek": "DeepSeek"
+      "deepseek": "DeepSeek",
+      "gemini": "Gemini"
     },
-    "subtabsLabel": "API services"
+    "subtabsLabel": "API services",
+    "gemini": {
+      "title": "Gemini spend",
+      "reading": "Reading what Gemini cost…",
+      "unknown": "not known",
+      "window": {
+        "label": "Window",
+        "today": "Today",
+        "7d": "7 days",
+        "30d": "30 days"
+      },
+      "total": {
+        "label": {
+          "today": "Gemini spend · today",
+          "7d": "Gemini spend · last 7 days",
+          "30d": "Gemini spend · last 30 days"
+        },
+        "missing": {
+          "connector": "CloudCLI only: the connector did not answer",
+          "meter": "Without CloudCLI: its meter did not answer"
+        },
+        "features": "Features",
+        "budgets": "Builds and sessions",
+        "cloudcli": "CloudCLI",
+        "noAnswer": "No answer",
+        "readAt": "Read {{when}}",
+        "unmeasured": "{{calls}} were answered without Google's own usage, so their dollars are missing from these figures.",
+        "unpriced": "No list price is held for {{models}}, so its calls add no dollars."
+      },
+      "days": {
+        "title": "By day",
+        "plotConnector": "Estimated spend per UTC day, features above the rule and builds and sessions below it, {{days}} days",
+        "plotMeter": "Estimated CloudCLI spend per UTC day, {{days}} days",
+        "features": "Features",
+        "cloudcli": "CloudCLI",
+        "budgets": "Builds and sessions",
+        "peak": "Tallest bar: {{usd}} in a UTC day",
+        "peakOwn": "Its own scale. Tallest bar: {{usd}} in a UTC day",
+        "barTitle": "{{date}} · {{parts}}",
+        "part": {
+          "features": "features {{usd}}",
+          "cloudcli": "CloudCLI {{usd}}",
+          "budgets": "builds and sessions {{usd}}"
+        },
+        "quiet": "No Gemini call was counted in this window.",
+        "byDay": "Each day's figures",
+        "tableLabel": "Estimated Gemini spend by day",
+        "columns": {
+          "day": "Day",
+          "features": "Features",
+          "cloudcli": "CloudCLI",
+          "budgets": "Builds"
+        },
+        "tableNote": "Days are UTC, and Builds is builds and sessions. Days with no spend are left out."
+      },
+      "projects": {
+        "restorly": "Restorly",
+        "shadowconnector": "shadow-connector",
+        "cloudcli": "CloudCLI",
+        "connector": "Restorly and shadow-connector",
+        "masterOff": "Restorly AI is off",
+        "masterOffNote": "Restorly's own AI switch reads off, so none of these asks Gemini, whatever its switch here says.",
+        "empty": "No feature is listed here yet"
+      },
+      "row": {
+        "call": "{{calls}} call",
+        "calls": "{{calls}} calls",
+        "tokens": "{{tokens}} tokens",
+        "noCalls": "No calls",
+        "off": "Off",
+        "unmeasured": "{{calls}} unmeasured",
+        "unpriced": "Unpriced",
+        "switch": "Gemini for {{label}}"
+      },
+      "budgets": {
+        "title": "Builds and sessions",
+        "empty": "No build or session spent Gemini in this window.",
+        "hint": "Plans, chains and chats. Each is stopped by its own cap, so none has a switch here."
+      },
+      "keys": {
+        "title": "By key and by process",
+        "keys": "Keys",
+        "processes": "Processes of the connector",
+        "tail": "…{{tail}}",
+        "heldAs": "held as {{names}}",
+        "noHolder": "no holder named",
+        "holder": {
+          "house": "the CloudCLI house key",
+          "account": "the CloudCLI account key"
+        },
+        "notCounted": "Held, not counted in this window",
+        "what": "A key whose usage at Google is above its count here is being spent where no wire sees it.",
+        "empty": "No key is held or counted yet.",
+        "noProcesses": "No process of the connector asked Gemini in this window."
+      },
+      "doorDown": {
+        "connector": "The connector did not answer, so Restorly, shadow-connector, builds and processes are missing here.",
+        "meter": "The CloudCLI meter did not answer, so its features and its key's count are missing here.",
+        "both": "Gemini spend is not answering",
+        "retry": "Try again"
+      },
+      "pressFailed": "{{label}} was not switched: {{sentence}}",
+      "pressDismiss": "Dismiss"
+    }
   },
   "rnd": {
     "mark": "{{count}} new or proved",

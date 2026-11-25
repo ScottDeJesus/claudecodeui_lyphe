@@ -1,7 +1,7 @@
 import type { TranscribeAnswer, VoiceAudioUpload } from '@/shared/types.js';
 
 import { describeFetchFailure, googleMessage, isRetryableStatus, namesTheKey, parseJsonObject, redactKey } from './gemini-errors.js';
-import { resolveGeminiKey } from './gemini-key.js';
+import { askGemini, type GeminiAsk } from './gemini-wire.js';
 import { cleanTranscript } from './transcript-cleanup.js';
 import { geminiVocabularyBlock } from './vocabulary-hints.js';
 import { readVocabulary } from './vocabulary.js';
@@ -10,6 +10,7 @@ import { readVoiceSettings } from './voice-settings.js';
 const GEMINI_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const CALL_TIMEOUT_MS = 60_000;
 const RETRY_DELAY_MS = 2_000;
+const NO_KEY_SENTENCE = 'No Gemini key: set one in Settings → Voice';
 
 /**
  * What the model is told to answer for a clip with no words. "Output nothing" is an answer a model hardly ever gives: asked to
@@ -48,8 +49,15 @@ type GeminiReply = {
   error?: { message?: unknown; status?: unknown; details?: unknown };
 };
 
-/** One attempt's outcome, before it becomes a TranscribeAnswer: the status and body text, or why no answer came. */
-type Attempt = { kind: 'answer'; status: number; bodyText: string } | { kind: 'unreachable'; why: string };
+/**
+ * One attempt's outcome, before it becomes a TranscribeAnswer: the status and body text with the redaction for its sentences, a
+ * refusal of the wire before anything was sent (`off`, `no_key`), or why no answer came.
+ */
+type Attempt =
+  | { kind: 'answer'; status: number; bodyText: string; redact: (sentence: string) => string }
+  | { kind: 'off'; sentence: string }
+  | { kind: 'no_key' }
+  | { kind: 'unreachable'; why: string };
 
 /** Gemini's audio guide accepts the recorder's own containers inline; the MIME is mapped by base type. */
 function geminiMimeType(mimeType: string): string {
@@ -58,16 +66,12 @@ function geminiMimeType(mimeType: string): string {
   return baseType === 'audio/mp4' ? 'audio/m4a' : baseType;
 }
 
-async function postOnce(url: string, key: string, body: string): Promise<Attempt> {
+/** One ask through the wire (`askGemini`), which counts it: each attempt is its own counted call. */
+async function postOnce(ask: Omit<GeminiAsk, 'signal'>): Promise<Attempt> {
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      // The key rides this header and nowhere else: never the URL, a log line or an error sentence.
-      headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
-      body,
-      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-    });
-    return { kind: 'answer', status: response.status, bodyText: await response.text() };
+    const sent = await askGemini({ ...ask, signal: AbortSignal.timeout(CALL_TIMEOUT_MS) });
+    if (sent.kind !== 'answer') return sent;
+    return { kind: 'answer', status: sent.response.status, bodyText: await sent.response.text(), redact: sent.redact };
   } catch (error) {
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       return { kind: 'unreachable', why: `no answer within ${CALL_TIMEOUT_MS / 1000} s` };
@@ -77,11 +81,11 @@ async function postOnce(url: string, key: string, body: string): Promise<Attempt
 }
 
 /** The ask, retried once after two seconds when Gemini says it is busy (429) or unavailable (503). */
-async function postWithRetry(url: string, key: string, body: string): Promise<Attempt> {
-  const first = await postOnce(url, key, body);
+async function postWithRetry(ask: Omit<GeminiAsk, 'signal'>): Promise<Attempt> {
+  const first = await postOnce(ask);
   if (first.kind !== 'answer' || !isRetryableStatus(first.status)) return first;
   await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-  return postOnce(url, key, body);
+  return postOnce(ask);
 }
 
 /** Candidate 0's text, trimmed: a success even when empty (nothing said, or only a note saying so). Otherwise the sentence for a reply that holds no text. */
@@ -104,23 +108,27 @@ function readTranscript(reply: GeminiReply | null): { text: string } | { why: st
   return { why: `the answer held no text (finish reason ${String(candidate.finishReason ?? 'missing')})` };
 }
 
-function answerFrom(attempt: Attempt, key: string): TranscribeAnswer {
+function answerFrom(attempt: Attempt): TranscribeAnswer {
+  if (attempt.kind === 'off') return { ok: false, reason: 'off', sentence: attempt.sentence };
+  if (attempt.kind === 'no_key') return { ok: false, reason: 'no_key', sentence: NO_KEY_SENTENCE };
   if (attempt.kind === 'unreachable') {
-    return { ok: false, reason: 'failed', sentence: redactKey(`Gemini could not transcribe this: ${attempt.why}`, key) };
+    // No answer came, so the wire handed back no redaction bound to the key: the shape rule alone guards this sentence.
+    return { ok: false, reason: 'failed', sentence: redactKey(`Gemini could not transcribe this: ${attempt.why}`) };
   }
 
+  const { redact } = attempt;
   const reply = parseJsonObject<GeminiReply>(attempt.bodyText);
   if (attempt.status < 200 || attempt.status >= 300) {
     const message = googleMessage(attempt.status, reply, attempt.bodyText);
     return namesTheKey(attempt.status, reply, attempt.bodyText)
-      ? { ok: false, reason: 'refused', sentence: redactKey(`Gemini refused the key: ${message}`, key) }
-      : { ok: false, reason: 'failed', sentence: redactKey(`Gemini could not transcribe this: HTTP ${attempt.status}: ${message}`, key) };
+      ? { ok: false, reason: 'refused', sentence: redact(`Gemini refused the key: ${message}`) }
+      : { ok: false, reason: 'failed', sentence: redact(`Gemini could not transcribe this: HTTP ${attempt.status}: ${message}`) };
   }
 
   const transcript = readTranscript(reply);
   return 'text' in transcript
     ? { ok: true, text: transcript.text }
-    : { ok: false, reason: 'failed', sentence: redactKey(`Gemini could not transcribe this: ${transcript.why}`, key) };
+    : { ok: false, reason: 'failed', sentence: redact(`Gemini could not transcribe this: ${transcript.why}`) };
 }
 
 /**
@@ -132,8 +140,9 @@ function answerFrom(attempt: Attempt, key: string): TranscribeAnswer {
  * empties a lone "Um."), after the no-speech reading; off, the model is told to keep them and they are left in. The account's
  * vocabulary works at both ends whichever way that switch is set: the model is told how the house words are spelled and sound,
  * and the text that comes back has each misheard form replaced by its spelling. It never throws for an expected
- * failure; it answers `no_key` (no request made), `refused` (Google refused the key) or `failed` as a sentence
- * ready to show. NOT COUNTED against any Gemini budget (the operator's ruling): no admit before, no record after.
+ * failure; it answers `off` (the account switched backup transcription off; no request made), `no_key` (no request made),
+ * `refused` (Google refused the key) or `failed` as a sentence ready to show. Never admitted, capped or named to a Gemini
+ * budget (the operator's ruling); every attempt goes through the wire (`askGemini`), counted as `backup_transcription`.
  * One log line per call, never the key.
  * Consumed by `speech-transcriber.ts`, the one try-then-backup transcriber that the chat mic and the companion's press both go through.
  */
@@ -141,26 +150,21 @@ export async function transcribeWithGemini(userId: number, audio: VoiceAudioUplo
   const startedAt = Date.now();
   const { gemini: { transcriptionModel: model }, cleanTranscripts } = readVoiceSettings(userId);
   const vocabulary = readVocabulary(userId);
-  const key = resolveGeminiKey(userId);
+  const body = JSON.stringify({
+    contents: [{
+      role: 'user',
+      parts: [
+        { text: TRANSCRIPTION_INSTRUCTION[cleanTranscripts ? 'clean' : 'verbatim'] + geminiVocabularyBlock(vocabulary) },
+        { inline_data: { mime_type: geminiMimeType(audio.mimeType), data: audio.bytes.toString('base64') } },
+      ],
+    }],
+    generationConfig: { temperature: 0 },
+  });
+  const url = `${GEMINI_MODELS_URL}/${encodeURIComponent(model)}:generateContent`;
 
-  let answer: TranscribeAnswer;
-  if (!key) {
-    answer = { ok: false, reason: 'no_key', sentence: 'No Gemini key: set one in Settings → Voice' };
-  } else {
-    const body = JSON.stringify({
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: TRANSCRIPTION_INSTRUCTION[cleanTranscripts ? 'clean' : 'verbatim'] + geminiVocabularyBlock(vocabulary) },
-          { inline_data: { mime_type: geminiMimeType(audio.mimeType), data: audio.bytes.toString('base64') } },
-        ],
-      }],
-      generationConfig: { temperature: 0 },
-    });
-    answer = answerFrom(await postWithRetry(`${GEMINI_MODELS_URL}/${encodeURIComponent(model)}:generateContent`, key, body), key);
-    // After the no-speech reading (`readTranscript` has already turned `[no speech]` into ''), and the only place a Gemini transcript is cleaned and corrected: whatever stands in for the home server comes through here (the home server's text is cleaned by the box itself, and `speech-transcriber.ts` applies the account's corrections to it), and Kaylee's name cut (`companion-press.ts`) reads what the transcriber answers.
-    if (answer.ok) answer = { ok: true, text: cleanTranscript(answer.text, { removeFillers: cleanTranscripts, vocabulary }) };
-  }
+  let answer = answerFrom(await postWithRetry({ userId, feature: 'backup_transcription', model, url, body }));
+  // After the no-speech reading (`readTranscript` has already turned `[no speech]` into ''), and the only place a Gemini transcript is cleaned and corrected: whatever stands in for the home server comes through here (the home server's text is cleaned by the box itself, and `speech-transcriber.ts` applies the account's corrections to it), and Kaylee's name cut (`companion-press.ts`) reads what the transcriber answers.
+  if (answer.ok) answer = { ok: true, text: cleanTranscript(answer.text, { removeFillers: cleanTranscripts, vocabulary }) };
 
   const outcome = answer.ok ? 'ok' : answer.reason;
   console.log(`[voice] gemini transcribe ${model} ${audio.bytes.length} B ${Date.now() - startedAt} ms → ${outcome}`);

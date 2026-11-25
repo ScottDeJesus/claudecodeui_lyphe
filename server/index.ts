@@ -52,7 +52,7 @@ import {
     stopAllPlugins,
 } from './modules/plugins/index.js';
 import providerRoutes from './modules/providers/provider.routes.js';
-import { voiceRoutes } from './modules/voice/index.js';
+import { heldGeminiKeys, voiceRoutes } from './modules/voice/index.js';
 import {
     closeScheduledMessageDispatcher,
     initializeScheduledMessageDispatcher,
@@ -75,6 +75,8 @@ import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory
 import { createFollowupsModule } from './modules/followups/index.js';
 import { createSessionPanelModule } from './modules/session-panel/index.js';
 import { createNotesModule } from './modules/notes/index.js';
+import { createGeminiMeterModule } from './modules/gemini-meter/index.js';
+import { createGeminiUsageModule } from './modules/gemini-usage/index.js';
 import { createCerberusModule } from './modules/cerberus/index.js';
 import { createCompanionModule } from './modules/companion/index.js';
 import { createChatNamer } from './modules/chat-names/index.js';
@@ -439,6 +441,12 @@ app.use('/api/affected-areas', authenticateToken, affectedAreas.router);
 const carrierBulletins = createCarrierBulletinsModule();
 app.use('/api/carrier-bulletins', authenticateToken, carrierBulletins.router);
 
+// Gemini usage — shadow-connector's `/api/gemini-usage`, what Gemini cost the account by feature, budget, key and
+// process, and the switch per feature, forwarded over loopback (protected). The same one hop as the Tours lane, for the
+// same reason: that surface is internal-caller gated and the browser never holds the secret. Two rows: the read and the switch.
+const geminiUsage = createGeminiUsageModule();
+app.use('/api/gemini-usage', authenticateToken, geminiUsage.router);
+
 // Upload runs — shadow-connector's `/api/upload-agent-runs`, what each upload run did and the feed that tells
 // of it as it happens, forwarded over loopback (protected). The same one hop as the two lanes above, for the
 // same reason: that surface is internal-caller gated (R-CAP-11) and the browser never holds the secret.
@@ -586,6 +594,11 @@ app.use('/api/schedules', authenticateToken, createSchedulesModule());
 app.use('/api/agent', agentRoutes);
 
 app.use('/api/voice', authenticateToken, voiceRoutes);
+
+// CloudCLI's own Gemini meter (protected): the signed-in account's spend on Google over a window and its switch per
+// feature. The voice module hands in the keys an account holds, by digest and tail only.
+const geminiMeter = createGeminiMeterModule({ heldKeysOf: heldGeminiKeys });
+app.use('/api/gemini-meter', authenticateToken, geminiMeter.router);
 
 // EVERY `/api` MOUNT IS ABOVE THIS LINE, so a request that reaches it named no lane at all: a route
 // that has gone, or one that never existed. The SPA fallback at the bottom of this file would answer

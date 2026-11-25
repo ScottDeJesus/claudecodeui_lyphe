@@ -1172,6 +1172,18 @@ export const api = {
       put(`/api/cerberus/checks/${encodeURIComponent(node)}/${encodeURIComponent(service)}/${encodeURIComponent(id)}/auto-diagnosis`, { on }),
   },
 
+  // The Gemini spend view's two doors (src/modules/gemini-spend, MAN-10233): `geminiUsage` is shadow-connector's
+  // /api/gemini-usage through its lane (server/modules/gemini-usage), `geminiMeter` CloudCLI's own meter. Both answer a
+  // bare Response: the view reads each door's status and sentence itself, so one door down never hides the other.
+  geminiUsage: {
+    usage: (range: 'today' | '7d' | '30d') => get(`/api/gemini-usage/usage${query({ range })}`),
+    setSwitch: (feature: string, enabled: boolean) => put(`/api/gemini-usage/switches/${encodeURIComponent(feature)}`, { enabled }),
+  },
+  geminiMeter: {
+    usage: (range: 'today' | '7d' | '30d') => get(`/api/gemini-meter/usage${query({ range })}`),
+    setSwitch: (feature: string, enabled: boolean) => put(`/api/gemini-meter/switches/${encodeURIComponent(feature)}`, { enabled }),
+  },
+
   // The affected-areas lane (the Tours tab; wire shapes in `@/shared/affected-areas-types`): DocuSketch tours,
   // what the reader saw in each pano, and the operator's marks, forwarded to shadow-connector by CloudCLI. Every
   // answer is its wire shape BARE. A failure arrives in one of three bodies, so read `.error` AND `.detail`, never one:

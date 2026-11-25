@@ -1,7 +1,8 @@
+import type { GeminiFeature } from '@/modules/gemini-meter/index.js';
 import type { SpeechAnswer, SpeechChunk } from '@/shared/types.js';
 
 import { describeFetchFailure, googleMessage, isRetryableStatus, namesTheKey, parseGoogleError, parseJsonObject, redactKey } from './gemini-errors.js';
-import { resolveGeminiKey } from './gemini-key.js';
+import { askGemini, type GeminiAsk, type GeminiSent } from './gemini-wire.js';
 import { readVocabulary } from './vocabulary.js';
 import { respellForSpeech } from './vocabulary-match.js';
 import { readVoiceSettings } from './voice-settings.js';
@@ -14,11 +15,15 @@ const INTERACTIONS_URL = 'https://generativelanguage.googleapis.com/v1beta/inter
  */
 const CALL_TIMEOUT_MS = 60_000;
 const RETRY_DELAY_MS = 1_000;
+const NO_KEY_SENTENCE = 'No Gemini key: set one in Settings → Voice';
+
+/** The features that speak through this door: Kaylee's sentences and the chat's read-aloud, each counted and switched as its own. */
+type SpeechFeature = Extract<GeminiFeature, 'companion_speech' | 'read_aloud'>;
 
 /** A sentence whose message is already worded for the person and has passed the key redaction: thrown inside the stream, rethrown as it is. */
 class WordedFailure extends Error {}
 
-type Outcome = 'ok' | 'no_key' | 'refused' | 'failed' | 'aborted';
+type Outcome = 'ok' | 'off' | 'no_key' | 'refused' | 'failed' | 'aborted';
 
 /**
  * One call's life: the request it can cancel, whether the caller or the clock ended it, the bytes it delivered, and the one
@@ -51,8 +56,8 @@ function beginCall(model: string, characters: number, callerSignal: AbortSignal)
     ended = true;
     clearTimeout(timer);
     callerSignal.removeEventListener('abort', onCallerAbort);
-    // Never the key: only the model, the sentence's length and what came of it.
-    console.log(`[voice] gemini speech ${model} ${characters} ch ${bytes} B ${Date.now() - startedAt} ms → ${outcome}`);
+    // Never the key: only the model, the sentence's length and what came of it. A switched-off feature sent nothing and writes no line.
+    if (outcome !== 'off') console.log(`[voice] gemini speech ${model} ${characters} ch ${bytes} B ${Date.now() - startedAt} ms → ${outcome}`);
     // The connection is released whatever state it is in; after a finished stream this is a no-op.
     request.abort();
   };
@@ -101,39 +106,45 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-/** How the ask opened: Google's answer to read, why none came, or that the caller no longer wants one. */
-type Opening = { kind: 'response'; response: Response } | { kind: 'unreachable'; why: string } | { kind: 'aborted' };
+/**
+ * How the ask opened: Google's answer to read with the redaction for its sentences, a refusal of the wire before anything was
+ * sent (`off`, `no_key`), why no answer came, or that the caller no longer wants one.
+ */
+type Opening =
+  | { kind: 'response'; response: Response; redact: (sentence: string) => string }
+  | { kind: 'off'; sentence: string }
+  | { kind: 'no_key' }
+  | { kind: 'unreachable'; why: string }
+  | { kind: 'aborted' };
 
-/** The ask, retried once after one second when Gemini says it is busy (429) or unavailable (503) before it sends a byte of audio. */
-async function openResponse(call: Call, key: string, body: string): Promise<Opening> {
+/**
+ * The ask through the wire (`askGemini`, which counts every attempt as its own call), retried once after one second when Gemini
+ * says it is busy (429) or unavailable (503) before it sends a byte of audio.
+ */
+async function openResponse(call: Call, ask: Omit<GeminiAsk, 'signal'>): Promise<Opening> {
   for (let attempt = 1; ; attempt += 1) {
-    let response: Response;
+    let sent: GeminiSent;
     try {
-      response = await fetch(INTERACTIONS_URL, {
-        method: 'POST',
-        // The key rides this header and nowhere else: never the URL, a log line or an error sentence.
-        headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
-        body,
-        signal: call.signal,
-      });
+      sent = await askGemini({ ...ask, signal: call.signal });
     } catch (error) {
       if (call.callerAborted()) return { kind: 'aborted' };
       return { kind: 'unreachable', why: call.timedOut() ? `no answer within ${CALL_TIMEOUT_MS / 1000} s` : describeFetchFailure(error) };
     }
-    if (attempt === 1 && isRetryableStatus(response.status)) {
-      await response.body?.cancel().catch(() => undefined);
+    if (sent.kind !== 'answer') return sent;
+    if (attempt === 1 && isRetryableStatus(sent.response.status)) {
+      await sent.response.body?.cancel().catch(() => undefined);
       await pause(RETRY_DELAY_MS, call.signal);
       if (call.callerAborted()) return { kind: 'aborted' };
       continue;
     }
-    return { kind: 'response', response };
+    return { kind: 'response', response: sent.response, redact: sent.redact };
   }
 }
 
 type Failure = Extract<SpeechAnswer, { ok: false }>;
 
 /** The answer for a call Google refused or could not take (a non-2xx status), with its body read for Google's own message. `null` when the caller aborted meanwhile. */
-async function refusalFrom(call: Call, response: Response, key: string): Promise<Failure | null> {
+async function refusalFrom(call: Call, response: Response, redact: (sentence: string) => string): Promise<Failure | null> {
   let bodyText = '';
   try {
     bodyText = await response.text();
@@ -144,8 +155,8 @@ async function refusalFrom(call: Call, response: Response, key: string): Promise
   const reply = parseGoogleError(bodyText);
   const message = googleMessage(response.status, reply, bodyText);
   return namesTheKey(response.status, reply, bodyText)
-    ? { ok: false, reason: 'refused', sentence: redactKey(`Gemini refused the key: ${message}`, key) }
-    : { ok: false, reason: 'failed', sentence: redactKey(`Gemini could not speak this: HTTP ${response.status}: ${message}`, key) };
+    ? { ok: false, reason: 'refused', sentence: redact(`Gemini refused the key: ${message}`) }
+    : { ok: false, reason: 'failed', sentence: redact(`Gemini could not speak this: HTTP ${response.status}: ${message}`) };
 }
 
 /** One server-sent event: its name (the `event:` line, else the data's own `event_type` or `type`) and its parsed data. */
@@ -196,7 +207,7 @@ function errorEventMessage(event: StreamEvent): string {
  * Ends quietly when the caller aborts; throws a `WordedFailure` for an `error` event, a stream that closes before
  * `interaction.completed` or holds no audio, and a request that dies. Writes the call's one log line however it ends.
  */
-async function* audioPieces(call: Call, response: Response, key: string): AsyncGenerator<SpeechChunk> {
+async function* audioPieces(call: Call, response: Response, redact: (sentence: string) => string): AsyncGenerator<SpeechChunk> {
   const reader = response.body?.getReader();
   try {
     if (reader === undefined) throw new WordedFailure('Gemini could not speak this: the answer had no body');
@@ -227,8 +238,8 @@ async function* audioPieces(call: Call, response: Response, key: string): AsyncG
     // The caller's own abort is the end it asked for, not a failure; the line was written when it fired.
     if (call.callerAborted()) return;
     call.end('failed');
-    if (error instanceof WordedFailure) throw new WordedFailure(redactKey(error.message, key));
-    throw new WordedFailure(redactKey(`Gemini could not speak this: ${call.timedOut() ? `no answer within ${CALL_TIMEOUT_MS / 1000} s` : describeFetchFailure(error)}`, key));
+    if (error instanceof WordedFailure) throw new WordedFailure(redact(error.message));
+    throw new WordedFailure(redact(`Gemini could not speak this: ${call.timedOut() ? `no answer within ${CALL_TIMEOUT_MS / 1000} s` : describeFetchFailure(error)}`));
   } finally {
     // A consumer that stops early lands here too: the request is cancelled so nothing more is generated.
     call.end('aborted');
@@ -269,16 +280,20 @@ async function* nothing(): AsyncGenerator<SpeechChunk> {}
  * One sentence spoken in the account's voice, through Gemini's Interactions API: the account's key (else the house's), its
  * speech model and its voice, streamed. `signal` ends it: the stream stops at once and the request is cancelled, so nothing
  * more is generated. The answer is given once the FIRST audio has arrived, so a refusal or a failure that comes before any
- * audio is an `ok: false` answer (`no_key`: no request made; `refused`: Google refused the key; `failed`: anything else, as a
+ * audio is an `ok: false` answer (`off`: the account switched the feature off; `no_key`: no key in reach; neither sends a request; `refused`: Google refused the key; `failed`: anything else, as a
  * sentence ready to show), and an `ok: true` answer is already speaking. A failure after audio began makes the iterator
  * throw an Error whose message is the sentence. A 429 or 503 before the first byte is asked again once after a second.
- * NOT COUNTED against any Gemini budget (the operator's ruling, 2026-10-26, "Kaylee doesn't count for the budget"): no
- * admit before, no record after. One log line per call, never the key. The sentence is sent with the account's house words
+ * Never admitted, capped or named to a Gemini budget (the operator's ruling, 2026-10-26, "Kaylee doesn't count for the budget");
+ * every attempt goes through the wire (`askGemini`), which counts it on the account's Gemini meter as `feature`
+ * (`companion_speech` or `read_aloud`). One log line per call, none for `off` (nothing was sent), never the key. The sentence is sent with the account's house words
  * respelled to their pronunciation (`respellForSpeech`).
  * Consumed through the voice barrel by the companion's speech door (`companion-speech.ts`), and inside the module by `gemini-read-aloud.ts`,
  * which speaks the chat's read-aloud through it piece by piece.
  */
-export async function synthesizeSentence(userId: number, input: { text: string; style: string; signal: AbortSignal }): Promise<SpeechAnswer> {
+export async function synthesizeSentence(
+  userId: number,
+  input: { text: string; style: string; signal: AbortSignal; feature: SpeechFeature },
+): Promise<SpeechAnswer> {
   const { speechModel, voice } = readVoiceSettings(userId).gemini;
   const call = beginCall(speechModel, input.text.length, input.signal);
   // An abort before the ask needs no ask: the listener was added too late to see it, so it is answered here.
@@ -287,29 +302,35 @@ export async function synthesizeSentence(userId: number, input: { text: string; 
     return { ok: true, chunks: nothing() };
   }
 
-  const key = resolveGeminiKey(userId);
-  if (!key) {
-    call.end('no_key');
-    return { ok: false, reason: 'no_key', sentence: 'No Gemini key: set one in Settings → Voice' };
-  }
-
   // Gemini TTS has no pronunciation lexicon, so a house word is respelled the way it is said ("lypheCli" → "life C-L-I") in the
   // text it is sent, and only there: the log line above and the words on the person's screen keep the spelling.
   const spokenText = respellForSpeech(input.text, readVocabulary(userId));
-  const opening = await openResponse(call, key, speechRequestBody(speechModel, voice, spokenText, input.style));
+  const body = speechRequestBody(speechModel, voice, spokenText, input.style);
+  const opening = await openResponse(call, { userId, feature: input.feature, model: speechModel, url: INTERACTIONS_URL, body });
   if (opening.kind === 'aborted') return { ok: true, chunks: nothing() };
+  if (opening.kind === 'off') {
+    call.end('off');
+    return { ok: false, reason: 'off', sentence: opening.sentence };
+  }
+  if (opening.kind === 'no_key') {
+    call.end('no_key');
+    return { ok: false, reason: 'no_key', sentence: NO_KEY_SENTENCE };
+  }
   if (opening.kind === 'unreachable') {
     call.end('failed');
-    return { ok: false, reason: 'failed', sentence: redactKey(`Gemini could not speak this: ${opening.why}`, key) };
+    // No answer came, so the wire handed back no redaction bound to the key: the shape rule alone guards this sentence.
+    return { ok: false, reason: 'failed', sentence: redactKey(`Gemini could not speak this: ${opening.why}`) };
   }
-  if (!opening.response.ok) {
-    const refusal = await refusalFrom(call, opening.response, key);
+
+  const { response, redact } = opening;
+  if (!response.ok) {
+    const refusal = await refusalFrom(call, response, redact);
     if (refusal === null) return { ok: true, chunks: nothing() };
     call.end(refusal.reason);
     return refusal;
   }
 
-  const pieces = audioPieces(call, opening.response, key);
+  const pieces = audioPieces(call, response, redact);
   try {
     const first = await pieces.next();
     // Done with no piece is only an abort: a stream that closes with no audio throws.

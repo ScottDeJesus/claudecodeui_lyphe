@@ -14,6 +14,9 @@ type SwitchProps = {
  *
  * The knob moves with `transform`, never `left`: a transformed knob is composited and never
  * reflows the row it sits in.
+ *
+ * Under a finger (a touch screen, or a window under 768 px) the press is 44 px tall around the same 30 px track, and
+ * the row it sits in keeps its height (`verve/controls.css`).
  */
 export function Switch({ checked, onChange, label, disabled = false }: SwitchProps) {
   return (

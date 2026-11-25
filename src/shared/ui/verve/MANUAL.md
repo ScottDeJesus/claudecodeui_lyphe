@@ -666,7 +666,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Readout.tsx, /home
 | prop | meaning |
 |---|---|
 | `days` | `{ day: 'YYYY-MM-DD', values: number[], title: string }[]`, oldest first. `values` holds one number per series, in the order of `series`. `title` is the day's whole reading in the caller's words and becomes the column's `title`. The last day is today's |
-| `series` | one or two of `{ label, tone? }`. `tone` is a `Tone`: the bars and the legend mark read its `--tone-dot`; left off, the accent |
+| `series` | one or two of `{ label, tone?, total? }`. `tone` is a `Tone`: the bars and the legend mark read its `--tone-dot`; left off, the accent. `total` is the series' figure over the window in the caller's words (`$9.45`), for a measure the locale's grouping does not say (money); left off, the legend says the sum of the series' values |
 | `label` | the plot's one spoken sentence (`role="img"`, `aria-label`) |
 | `peakLabel` | `(peak: number) => string`: the words for the scale, given the tallest bar of either series |
 
@@ -675,7 +675,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Readout.tsx, /home
 - Two series: THE SECOND HANGS BELOW THE SAME BASELINE, 64 px a side, both on one scale (the peak is the tallest bar of either). A day is one column at any width; side by side, two bars a day are under 2 px each at 90 days on a 390 px phone. Which series a bar belongs to is its side of the rule as well as its ink, and the legend marks them ▲ and ▼ (one series: ■).
 - A zero day is a 1 px stub on its side of the rule, so a quiet day never reads as a missing one. A window of all zeros is a row of stubs.
 - Every bar is at full strength, on every day, with nothing behind it but the plot's own ground: a faded bar, or one on a tinted column, falls under the 3:1 a drawn shape needs on the light ground. Today is marked by a 2 px rule under its column (`.vv-daybars__day[data-today]::after`, `--ink-muted`), in the gap between the plot and its dates; a pointer's hover draws the same rule in `--border-strong` under the column it is over. The two plots it was lifted from fade every day but today.
-- The legend says each series' total (summed by the piece) and, at its far end, `peakLabel(peak)`.
+- The legend says each series' total (the caller's `total` words, else summed by the piece) and, at its far end, `peakLabel(peak)`. A second caller, the API tab's Gemini view (`src/modules/gemini-spend/GeminiDays.tsx`), gives its totals in dollars.
 - Under the plot: the first and last day as short dates, and the middle day too from 14 days on. Dates are built from the parts of `day`, so the browser's zone never shifts one.
 - From 45 days on the columns stand 1 px apart instead of 4 (`data-dense`).
 
@@ -712,3 +712,19 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DayBars.tsx, /home
 `.ast-excerpt` section of the sheet that also paints Hoop, InstrumentCore, Track, Opening and Rule; selectors `.ast-excerpt-path`, `-body`, `-pre`, `-line`, `-n`. Not a `.vv-*` component: MAN-740's count excludes it.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Excerpt.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/astrolabe.css
+
+## MAN-10234 — `Switch` — the 44 px finger press around the 30 px track (`verve/controls.css`)
+
+`src/shared/ui/Switch.tsx` over `.vv-switch`, `__knob` (`verve/controls.css` §Switch).
+
+## Track and press
+| Input | Press target | Track |
+|---|---|---|
+| fine pointer, window >= 768 px | the 30 px track | the button's own ground |
+| `@media (pointer: coarse), (max-width: 767.98px)` | 44 px tall (`.vv-switch { height: 44px; margin-block: -7px }`) | 30 px, drawn by `.vv-switch::before { inset: 7px 0 }`; the button's own background is `none` |
+
+- The `-7px` margins give the 14 px back: a row holding a Switch keeps its height at both sizes.
+- Checked ground is on the `::before` (`--accent`, else `--border-strong`); `.vv-switch__knob` is `top: 10px` under a finger.
+- The change reaches every `Switch` in the app under a finger. Walked on the Gemini view only.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Switch.tsx

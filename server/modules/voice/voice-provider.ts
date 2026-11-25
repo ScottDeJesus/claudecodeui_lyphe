@@ -15,7 +15,7 @@ import { readVoiceSettings } from './voice-settings.js';
  * account's home server first, Gemini the backup), whatever the account's provider says; the provider no longer chooses who
  * transcribes. A heard clip answers its cleaned `text` and, only when Gemini stood in because the home server could not, a `notice`
  * (the one short line the composer shows where its mic's errors show). A clip neither could hear answers the sentence naming both,
- * with the status the route gives it (`chatStatusForRefusal`): no key and a refused key are 409 (the person can fix both in Settings →
+ * with the status the route gives it (`chatStatusForRefusal`): a switched-off feature, no key and a refused key are 409 (the person can fix each in API → Gemini or Settings →
  * Voice), a failed call is 502.
  *
  * `synthesizeForChat` is read-aloud, and the provider chooses it: on `gemini` the server speaks it (`synthesizeReadAloud`: Kaylee's

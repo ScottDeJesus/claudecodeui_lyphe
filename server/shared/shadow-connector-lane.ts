@@ -115,7 +115,7 @@ export type ShadowConnectorLaneDependencies = {
 };
 
 /**
- * The lane's two verbs. Consumers: the `affected-areas`, `carrier-bulletins` and `upload-runs` modules
+ * The lane's two verbs. Consumers: the `affected-areas`, `carrier-bulletins`, `gemini-usage` and `upload-runs` modules
  * (each builds one) and their routes (each hands the router the verbs its table uses: `forward` for a
  * `json` or `bytes` row, `stream` for a `stream` row).
  */
@@ -155,8 +155,8 @@ function parseSecret(envText: string): string | null {
 }
 
 /**
- * Builds a forwarder. Consumers: `affected-areas.module.ts`, the `carrier-bulletins` module and the
- * `upload-runs` module, so each lane's environment is read in its own module and passed down, and each
+ * Builds a forwarder. Consumers: `affected-areas.module.ts`, the `carrier-bulletins` module, the
+ * `gemini-usage` module and the `upload-runs` module, so each lane's environment is read in its own module and passed down, and each
  * lane holds its own parse of the file and its own last-reported cause (one log line per distinct cause,
  * per lane).
  */

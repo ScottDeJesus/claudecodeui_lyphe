@@ -2254,7 +2254,7 @@ export type HomeServerKeyStatus = { source: 'stored' | 'none'; last4: string | n
  * not hear a clip, or when the account has no home server.
  *
  * `ok: true` carries the trimmed words heard; an empty string is a success (nothing was
- * said). `ok: false` names why and carries a ready sentence for the person: `no_key` (no key
+ * said). `ok: false` names why and carries a ready sentence for the person: `off` (the account switched backup transcription off in API → Gemini; no request was made), `no_key` (no key
  * in reach; no request was made), `refused` (Google refused the key) and `failed` (anything
  * else: another status, a network error or timeout, an answer without text). Every sentence
  * has passed the key-shape redaction. Shared by `gemini-transcribe.ts` (builds it) and
@@ -2262,7 +2262,7 @@ export type HomeServerKeyStatus = { source: 'stored' | 'none'; last4: string | n
  */
 export type TranscribeAnswer =
   | { ok: true; text: string }
-  | { ok: false; reason: 'no_key' | 'refused' | 'failed'; sentence: string };
+  | { ok: false; reason: 'off' | 'no_key' | 'refused' | 'failed'; sentence: string };
 
 /**
  * What hearing one clip came to, from whichever transcriber heard it: the home server first, Gemini the backup.
@@ -2294,14 +2294,15 @@ export type SpeechChunk = Uint8Array;
  * has already arrived when the answer is given, so every failure that comes before any audio is an
  * `ok: false` answer. A failure after audio began makes the iterator throw an Error whose message
  * is a ready sentence, and an abort on the call's signal simply ends it. `ok: false` names why and
- * carries a ready sentence for the person: `no_key` (no key in reach; no request was made),
+ * carries a ready sentence for the person: `off` (the account switched the feature off in API → Gemini; no request was
+ * made), `no_key` (no key in reach; no request was made),
  * `refused` (Google refused the key) and `failed` (anything else). Every sentence has passed the
  * key-shape redaction. Shared by `gemini-speech.ts` (builds it) and the companion's speech route,
  * which reads it through the voice barrel's `SpeechAnswer`.
  */
 export type SpeechAnswer =
   | { ok: true; chunks: AsyncIterable<SpeechChunk> }
-  | { ok: false; reason: 'no_key' | 'refused' | 'failed'; sentence: string };
+  | { ok: false; reason: 'off' | 'no_key' | 'refused' | 'failed'; sentence: string };
 
 // ---------------------------
 //----------------- CLI MODULE CONTRACTS ------------

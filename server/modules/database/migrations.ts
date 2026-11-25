@@ -20,6 +20,7 @@ import {
 } from '@/modules/database/schema.js';
 import { COMPANION_SCHEMA_SQL } from '@/modules/database/companion-schema.js';
 import { FOLLOWUPS_SCHEMA_SQL } from '@/modules/database/followups-schema.js';
+import { GEMINI_METER_SCHEMA_SQL } from '@/modules/database/gemini-meter-schema.js';
 import { SESSION_PANEL_SCHEMA_SQL } from '@/modules/database/session-panel-schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
@@ -989,6 +990,9 @@ export const runMigrations = (db: Database) => {
     // cascade is what removes a deleted chat's items) and `users`, both of which exist by here.
     db.exec(FOLLOWUPS_SCHEMA_SQL);
     addFollowupsClosedForColumn(db);
+    // CloudCLI's own Gemini meter: the count of every request to Google and the switch per feature. Both reference
+    // `users` alone, which exists by here.
+    db.exec(GEMINI_METER_SCHEMA_SQL);
     // The session panel's table: what a chat has put on its panel, a row for each version. It references `sessions`
     // and `users` as the followups table does, for the same cascade.
     db.exec(SESSION_PANEL_SCHEMA_SQL);

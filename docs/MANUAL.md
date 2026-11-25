@@ -405,15 +405,15 @@ section: api-tab/001 What the tab holds
 | --- | --- |
 | Rail entry | `HOUSE_VIEWS` in `src/modules/project-workspace/hooks/useWorkspaceViews.ts` — `{ id: 'api', group: 'house', icon: Coins, … }`, last of the house run |
 | Panel | `src/modules/api-tab/ApiPanel.tsx`, re-exported lazily by `src/modules/api-tab/index.ts`; rendered for `activeTab === 'api'` in `WorkspaceMain.tsx` |
-| Views | `JevPanel` (`@/modules/jev`) and `DeepseekUsagePanel` (`@/modules/deepseek-spend`), each imported through its module's `index.ts` |
+| Views | `JevPanel` (`@/modules/jev`), `DeepseekUsagePanel` (`@/modules/deepseek-spend`) and `GeminiUsagePanel` (`@/modules/gemini-spend`, MAN-10233), each imported through its module's `index.ts` |
 | Command palette | `Go to API`: the `api` entry of `HOUSE_VIEWS` in `src/modules/project-workspace/hooks/useWorkspaceViews.ts`, last of the house run; `ProjectCommandPalette.tsx` turns every view into a Navigate row (MAN-8999) |
 
-- Sub-tab ids are `jev` and `deepseek`; their labels come from the `api.subtabs` map in
-  `src/modules/i18n/locales/en/common.json` — `jev` reads "Jev", `deepseek` reads "DeepSeek".
+- Sub-tab ids are `jev`, `deepseek` and `gemini`; their labels come from the `api.subtabs` map in
+  `src/modules/i18n/locales/en/common.json` — `jev` reads "Jev", `deepseek` reads "DeepSeek", `gemini` reads "Gemini". The Gemini view's words are the `api.gemini` block of the same file. It reads two doors through `src/shared/api.ts`: `api.geminiUsage` (shadow-connector's `/api/gemini-usage`, through the lane `server/modules/gemini-usage`, MAN-10235) and `api.geminiMeter` (CloudCLI's own `/api/gemini-meter`, MAN-10223).
 - `ApiPanel` mounts ONLY the chosen view. Roots: `data-api-panel` on the panel, `data-api-subtab="<id>"`
   on the body.
 - The choice persists in `localStorage['apiSubTab']`, read through `isApiSubTab` — which accepts
-  exactly `jev` and `deepseek`, and answers `jev` for anything else (including a failed read).
+  exactly `jev`, `deepseek` and `gemini`, and answers `jev` for anything else (including a failed read).
 - **The stored-`jev` migration.** `useProjectsState.ts` `readPersistedTab` maps a stored
   `activeTab === 'jev'` to `'api'` before `isValidTab`; `VALID_TABS` holds `'api'` and not `'jev'`.
   This is the ONE alias kept — a browser's old tab id, turned into the new one at read.
