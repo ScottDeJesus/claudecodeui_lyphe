@@ -57,7 +57,23 @@ export type ConnectorUsage = {
   keys: KeyRow[];
   processes: ProcessRow[];
   unpriced_models: string[];
+  /** The callers on the operator's Claude login, counted and never priced; null when the service holds more than one account. */
+  claude_login?: ClaudeLoginUsage | null;
 };
+
+/** One caller on the Claude login (the job stage reader, the bulletin page check, the demo-sheet transcriber) over the window. */
+export type ClaudeLoginSite = {
+  site: string;
+  label: string;
+  calls: number;
+  failures: number;
+  input_tokens: number;
+  output_tokens: number;
+  models: string[];
+  last_at: string | null;
+};
+
+export type ClaudeLoginUsage = { sites: ClaudeLoginSite[] };
 
 /** The body of GET /api/gemini-meter/usage: the signed-in account's rows of CloudCLI's own meter. */
 export type MeterUsage = {

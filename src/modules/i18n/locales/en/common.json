@@ -557,7 +557,12 @@
         "retry": "Try again"
       },
       "pressFailed": "{{label}} was not switched: {{sentence}}",
-      "pressDismiss": "Dismiss"
+      "pressDismiss": "Dismiss",
+      "claudeLogin": {
+        "title": "On the Claude login",
+        "note": "These callers run on the operator's Claude subscription: their calls and tokens are counted here, never priced.",
+        "unpriced": "Counted, not priced"
+      }
     }
   },
   "rnd": {

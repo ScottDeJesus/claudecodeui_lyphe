@@ -8,11 +8,12 @@ import { GeminiDoorDown } from '@/modules/gemini-spend/GeminiDoorDown';
 import { daysOf, keysOf, usdWords } from '@/modules/gemini-spend/geminiFigures';
 import { GeminiKeys } from '@/modules/gemini-spend/GeminiKeys';
 import { GeminiProjectSection } from '@/modules/gemini-spend/GeminiProjectSection';
+import { GeminiRow, GeminiRows } from '@/modules/gemini-spend/GeminiRow';
 import { GeminiTotal } from '@/modules/gemini-spend/GeminiTotal';
 import type { GeminiDoor, GeminiRange } from '@/modules/gemini-spend/types';
 import { useGeminiUsage } from '@/modules/gemini-spend/useGeminiUsage';
 import { SCREEN_FRAME } from '@/shared/constants';
-import { Banner, Button, EmptyState, ScrollArea, SegmentedControl, Spinner } from '@/shared/ui';
+import { Banner, Button, EmptyState, Rule, ScrollArea, SegmentedControl, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 const WINDOWS: GeminiRange[] = ['today', '7d', '30d'];
@@ -146,6 +147,27 @@ export function GeminiUsagePanel() {
                   sentence={t('api.gemini.doorDown.meter') + ' ' + (meterSentence ?? '')}
                   onRetry={onRetry}
                 />
+              )}
+
+              {connector?.claude_login && (
+                <section className="flex min-w-0 flex-col gap-3" aria-labelledby="gemini-claude-login" data-gemini-section="claude-login">
+                  <Rule id="gemini-claude-login" end={t('api.gemini.claudeLogin.unpriced')}>
+                    {t('api.gemini.claudeLogin.title')}
+                  </Rule>
+                  <p className="min-w-0 text-xs text-muted-foreground">{t('api.gemini.claudeLogin.note')}</p>
+                  <GeminiRows>
+                    {connector.claude_login.sites.map((site) => (
+                      <GeminiRow
+                        key={site.site}
+                        name={site.label}
+                        detail={site.models.length > 0 ? site.models.join(', ') : undefined}
+                        calls={site.calls}
+                        tokens={site.input_tokens + site.output_tokens}
+                        costUsd={null}
+                      />
+                    ))}
+                  </GeminiRows>
+                </section>
               )}
 
               {connector && <GeminiBudgets budgets={connector.budgets} figure={usdWords(connector.budgets_usd)} />}

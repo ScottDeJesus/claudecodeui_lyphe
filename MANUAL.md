@@ -17154,6 +17154,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-usag
 - Open: DayBars cannot take a third series or a shared ceiling, so the two plots stand on two scales (ticket 361). On change, `GeminiDays.tsx` is the one place to edit and `api.gemini.days.peakOwn` goes.
 - Open: on a phone the day table's fourth column sits behind the `DataTable` shade, one swipe away.
 
+## The Claude-login group
+
+After the CloudCLI section the panel draws the connector's `claude_login` as one section (`data-gemini-section="claude-login"`) headed "On the Claude login", with "Counted, not priced" at the rule's end and a note that these callers run on the operator's Claude subscription. Each caller is a GeminiRow: its label, the models it ran on as detail, calls and tokens, and a cost of null (a dash, never $0.00). The window control sets the span (Today is one day). It is not drawn when the door answers `claude_login` null or leaves it out.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/GeminiDays.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/geminiFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/GeminiUsagePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/useGeminiUsage.ts
 
 ## MAN-10235 — The gemini-usage lane — /api/gemini-usage forwarded to shadow-connector
