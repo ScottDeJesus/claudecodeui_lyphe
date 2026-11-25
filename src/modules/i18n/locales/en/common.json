@@ -571,7 +571,6 @@
     "launchMissing": "The launch table has no rnd.scout or rnd.spike row yet.",
     "weeklyOn": "{{day}}s at {{time}}",
     "dailyAt": "every day at {{time}}",
-    "noMilestone": "No milestone",
     "loading": "Reading what the scout has filed…",
     "unreachable": {
       "title": "R&D is not answering",
@@ -617,12 +616,14 @@
       "waiting": "Waiting",
       "spiking": "Spiking",
       "proved": "Proved",
+      "placing": "Placing",
       "adopted": "Adopted",
       "rejected": "Rejected"
     },
     "row": {
       "meta": "{{host}} · {{age}}",
-      "spiking": "{{host}} · spike started {{age}}"
+      "spiking": "{{host}} · spike started {{age}}",
+      "placing": "{{host}} · Opus is placing it · {{age}}"
     },
     "empty": {
       "noSources": {
@@ -668,27 +669,20 @@
       "rejectedBecause": "Rejected because",
       "became": "Became",
       "becameValue": "{{plan}} · {{word}} · under {{epic}}",
-      "adoptedNote": "It is the roadmap’s now; there is nothing more to do here."
+      "placing": "Placing",
+      "placingValue": "Opus is choosing its epic, title and goal · asked {{ago}}",
+      "placeFailed": "Last Adopt failed",
+      "placedWhy": "Why there",
+      "adoptedNote": "Its design is sent; it comes to you for Accept on the feature’s card in the Roadmap."
     },
     "act": {
       "spike": "Spike",
       "spikeAgain": "Spike again",
       "openChat": "Open chat",
       "adopt": "Adopt",
+      "placing": "Placing…",
       "reject": "Reject",
       "reopen": "Bring back"
-    },
-    "adopt": {
-      "title": "Adopt",
-      "accent": "as an idea",
-      "about": "“{{title}}” becomes an idea on the roadmap, under the epic you choose. Its question, its verdict and its evidence go with it.",
-      "epic": "Epic",
-      "epicPlaceholder": "Choose an epic…",
-      "noEpics": "The roadmap has no epic to adopt under. Add one on the Roadmap, then come back.",
-      "goal": "Goal",
-      "goalHelper": "Optional. In your own words, what this should do for us.",
-      "cancel": "Cancel",
-      "confirm": "Adopt"
     },
     "reject": {
       "title": "Reject",
@@ -719,6 +713,8 @@
       "scoutAbout": "The weekly reader. It reads the sources and files candidates; it changes nothing.",
       "spike": "Spike",
       "spikeAbout": "The chat that tries one candidate and answers yes or no.",
+      "adopt": "Adopt's placer",
+      "adoptAbout": "The one call that places a proved candidate on the roadmap — its epic, title and goal — before its design starts.",
       "modelLabel": "{{who}} model",
       "effortLabel": "{{who}} effort",
       "web": "Web search",

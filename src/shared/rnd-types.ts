@@ -94,8 +94,11 @@ export type RndCandidate = {
   spike: { session: string; started_at: string } | null;
   verdict: { word: RndVerdictWord; evidence: string | null; dir: string | null; at: string } | null;
   rejected: { why: string; at: string; by: string | null } | null;
-  /** The feature it became, the epic it stands under, and that feature's own word on the roadmap. */
-  adopted: { plan: string; epic: string; at: string; word: string } | null;
+  /** The feature it became, the epic it stands under, that feature's own word on the roadmap, and Opus's one line of why
+   * it stands there (null when adopted at the terminal with an epic named). */
+  adopted: { plan: string; epic: string; at: string; word: string; why: string | null } | null;
+  /** A proved candidate's Adopt: out while Opus places it, or the last one that failed and why; null otherwise. */
+  placing: { state: 'out' | 'failed'; at: string | null; why: string | null } | null;
 };
 
 export type RndPicture = {

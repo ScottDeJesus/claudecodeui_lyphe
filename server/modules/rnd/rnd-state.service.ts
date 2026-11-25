@@ -18,6 +18,8 @@ export const RND_REFUSAL_EXITS: readonly number[] = [1, 2];
 export const RND_WORDS = ['waiting', 'spiking', 'proved', 'adopted', 'rejected'] as const;
 export type RndWord = (typeof RND_WORDS)[number];
 const VERDICT_WORDS = ['yes', 'no', 'unsettled'] as const;
+/** An Adopt's placing as the document carries it: out while Opus places it, failed with why while it stands proved. */
+const PLACING_STATES = ['out', 'failed'] as const;
 const SCOUT_TRIGGERS = ['weekly', 'now'] as const;
 const SCOUT_OUTCOMES = ['done', 'failed', 'lost'] as const;
 const SCOUTS_RUN = ['one_at_a_time', 'all_at_once'] as const;
@@ -69,7 +71,8 @@ export type RndCandidate = {
   spike: { session: string; started_at: string | null } | null;
   verdict: { word: (typeof VERDICT_WORDS)[number]; evidence: string | null; dir: string | null; at: string | null } | null;
   rejected: { why: string | null; at: string | null; by: string | null } | null;
-  adopted: { plan: string; epic: string | null; at: string | null; word: string | null } | null;
+  adopted: { plan: string; epic: string | null; at: string | null; word: string | null; why: string | null } | null;
+  placing: { state: (typeof PLACING_STATES)[number]; at: string | null; why: string | null } | null;
 };
 export type RndPicture = {
   generated_at: string;
@@ -216,6 +219,15 @@ export function readRndCandidate(value: unknown, path: string): RndCandidate {
         epic: textOrNull(fields['epic'], `${where}.epic`),
         at: textOrNull(fields['at'], `${where}.at`),
         word: textOrNull(fields['word'], `${where}.word`),
+        why: textOrNull(fields['why'], `${where}.why`),
+      };
+    }),
+    placing: orNull(candidate['placing'], at('placing'), (placing, where) => {
+      const fields = record(placing, where);
+      return {
+        state: oneOf(fields['state'], PLACING_STATES, `${where}.state`),
+        at: textOrNull(fields['at'], `${where}.at`),
+        why: textOrNull(fields['why'], `${where}.why`),
       };
     }),
   };

@@ -5,7 +5,7 @@
 // wired (RndFeed.tsx, hooks/, startSpikeChat.ts, rndWire.ts: they draw nothing) may lean only on the lanes they read —
 // @/modules/live-bus, @/modules/roadmap and @/modules/dispatcher (rnd-area phase 6). The pieces the design names come from
 // @/shared/ui: RndPanel its SegmentedControl, ScrollArea, EmptyState, SignalLoop and Button; CandidateRow its Badge;
-// CandidateOpening its Opening, KeyValueList and Excerpt; AdoptDialog its Select; RndSettingsSheet its Sheet and Switch, with
+// CandidateOpening its Opening, KeyValueList and Excerpt; RndSettingsSheet its Sheet and Switch, with
 // AgentLaunchChoice from the agent-launch module. One native button is allowed: CandidateRow's whole line as its press, the
 // pattern the roadmap's PanelRows rows use; any second one, or one in another file, is a control built by hand.
 //
@@ -35,7 +35,6 @@ const WANTS = {
   "RndPanel.tsx": ["SegmentedControl", "ScrollArea", "EmptyState", "SignalLoop", "Button"],
   "CandidateRow.tsx": ["Badge"],
   "CandidateOpening.tsx": ["Opening", "KeyValueList", "Excerpt"],
-  "AdoptDialog.tsx": ["Select"],
   "RndSettingsSheet.tsx": ["Sheet", "Switch"],
 };
 

@@ -17,7 +17,8 @@ export type RndWrites = {
   dismiss: () => void;
   scoutNow: () => void;
   spike: (name: string, projectPath: string | null, sendMessage: (message: unknown) => void, goChat: (sessionId: string) => void) => void;
-  adopt: (name: string, arc: string, goal: string | null) => void;
+  /** Opus places it on the roadmap and its design starts; the press returns at once and the candidate reads Placing. */
+  adopt: (name: string) => void;
   reject: (name: string, why: string) => void;
   reopen: (name: string) => void;
   addSource: (url: string, label?: string | null) => void;
@@ -91,7 +92,7 @@ export function useRndWrites(): RndWrites {
     dismiss: () => setRefusal(null),
     scoutNow: () => press('scout', () => api.rnd.scout()),
     spike,
-    adopt: (name, arc, goal) => press(name, () => api.rnd.adopt(name, goal === null ? { arc } : { arc, goal })),
+    adopt: (name) => press(name, () => api.rnd.adopt(name)),
     reject: (name, why) => press(name, () => api.rnd.reject(name, { why })),
     reopen: (name) => press(name, () => api.rnd.reopen(name)),
     addSource: (url, label) => press('settings', () => api.rnd.addSource(label ? { url, label } : { url })),

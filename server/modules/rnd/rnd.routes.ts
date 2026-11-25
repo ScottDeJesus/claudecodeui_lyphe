@@ -105,15 +105,9 @@ export function createRndRouter(dependencies: RndRouterDependencies): express.Ro
 
   router.post('/scout', relayWrite(relayLine, () => ['rnd', 'scout', '--now']));
 
-  router.post('/candidates/:name/adopt', relayWrite(relayLine, (body, name) => {
-    const { arc, goal, as } = body;
-    if (!isArgText(arc)) return { error: 'arc is required text that does not begin with a dash' };
-    if (as !== undefined && !isArgText(as)) return { error: 'as must be text that does not begin with a dash' };
-    if (goal !== undefined && !isFreeText(goal)) return { error: `goal must be text of at most ${FREE_TEXT_MAX} characters` };
-    const asFlags = as === undefined ? [] : ['--as', as];
-    const goalFlags = goal === undefined ? [] : [`--goal=${goal}`];
-    return ['rnd', 'adopt', name, '--arc', arc, ...asFlags, ...goalFlags];
-  }));
+  // Adopt asks nothing: the dispatcher sends Opus to place it (epic, title, goal) and starts its design. The press is his
+  // word that promotes it (skills/roadmap rule 3), so it travels as `--by app:card`.
+  router.post('/candidates/:name/adopt', relayWrite(relayLine, (_body, name) => ['rnd', 'adopt', name, '--by', 'app:card']));
 
   router.post('/candidates/:name/reject', relayWrite(relayLine, (body, name) => {
     const { why } = body;
