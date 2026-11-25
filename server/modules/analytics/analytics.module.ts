@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import type { Router } from 'express';
 
+import { dispatcherBin } from '../../shared/dispatcher-command.js';
+
 import { createAnalyticsRouter } from './analytics.routes.js';
 import { createAnalyticsService } from './analytics.service.js';
 import { createAnalyticsReaders } from './sections/index.js';
@@ -36,6 +38,7 @@ export function createAnalyticsModule(): AnalyticsModule {
   const codeModeBin = expandHome(process.env.CODE_MODE_BIN || DEFAULT_CODE_MODE_BIN);
   const webWalkBin = expandHome(process.env.WEB_WALK_BIN || DEFAULT_WEB_WALK_BIN);
   const healRepeatsBin = expandHome(process.env.HEAL_REPEATS_BIN || DEFAULT_HEAL_REPEATS_BIN);
-  const service = createAnalyticsService(createAnalyticsReaders({ codeModeBin, webWalkBin, healRepeatsBin }));
+  // The dispatcher's entry point comes through its own door, the one place that knows it (`DISPATCHER_BIN` moves it).
+  const service = createAnalyticsService(createAnalyticsReaders({ codeModeBin, webWalkBin, healRepeatsBin, dispatcherBin: dispatcherBin() }));
   return { router: createAnalyticsRouter(service) };
 }

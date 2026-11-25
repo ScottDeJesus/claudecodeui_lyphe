@@ -669,6 +669,8 @@
       "rejectedBecause": "Rejected because",
       "became": "Became",
       "becameValue": "{{plan}} · {{word}} · under {{epic}}",
+      "measure": "Measured by",
+      "measureNone": "No measure named yet",
       "placing": "Placing",
       "placingValue": "Opus is choosing its epic, title and goal · asked {{ago}}",
       "placeFailed": "Last Adopt failed",
@@ -5458,6 +5460,7 @@
     "sections": {
       "codeMode": "Code Mode",
       "repeats": "Repeats",
+      "rnd": "R&D",
       "webWalk": "Web walks"
     },
     "frame": {
@@ -5468,6 +5471,27 @@
       "takenOn": "Numbers taken {{date}} at {{time}}.",
       "newer": "Reading newer numbers…",
       "refresh": "Refresh"
+    },
+    "rnd": {
+      "title": "Adopted from R&D",
+      "count": "{{total}}",
+      "worse": "{{count}} of {{total}} worse",
+      "empty": {
+        "title": "Nothing adopted from R&D yet",
+        "message": "Adopt a proved idea in R&D, and its feature shows here with what its design promised and its number now."
+      },
+      "now": "Now",
+      "noReading": "no reading",
+      "promised": "Promised",
+      "against": {
+        "better": "better than the spike’s {{baseline}}",
+        "level": "level with the spike’s {{baseline}}",
+        "worse": "worse than the spike’s {{baseline}}"
+      },
+      "none": "No measure named yet",
+      "notBuilt": "Not built yet",
+      "failed": "The reading failed",
+      "open": "Open {{section}}"
     },
 "repeats": {
       "unknown": "not known",

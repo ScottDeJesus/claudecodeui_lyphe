@@ -14,6 +14,7 @@ import { cn } from '@/shared/utils';
  * row from the first day) and how far back (the chosen section's own windows), each the kit's segmented control, under
  * the area's Rule. They stand at the head in every state, a section still downloading, still reading or unreachable
  * included, so the way to ask a different question never moves.
+ * A section read as it stands now offers no window (its `windows` is empty), and the head draws the first question alone.
  *
  * THE BODY IS THE CHOSEN SECTION'S, under the head in a Suspense: a section's code is its own chunk. While it downloads
  * the pane draws the ring with the words the section's own read draws next, in the same place, so opening a section is
@@ -23,6 +24,7 @@ import { cn } from '@/shared/utils';
  *
  * THE CHOICE IS KEPT: `{ section, days }` under `analytics-view` in localStorage, written at each press. A stored id the registry
  * does not hold, or a window its section does not offer, falls to the first row and its default.
+ * A section with no window is kept by its id alone, and opens on its own default.
  *
  * Mounted by project-workspace (`WorkspaceMain`) through the barrel's lazy export, under the screen's own head.
  */
@@ -66,13 +68,16 @@ export function AnalyticsPanel() {
               value={chosen.id}
               onChange={openSection}
             />
-            {/* Three windows, all worth seeing at once, so a segmented control and not a list to open. */}
-            <SegmentedControl
-              label={t('analytics.head.window')}
-              options={chosen.windows.map((days) => ({ value: String(days), label: t('analytics.head.days', { days }) }))}
-              value={String(choice.days)}
-              onChange={openWindow}
-            />
+            {/* Three windows, all worth seeing at once, so a segmented control and not a list to open. A section read as it
+                stands now offers no window, and the head draws the first question alone. */}
+            {chosen.windows.length > 0 && (
+              <SegmentedControl
+                label={t('analytics.head.window')}
+                options={chosen.windows.map((days) => ({ value: String(days), label: t('analytics.head.days', { days }) }))}
+                value={String(choice.days)}
+                onChange={openWindow}
+              />
+            )}
           </div>
         </header>
 
@@ -83,7 +88,7 @@ export function AnalyticsPanel() {
             </div>
           }
         >
-          <chosen.Body key={chosen.id} days={choice.days} />
+          <chosen.Body key={chosen.id} days={choice.days} openSection={openSection} />
         </Suspense>
       </div>
     </section>
@@ -105,7 +110,10 @@ function settledChoice(stored: unknown): AnalyticsChoice | null {
   const fallback = { section: first.id, days: first.defaultDays };
   if (!isRecord(stored)) return fallback;
   const row = ANALYTICS_SECTIONS.find((each) => each.id === stored.section);
-  if (row === undefined || typeof stored.days !== 'number' || !row.windows.includes(stored.days)) return fallback;
+  if (row === undefined) return fallback;
+  // A section with no window to choose is kept by its id alone, and opens on its own default.
+  if (row.windows.length === 0) return { section: row.id, days: row.defaultDays };
+  if (typeof stored.days !== 'number' || !row.windows.includes(stored.days)) return fallback;
   return { section: row.id, days: stored.days };
 }
 

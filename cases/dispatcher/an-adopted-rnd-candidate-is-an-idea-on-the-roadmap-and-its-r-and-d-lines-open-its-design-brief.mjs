@@ -20,6 +20,7 @@ const QUESTION = "Does the ratio name one live query scanning 100 times what it 
 const SOURCE_URL = "https://example.com/case/rnd-joined-line";
 const EVIDENCE = "Measured: the ranking named 2 queries over 100 to 1.";
 const GOAL = "Rank the live queries by rows scanned over rows returned.";
+const MEASURE_LINE = "Measure: this feature came from R&D, so its design names how its doing is measured — one [measure] table (~/.claude/scripts/dispatcher shapes measure prints it), its baseline the spike's own number from the evidence above. dispatcher load refuses the design without it, and Analytics → R&D draws its row. Where the evidence holds no number to stand on, that is a question for the operator. Give the feature its own Analytics tab as well when it has more to show than one number, and name it in section.";
 
 function run(house, args, input) {
   const env = Object.assign({}, house.env);
@@ -118,10 +119,10 @@ runCase(async (t) => {
   if (brief.error) wrong.push(brief.error);
   else {
     const want = [GOAL, "From R&D: " + TITLE + " — " + SOURCE_URL, "What it is: " + WHAT, "Why it might help: " + WHY,
-      "Spike: " + QUESTION + " — yes, ", "Evidence: " + EVIDENCE, "Spike directory: " + dir];
+      "Spike: " + QUESTION + " — yes, ", "Evidence: " + EVIDENCE, "Spike directory: " + dir, MEASURE_LINE];
     const missing = want.filter((line) => brief.text.indexOf(line) === -1);
     if (missing.length) wrong.push("the design brief " + brief.file + " lacks " + JSON.stringify(missing));
   }
   if (wrong.length) return broken(wrong.join("; "));
-  return held("filed " + name + ", spiked, proved and adopted as idea " + plan + " under case-epic; rnd show reads adopted/idea with standing adopted 1; roadmap show carries the idea, candidates 0/0/0/0 and the rnd show line; dispatcher design's brief carries his goal and the six R&D lines");
+  return held("filed " + name + ", spiked, proved and adopted as idea " + plan + " under case-epic; rnd show reads adopted/idea with standing adopted 1; roadmap show carries the idea, candidates 0/0/0/0 and the rnd show line; dispatcher design's brief carries his goal and the seven R&D lines, the Measure line last");
 });

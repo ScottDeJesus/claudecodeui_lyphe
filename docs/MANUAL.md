@@ -10519,7 +10519,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostWi
 
 ## MAN-7491 — The chat host — the panel: geometry, stacking, storage
 
-The chat's `panel` placement: a frame in the page, over every page, beside the chat's button (MAN-10247). Files in `src/modules/chat-host/`: `ChatHostPanel.tsx`, `ChatHostHeader.tsx`, `ChatHostPlaceholder.tsx`, `hooks/useFloatingPanel.ts`, `hooks/usePanelViewport.ts`, `utils/panelGeometry.ts`, `utils/anchorStore.ts`, `utils/chatHostStorage.ts`. Placements and the node: MAN-7489. Per-file rules and probes: MAN-7467, MAN-7478, MAN-7446.
+The chat's `panel` placement: a frame in the page, over every page, beside the chat's button (MAN-10247). Files in `src/modules/chat-host/`: `ChatHostPanel.tsx`, `ChatHostHeader.tsx`, `ChatHostPlaceholder.tsx`, `hooks/useFloatingPanel.ts`, `hooks/usePanelViewport.ts`, `utils/panelGeometry.ts`, `utils/anchorStore.ts`, `utils/chatHostStorage.ts`. Placements and the node: MAN-7489. Per-file rules and probes: MAN-7467, MAN-7478, MAN-7446. The panel carries `data-ast-keeps-opening={FLOATING_CHAT_REGION}`, the name the chat's button carries too, and claims on pointer/mouse down capture the presses React delivers from its header's portalled layers (`claimPressForKeepsOpeningRegion`; `ChatHostSlot` claims the chat's own the same way). Every outside-press close in the kit and the modules asks `shouldOutsidePressClose(event, ownParts)` (`src/shared/utils.ts`): a press in a keeps-opening region closes a pop-out only when that region (every element sharing its mark name) holds one of the pop-out's parts.
 
 ## Stacking
 - `position: fixed`, at `z-[45]`, rendered by `ChatHostFloating`, which `WorkspaceFrame` mounts beside `HeldWorkspace`, outside the shell's container.

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useChatHost, useChatHostMechanics } from '@/modules/chat-host/context/ChatHostContext';
 import { DockableFab } from '@/shared/ui';
 import type { DockableFabPosition } from '@/shared/ui';
+import { FLOATING_CHAT_REGION } from '@/shared/constants';
 
 type ChatHostFabProps = {
   /** Where the button stands: the reader's stored point, or the kit's resting corner. */
@@ -22,7 +23,7 @@ type ChatHostFabProps = {
  * itself there, so the button says what the chat is doing without a word. The kit's dot on its rim is the unread rule's: a reply
  * that landed while the panel was folded.
  *
- * ITS PRESS folds the panel down to this button and brings it back; the chat keeps floating either way. ITS DRAG is the kit's, and
+ * ITS PRESS folds the panel down to this button and brings it back; the chat keeps floating either way. A press on it leaves up any pop-out opened outside the chat (`shouldOutsidePressClose`), as a press in the panel does. ITS DRAG is the kit's, and
  * it is the same move as a drag of the panel's header: the panel follows the rect this button reports (`reportAnchor`).
  *
  * 44px, not the kit's 28: at 28 the core's form cannot be told apart, and 44 is the kit's own catch, so the button is as large to
@@ -42,7 +43,7 @@ export function ChatHostFab({ position, onDragStart, onPositionChange }: ChatHos
   useEffect(() => () => reportAnchor(null), [reportAnchor]);
 
   return (
-    <div data-chat-host-fab={folded ? 'folded' : 'open'} className="contents [&_.vv-fab]:z-[46] [&_.vv-fab]:[--vv-fab-size:44px] [&_.vv-fab]:bg-transparent [&_.vv-fab:hover]:bg-transparent [&_.vv-fab]:shadow-none [&_.vv-fab:hover]:shadow-none [&_.vv-fab]:text-foreground">
+    <div data-chat-host-fab={folded ? 'folded' : 'open'} data-ast-keeps-opening={FLOATING_CHAT_REGION} className="contents [&_.vv-fab]:z-[46] [&_.vv-fab]:[--vv-fab-size:44px] [&_.vv-fab]:bg-transparent [&_.vv-fab:hover]:bg-transparent [&_.vv-fab]:shadow-none [&_.vv-fab:hover]:shadow-none [&_.vv-fab]:text-foreground">
       <DockableFab
         label={folded
           ? t('chatHost.unfold', { defaultValue: 'Bring the chat back' })

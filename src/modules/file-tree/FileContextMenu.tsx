@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Copy, Download, FileText, FolderPlus, Pencil, RefreshCw, Trash2, Upload, type LucideIcon } from 'lucide-react';
 
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
-import { cn } from '@/shared/utils';
+import { cn, shouldOutsidePressClose } from '@/shared/utils';
 
 type FileContextItem = {
   name: string;
@@ -213,7 +213,7 @@ export default function FileContextMenu({
 
     const handleOutsideMouseDown = (event: MouseEvent) => {
       const menuElement = menuRef.current;
-      if (menuElement && !menuElement.contains(event.target as Node)) {
+      if (menuElement && shouldOutsidePressClose(event, [menuElement])) {
         closeContextMenu();
       }
     };

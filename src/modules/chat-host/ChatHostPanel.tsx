@@ -1,9 +1,10 @@
-import type { ComponentProps, ReactNode, Ref } from 'react';
+import type { ComponentProps, ReactNode, Ref, SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PanelPlacement } from '@/shared/types';
 import { Card, ResizeGrip } from '@/shared/ui';
-import { cn } from '@/shared/utils';
+import { claimPressForKeepsOpeningRegion, cn } from '@/shared/utils';
+import { FLOATING_CHAT_REGION } from '@/shared/constants';
 
 type GripHandler = ComponentProps<typeof ResizeGrip>['onResize'];
 
@@ -19,6 +20,11 @@ type ChatHostPanelProps = {
   /** The grip's delta once, at release; the size is written then and not before. */
   onResizeEnd: GripHandler;
 };
+
+/** Claims a press for the floating chat's region, so a pop-out opened outside the chat stays up. */
+function claimPressForFloatingPanel(event: SyntheticEvent<HTMLDivElement>) {
+  claimPressForKeepsOpeningRegion(event.nativeEvent, event.currentTarget);
+}
 
 /**
  * Where the resize grip stands inside the panel, one class per corner. The kit's grip paints and the caller
@@ -89,6 +95,11 @@ export function ChatHostPanel({ placement, header, bodyRef, onResize, onResizeEn
       role="region"
       aria-label={t('chatHost.panelLabel')}
       data-chat-host-panel=""
+      // A press in the floating chat leaves up any pop-out opened outside it (`shouldOutsidePressClose`), so the reader can type while reading it.
+      data-ast-keeps-opening={FLOATING_CHAT_REGION}
+      // Its header's portalled layers (the session picker's list) are drawn outside it: React still delivers their presses here.
+      onPointerDownCapture={claimPressForFloatingPanel}
+      onMouseDownCapture={claimPressForFloatingPanel}
       data-grip={placement.grip}
       className={cn('fixed z-[45] flex flex-col overflow-hidden border-input shadow-lift', HEADER_CLEARANCE[placement.grip])}
       style={{

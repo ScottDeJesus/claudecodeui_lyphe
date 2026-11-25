@@ -165,3 +165,9 @@ says = "Analytics, the Repeats section: the work launches keep writing by hand, 
 from = "analytics"
 steps = [{ click = { role = "radio", name = "Repeats" } }]
 landmark = { role = "heading", name = "Families", exact = true }
+
+[screen.analytics-rnd]
+says = "Analytics, the R&D section: each feature adopted from R&D, what it promised and its number now."
+from = "analytics"
+steps = [{ click = { role = "radio", name = "R&D" } }]
+landmark = { role = "heading", name = "Adopted from R&D", exact = false }

@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE, overlayInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
 import { useEdgeShift } from '@/shared/ui/useEdgeShift';
+import { shouldOutsidePressClose } from '@/shared/utils';
 
 type MenuItem = {
   id: string;
@@ -79,7 +80,7 @@ export function Menu(props: MenuProps) {
     // The finger now down outside the panel, waiting to be told whether it is a tap or a scroll.
     let stopWaitingForLift = () => {};
     const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (!rootRef.current || rootRef.current.contains(event.target as Node) || pressInside.current === event) return;
+      if (!rootRef.current || pressInside.current === event || !shouldOutsidePressClose(event, [rootRef.current])) return;
       if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
         setOpen(false);
         return;

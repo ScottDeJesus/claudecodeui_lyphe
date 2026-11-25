@@ -950,3 +950,10 @@ export const SUBAGENT_DOT_FILL: Record<CompanionMaterial, string> = {
 export const CARD_WIDTH_MIN = 1;
 /** The most board cards the dispatcher works at once, house-wide: WIDTH_MAX in the same file. Settings and the bug board both draw their choices from these two. */
 export const CARD_WIDTH_MAX = 4;
+
+// ---------------------------
+
+//----------------- FLOATING CHAT ------------
+
+/** The keeps-opening region name the floating chat's panel and button share (`data-ast-keeps-opening`), so `shouldOutsidePressClose` reads the two as one region. */
+export const FLOATING_CHAT_REGION = 'floating-chat';

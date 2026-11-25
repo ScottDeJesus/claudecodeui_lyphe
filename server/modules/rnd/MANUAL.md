@@ -7,7 +7,7 @@
 | file | holds |
 |---|---|
 | `rnd.module.ts` | the composition root: the lane, the broadcast, the journal door (`[R&D]`, each message once), the spike's model door |
-| `rnd-state.service.ts` | `readRndState`: `rnd show --json` under `RND_MAX_BUFFER` (4 MiB), checked field by field into `RndPicture` (a field it cannot read throws a sentence naming its path; keys the contract does not name are dropped); `readRndCandidate`; `RND_REFUSAL_EXITS` |
+| `rnd-state.service.ts` | `readRndState`: `rnd show --json` under `RND_MAX_BUFFER` (4 MiB), checked field by field into `RndPicture` (a field it cannot read throws a sentence naming its path; keys the contract does not name are dropped); `readRndCandidate` (an adopted candidate's `adopted.measure`: `{says, promised}` from its design's `[measure]` row, or null until one is named — carried as the dispatcher prints it); `RND_REFUSAL_EXITS` |
 | `rnd.routes.ts` | the routes: fence, compose argv, relay, poke |
 | `rnd-spike.service.ts` | `startSpike` and the `/spike` prompt |
 

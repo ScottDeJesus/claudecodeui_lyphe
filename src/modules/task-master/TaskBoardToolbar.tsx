@@ -5,6 +5,7 @@ import { Button, Chip, Input } from '@/shared/ui';
 import type { PrdFile, TaskBoardSortField, TaskBoardSortOrder, TaskBoardView } from '@/shared/types';
 import TaskFiltersPanel from '@/modules/task-master/TaskFiltersPanel';
 import TaskQuickSortBar from '@/modules/task-master/TaskQuickSortBar';
+import { shouldOutsidePressClose } from '@/shared/utils';
 
 type TaskBoardToolbarProps = {
   hasProject: boolean;
@@ -74,7 +75,7 @@ export default function TaskBoardToolbar({
 
   useEffect(() => {
     const handleMouseDown = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (dropdownRef.current && shouldOutsidePressClose(event, [dropdownRef.current])) {
         setIsPrdDropdownOpen(false);
       }
     };

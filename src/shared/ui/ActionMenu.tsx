@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, Loader2, type LucideIcon } from 'lucide-react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { cn } from '@/shared/utils';
+import { cn, shouldOutsidePressClose } from '@/shared/utils';
 import { Button } from '@/shared/ui/Button';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { useEdgeShift } from '@/shared/ui/useEdgeShift';
@@ -116,12 +116,7 @@ export function ActionMenu({
     }
 
     const closeOnOutsideClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        rootRef.current
-        && !rootRef.current.contains(target)
-        && !menuRef.current?.contains(target)
-      ) {
+      if (rootRef.current && shouldOutsidePressClose(event, [rootRef.current, menuRef.current])) {
         setMenuOpen(false);
       }
     };

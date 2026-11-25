@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
-import { cn } from '@/shared/utils';
+import { cn, shouldOutsidePressClose } from '@/shared/utils';
 
 /**
  * `hint` is secondary text drawn beside the label in a muted ink, for a choice whose label alone
@@ -165,9 +165,8 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
     if (!open) return;
 
     const closeOnOutsidePointer = (event: PointerEvent) => {
-      const target = event.target as Node;
       // The panel is on `body`, not inside the root, so a press on one of its rows is not "outside".
-      if (rootRef.current && !rootRef.current.contains(target) && !panelRef.current?.contains(target)) setOpen(false);
+      if (rootRef.current && shouldOutsidePressClose(event, [rootRef.current, panelRef.current])) setOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;

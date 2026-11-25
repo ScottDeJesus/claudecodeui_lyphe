@@ -71,7 +71,14 @@ export type RndCandidate = {
   spike: { session: string; started_at: string | null } | null;
   verdict: { word: (typeof VERDICT_WORDS)[number]; evidence: string | null; dir: string | null; at: string | null } | null;
   rejected: { why: string | null; at: string | null; by: string | null } | null;
-  adopted: { plan: string; epic: string | null; at: string | null; word: string | null; why: string | null } | null;
+  adopted: {
+    plan: string;
+    epic: string | null;
+    at: string | null;
+    word: string | null;
+    why: string | null;
+    measure: { says: string; promised: string } | null;
+  } | null;
   placing: { state: (typeof PLACING_STATES)[number]; at: string | null; why: string | null } | null;
 };
 export type RndPicture = {
@@ -220,6 +227,10 @@ export function readRndCandidate(value: unknown, path: string): RndCandidate {
         at: textOrNull(fields['at'], `${where}.at`),
         word: textOrNull(fields['word'], `${where}.word`),
         why: textOrNull(fields['why'], `${where}.why`),
+        measure: orNull(fields['measure'], `${where}.measure`, (measure, inner) => {
+          const said = record(measure, inner);
+          return { says: text(said['says'], `${inner}.says`), promised: text(said['promised'], `${inner}.promised`) };
+        }),
       };
     }),
     placing: orNull(candidate['placing'], at('placing'), (placing, where) => {

@@ -71,7 +71,7 @@
 /* Verve's 44px on a touch screen, and in any window under 768px, the house's mobile breakpoint, where Kaylee Station's
  * touch law holds every press to a finger's size whatever points at it. */
 @media (pointer: coarse), (max-width: 767.98px) {
-  .vv-segmented__option { min-height: 44px; }
+  .vv-segmented__option { min-width: 44px; min-height: 44px; justify-content: center; }
 }
 /* The count is the same pill `Tabs` draws (`.vv-tabs__count`, feedback.css), read off the same two tone tokens; it
  * is spelt again here because feedback.css is at its ceiling and takes no more lines. */

@@ -91,8 +91,9 @@ function factsOf(candidate: RndCandidate, t: TFunction): Array<readonly [string,
     else facts.push([t('rnd.opening.placeFailed'), said(why ?? '')]);
   }
   if (candidate.adopted !== null) {
-    const { plan, word, epic, why } = candidate.adopted;
+    const { plan, word, epic, why, measure } = candidate.adopted;
     facts.push([t('rnd.opening.became'), said(t('rnd.opening.becameValue', { plan, word, epic }))]);
+    facts.push([t('rnd.opening.measure'), measure === null ? said(t('rnd.opening.measureNone')) : said(measure.promised, measure.says)]);
     if (why !== null) facts.push([t('rnd.opening.placedWhy'), said(why)]);
   }
   return facts;
