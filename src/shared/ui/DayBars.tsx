@@ -5,6 +5,8 @@ type DayBarsSeries = {
   label: string;
   /** The ink its bars and its legend mark wear, through the `[data-tone]` swap. Left off, the accent. */
   tone?: Tone;
+  /** The series' figure over the whole window, in the caller's words ("$9.45"). Left off, the sum of its values with the locale's grouping. */
+  total?: string;
 };
 
 type DayBarsDay = {
@@ -42,7 +44,8 @@ function dateLabel(day: string): string {
 }
 
 /**
- * Used by the kanban module's bug dashboard: cards opened and fixed per day, two series over the window.
+ * Used by the kanban module's bug dashboard (cards opened and fixed per day) and the API tab's Gemini view (estimated
+ * spend per UTC day): two series over the window.
  *
  * Lifted from the two plots the API view draws for itself (`DeepseekDayBars`, `JevDayBars`), which stay as they are:
  * bars from a ruled zero baseline, the tallest bar the whole plot and its figure said beside the legend, a zero day a
@@ -55,7 +58,8 @@ function dateLabel(day: string): string {
  * column at any width, and which series a bar belongs to is its SIDE of the rule as well as its ink (the legend marks
  * them ▲ and ▼), so the two survive greyscale. What is above the rule against what is below it is the plot's answer.
  *
- * THE LEGEND SAYS EACH SERIES' TOTAL, so the picture's two sums are read as numbers and never estimated from bars.
+ * THE LEGEND SAYS EACH SERIES' TOTAL, so the picture's two sums are read as numbers and never estimated from bars. A
+ * measure the locale's grouping does not say (money) gives each total in its own words, through the series' `total`.
  *
  * A TITLE IS A POINTER'S. The plot is one image with one spoken sentence; a caller that owes each day's figures to a
  * finger or a screen reader draws them in a table beside it, as the dashboard does.
@@ -79,7 +83,7 @@ export function DayBars({ days, series, label, peakLabel }: DayBarsProps) {
               {/* The side of the rule the series is drawn on, as a mark: its second channel beside its ink. */}
               <span className="vv-daybars__mark" aria-hidden="true">{mirrored ? (index === 0 ? '▲' : '▼') : '■'}</span>
               {entry.label}
-              <span className="vv-daybars__total">{totals[index].toLocaleString()}</span>
+              <span className="vv-daybars__total">{entry.total ?? totals[index].toLocaleString()}</span>
             </span>
           ))}
         </span>

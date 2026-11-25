@@ -16,7 +16,7 @@ import type { ClaudeAccountRow, ClaudeAccounts, ClaudeUsage, ClaudeUsagePace, Cl
  * and its `pace` figures as fractions 0..1 (window POINTS, INV-4299 — never dollars); the meters take
  * percent and do no arithmetic, so the conversion happens here, once, and nowhere else.
  *
- * A WINDOW PAST ITS RESET IS DRAWN AS THE WINDOW THAT BEGAN THERE (`windowPastReset`, the one rule). Every
+ * A WINDOW PAST ITS RESET IS DRAWN AS THE WINDOW THAT BEGAN THERE, FIGURE UNKNOWN (`windowPastReset`, the one rule). Every
  * reading this file hands out — a row's (`pictureReading`, which the account rows draw through `rowWeek`) and the
  * live route's — has the rule applied before it leaves, so no surface draws a closed window's figure and none carries
  * a rule of its own.
@@ -116,7 +116,7 @@ function withCarriedWindows(usage: ReachableUsage, nowMs: number): ReachableUsag
     windows,
     pace: {
       ...pace,
-      ...(carriedKeys.has(WEEKLY.key) ? { used7: 0, projected7: null, words: '' } : {}),
+      ...(carriedKeys.has(WEEKLY.key) ? { used7: null, projected7: null, words: '' } : {}),
     },
   };
 }
@@ -125,10 +125,11 @@ function withCarriedWindows(usage: ReachableUsage, nowMs: number): ReachableUsag
  * A row's newest reading and pace, as the `ClaudeUsage` the meters draw, with a window past its
  * reset carried to the window that began there.
  *
- * Drawn at full strength whatever its age: never `degraded`, never an "as of" line. An account is read only
- * through the rate-limit reports of the chats and jobs that run on it, and its figures move a whole percent
- * at a time, so a filed-at stamp hours old is still the current figure while nothing has moved it — and a
- * reset that has passed since is a window nothing has used.
+ * Only the live login is metered (`usage.service.ts`): Anthropic's usage endpoint does not serve an account's saved
+ * sign-in token, so any other account's figure moves only when a chat or a stream on it files one. So an old figure
+ * (`READING_OLD_AFTER_MS`) or one with no time it was read leaves here `degraded`, `staleSince` its filed-at, and
+ * every surface that already says "stale" says it: the meters dim under their *As of* line, the rail ring dims, and
+ * both rings' words carry the age (`usageAgeWords`). The row says it beside its state (`readingAgeWords`).
  */
 function pictureReading(row: ClaudeAccountRow, nowMs: number): ReachableUsage {
   const reading = row.reading;
@@ -148,16 +149,18 @@ function pictureReading(row: ClaudeAccountRow, nowMs: number): ReachableUsage {
   // The row's filed-at is wire input as much as its figures are, and `checkedAt` must stay a number:
   // a stamp naming no instant is replaced by the moment this picture was read, the only time we can
   // vouch for.
-  const filedAt = Number.isFinite(reading.at) ? reading.at : Math.floor(nowMs / 1000);
+  const readAt = readAtSeconds(reading);
+  const filedAt = readAt ?? Math.floor(nowMs / 1000);
+  const isOld = readAt === null || nowMs - readAt * 1000 >= READING_OLD_AFTER_MS;
   const pace = paceInPercent(row, week);
 
   return withCarriedWindows({
     reachable: true,
     account: row.digest,
     windows: [{ key: WEEKLY.key, label: WEEKLY.label, percent: week, resetsAt: resetStamp(reading.week_resets) }],
-    degraded: false,
-    reason: '',
-    staleSince: null,
+    degraded: isOld,
+    reason: !isOld ? '' : readAt === null ? 'unaged' : 'old',
+    staleSince: isOld ? readAt : null,
     checkedAt: filedAt,
     // The key stays absent, not null, when the pacer could not weigh the week.
     ...(pace === undefined ? {} : { pace }),
@@ -174,6 +177,45 @@ function pictureReading(row: ClaudeAccountRow, nowMs: number): ReachableUsage {
 export function rowWeek(row: ClaudeAccountRow, nowMs: number): ClaudeUsageWindow {
   const { windows } = pictureReading(row, nowMs);
   return windows.find((usageWindow) => usageWindow.key === WEEKLY.key) ?? unmeasuredWindow(WEEKLY);
+}
+
+/** A reading this old is said with its age: five of the live meter's 3-minute polls, so nothing has refreshed it lately. */
+const READING_OLD_AFTER_MS = 15 * 60_000;
+
+/** No clock this app runs on wrote a stamp before 2020-01-01: an `at` below it (`0`) names no reading time. */
+const PLAUSIBLE_AT_FLOOR_S = 1_577_836_800;
+
+/** A reading's filed-at, epoch seconds, or `null` when it names no instant a clock could have written. */
+function readAtSeconds(reading: NonNullable<ClaudeAccountRow['reading']>): number | null {
+  return Number.isFinite(reading.at) && reading.at >= PLAUSIBLE_AT_FLOOR_S ? reading.at : null;
+}
+
+/** An age as the row says it: minutes under an hour, hours under two days, else days. */
+function ageInWords(ageMs: number): string {
+  const minutes = Math.max(0, Math.round(ageMs / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
+}
+
+/**
+ * How current a row's week is, in words, or `null` when it is recent: "Not read yet" with no reading, "Reset · not
+ * read since" when its week has turned over after the reading, else "As of 17h ago" once it is `READING_OLD_AFTER_MS`
+ * old. A figure is never shown as current when it is not.
+ *
+ * Used by the accounts module's ClaudeAccountRowViews, beside each row's state.
+ */
+export function readingAgeWords(row: ClaudeAccountRow, nowMs: number): string | null {
+  const reading = row.reading;
+  if (!reading) return 'Not read yet';
+  const readAt = readAtSeconds(reading);
+  if (readAt === null) {
+    // A stamp no clock could write (`at: 0`) is a reading never taken; a figure with no stamp at all was read, at a time nobody knows.
+    return Number.isFinite(reading.at) || points(reading.week) === null ? 'Not read yet' : 'Age unknown';
+  }
+  if (points(reading.week) !== null && rowWeek(row, nowMs).percent === null) return 'Reset · not read since';
+  const ageMs = nowMs - readAt * 1000;
+  return ageMs < READING_OLD_AFTER_MS ? null : `As of ${ageInWords(ageMs)} ago`;
 }
 
 /**
@@ -198,4 +240,14 @@ export function accountInUseUsage(
   return usage !== null && usage.reachable && !usage.degraded && usage.account === row.digest
     ? withCarriedWindows(usage, nowMs)
     : pictureReading(row, nowMs);
+}
+
+/**
+ * How old a reading the meters draw is, in words, or `null` when it is current: "as of 5d ago", or "age unknown" for a
+ * degraded reading with no stamp. Used by the accounts module's UsageRings and useAccountWeek, so the rail ring and the
+ * core ring say what the meters' *As of* line says.
+ */
+export function usageAgeWords(usage: ClaudeUsage | null, nowMs: number): string | null {
+  if (usage === null || !usage.reachable || !usage.degraded) return null;
+  return usage.staleSince === null ? 'age unknown' : `as of ${ageInWords(nowMs - usage.staleSince * 1000)} ago`;
 }

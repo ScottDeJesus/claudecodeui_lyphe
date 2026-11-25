@@ -160,6 +160,10 @@ export type { RelayedSendRow } from '@/modules/database/repositories/relayed-sen
 // table and no board reads it.
 export { notesDb } from '@/modules/database/repositories/notes.db.js';
 export type { NoteRow } from '@/modules/database/repositories/notes.db.js';
+// CloudCLI's own Gemini meter: every request to Google counted per account, day, feature, model and key, and the
+// switch per feature. Used by the gemini-meter module alone.
+export { geminiMeterDb } from '@/modules/database/repositories/gemini-meter.db.js';
+export type { GeminiCallCount, GeminiCallsDailyRow } from '@/modules/database/repositories/gemini-meter.db.js';
 export { notificationChannelEndpointsDb } from '@/modules/database/repositories/notification-channel-endpoints.js';
 export { notificationPreferencesDb } from '@/modules/database/repositories/notification-preferences.js';
 // notificationHistoryDb: what the house told each account — every row of the last seven days and, past that, the newest 300 — written

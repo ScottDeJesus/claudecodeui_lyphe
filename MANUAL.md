@@ -3960,6 +3960,7 @@ Consumers (each owns its allowlist, id rules and image type; none owns a transpo
 | `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas`, the Tours lane | `affected-areas` |
 | `server/modules/carrier-bulletins/` (MAN-8909) | `/api/carrier-bulletins`, the bulletins lane | `carrier-bulletins` |
 | `server/modules/upload-runs/` (MAN-9897) | `/api/upload-runs`, the upload runs' lane (the first with event streams) | `upload-runs` |
+| `server/modules/gemini-usage/` (MAN-10235) | `/api/gemini-usage`, the Gemini spend lane | `gemini-usage` |
 | `server/modules/scheduling-report/` (MAN-9996) | `/api/scheduling-report`, the scheduling record's lane — the first that points at the eis backend (`:8004`, base URL `EIS_BACKEND_URL`, secret file `EIS_BACKEND_ENV_FILE`), not at `:8001` | `scheduling-report` |
 
 A lane may point at either service: `baseUrl` and `envFile` are the lane module's own, and the forwarder reads the file the lane names. `:8004`'s internal gate (`routes/internal_gate.py`) compares the same `EIS_INTERNAL_SECRET` class.
@@ -4173,6 +4174,7 @@ Consumers (each declares a table and its id shapes; neither writes a handler):
 | `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas` | `affected-areas` | `image/jpeg` |
 | `server/modules/carrier-bulletins/` | `/api/carrier-bulletins` | `carrier-bulletins` | `image/png` |
 | `server/modules/upload-runs/` (MAN-9897) | `/api/upload-runs` | `upload-runs` | none (no bytes row) |
+| `server/modules/gemini-usage/` (MAN-10235) | `/api/gemini-usage` | `gemini-usage` | none (no bytes row) |
 
 | export | does |
 |---|---|
@@ -5030,7 +5032,7 @@ A press is OPENED two ways: by his talk button (`opened: 'button'`) or by her na
 - A transcript whose opening is not her name (the transcriber wrote "Gilly") is pushed as it is, its opening untouched. why: the page already heard the name; a misheard one must not swallow his call, and the transcriber is asked for no second check.
 - `MESSAGE_TEXT_MAX` measures the text that would be logged, so a name press is counted less its name.
 - ARRIVAL ORDER: hearing starts when a press arrives (two uploads can be in flight), but each account keeps one chain and a press is settled only after the press before it was pushed or refused. why: a slow transcription must not let a later press overtake it into her conversation.
-- A hearing that is refused or fails pushes nothing and does not wake her: a `system` log line "I could not hear that: <sentence>" and an AppError carrying the sentence (`speechRefusal`, `companion-input.ts`) — 409 `COMPANION_SPEECH_REFUSED` (`no_key`, `refused`), 502 `COMPANION_SPEECH_FAILED` (`failed`). Once the home server was tried the sentence names both transcribers (`The home server and Gemini both failed to transcribe this. Home server: <why>. <Gemini's sentence>`, MAN-9740) and holds no key; the reason is the backup's, so a missing Gemini key is still the 409 that points at Settings. A `transcribeSpeech` that throws is a defect: logged, and settled as `failed`.
+- A hearing that is refused or fails pushes nothing and does not wake her: a `system` log line "I could not hear that: <sentence>" and an AppError carrying the sentence (`speechRefusal`, `companion-input.ts`) — 409 `COMPANION_SPEECH_REFUSED` (`off`, `no_key`, `refused`), 502 `COMPANION_SPEECH_FAILED` (`failed`). Once the home server was tried the sentence names both transcribers (`The home server and Gemini both failed to transcribe this. Home server: <why>. <Gemini's sentence>`, MAN-9740) and holds no key; the reason is the backup's, so a missing Gemini key is still the 409 that points at Settings. A `transcribeSpeech` that throws is a defect: logged, and settled as `failed`.
 - A clip Gemini heard because the home server could not is settled like any other (his line logged and pushed) and the log then gains ONE `system` line saying so (`Home server didn't answer; Gemini transcribed this`, or `…took too long…`, `…refused the key…`, `…had an error…`), so he learns the box is down; the chat mic shows the same line where its errors show. A clip the home server heard adds no line.
 - A transcript past `MESSAGE_TEXT_MAX` (8000 characters, counted by code points like a typed line) is refused the same way: a `system` line and a 400 `COMPANION_INPUT_INVALID` naming `audio`, not logged and pushed whole.
 - A message pushed while a turn runs joins that turn, so her one answer can cover both lines of two quick presses.
@@ -6924,13 +6926,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-scaffold.mjs
 | `synthesizeSentence` | `companion/companion-speech.ts`: one call per sentence a floor page pulls (MAN-9105, MAN-9110) |
 | `readVoiceSettings` | `companion/companion-account.ts`: `readSoundTags`, the account's `gemini.soundTags` read at the start of each turn (the parse) and at each push (the register); `companion/eyes/house-reads.ts`: `read_settings voice`, every setting said as a line (`settings-lines.ts`, which says `cleanTranscripts` as `Transcript cleanup: on|off`). Inside the module: `speech-transcriber.ts` (the home server's address, `cleanTranscripts` as the `clean` it is asked for, and the cleanup of its text when the box's own did not run), `gemini-transcribe.ts`, `gemini-speech.ts`, `voice-provider.ts`, the settings routes |
 | `geminiKeyStatus` | `companion/eyes/house-reads.ts`: `read_settings` says whose Gemini key the voice uses ("a key of yours", "the house's key", "no key") from the status's `source` alone; the key and its `last4` are never read there. Inside the module: `gemini-key.ts`, the settings routes |
+| `heldGeminiKeys` | `server/index.ts`, which hands it to `createGeminiMeterModule` (MAN-10223): the keys an account's calls can be sent with, `{ keyId, keyTail, heldAs: 'account' | 'house' }`, by sha256 digest (`geminiKeyId`) and last four characters; the key never leaves `gemini-key.ts` |
 | `DEFAULT_SOUND_TAGS` | `.verify/companion-wire-contract.mjs` (the parse proven against the shipped set). Its one home is `voice-settings.ts`; the companion's filter and her register read the account's list through `readVoiceSettings` (INV-9938) |
 | `homeServerKeyStatus` | `companion/eyes/house-reads.ts`: `read_settings` says whether the home server that transcribes first is set up (an address and a key) from the status's `source` alone; the key and its `last4` are never read there. Inside the module: `home-server-key.ts`, the settings routes |
 | type `HeardAnswer` | `companion-press.ts`: tells a refusal from a failure, and sees `standIn` when Gemini stood in for the home server |
-| type `SpeechAnswer` | `companion/companion-speech.ts`: tells a refusal (`no_key`, `refused`, `failed`) from a stream |
+| type `SpeechAnswer` | `companion/companion-speech.ts`: tells a refusal (`off`, `no_key`, `refused`, `failed`) from a stream |
+| `askGemini`, types `GeminiAsk`, `GeminiSent` | the voice doors (`gemini-speech.ts`, `gemini-transcribe.ts`) send every request to Google through it; exported so any later Gemini caller in this server sends through the one wire (MAN-10228, INV-9908) |
 - Types in `server/shared/types.ts`: `VoiceProvider`, `VoiceSettings`, `GeminiKeyStatus`, `HomeServerKeyStatus`, `VoiceTranscribeInput`, `VoiceTranscribeResult`, `TranscribeAnswer` (the Gemini door's), `HeardAnswer` (the transcriber's), `SpeechChunk`, `SpeechAnswer`, `VocabularyEntry`. The page mirrors `VoiceProvider`, `VoiceSettings`, `GeminiKeyStatus`, `HomeServerKeyStatus`, and `VocabularyEntry`, in `src/shared/types.ts`, with `VoiceSettingsPatch` (what `PUT /settings` takes; `soundTags: null` allowed).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-read-aloud.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-address.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-read-aloud.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-wire.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-address.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
 
 ## MAN-9102 — server/modules/voice — the account's `voice` preference, its Gemini key, the — The `voice` preference — `voice-settings.ts`
 section: server/modules/voice — the account's `voice` preference, its Gemini and home server keys, the settings routes and the try-then-backup transcriber/001 The `voice` preference — `voice-settings.ts`
@@ -6985,7 +6989,7 @@ section: server/modules/voice — the account's `voice` preference, its Gemini a
   2. `GEMINI_API_KEY` in the process environment (Python-stripped);
   3. the `GEMINI_API_KEY=` line of the file `GEMINI_ENV_FILE` names (default `/opt/shadow-connector/.env`);
   4. `null`: none.
-- `resolveGeminiKey` is NOT in the barrel. Its readers are `gemini-transcribe.ts` and `gemini-speech.ts`.
+- `resolveGeminiKey` is NOT in the barrel. Its one reader is the wire, `gemini-wire.ts` (MAN-10228); the doors never hold the key.
 - The env file is parsed as `~/.claude/scripts/gemini-image` `_read_api_key` parses it: lines split at Python's `str.splitlines()` boundaries, each stripped by Python's own whitespace set (`pythonStrip`), an `export ` prefix dropped, the name before the first `=` compared after stripping, the value stripped then stripped of quote marks, a line with an empty value skipped; the first line that yields a value wins. An absent or unreadable file is no house key.
 - `geminiKeyStatus(userId)` → `{ source, last4 }`:
   | source | when | last4 |
@@ -7072,7 +7076,7 @@ The route's answer:
 |---|---|---|
 | `ok`, the box heard it | 200 | `{ text }`; `''` for a clip with no speech |
 | `ok`, Gemini stood in | 200 | `{ text, notice }`: the page shows `notice` where the mic's errors show (MAN-9092). `''` text is possible (a silent clip is not certain to come back `''`: INV-9876, MAN-9099 §Standing defect) |
-| `no_key`, `refused` | 409 | `{ error: <sentence> }` (a plain string, not the envelope). why: the person fixes both in Settings → Voice. The mapping is `chatStatusForRefusal` (`gemini-errors.ts`), shared with read-aloud |
+| `off`, `no_key`, `refused` | 409 | `{ error: <sentence> }` (a plain string, not the envelope). why: the person fixes each: `off` in API → Gemini, the key in Settings → Voice. The mapping is `chatStatusForRefusal` (`gemini-errors.ts`), shared with read-aloud |
 | `failed` | 502 | `{ error: <sentence> }` |
 - Sentences: MAN-9099 (Gemini's own) and the both-failed one above. On the press door the same answer is 409 `COMPANION_SPEECH_REFUSED` / 502 `COMPANION_SPEECH_FAILED` (`speechRefusal`, MAN-9272), and a stand-in adds a system line to her log. The chat's `useVoiceInput` shows them as they came (MAN-9092).
 - An upload multer refuses is 400 `{ error: <its message> }`; no `audio` part is 400 `{ error: 'No audio uploaded' }`.
@@ -7093,7 +7097,7 @@ section: server/modules/voice — the account's `voice` preference, its Gemini a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-read-aloud.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-address.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
 
-## MAN-9099 — server/modules/voice — `transcribeWithGemini`: the generateContent call, the three refusals, the key rules and what is never counted
+## MAN-9099 — server/modules/voice — `transcribeWithGemini`: the generateContent call through the wire, the four refusals, the key rules and the count
 
 `transcribeWithGemini(userId, audio: VoiceAudioUpload): Promise<TranscribeAnswer>` (`gemini-transcribe.ts`) turns one clip into the words spoken, for one account. Gemini is the BACKUP transcriber: this door is called only when the account's home server could not hear a clip, or the account has none (MAN-9104). It never throws for an expected failure. Settings, key and routes: MAN-9098. Rules: INV-11542, INV-9908. Open defect: INV-9876 (§Standing defect).
 
@@ -7105,6 +7109,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.
 | answer | when | `sentence` |
 |---|---|---|
 | `{ ok: true, text }` | the model answered; `text` is trimmed; `''` when it reported no words or only a bracketed note (`[no speech]`). `text` is then run through `cleanTranscript` (§Cleanup): with the account's `cleanTranscripts` on its fillers go (a lone `Um.` is `''` too), and always each misheard house word is replaced by its spelling (MAN-9452 §The net). A silent clip is not certain to come back `''` (§Standing defect) | – |
+| `{ ok: false, reason: 'off' }` | the account switched `backup_transcription` off in API → Gemini (read by the wire at each ask, MAN-10228); NO request is made and nothing is counted | `Gemini is switched off for Backup transcription: turn it on in API → Gemini` |
 | `{ ok: false, reason: 'no_key' }` | no key in reach (MAN-9098 §The key); NO request is made | `No Gemini key: set one in Settings → Voice` |
 | `{ ok: false, reason: 'refused' }` | HTTP 401 or 403, or a 400 whose error names the key (`API_KEY_INVALID` in the body, or `api key` in Google's message, case-insensitive) | `Gemini refused the key: <Google's message>` |
 | `{ ok: false, reason: 'failed' }` | any other status, a network error, a timeout, a reply with no text | `Gemini could not transcribe this: <why>` |
@@ -7119,7 +7124,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.
 | no candidate | `the answer held no candidate` |
 | candidate with no text and `finishReason` other than `STOP` | `the answer held no text (finish reason <reason>)`; `missing` when the reply names none |
 
-HTTP of each reason on the chat route: `no_key`, `refused` → 409; `failed` → 502 (MAN-9740 §The route's answer). On the press door: 409 `COMPANION_SPEECH_REFUSED`, 502 `COMPANION_SPEECH_FAILED` (MAN-9272 §Press). When the home server was tried first, the sentence the person sees is the both-failed one that holds this one (MAN-9740).
+HTTP of each reason on the chat route: `off`, `no_key`, `refused` → 409; `failed` → 502 (MAN-9740 §The route's answer). On the press door: 409 `COMPANION_SPEECH_REFUSED`, 502 `COMPANION_SPEECH_FAILED` (MAN-9272 §Press). When the home server was tried first, the sentence the person sees is the both-failed one that holds this one (MAN-9740).
 
 ## The request
 - `POST https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent`; `<model>` = the account's `gemini.transcriptionModel` (the backup's model) through `encodeURIComponent`.
@@ -7171,9 +7176,9 @@ section: server/modules/voice — `transcribeWithGemini`: the generateContent ca
 - A whole answer that is one bracketed note — `[no speech]`, `[silence]`, `(inaudible)`; `ANNOTATION_ONLY`: `[…]` or `(…)` of 1–40 characters on one line, an optional trailing `.` — is a success with `text` `''`. Words with a bracket inside them are kept whole.
 
 ## The key — rules of this file
-- The key is resolved per call (`resolveGeminiKey`, MAN-9098).
+- The door never holds the key: each attempt is an `askGemini` (MAN-10228), which resolves it (MAN-9098), sends it in the header and counts the attempt; the one retry after a 429 or 503 is its own ask and its own counted call.
 - It rides the `x-goog-api-key` header only: never the URL, a log line or a sentence.
-- Every sentence returned passes `redactKey` (`gemini-errors.ts`, shared with `gemini-speech.ts`, MAN-9105): the key's own text, and anything shaped `AIza[0-9A-Za-z_-]{20,}`, becomes `[key]`. The status, message and failure helpers (`isRetryableStatus`, `googleMessage`, `namesTheKey`, `describeFetchFailure`, `parseJsonObject`) live there too, and `chatStatusForRefusal(reason)`, the route's status for a refusal (`no_key`, `refused` 409; `failed` 502: MAN-9740).
+- Every sentence returned passes `redactKey` (`gemini-errors.ts`, shared with `gemini-speech.ts`, MAN-9105), bound to the key through the `redact` the wire hands back with an answer, and as the shape rule alone when no answer came: the key's own text, and anything shaped `AIza[0-9A-Za-z_-]{20,}`, becomes `[key]`. The status, message and failure helpers (`isRetryableStatus`, `googleMessage`, `namesTheKey`, `describeFetchFailure`, `parseJsonObject`) live there too, and `chatStatusForRefusal(reason)`, the route's status for a refusal (`no_key`, `refused` 409; `failed` 502: MAN-9740).
 
 ## Standing defect — INV-9876
 - A clip with no words in it, longer than the press door's 0.4 s empty-press floor, can still come back as invented words under the current instruction. 2026-10-27, `gemini-3.8-flash`, 2 s of silence, two runs of INV-9876's probe: `I'll do that`, then `the world's most`.
@@ -7181,12 +7186,12 @@ section: server/modules/voice — `transcribeWithGemini`: the generateContent ca
 - Nothing in this file separates them from speech: read an `ok` text as what the model heard, not proof that something was said.
 - Reached only when Gemini hears the clip, as the backup or for an account with no home server: the home server answers `''` for a clip with no speech (measured on a tone, MAN-9272).
 
-## Never counted
-- The door carries no `admit`, no `record` and no budget name. Operator, 2026-10-26: "Kaylee doesn't count for the budget." The chat mic and the press ride the same door when Gemini stands in for the home server, and are not counted.
+## Counted, never budgeted
+- The door carries no `admit`, no cap and no budget name. Operator, 2026-10-26: "Kaylee doesn't count for the budget." The chat mic and the press ride the same door when Gemini stands in for the home server. Every attempt is counted by the wire as `backup_transcription` on the account's Gemini meter (`gemini_calls_daily`, MAN-10223), and the account's switch for it is read at each ask (INV-9908).
 - Measured (MAN-9059 §Press): after a live press, `/opt/shadow-connector/state/gemini_plan_spend/` gained no file.
 
 ## Log
-- One line per call, never the key: `[voice] gemini transcribe <model> <clip bytes> B <ms> ms → ok|no_key|refused|failed`. The journal is shared: a probe names its call by the bytes it uploaded (the fixture posted by curl is 122924 B, MAN-9100).
+- One line per call, never the key: `[voice] gemini transcribe <model> <clip bytes> B <ms> ms → ok|off|no_key|refused|failed`. The journal is shared: a probe names its call by the bytes it uploaded (the fixture posted by curl is 122924 B, MAN-9100).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts
 
@@ -7304,9 +7309,9 @@ Used by `CompanionSettingsSection`, which passes `saveBinding = (talkBinding) =>
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBindingCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts
 
-## MAN-9105 — server/modules/voice — synthesizeSentence: Kaylee's voice from Gemini, the streamed Interactions call, the answer, the abort and what is never counted
+## MAN-9105 — server/modules/voice — synthesizeSentence: Kaylee's voice and read-aloud from Gemini, the streamed Interactions call through the wire, the answer, the abort and the count
 
-`synthesizeSentence(userId, { text, style, signal }): Promise<SpeechAnswer>` (`gemini-speech.ts`) speaks one sentence of hers in the account's Gemini voice, streamed as PCM. `text` is the sentence's words as `utteranceOf` rebuilds them from her stored row (sounds written back as `<tag>`, MAN-9110), `style` its delivery. It never throws for an expected failure. Settings, key, routes: MAN-9098. The transcribing twin: MAN-9099. Rules: INV-9908. The sound-tag list's one home: INV-9938. Proof: `.verify/kaylee-voice-speech.mjs`.
+`synthesizeSentence(userId, { text, style, signal, feature }): Promise<SpeechAnswer>` (`gemini-speech.ts`) speaks one sentence of hers in the account's Gemini voice, streamed as PCM. `text` is the sentence's words as `utteranceOf` rebuilds them from her stored row (sounds written back as `<tag>`, MAN-9110), `style` its delivery. It never throws for an expected failure. Settings, key, routes: MAN-9098. The transcribing twin: MAN-9099. Rules: INV-9908. The sound-tag list's one home: INV-9938. Proof: `.verify/kaylee-voice-speech.mjs`.
 
 | consumer | reaches it as |
 |---|---|
@@ -7317,6 +7322,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useT
 | answer | when | `sentence` |
 |---|---|---|
 | `{ ok: true, chunks }` | the FIRST audio has already arrived: `chunks` yields it, then the rest | – |
+| `{ ok: false, reason: 'off' }` | the account switched the call's `feature` (`companion_speech` or `read_aloud`) off in API → Gemini (read by the wire at each ask, MAN-10228); NO request is made, nothing is counted and no log line is written | `Gemini is switched off for Companion speech: turn it on in API → Gemini` (or `Read aloud`) |
 | `{ ok: false, reason: 'no_key' }` | no key in reach (MAN-9098 §The key); NO request is made | `No Gemini key: set one in Settings → Voice` |
 | `{ ok: false, reason: 'refused' }` | HTTP 401 or 403, or a 400 that names the key | `Gemini refused the key: <Google's message>` |
 | `{ ok: false, reason: 'failed' }` | any other status, a network error, a timeout, an `error` event before any audio, a stream that closes holding no audio | `Gemini could not speak this: <why>` |
@@ -7335,12 +7341,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useT
 - One 60 s bound on the whole call (the ask to the last byte). Kaylee's sentences are at most 300 characters; the chat's read-aloud sends the same door pieces of at most 700 (`gemini-read-aloud.ts`, MAN-9741), and a 91-character sentence has been measured at 31 s under load, so the bound is a give-up, not proof of a stuck stream.
 - `signal` aborting ends the stream at once (a pending `next()` resolves done) and cancels the request, so nothing more is generated. A consumer that stops early (`return()` on the iterator, even before its first read) cancels it too and the call's line is written; an abort that lands before the first read delivers no piece (`firstThenRest` is a hand-written iterator for that reason: a generator's body does not start until its first `next()`). An already-aborted signal makes no request, and an abort before the first audio answers `{ ok: true, chunks }` with `chunks` empty (no `ok: false`). Measured: an abort after the first chunk ended the iterator in 1 ms, the replay server saw the connection close with 4 of 42 events sent.
 
-## The key and the budget
-- The key is resolved per call (`resolveGeminiKey`) and rides the header only; every sentence passes `redactKey`.
-- NOT COUNTED (operator, 2026-10-26, "Kaylee doesn't count for the budget"): no `admit` before, no `record` after, no budget name. Measured: `/opt/shadow-connector/state/gemini_plan_spend/` listing identical before and after the paid proof.
+## The key, the count and the budget
+- The door never holds the key: each attempt is an `askGemini` (MAN-10228), which resolves it and sends it in the header only; every sentence passes the `redact` the wire hands back with an answer, or `redactKey`'s shape rule alone when no answer came.
+- Counted, never budgeted (operator, 2026-10-26, "Kaylee doesn't count for the budget"): no `admit`, no cap, no budget name. Every attempt, the one retry included, is counted on the account's Gemini meter as the caller's `feature`: `companion_speech` from `companion-speech.ts`, `read_aloud` from `gemini-read-aloud.ts`. Measured 2026-11-24: one sentence ('Hello there.') on `gemini-3.8-flash-lite-tts` left `companion_speech | gemini-3.8-flash-lite-tts | calls 1 | metered_calls 1 | input 4 | output 27 | output_audio 27`; with the switch off the same ask answered `off`, wrote no log line and left the row unchanged.
 
 ## Log
-- One line per call, written when it ends, never the key: `[voice] gemini speech <model> <characters> ch <bytes> B <ms> ms → ok|no_key|refused|failed|aborted`. `<bytes>` is the PCM delivered so far. Measured: `[voice] gemini speech gemini-3.8-flash-lite-tts 41 ch 138240 B 1322 ms → ok` (2.88 s of audio, first chunk 951 ms after the ask, 37 chunks of 1920–7680 B).
+- One line per call, written when it ends, never the key: `[voice] gemini speech <model> <characters> ch <bytes> B <ms> ms → ok|no_key|refused|failed|aborted` (none for `off`: nothing was sent). `<bytes>` is the PCM delivered so far. Measured: `[voice] gemini speech gemini-3.8-flash-lite-tts 41 ch 138240 B 1322 ms → ok` (2.88 s of audio, first chunk 951 ms after the ask, 37 chunks of 1920–7680 B).
 
 ## Gotcha — the voice slurs "build is"
 - `Okay so <short pause> the build is green!` with style `bright, warm, quick, a smile in the voice; delighted` is voiced, has a 340 ms pause where `<short pause>` stands, and nothing bracketed is spoken. It does NOT say "build is" clearly: Gemini's transcriber heard `Okay, so, the middle's green!` (lite) and `Okay, so the bill is green.` (flash-tts); faster-whisper `base` heard `Okay, so the bill's green!`. The delivered bytes are Google's, byte for byte (the PCM equals the base64 of the 37 stored deltas), so the slur is the voice's, not the module's. `.verify/kaylee-voice-speech.mjs` therefore judges that `green` was heard and that `short pause` was not spoken, and prints the words; a probe that must assert on "build" should choose a sentence without a fast contraction.
@@ -7407,7 +7413,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.mj
 | 400 | `COMPANION_INPUT_INVALID` | a malformed param, or no client id | the field's sentence |
 | 404 | `COMPANION_NO_SENTENCE` | an index the log holds no `kaylee` row for, a cleared log, or a sentence of a turn that is not current written over five minutes ago | `She has no such sentence to say: it is unknown or too old to speak.` |
 | 409 | `COMPANION_NOT_FLOOR` | check 1 | `Another page holds the floor, so her voice plays there; this page shows her words only.` |
-| 409 | `COMPANION_SPEECH_REFUSED` | `synthesizeSentence` answered `no_key` or `refused` | Google's sentence, e.g. `No Gemini key: set one in Settings → Voice` |
+| 409 | `COMPANION_SPEECH_REFUSED` | `synthesizeSentence` answered `off`, `no_key` or `refused` | the sentence, e.g. `Gemini is switched off for Companion speech: turn it on in API → Gemini` or `No Gemini key: set one in Settings → Voice` |
 | 502 | `COMPANION_SPEECH_FAILED` | `synthesizeSentence` answered `failed` before the first byte | its sentence (key redacted) |
 - Envelope: MAN-9058 §Refusals. The mapping is `speechRefusal` (`companion-input.ts`), shared with the press door.
 - A synthesis that fails or stops AFTER the first byte ends the response where the audio stopped; the status is already 200. The door writes `[companion] speech <turn>/<index>: the audio stopped early: <sentence>` on stderr (`fill`, `companion-speech.ts`) and drops the entry. `[companion] speech: the audio stream stopped before its end` (`streamPcm`) is the route's own catch for an iterator that throws, which `followEntry` does not. The write waits on `drain` or `close` between pieces.
@@ -7424,7 +7430,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.mj
 - No route, status or answer of this door changes: the frames ride the existing `/ws`.
 
 ## The refusal's system line
-- The first `no_key` or `refused` of a turn writes ONE `system` log line `I could not speak: <sentence>` (`claimRefusalLine(turnId)`); later refused sentences of that turn write none. A `failed` writes none. A panel write that throws is logged and does not change the answer.
+- The first `off`, `no_key` or `refused` of a turn writes ONE `system` log line `I could not speak: <sentence>` (`claimRefusalLine(turnId)`); later refused sentences of that turn write none. A `failed` writes none. A panel write that throws is logged and does not change the answer.
 - The page stops pulling that turn on a 409 (MAN-9113) and shows nothing of its own: the line arrives as a `companion_log` frame.
 
 ## The sentence, rebuilt from its log row (`companion-utterance.ts`, pure)
@@ -17054,18 +17060,19 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/r
 Client half of the Analytics `web-walk` section: whether the house drives its running apps through the web-walk helper or writes browser programs by hand. Registered in `sections/registry.ts` as id `'web-walk'` (MAN-10106). Words: `analytics.sections.webWalk` ("Web walks") and the `analytics.webWalk.*` block of en/common.json.
 
 ## State today
-- `WebWalkSection` reads `GET /api/analytics/web-walk?days=N` through `useAnalyticsSection<WebWalkAnalytics>('web-walk', days, narrow)`; `narrow` checks the top-level keys (numbers, `first_day` a string or null, `settled` with a boolean `refusing` and numeric `bars`, `totals` and `doors` all numbers, three lists) and carries the rows as printed. The server reader is `server/modules/analytics/sections/web-walk.ts` (MAN-10102) over `~/.claude/scripts/web-walk reading --days N`.
+- `WebWalkSection` reads `GET /api/analytics/web-walk?days=N` through `useAnalyticsSection<WebWalkAnalytics>('web-walk', days, narrow)`; `narrow` checks the top-level keys (numbers, `first_day` a string or null, `settled` with a boolean `refusing` and numeric `bars`, `totals` and `doors` all numbers, three lists, `autocorrect` with its `corrected` and `refused` lists) and carries the rows as printed (`isAutocorrect`). `WebWalkAutocorrection` draws `autocorrect`, last in the section. The server reader is `server/modules/analytics/sections/web-walk.ts` (MAN-10102) over `~/.claude/scripts/web-walk reading --days N`.
 - The two folds are the components' own state: `WebWalkTrend`'s day table (`useState(false)`, closed on every mount) and `WebWalkApps`' open app (`useState<string | null>(null)`, none on arrival).
 
 ## Files — `src/modules/analytics/sections/web-walk/`
 | file | what |
 |---|---|
-| `WebWalkSection.tsx` | `WebWalkSection({ days })` in `AnalyticsSectionFrame`, `takenAt = answer.generated_at`. an info `Banner` `historyStarts` while `daysCovered` is under the window; quiet (`totals.walks === 0 && totals.launches_by_hand === 0`) ⇒ one `EmptyState` (`empty.noHistory*` when `first_day` is null, else `empty.title`/`message`); else Glance, Trend, then Checks and Apps side by side from `xl`. |
+| `WebWalkSection.tsx` | `WebWalkSection({ days })` in `AnalyticsSectionFrame`, `takenAt = answer.generated_at`. an info `Banner` `historyStarts` while `daysCovered` is under the window; quiet (`totals.walks === 0 && totals.launches_by_hand === 0`) ⇒ one `EmptyState` (`empty.noHistory*` when `first_day` is null, else `empty.title`/`message`); else Glance, Trend, then Checks and Apps side by side from `xl`, then Autocorrect. |
 | `WebWalkGlance.tsx` | `WebWalkGlance({ totals, doors, settled, days })`: the share on the helper as the one large `Readout`; launches walking / by hand; walks (by door) and custom steps, with `walksNoteNone` / `customStepsNoteNone` for a window with no walk; `WebWalkNudge`: the nudge's state in one sentence (warning, refusing, since) with its bars and where each stands. |
 | `WebWalkTrend.tsx` | `WebWalkTrend({ series, totals, span })`: `DayChart` of launches walking vs by hand; the days as a folded `DataTable` (Day by day) under the plot, closed on every mount. |
 | `WebWalkChecks.tsx` | `WebWalkChecks({ checks, days })`: premade checks ranked by answered false. |
 | `WebWalkApps.tsx` | `WebWalkApps({ apps, days })`: table App / Walks / Unreached (three columns for a 390px screen); a row opens to Screen / Opened, "N unreached" only where it happened, and the re-check sentence naming up to `MOST_NAMED = 6` unreached screens, past it the app alone. Wraps with `[overflow-wrap:anywhere]`. |
-| `webWalkFigures.ts` | pure seam: `shareWords`, `daysCovered`, `launchDays`, `rankedChecks`, `appRows`, `refusingBars(settled): NudgeBar[]`, `unreachedScreens(row)`, `sinceDay`; types `Worded`, `WalkSpan`, `LaunchDay`, `AppRow`, `NudgeBar`. |
+| `WebWalkAutocorrection.tsx` | `WebWalkAutocorrection({ autocorrect, walks, days })`: two `Readout`s, each over its list. Steps corrected over the table Mistake corrected / Steps (the entry's `label` from the helper's table, its code name small under it). Walks still refused (of all walks) over the table Refusal / Walks: `whole` cut at two lines with its title, "Refused on purpose" under a row whose `on_purpose` is set; a pressed row opens to the whole wording and the next step (for an on-purpose row, the rule's `reason`); past `MOST_SHOWN = 8` the rest fold behind one `Button`. One quiet line when both lists are empty, one in a list's place when only it is. |
+| `webWalkFigures.ts` | pure seam: `shareWords`, `daysCovered`, `launchDays`, `rankedChecks`, `rankedCorrected`, `rankedRefused`, `appRows`, `refusingBars(settled): NudgeBar[]`, `unreachedScreens(row)`, `sinceDay`; types `Worded`, `WalkSpan`, `LaunchDay`, `AppRow`, `NudgeBar`. |
 
 
 ## Rules
@@ -17089,3 +17096,91 @@ Shared door for a CloudCLI case that walks an app through `~/.claude/scripts/web
 **Users.** The cases under `cases/walk/` that run a walk: the light/dark fan-out, and the Restorly reach, adapter, dictionary and light/dark cases.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/cases/lib/web_walk.mjs
+
+## MAN-10228 — server/modules/voice — askGemini, the wire: the one sender to Google, its switch, its key, the tee and one count per attempt; usageOf reads the cost
+
+`server/modules/voice/gemini-wire.ts` is CloudCLI's one sender to Google, and `gemini-usage-read.ts` reads what each answer says it cost. Rules: INV-9908. The meter it counts on: MAN-10223. The doors that send through it: MAN-9099 (`transcribeWithGemini`), MAN-9105 (`synthesizeSentence`).
+
+## `askGemini(ask: GeminiAsk): Promise<GeminiSent>`
+`GeminiAsk = { userId, feature: GeminiFeature, model, url, body, signal }`; `GeminiSent = { kind: 'off', sentence } | { kind: 'no_key' } | { kind: 'answer', response, redact(sentence) }`. Exported through the voice barrel with its types; `resolveGeminiKey` is not.
+
+| step | what happens |
+|---|---|
+| switch | `geminiFeatureOff(userId, feature)`, read at this ask. Off: `{ kind: 'off', sentence: 'Gemini is switched off for <label>: turn it on in API → Gemini' }` (`<label>` from `geminiFeatureLabel`: Companion speech, Read aloud, Backup transcription). Nothing sent, nothing counted |
+| key | `resolveGeminiKey(userId)` (this file is its one importer). None: `{ kind: 'no_key' }`, nothing sent |
+| send | one `fetch` POST to `url`, the key in the `x-goog-api-key` header and nowhere else, `Content-Type: application/json`, the caller's `signal`. A fetch that throws (abort, timeout, network) is counted as a failure and thrown on |
+| answer | the Response is rebuilt over one branch of `response.body.tee()` (same status, status text and headers), so the caller reads the same bytes at the same moments; the wire reads the other branch. A body-less answer (or status 101/204/205/304) is handed on as it came and counted at once |
+| count | ONE `recordGeminiCall` per ask, when the wire's branch ends or the request dies: non-2xx → `failed`; 2xx whose copy carried Google's usage → metered; 2xx without → unmetered, its output derived from the audio delivered (`deliveredSpeechUsage`), else no tokens. The count holds the key's 8-hex sha256 digest (`geminiKeyId`) and last four characters, never the key. A fault while counting is one `console.warn` naming the user, feature, model and the error's class |
+| redact | `redact(sentence)` is `redactKey(sentence, key)`: the door passes every sentence built from this answer through it. A door whose ask got no answer passes its sentence through `redactKey(sentence)`, the shape rule alone |
+
+A retry is the door's own second ask, so every attempt is its own counted call. The copy kept for counting stops at 16 MB; an answer past that is counted unmetered with no tokens. A stream that dies after a 2xx (the caller's abort, the 60 s clock) is counted as answered, from what arrived.
+
+## `gemini-usage-read.ts`
+- `usageOf(contentType, copy) → { usage: GeminiUsage | null, audioBytes }`. JSON (`generateContent`): `usageMetadata` — input `promptTokenCount`; output `candidatesTokenCount` + `thoughtsTokenCount`; the AUDIO entries of `promptTokensDetails` / `candidatesTokensDetails` as the audio part, and with no input breakdown the whole input as audio. Event stream (Interactions API; `text/event-stream`, or a body that begins `event:`/`data:`): the last event's `usage` (on the event, or on its `interaction`) — input `total_input_tokens`; output `total_output_tokens` + `total_thought_tokens`; the audio entries of its by-modality lists, and with no output breakdown the whole output as audio — and `audioBytes`, the decoded bytes of every `delta` of type `audio`. A usage whose two totals are 0 is no usage: absence of measurement is never recorded as zero.
+- `deliveredSpeechUsage(model, audioBytes, at)`: PCM 24 kHz 16-bit mono is 48,000 bytes a second; tokens = seconds × the model's `audioOutTokensPerSecond` on that UTC day (`rateFor`, the meter's barrel), as output and output-audio tokens. Null for a model with none listed (the call is counted, its tokens are not) and for no audio.
+
+## Prove it
+One short sentence on `gemini-3.8-flash-lite-tts` (INV-9908's probe rule) over a scratch `DATABASE_PATH`, then the same ask with `companion_speech` switched off. Measured 2026-11-24: the first answered 51,840 B of PCM and left `companion_speech | gemini-3.8-flash-lite-tts | calls 1 | metered_calls 1 | input_tokens 4 | output_tokens 27 | output_audio_tokens 27` in `gemini_calls_daily`; the second answered `{ ok: false, reason: 'off', sentence: 'Gemini is switched off for Companion speech: turn it on in API → Gemini' }`, wrote no `[voice] gemini speech` line and left the row as it was.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-usage-read.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-wire.ts
+
+## MAN-10233 — gemini-spend — the API tab's Gemini view: seam, layout, rules, fake states
+
+`src/modules/gemini-spend/`: the API tab's Gemini view (`ApiPanel` sub-tab id `gemini`, MAN-470). Live: the hook reads both doors (rules: INV-11944).
+
+## Seam
+| Piece | State |
+|---|---|
+| `useGeminiUsage(range): GeminiUsageView` (`useGeminiUsage.ts`) | live; its doc comment is its contract |
+| Doors it reads | `GET /api/gemini-usage/usage` (connector through the lane MAN-10235, `ConnectorUsage`) and `GET /api/gemini-meter/usage` (CloudCLI's own, `MeterUsage`), via `api.geminiUsage` / `api.geminiMeter`, each a `DoorRead`: `reading` / `answered` (+`readAt`) / `failed` (+`sentence`) |
+| Presses | `PUT /api/gemini-meter/switches/:feature` for CloudCLI's three, `PUT /api/gemini-usage/switches/:feature` for the rest |
+| Re-read triggers | mount, range change, page visible, after a press; no interval (INV: events, never a clock) |
+| `GeminiUsageView` (`types.ts`) | both doors, `refresh`, `pressFailure`, `dismissPressFailure`, `setSwitch`, held switch ids |
+| `GeminiRange` | `today` \| `7d` \| `30d`; the panel opens on 7d |
+
+
+## Layout (`GeminiUsagePanel.tsx`, top to bottom)
+1. `SegmentedControl` window.
+2. `GeminiTotal`: `Readout` (lg) total + `cost_basis` as served (both doors must send a sentence), three series Readouts, one line on what unmeasured and unpriced do to the dollars.
+3. `GeminiDays`: TWO `DayBars` plots by UTC day (MAN-10037), each on its own scale: the connector's (Features above the rule, Builds and sessions below) and CloudCLI's, whose legend reads `api.gemini.days.peakOwn` ("Its own scale."). Folded day table (local state, no FILL). `today` draws no plot (`days.length < 2`).
+4. `GeminiProjectSection` per project (Restorly with a Badge and a sentence when its master reads off, shadow-connector, CloudCLI): `GeminiFeatureRow` = label, marks, calls, tokens, dollars, `Switch`.
+5. `GeminiBudgets` (Builds and sessions, no switch); `GeminiKeys` (By key, by process, never-counted mark).
+6. `GeminiDoorDown`: `Banner` with Try again in the dead door's place; the total says it is short, missing series read the unknown dash.
+
+## Rules
+- The `role="status"` region stays mounted; a refused press renders inside it as `data-gemini-press-failed`.
+- `keysOf` (`geminiFigures.ts`): a key both doors list is one row, counts summed, both holders named.
+- `failures` and `last_at` are in the row types and not drawn.
+- Only `en/common.json` carries the words (`api.subtabs.gemini`, `api.gemini`).
+- Open: DayBars cannot take a third series or a shared ceiling, so the two plots stand on two scales (ticket 361). On change, `GeminiDays.tsx` is the one place to edit and `api.gemini.days.peakOwn` goes.
+- Open: on a phone the day table's fourth column sits behind the `DataTable` shade, one swipe away.
+
+## The Claude-login group
+
+After the CloudCLI section the panel draws the connector's `claude_login` as one section (`data-gemini-section="claude-login"`) headed "On the Claude login", with "Counted, not priced" at the rule's end and a note that these callers run on the operator's Claude subscription. Each caller is a GeminiRow: its label, the models it ran on as detail, calls and tokens, and a cost of null (a dash, never $0.00). The window control sets the span (Today is one day). It is not drawn when the door answers `claude_login` null or leaves it out.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/GeminiDays.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/geminiFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/GeminiUsagePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/useGeminiUsage.ts
+
+## MAN-10235 — The gemini-usage lane — /api/gemini-usage forwarded to shadow-connector
+
+`server/modules/gemini-usage/`: the lane to shadow-connector's `/api/gemini-usage` — what Gemini cost the account by feature, budget, key and process, and the switch per feature. Rules: INV-8633 (the lanes' secret, allowlist and pass-through).
+
+| Piece | Home |
+|---|---|
+| Factory | `createGeminiUsageModule()` in `gemini-usage.module.ts`, re-exported by `index.ts`; reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` and passes them to `createShadowConnectorLane` with label `gemini-usage` |
+| Routes | `createGeminiUsageRouter` in `gemini-usage.routes.ts`: `createLaneRouter` over the ALLOWLIST below, upstream prefix `/api/gemini-usage`, no passed headers |
+| Mount | `server/index.ts`, beside the Tours and bulletins lanes: `app.use('/api/gemini-usage', authenticateToken, geminiUsage.router)` |
+| Browser caller | `api.geminiUsage.usage(range)` / `api.geminiUsage.setSwitch(feature, enabled)` in `src/shared/api.ts`, read by `useGeminiUsage` (MAN-10233) |
+
+## ALLOWLIST
+| Row | Checks | Upstream |
+|---|---|---|
+| `GET /usage` | query `range`: `today`, `7d` or `30d` (else the lane's 422) | the connector's summary body, passed whole |
+| `PUT /switches/:feature` | `feature` `[a-z0-9_]{1,80}` (else 422); body a JSON object, passed whole | `{feature, enabled, account_id}` as the switch file reads back |
+
+Any other method and path is the lane's own 404 (`not a route of the gemini-usage lane`); nothing leaves the server. Timeouts 30 s each. A connector refusal (its 409 when no account is named and the house holds several, its 422) passes through with its status.
+
+## Proof
+Signed in, `GET /api/gemini-usage/usage?range=7d` answers the connector's body; `GET /api/gemini-usage/nothing` answers the lane's 404.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/gemini-usage/gemini-usage.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/gemini-usage/gemini-usage.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/gemini-usage/index.ts

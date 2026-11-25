@@ -120,7 +120,7 @@ function startSynthesis(account: CompanionAccount, { turnId, index }: SpeechRequ
   async function open(entry: SpeechEntry): Promise<AppError | null> {
     let answer: SpeechAnswer;
     try {
-      answer = await synthesizeSentence(userId, { text: utterance.text, style: utterance.style, signal: entry.abort.signal });
+      answer = await synthesizeSentence(userId, { text: utterance.text, style: utterance.style, signal: entry.abort.signal, feature: 'companion_speech' });
     } catch (error) {
       // `synthesizeSentence` answers its expected failures as values; a throw is a defect, and the request must still be answered.
       console.error(`[companion] speech ${label}: the synthesis threw`, error);

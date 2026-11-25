@@ -1,6 +1,6 @@
 import { useAccountsContext } from '@/modules/accounts/context/AccountsContext';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
-import { accountInUse, accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
+import { accountInUse, accountInUseUsage, usageAgeWords } from '@/modules/accounts/utils/accountInUseUsage';
 import { WINDOW_NAMES, ringTone, windowPercent } from '@/modules/accounts/utils/usageWindows';
 
 /** The account in use's week, as a ring reads it: its percent (null while nobody has measured it), its tone, and the sentence that says both. */
@@ -24,6 +24,7 @@ export function useAccountWeek(): AccountWeek {
   const tone = ringTone(percent);
   const inUse = accountInUse(accounts);
   const owner = inUse?.email ?? inUse?.slug ?? null;
-  const words = `${owner === null ? 'Account' : `Account ${owner}`}. ${WINDOW_NAMES.seven_day} ${percent === null ? 'has no reading yet' : `${percent}%`}`;
+  const age = percent === null ? null : usageAgeWords(reading, now);
+  const words = `${owner === null ? 'Account' : `Account ${owner}`}. ${WINDOW_NAMES.seven_day} ${percent === null ? 'has no reading yet' : `${percent}%`}${age === null ? '' : `, ${age}`}`;
   return { percent, tone: tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : 'quiet', words };
 }

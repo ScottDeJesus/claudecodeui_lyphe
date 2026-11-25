@@ -2,10 +2,10 @@
 export { voiceRoutes } from './voice.module.js';
 // transcribeSpeech: used by the companion module's press door to turn the operator's recorded clip into words. It is the one
 // try-then-backup transcriber the chat mic uses too (the account's home server first, Gemini the backup), whatever the chat
-// composer's provider picker says; Gemini's calls are not counted against any Gemini budget.
+// composer's provider picker says; Gemini's calls are never admitted, capped or named to a Gemini budget, and are counted by the wire.
 export { transcribeSpeech } from './voice.module.js';
 // synthesizeSentence: used by the companion module's speech door (`companion-speech.ts`, behind `GET /api/companion/speech/:turnId/:index`)
-// to speak one of her sentences in the account's Gemini voice, streamed as PCM. Not counted against any Gemini budget.
+// to speak one of her sentences in the account's Gemini voice, streamed as PCM. Never admitted to a Gemini budget; counted by the wire.
 export { synthesizeSentence } from './gemini-speech.js';
 // readVoiceSettings: used by the companion module's wiring (`companion-account.ts`) to read the account's sound-tag list fresh, at the start
 // of each turn (the parse that strips her sentences) and at each push (the register that teaches her the sounds), and by its `read_settings`
@@ -24,3 +24,11 @@ export { DEFAULT_SOUND_TAGS } from './voice-settings.js';
 export type { HeardAnswer } from '@/shared/types.js';
 // SpeechAnswer: the type of synthesizeSentence's answer, read by the companion's speech route to tell a refusal from a stream.
 export type { SpeechAnswer } from '@/shared/types.js';
+// heldGeminiKeys: used by server/index.ts, which hands it to the Gemini meter (createGeminiMeterModule) so the usage
+// reading lists the keys an account's calls can be sent with, by sha256 digest and last four characters, never the key.
+export { heldGeminiKeys } from './gemini-key.js';
+// askGemini, GeminiAsk, GeminiSent: CloudCLI's one sender to Google. It reads the feature's switch, resolves the key (which never
+// leaves the module), sends one POST and counts it on the account's Gemini meter; both voice doors send through it, and any
+// future Gemini caller in this server must too (INV-9908).
+export { askGemini } from './gemini-wire.js';
+export type { GeminiAsk, GeminiSent } from './gemini-wire.js';

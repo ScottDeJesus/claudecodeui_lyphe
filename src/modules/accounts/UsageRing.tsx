@@ -33,6 +33,8 @@ type UsageRingProps = {
    * rail draws the one account in use and passes none.
    */
   owner?: string;
+  /** How old the figure is ("as of 5d ago"), said after it in the ring's words; absent while it is current. */
+  asOf?: string | null;
 };
 
 /**
@@ -44,7 +46,7 @@ type UsageRingProps = {
  * A status, not a control: no button, no tab stop. A row ring stands outside the row's Use button on purpose — a long
  * press on it is a phone's way to read its words, and must never switch the account.
  */
-export function UsageRing({ usageWindow, now, degraded = false, captioned = false, owner }: UsageRingProps) {
+export function UsageRing({ usageWindow, now, degraded = false, captioned = false, owner, asOf = null }: UsageRingProps) {
   const percent = usageWindow === null ? null : windowPercent(usageWindow);
   const tone = ringTone(percent);
 
@@ -55,6 +57,7 @@ export function UsageRing({ usageWindow, now, degraded = false, captioned = fals
     words.push(NO_READING_WORDS);
   } else {
     words.push(windowValue(percent));
+    if (asOf) words.push(`${asOf.charAt(0).toUpperCase()}${asOf.slice(1)}`);
     const reset = resetsLine(usageWindow?.resetsAt ?? null);
     if (reset) words.push(reset);
   }

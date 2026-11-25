@@ -452,9 +452,118 @@
   "api": {
     "subtabs": {
       "jev": "Jev",
-      "deepseek": "DeepSeek"
+      "deepseek": "DeepSeek",
+      "gemini": "Gemini"
     },
-    "subtabsLabel": "API services"
+    "subtabsLabel": "API services",
+    "gemini": {
+      "title": "Gemini spend",
+      "reading": "Reading what Gemini cost…",
+      "unknown": "not known",
+      "window": {
+        "label": "Window",
+        "today": "Today",
+        "7d": "7 days",
+        "30d": "30 days"
+      },
+      "total": {
+        "label": {
+          "today": "Gemini spend · today",
+          "7d": "Gemini spend · last 7 days",
+          "30d": "Gemini spend · last 30 days"
+        },
+        "missing": {
+          "connector": "CloudCLI only: the connector did not answer",
+          "meter": "Without CloudCLI: its meter did not answer"
+        },
+        "features": "Features",
+        "budgets": "Builds and sessions",
+        "cloudcli": "CloudCLI",
+        "noAnswer": "No answer",
+        "readAt": "Read {{when}}",
+        "unmeasured": "{{calls}} were answered without Google's own usage, so their dollars are missing from these figures.",
+        "unpriced": "No list price is held for {{models}}, so its calls add no dollars."
+      },
+      "days": {
+        "title": "By day",
+        "plotConnector": "Estimated spend per UTC day, features above the rule and builds and sessions below it, {{days}} days",
+        "plotMeter": "Estimated CloudCLI spend per UTC day, {{days}} days",
+        "features": "Features",
+        "cloudcli": "CloudCLI",
+        "budgets": "Builds and sessions",
+        "peak": "Tallest bar: {{usd}} in a UTC day",
+        "peakOwn": "Its own scale. Tallest bar: {{usd}} in a UTC day",
+        "barTitle": "{{date}} · {{parts}}",
+        "part": {
+          "features": "features {{usd}}",
+          "cloudcli": "CloudCLI {{usd}}",
+          "budgets": "builds and sessions {{usd}}"
+        },
+        "quiet": "No Gemini call was counted in this window.",
+        "byDay": "Each day's figures",
+        "tableLabel": "Estimated Gemini spend by day",
+        "columns": {
+          "day": "Day",
+          "features": "Features",
+          "cloudcli": "CloudCLI",
+          "budgets": "Builds"
+        },
+        "tableNote": "Days are UTC, and Builds is builds and sessions. Days with no spend are left out."
+      },
+      "projects": {
+        "restorly": "Restorly",
+        "shadowconnector": "shadow-connector",
+        "cloudcli": "CloudCLI",
+        "connector": "Restorly and shadow-connector",
+        "masterOff": "Restorly AI is off",
+        "masterOffNote": "Restorly's own AI switch reads off, so none of these asks Gemini, whatever its switch here says.",
+        "empty": "No feature is listed here yet"
+      },
+      "row": {
+        "call": "{{calls}} call",
+        "calls": "{{calls}} calls",
+        "tokens": "{{tokens}} tokens",
+        "noCalls": "No calls",
+        "off": "Off",
+        "unmeasured": "{{calls}} unmeasured",
+        "unpriced": "Unpriced",
+        "switch": "Gemini for {{label}}"
+      },
+      "budgets": {
+        "title": "Builds and sessions",
+        "empty": "No build or session spent Gemini in this window.",
+        "hint": "Plans, chains and chats. Each is stopped by its own cap, so none has a switch here."
+      },
+      "keys": {
+        "title": "By key and by process",
+        "keys": "Keys",
+        "processes": "Processes of the connector",
+        "tail": "…{{tail}}",
+        "heldAs": "held as {{names}}",
+        "noHolder": "no holder named",
+        "holder": {
+          "house": "the CloudCLI house key",
+          "account": "the CloudCLI account key"
+        },
+        "notCounted": "Held, not counted in this window",
+        "what": "A key whose usage at Google is above its count here is being spent where no wire sees it.",
+        "empty": "No key is held or counted yet.",
+        "noProcesses": "No process of the connector asked Gemini in this window."
+      },
+      "doorDown": {
+        "connector": "The connector did not answer, so Restorly, shadow-connector, builds and processes are missing here.",
+        "meter": "The CloudCLI meter did not answer, so its features and its key's count are missing here.",
+        "both": "Gemini spend is not answering",
+        "retry": "Try again"
+      },
+      "pressFailed": "{{label}} was not switched: {{sentence}}",
+      "pressDismiss": "Dismiss",
+      "claudeLogin": {
+        "title": "On the Claude login",
+        "note": "These callers run on the operator's Claude subscription: their calls and tokens are counted here, never priced.",
+        "unpriced": "Counted, not priced"
+      }
+    }
   },
   "rnd": {
     "mark": "{{count}} new or proved",
@@ -5750,6 +5859,40 @@
         "reachHint_one": "The unreached screen's entry in {{app}}'s dictionary needs a look. Check it again: ~/.claude/scripts/web-walk reach {{app}} {{screens}}",
         "reachHint_other": "The unreached screens' entries in {{app}}'s dictionary need a look. Check them again: ~/.claude/scripts/web-walk reach {{app}} {{screens}}",
         "reachHintAll": "The unreached screens' entries in {{app}}'s dictionary need a look. Check every screen again: ~/.claude/scripts/web-walk reach {{app}}"
+      },
+      "autocorrect": {
+        "title": "Autocorrect",
+        "about": "A step written wrongly whose meaning is plain is corrected, and the walk runs. One that could mean two things is refused before a browser opens.",
+        "quiet": "No step was corrected and no walk was refused over a step's wording in the last {{days}} days.",
+        "corrected": {
+          "figure": "Steps corrected",
+          "note_one": "{{count}} kind of mistake, last {{days}} days",
+          "note_other": "{{count}} kinds of mistake, last {{days}} days",
+          "noteNone": "in the last {{days}} days",
+          "quiet": "Autocorrect rewrote no step in this window.",
+          "tableLabel": "Steps Autocorrect corrected in the last {{days}} days, by mistake",
+          "columns": {
+            "mistake": "Mistake corrected",
+            "steps": "Steps"
+          }
+        },
+        "refused": {
+          "figure": "Walks still refused",
+          "note_one": "of {{walks}} walks, over {{count}} refusal",
+          "note_other": "of {{walks}} walks, over {{count}} refusals",
+          "noteNone": "of {{walks}} walks",
+          "quiet": "No walk was refused over how a step was written.",
+          "tableLabel": "Step refusals walks still met in the last {{days}} days. Press one for its whole wording.",
+          "columns": {
+            "refusal": "Refusal",
+            "walks": "Walks"
+          },
+          "onPurpose": "Refused on purpose",
+          "next": "If what was meant is plain, this is an entry to add to Autocorrect's table: ~/.claude/hooks/web_walk/node/autocorrect.mjs",
+          "nextOnPurpose": "The helper refuses this on purpose: {{reason}}. The step is the thing to change, written the way the refusal says.",
+          "showAll": "Show all {{count}} refusals",
+          "showFewer": "Show the {{count}} most met"
+        }
       },
       "listSeparator": ", "
     }

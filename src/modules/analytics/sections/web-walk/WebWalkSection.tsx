@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next';
 
-import type { WebWalkAnalytics, WebWalkApp, WebWalkCheck, WebWalkDay, WebWalkDoors, WebWalkSettled, WebWalkTotals } from '@/shared/analytics-types';
+import type { WebWalkAnalytics, WebWalkApp,
+  WebWalkAutocorrect, WebWalkCheck, WebWalkDay, WebWalkDoors, WebWalkSettled, WebWalkTotals } from '@/shared/analytics-types';
 import { Banner, EmptyState } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 import { AnalyticsSectionFrame } from '@/modules/analytics/AnalyticsSectionFrame';
 import { useAnalyticsSection } from '@/modules/analytics/hooks/useAnalyticsSection';
 import { WebWalkApps } from '@/modules/analytics/sections/web-walk/WebWalkApps';
+import { WebWalkAutocorrection } from '@/modules/analytics/sections/web-walk/WebWalkAutocorrection';
 import { WebWalkChecks } from '@/modules/analytics/sections/web-walk/WebWalkChecks';
 import { WebWalkGlance } from '@/modules/analytics/sections/web-walk/WebWalkGlance';
 import { WebWalkTrend } from '@/modules/analytics/sections/web-walk/WebWalkTrend';
@@ -19,7 +21,8 @@ import { daysCovered } from '@/modules/analytics/sections/web-walk/webWalkFigure
  * Under it, in the order a reader asks: how many launches on each side and how much walking that was (WebWalkGlance, with
  * the nudge's state and the bars it is held to), how the two sides moved day by day (WebWalkTrend), what the premade
  * checks found (WebWalkChecks), and which apps and screens were walked, with the screens that were not reached
- * (WebWalkApps).
+ * (WebWalkApps). Last, what Autocorrect made of the steps written wrongly: how many it corrected and by which entry of
+ * its table, and which refusals walks still met (WebWalkAutocorrection).
  *
  * THE FRAME DRAWS LOADING AND UNREACHABLE; this draws the rest: no history yet, a window with nothing in it, a history
  * younger than the window, and the full page.
@@ -37,7 +40,7 @@ export function WebWalkSection({ days }: { days: number }) {
 /** The section as drawn from one answer: the frame's children, spaced by the frame. Rendered by the Body above, and by nothing else. */
 function WebWalkAnswer({ answer }: { answer: WebWalkAnalytics }) {
   const { t } = useTranslation('common');
-  const { days, totals, settled, series, checks, doors, apps } = answer;
+  const { days, totals, settled, series, checks, doors, apps, autocorrect } = answer;
   const span = { firstDay: answer.first_day, today: answer.today, days };
   const covered = daysCovered(span);
   const young = covered !== null && answer.first_day !== null;
@@ -67,6 +70,7 @@ function WebWalkAnswer({ answer }: { answer: WebWalkAnalytics }) {
             <WebWalkChecks checks={checks} days={days} />
             <WebWalkApps apps={apps} days={days} />
           </div>
+          <WebWalkAutocorrection autocorrect={autocorrect} walks={totals.walks} days={days} />
         </>
       )}
     </>
@@ -80,13 +84,19 @@ function WebWalkAnswer({ answer }: { answer: WebWalkAnalytics }) {
  */
 function narrow(data: unknown): WebWalkAnalytics | null {
   if (!isRecord(data)) return null;
-  const { days, generated_at, today, first_day, settled, totals, series, checks, doors, apps } = data;
+  const { days, generated_at, today, first_day, settled, totals, series, checks, doors, apps, autocorrect } = data;
   if (typeof days !== 'number' || typeof generated_at !== 'number' || typeof today !== 'string') return null;
   const firstDay = typeof first_day === 'string' ? first_day : null;
   if (first_day !== null && firstDay === null) return null;
   if (!isSettled(settled) || !isFigures<WebWalkTotals>(totals) || !isFigures<WebWalkDoors>(doors)) return null;
   if (!isList<WebWalkDay>(series) || !isList<WebWalkCheck>(checks) || !isList<WebWalkApp>(apps)) return null;
-  return { days, generated_at, today, first_day: firstDay, settled, totals, series, checks, doors, apps };
+  if (!isAutocorrect(autocorrect)) return null;
+  return { days, generated_at, today, first_day: firstDay, settled, totals, series, checks, doors, apps, autocorrect };
+}
+
+/** Autocorrect's two lists, their rows taken as the command printed them (see `narrow`). */
+function isAutocorrect(value: unknown): value is WebWalkAutocorrect {
+  return isRecord(value) && isList(value.corrected) && isList(value.refused);
 }
 
 /** A JSON object: not null, not an array. */

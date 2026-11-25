@@ -13,11 +13,11 @@ const RETRY_STATUSES = new Set([429, 503]);
 const REFUSED_STATUSES = new Set([401, 403]);
 
 /**
- * The HTTP status the chat's routes answer with for a refusal of a Gemini door: `no_key` and `refused` are the person's to fix in
- * Settings → Voice (409); `failed` is Google's or the network's (502). One mapping for the chat mic (`voice-provider.ts`) and
+ * The HTTP status the chat's routes answer with for a refusal of a Gemini door: `off` (API → Gemini), `no_key` and `refused`
+ * (Settings → Voice) are the person's to fix (409); `failed` is Google's or the network's (502). One mapping for the chat mic (`voice-provider.ts`) and
  * read-aloud (`gemini-read-aloud.ts`), so the two answer the same refusal the same way.
  */
-export function chatStatusForRefusal(reason: 'no_key' | 'refused' | 'failed'): 409 | 502 {
+export function chatStatusForRefusal(reason: 'off' | 'no_key' | 'refused' | 'failed'): 409 | 502 {
   return reason === 'failed' ? 502 : 409;
 }
 
@@ -29,9 +29,10 @@ export function isRetryableStatus(status: number): boolean {
   return RETRY_STATUSES.has(status);
 }
 
-/** The sentence with the key (and anything shaped like one) replaced by `[key]`. Consumed by `gemini-transcribe.ts` and `gemini-speech.ts`, which pass every sentence they return through it. */
-export function redactKey(sentence: string, key: string): string {
-  return sentence.replaceAll(key, '[key]').replace(KEY_SHAPE, '[key]');
+/** The sentence with the key (and anything shaped like one) replaced by `[key]`. The wire (`gemini-wire.ts`) hands it to each door as `redact`, bound to the key it sent; a door whose ask got no answer has no key in hand and passes the sentence through the shape rule alone. */
+export function redactKey(sentence: string, key?: string): string {
+  const named = key ? sentence.replaceAll(key, '[key]') : sentence;
+  return named.replace(KEY_SHAPE, '[key]');
 }
 
 /** The text as a JSON object, or `null` when it is not one (an array, a string, a number, or not JSON at all). Consumed by `gemini-transcribe.ts` (the reply), `gemini-speech.ts` (the stream's events) and `voice.service.ts` (the home server's reply). */

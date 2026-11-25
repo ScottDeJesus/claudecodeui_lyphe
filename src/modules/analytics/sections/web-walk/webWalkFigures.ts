@@ -1,4 +1,4 @@
-import type { WebWalkApp, WebWalkCheck, WebWalkDay, WebWalkScreen, WebWalkSettled } from '@/shared/analytics-types';
+import type { WebWalkApp, WebWalkAutocorrected, WebWalkCheck, WebWalkDay, WebWalkScreen, WebWalkSettled, WebWalkUncorrected } from '@/shared/analytics-types';
 
 // The Web walks section's arithmetic: shares as words, the plotted days, the tables' rows and their order.
 // No words of its own and nothing drawn: a sentence leaves here as a key and its values, for the caller's t.
@@ -62,6 +62,16 @@ export function launchDays(series: WebWalkDay[], span: WalkSpan): LaunchDay[] {
 /** The checks, the one that answered false most first; ties by how often they ran, then by name. */
 export function rankedChecks(checks: WebWalkCheck[]): WebWalkCheck[] {
   return [...checks].sort((a, b) => b.false - a.false || b.ran - a.ran || a.check.localeCompare(b.check));
+}
+
+/** What Autocorrect rewrote, the entry that rewrote most steps first; ties by the entry's name. */
+export function rankedCorrected(corrected: WebWalkAutocorrected[]): WebWalkAutocorrected[] {
+  return [...corrected].sort((a, b) => b.steps - a.steps || a.entry.localeCompare(b.entry));
+}
+
+/** The step refusals still met, the one most walks met first; ties by their wording. */
+export function rankedRefused(refused: WebWalkUncorrected[]): WebWalkUncorrected[] {
+  return [...refused].sort((a, b) => b.walks - a.walks || a.whole.localeCompare(b.whole));
 }
 
 /** The apps as rows, the most walked first; each app's screens with the unreached first, then the most opened. */

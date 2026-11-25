@@ -343,6 +343,22 @@
   transition: transform 0.55s var(--ease-spring);
 }
 .vv-switch[aria-checked='true'] .vv-switch__knob { transform: translateX(22px); }
+/* Under a finger (a touch screen, or a window under 768 px) the press is 44 px tall and the track keeps its 30: the track
+   is drawn by a ::before inside the taller button, and a negative margin gives the 14 px back, so no row grows. */
+@media (pointer: coarse), (max-width: 767.98px) {
+  .vv-switch { height: 44px; margin-block: -7px; background: none; }
+  .vv-switch[aria-checked='true'] { background: none; }
+  .vv-switch::before {
+    content: '';
+    position: absolute;
+    inset: 7px 0;
+    border-radius: inherit;
+    background: var(--border-strong);
+    transition: background-color var(--dur-move);
+  }
+  .vv-switch[aria-checked='true']::before { background: var(--accent); }
+  .vv-switch__knob { top: 10px; }
+}
 
 /* ---------------------------------------------------------------- Avatar */
 .vv-avatar {

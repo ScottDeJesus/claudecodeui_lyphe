@@ -20,6 +20,8 @@ const DEGRADED_REASONS: Record<string, string> = {
   network: 'the provider could not be reached',
   throttled: 'the provider is limiting how often it will answer',
   upstream: 'the provider had a problem of its own',
+  old: 'nothing has read this account since',
+  unaged: 'this figure carries no time it was read',
 };
 
 function degradedReasonInWords(reason: string): string {

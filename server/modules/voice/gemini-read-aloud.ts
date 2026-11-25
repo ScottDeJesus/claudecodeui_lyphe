@@ -85,9 +85,10 @@ function wavOf(pcm: readonly Uint8Array[]): Buffer {
  * account's Gemini speech model and voice, on its key (else the house's). Each piece of the message goes through `synthesizeSentence`,
  * the door Kaylee speaks through, with no delivery note, so the house words are respelled there exactly as hers are (a multi-word spelling that a cut falls inside is the one miss: each piece is respelled alone) and nothing of
  * the respelling is copied here. The pieces are spoken one after another and joined, so the clip is whole before the first byte is
- * sent. NOT COUNTED against any Gemini budget (INV-9908), like every call of that door.
+ * sent. Never admitted, capped or named to a Gemini budget (INV-9908); each piece is counted on the account's Gemini meter as
+ * `read_aloud` by the wire, and answers `off` while the account has read-aloud switched off in API → Gemini.
  * Answers like the OpenAI-compatible proxy does (`VoiceServiceResult`), so the `/tts` route sends either without knowing which: a
- * refusal or failure of the door carries the door's own sentence (409 for a missing or refused key, 502 for anything else); a message
+ * refusal or failure of the door carries the door's own sentence (409 for a switched-off feature or a missing or refused key, 502 for anything else); a message
  * over `MESSAGE_MAX_CHARS` is a 413 with a sentence, and a request the client dropped (`signal`) stops the calls at once.
  * Consumed by `voice-provider.ts` (`synthesizeForChat`).
  */
@@ -98,7 +99,7 @@ export async function synthesizeReadAloud(userId: number, text: string, signal: 
 
   const pcm: Uint8Array[] = [];
   for (const piece of splitIntoPieces(text)) {
-    const answer = await synthesizeSentence(userId, { text: piece, style: '', signal });
+    const answer = await synthesizeSentence(userId, { text: piece, style: '', signal, feature: 'read_aloud' });
     if (!answer.ok) return { ok: false, status: chatStatusForRefusal(answer.reason), error: answer.sentence };
     try {
       for await (const chunk of answer.chunks) pcm.push(chunk);

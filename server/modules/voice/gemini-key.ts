@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { credentialsDb } from '@/modules/database/index.js';
+import type { HeldGeminiKey } from '@/modules/gemini-meter/index.js';
 import type { GeminiKeyStatus } from '@/shared/types.js';
 import { AppError, pythonStrip } from '@/shared/utils.js';
 
@@ -61,11 +63,34 @@ function keyInvalid(): AppError {
 /**
  * The key the account's Gemini calls use, resolved at call time: the account's stored active credential, else the
  * house's (`GEMINI_API_KEY`, else the env file's line), else `null`. The raw key leaves the module nowhere:
- * `gemini-transcribe.ts` and `gemini-speech.ts` put it in the `x-goog-api-key` header and nothing else.
- * Consumed by `gemini-transcribe.ts` and `gemini-speech.ts`.
+ * the wire (`gemini-wire.ts`) puts it in the `x-goog-api-key` header and nothing else.
+ * Consumed by `gemini-wire.ts` alone, the one sender to Google.
  */
 export function resolveGeminiKey(userId: number): string | null {
   return credentialsDb.getActiveCredential(userId, CREDENTIAL_TYPE) ?? readHouseKey();
+}
+
+/** The hex characters of a key's sha256 the meter names it by: enough to tell keys apart, nothing to rebuild one from. */
+const KEY_ID_LENGTH = 8;
+const KEY_TAIL_LENGTH = 4;
+
+/** A key's name outside this file: the first 8 hex of its sha256. */
+export function geminiKeyId(key: string): string {
+  return createHash('sha256').update(key).digest('hex').slice(0, KEY_ID_LENGTH);
+}
+
+/**
+ * The keys an account's Gemini calls can be sent with, by digest and tail: its stored key ("account") and the
+ * house's ("house"), the same key listed once with both. Consumed by the Gemini meter's usage reading (handed in by
+ * server/index.ts); the raw key never leaves this file.
+ */
+export function heldGeminiKeys(userId: number): HeldGeminiKey[] {
+  const held: HeldGeminiKey[] = [];
+  const stored = credentialsDb.getActiveCredential(userId, CREDENTIAL_TYPE);
+  if (stored) held.push({ keyId: geminiKeyId(stored), keyTail: stored.slice(-KEY_TAIL_LENGTH), heldAs: 'account' });
+  const houseKey = readHouseKey();
+  if (houseKey) held.push({ keyId: geminiKeyId(houseKey), keyTail: houseKey.slice(-KEY_TAIL_LENGTH), heldAs: 'house' });
+  return held;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useAccountsContext } from '@/modules/accounts/context/AccountsContext';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
 import { UsageRing } from '@/modules/accounts/UsageRing';
-import { accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
+import { accountInUseUsage, usageAgeWords } from '@/modules/accounts/utils/accountInUseUsage';
 
 /**
  * The week's usage as one small ring, at the foot of the views rail above Inbox, so the figure stays in sight with the
@@ -33,6 +33,7 @@ export function UsageRings() {
       <UsageRing
         usageWindow={windows.find((usageWindow) => usageWindow.key === 'seven_day') ?? null}
         degraded={degraded}
+        asOf={usageAgeWords(reading, now)}
         now={now}
       />
     </div>
