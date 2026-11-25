@@ -113,11 +113,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claud
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
 
-37 components carry Verve paint (a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Gallery` with `PhotoFill`, `RegionImage` with `RegionDrawLayer`, `SphereView` with `sphere/SphereCanvas` count once). The sheet that paints each (rule 6):
+38 components carry Verve paint (a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Gallery` with `PhotoFill`, `RegionImage` with `RegionDrawLayer`, `SphereView` with `sphere/SphereCanvas` count once). The sheet that paints each (rule 6):
 
 | sheet | components |
 |---|---|
-| `controls.css` | Button, Badge, Input, Card, Shimmer, Chip, Switch, Avatar, Meter, Spinner, Field, Select, Stepper |
+| `controls.css` | Button, Badge, Input, Card, Shimmer, Chip, Switch, Avatar, Meter, Spinner, Field, Select, Stepper, Slider |
 | `feedback.css` | Banner, Toast, Tabs, EmptyState, Menu, Dialog, Tooltip, ActionMenu |
 | `surfaces.css` | DockableFab, SplitPane, ResizeGrip |
 | `panels.css` | TextArea, Sheet, Timeline, Steps, Checkbox, DialogFrame |
@@ -728,3 +728,28 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Excerpt.tsx, /home
 - The change reaches every `Switch` in the app under a finger. Walked on the Gemini view only.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Switch.tsx
+
+## MAN-10238 — `Slider` — one number out of a short run of stops, saved when the knob is let go (`verve/controls.css`)
+
+`src/shared/ui/Slider.tsx` over `.vv-slider`, `__stops`, `__stop`, `__input` (`verve/controls.css` §Slider). Built to Astrolabe's rule for a control (a square knob with a 1 px radius, `--accent` for what is set). The copy of the live system under `design-system/` carries no Slider.
+
+## Props
+| prop | what |
+|---|---|
+| `value`, `min`, `max`, `step` (1) | the number under the knob and its run. `value` may be `null` while no number is known: the bare track and ticks are drawn with no knob and no fill (`data-empty` on the wrapper), the input under it holds the first stop, and the caller's `valueText` says the number is not known; a tick is drawn at every stop while the run has 12 steps or fewer |
+| `onChange(next)` | every move (the browser's `input` event): the number to draw |
+| `onCommit(next)` | once, when the knob is let go or a key steps it (the browser's `change` event, listened for on the element): the number to save |
+| `label`, `valueText` | the accessible name, and the number said with its noun (`aria-valuetext`) |
+| `disabled` | dims the whole control to 0.6 |
+
+## Track and press
+| Input | Press target | Knob |
+|---|---|---|
+| fine pointer, window >= 768 px | 20 px tall | 16 px |
+| `@media (pointer: coarse), (max-width: 767.98px)` | 44 px tall | 20 px |
+
+- The track (4 px, `--border-strong`, `--accent` up to the knob) and the ticks are the wrapper's; the input paints only its knob. `--vv-slider-at` and `--vv-slider-stop` are 0 to 1 along the knob's run, which starts and ends half a knob inside the track.
+- A value the page sets itself (a save's answer, a refusal putting the old number back) fires neither prop.
+- First use: the bug board's Opening, Fixers at once (`src/modules/kanban/BugBoardOpening.tsx` with `hooks/useFixerWidth.ts`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Slider.tsx

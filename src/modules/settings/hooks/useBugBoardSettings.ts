@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
+import { CARD_WIDTH_MAX, CARD_WIDTH_MIN } from '@/shared/constants';
 
 /**
  * How many board cards the dispatcher may work at the same time: every whole number `~/.claude/charters/cards.toml` accepts for `width`, lowest
  * first. Used by `RunnerBugBoardRow`, which builds its dropdown from it.
  */
-export const BUG_BOARD_WIDTH_CHOICES: readonly number[] = [1, 2, 3, 4];
+export const BUG_BOARD_WIDTH_CHOICES: readonly number[] = Array.from({ length: CARD_WIDTH_MAX - CARD_WIDTH_MIN + 1 }, (_, index) => CARD_WIDTH_MIN + index);
 
 /** The bounds the dispatcher holds the sort's confidence to (`card_config`'s `threshold`). The row prints them over its field. */
 export const BUG_BOARD_THRESHOLD_MIN = 0.5;

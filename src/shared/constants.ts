@@ -943,3 +943,10 @@ export const SUBAGENT_DOT_FILL: Record<CompanionMaterial, string> = {
   plasma: 'var(--plasma)',
 };
 
+// ---------------------------
+
+//----------------- BOARD CARDS WORKED AT ONCE ------------
+/** The fewest board cards the dispatcher works at once, house-wide. The source is WIDTH_MIN in ~/.claude/hooks/dispatcher/card_config.py; the server's relay (server/modules/kanban-dispatch/kanban-dispatch.routes.ts) checks a write by the same two bounds. */
+export const CARD_WIDTH_MIN = 1;
+/** The most board cards the dispatcher works at once, house-wide: WIDTH_MAX in the same file. Settings and the bug board both draw their choices from these two. */
+export const CARD_WIDTH_MAX = 4;

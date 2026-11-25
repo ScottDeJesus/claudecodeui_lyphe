@@ -480,6 +480,8 @@ export function KanbanPanel({ projectId, menu }: KanbanPanelProps) {
           >
             <BugBoardOpening
               board={currentBoard}
+              open={other?.kind === 'board'}
+              shared={boards.filter((each) => !each.archived).length > 1}
               onAutonomy={(next) => {
                 // It changes what the board SHOWS only: no write is skipped and nothing is hidden on the
                 // server, which is why the lanes are recomposed from the same setting the faces read.

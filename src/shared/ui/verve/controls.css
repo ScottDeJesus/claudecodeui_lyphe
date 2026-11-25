@@ -360,6 +360,94 @@
   .vv-switch__knob { top: 10px; }
 }
 
+/* ---------------------------------------------------------------- Slider */
+/* One number out of a short run of stops: a square knob on a hairline track, as the Switch is a square knob in a square track. The
+   track and its ticks are drawn by the wrapper, filled in --accent up to the knob; the input over them is the browser's own range with
+   nothing of its own painted but the knob, so the keyboard and a screen reader have the whole control. --vv-slider-at and
+   --vv-slider-stop are 0 to 1 along the knob's run, which starts and ends half a knob inside the track. */
+.vv-slider {
+  --vv-slider-knob: 16px;
+  position: relative;
+  display: block;
+  min-width: 96px;
+  height: 20px;
+}
+.vv-slider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    to right,
+    var(--accent) calc(var(--vv-slider-knob) / 2 + (100% - var(--vv-slider-knob)) * var(--vv-slider-at)),
+    var(--border-strong) 0
+  );
+}
+.vv-slider:has(.vv-slider__input:disabled) { opacity: 0.6; }
+.vv-slider__stops { position: absolute; inset: 0; pointer-events: none; }
+.vv-slider__stop {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--vv-slider-knob) / 2 + (100% - var(--vv-slider-knob)) * var(--vv-slider-stop));
+  width: 2px;
+  height: 10px;
+  margin: -5px 0 0 -1px;
+  border-radius: 1px;
+  background: var(--border-strong);
+}
+.vv-slider__stop[data-passed] { background: var(--accent); }
+/* No number known: the bare track and its ticks, no fill and no knob, so an unknown number is never drawn as the first stop. */
+.vv-slider[data-empty]::before { background: var(--border-strong); }
+.vv-slider[data-empty] .vv-slider__input::-webkit-slider-thumb { visibility: hidden; }
+.vv-slider[data-empty] .vv-slider__input::-moz-range-thumb { visibility: hidden; }
+.vv-slider__input {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.vv-slider__input:disabled { cursor: not-allowed; }
+.vv-slider__input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vv-slider__input::-webkit-slider-runnable-track { height: var(--vv-slider-knob); border: none; background: none; }
+.vv-slider__input::-moz-range-track { height: var(--vv-slider-knob); border: none; background: none; }
+.vv-slider__input::-webkit-slider-thumb {
+  width: var(--vv-slider-knob);
+  height: var(--vv-slider-knob);
+  border: none;
+  border-radius: 1px; /* machined, as the Switch's knob */
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(8, 9, 11, 0.22);
+  transition: transform var(--dur-move);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.vv-slider__input::-moz-range-thumb {
+  width: var(--vv-slider-knob);
+  height: var(--vv-slider-knob);
+  border: none;
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(8, 9, 11, 0.22);
+  transition: transform var(--dur-move);
+}
+.vv-slider__input:active::-webkit-slider-thumb { transform: scale(1.12); }
+.vv-slider__input:active::-moz-range-thumb { transform: scale(1.12); }
+/* Under a finger (a touch screen, or a window under 768 px) the press is 44 px tall and the knob a little larger; the track keeps its line. */
+@media (pointer: coarse), (max-width: 767.98px) {
+  .vv-slider { --vv-slider-knob: 20px; height: 44px; }
+}
+
 /* ---------------------------------------------------------------- Avatar */
 .vv-avatar {
   border-radius: 50%;

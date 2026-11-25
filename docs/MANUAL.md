@@ -5852,6 +5852,8 @@ cannot announce.
 
 **Where they are drawn.** `BugBoardOpening.tsx` lists them in one fixed order as label and value (`KeyValueList`): Building (`building`), Asking (`awaitingAnswer`), Waiting to start (`queued`, the To Do count — the operator's ruled words, never "Queued"; key `kanban.ring.vitals.queued`), then Lessons and Memories, each said "· every board" beside its number. The vitals strip that once drew them in the board header was deleted by the bug screen's redraw (689bdd2b); the case the-board-strips-to-do-count-reads-waiting-to-start keeps the To Do words.
 
+**The first row: Fixers at once, beside the board's switch.** Left: the caption (`kanban.board.fixersLabel`), the number as a figure, and the kit's `Slider` (MAN-10238) with a stop for each number from `CARD_WIDTH_MIN` to `CARD_WIDTH_MAX`. Right: the word On or Off and the switch, the word in the switch's own cell (the case the-board-headers-one-switch-reads-runs-itself-in-word-and-name-at-both-widths reads it there). The number is the dispatcher's one `width` for every board (`useFixerWidth`, MAN-10239), so the slider is named `fixersName`, or `fixersNameShared` ("…, shared by all boards") when `KanbanPanel` passes `shared`: a second unarchived board exists. It saves when the knob is let go (`onCommit`), never on a move, and it does not wait on the switch: off, it sets what applies when the board is turned on. A refused save draws the old number and `fixersRefused` with the server's sentence in a `role="alert"` line under the row (`data-bug-fixers-problem="refused"`). A number that could not be read draws a dash, the slider empty and disabled and said as `fixersUnknown`, `fixersUnread` and Retry (`data-bug-fixers-problem="unread"`). `data-bug-fixers` on the cell carries the drawn number for scripts. `KanbanPanel` also passes `open`, so the number is asked for each time the Opening opens.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-vitals.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/BugBoardOpening.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
 
 ## MAN-590 — The lessons lane
@@ -14359,3 +14361,40 @@ Both lists come from the dispatcher's document (`hooks/dispatcher`); no plan car
 All through `t()` under `dispatcher.decided.*` in `en/common.json`: `title`, `fresh`, `freshCount`, `by.{builder,designer,rule}`, `wholeFeature`, `what`, `choice`, `why`, `undo`, `earlier`, `gaps`, `gapsBelow` (+ `gapsBelow_one`), `priority.{high,medium,low}`, `ticket`, `ticketCopied`, `ticketNotCopied`. Every string reaches the DOM as a text node: titles, choices, reasons and gap titles are free text souls wrote.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanDecided.tsx
+
+## MAN-10239 — `useFixerWidth` — the bug board's Fixers-at-once number: the dispatcher's one width, one file, one order of answers
+
+`src/modules/kanban/hooks/useFixerWidth.ts`: how many bug fixers run at once, for the slider in the board Opening's first row (`BugBoardOpening.tsx`, MAN-10002; the kit's `Slider`, MAN-10238).
+
+## What the number is
+- The dispatcher's `width` in `~/.claude/charters/cards.toml` (MAN-10005): ONE number for every board that runs itself, the same one Settings → Agents draws as cards walked at once (`useBugBoardSettings`, MAN-10000). No per-board number exists.
+- Read and written through `api.settings.bugBoard()` / `saveBugBoard({width})`: `GET` / `PUT /api/kanban-dispatch/settings`, which run `dispatcher card config` (MAN-10009). A raise wakes the daemon in the verb, so waiting cards start without the board's switch being touched; a lower number stops no fixer at work.
+- Its bounds are `CARD_WIDTH_MIN` / `CARD_WIDTH_MAX` in `src/shared/constants.ts` (source: `WIDTH_MIN` / `WIDTH_MAX` in `hooks/dispatcher/card_config.py`). An answer outside them is no answer (`widthOf`), never a default.
+
+## `useFixerWidth(watching)` answers `{saved, shown, saving, problem, move, keep, refresh}`
+| name | what |
+|---|---|
+| `watching` | the Opening is open: the number is read when it turns true, and on window `focus` / `visibilitychange` while it is |
+| `saved` | the number the server last read off the file; `null` until a read answers, and again after a read that answered none |
+| `shown` | the draft, else `saved`: the knob's place while it is held or while its save is out |
+| `move(next)` | draws, writes nothing; clears a `refused` line |
+| `keep(next)` | the knob's release: writes, then draws what the server read back |
+| `problem` | `kind` `unread` or `refused`, with the server's own `sentence` (`refusalSentence`) or `null` when it sent none |
+
+## Rules
+- ONE FILE, ONE ORDER OF ANSWERS. Saves go one at a time (`writing`). A release during a save is kept in `pending` and sent next, and skipped when the file already holds it. Every save bumps `generation`, which retires any read asked before it.
+- A refused or unanswered save sets `problem.kind` to `refused`, drops the draft so the old number is drawn, then reads the file again: a save whose answer was lost may have landed. A read that answers a number keeps the `refused` line; one that answers none replaces it with `unread`.
+- `unread` means no number: `saved` is `null`, and the header draws a dash, the slider empty and disabled, and Retry (`refresh`). An unknown number is never drawn or said as 1.
+- `keep` does nothing while `saved` is `null`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useFixerWidth.ts
+
+## MAN-10240 — `useAnalyticsSection` — the question is compared by id and days, and the question already out is never read twice
+
+`src/modules/analytics/hooks/useAnalyticsSection.ts`, the mount effect (`[id, days, read]`).
+
+- The effect replaces `asked.current` only when `id` or `days` moved, and starts no read when the same question is asked while its read is out (`same && inFlight.current`).
+- why: a dev build runs the effect twice on mount. The second run used to store an equal but new object, so the first answer failed `question === asked.current`, was dropped as "no longer asked", and the route was read again. Every section cost two reads; Repeats, whose read takes seconds, drew after 15 to 19 s, and `web-walk reach cloudcli` (20 s a screen) stopped reaching `analytics-repeats` (measured 2026-11-25: two `GET /api/analytics/repeats` at 8.9 s and 15.1 s; after the cure one, drawn at 6.7 s).
+- Unchanged: a moved id or window still drops the old answer and asks the current one; Refresh and `visibilitychange` during a read still owe ONE more read.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/hooks/useAnalyticsSection.ts

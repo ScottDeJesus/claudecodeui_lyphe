@@ -21,7 +21,8 @@ type Question = { id: string; days: number };
  * THREE READINGS (`AnalyticsReading`), drawn by `AnalyticsSectionFrame`: `loading` before the first answer; `unreachable` when
  * there is no answer; else the answer, with `stale` raised while a newer one is out. A newer answer replaces the drawn one whole,
  * never a spinner between; an answer to a question no longer asked (the id or the window moved while it was out) is never drawn,
- * and the owed read asks the current one. A burst of asks during one read is ONE more read.
+ * and the owed read asks the current one. A burst of asks during one read is ONE more read. The question is compared by its id
+ * and days, never by object, and the mount effect run again for the question already out starts no read: its answer is the one drawn.
  *
  * IT IS TOLD, IT NEVER ASKS ON A CLOCK. It reads on mount, on a change of id or days, on `refresh`, and when the page becomes
  * visible again (the house kept working while it was hidden). No timer.
@@ -75,7 +76,11 @@ export function useAnalyticsSection<T>(id: string, days: number, narrow: (data: 
 
   // The mount read, and the read on a change of section or window.
   useEffect(() => {
-    asked.current = { id, days };
+    const same = asked.current.id === id && asked.current.days === days;
+    if (!same) asked.current = { id, days };
+    // The question already being read needs no second read: a dev build runs this effect twice on mount, and the second run used to
+    // replace the question with an equal object, so the first answer was dropped as "no longer asked" and the route was read again.
+    if (same && inFlight.current) return;
     void read();
   }, [id, days, read]);
 
