@@ -35,6 +35,12 @@ type UsageRingProps = {
   owner?: string;
   /** How old the figure is ("as of 5d ago"), said after it in the ring's words; absent while it is current. */
   asOf?: string | null;
+  /** The window's short name in the caption under a row ring ("wk · 3d"): the week's "wk" when absent. */
+  shortName?: string;
+  /** The window's name in the ring's accessible words, opening them ("This week"): the week's name when absent. */
+  longName?: string;
+  /** The window's key as the ring's `data-usage-ring` handle, which a probe finds it by: the week's key when absent. */
+  handle?: string;
 };
 
 /**
@@ -46,13 +52,23 @@ type UsageRingProps = {
  * A status, not a control: no button, no tab stop. A row ring stands outside the row's Use button on purpose — a long
  * press on it is a phone's way to read its words, and must never switch the account.
  */
-export function UsageRing({ usageWindow, now, degraded = false, captioned = false, owner, asOf = null }: UsageRingProps) {
+export function UsageRing({
+  usageWindow,
+  now,
+  degraded = false,
+  captioned = false,
+  owner,
+  asOf = null,
+  shortName = SHORT_NAME,
+  longName = WINDOW_NAMES.seven_day,
+  handle = RING_HANDLE,
+}: UsageRingProps) {
   const percent = usageWindow === null ? null : windowPercent(usageWindow);
   const tone = ringTone(percent);
 
   // Name, figure, reset — the lines the meters say, from the same helpers. The week's own reset time is dropped when
   // it carries no figure: a countdown to a week nobody measured would be the only number in a "no reading" tooltip.
-  const words: string[] = [WINDOW_NAMES.seven_day];
+  const words: string[] = [longName];
   if (percent === null) {
     words.push(NO_READING_WORDS);
   } else {
@@ -72,7 +88,7 @@ export function UsageRing({ usageWindow, now, degraded = false, captioned = fals
   const ring = (
     <div
       data-tone={tone ?? undefined}
-      data-usage-ring={captioned ? undefined : RING_HANDLE}
+      data-usage-ring={captioned ? undefined : handle}
       className={cn('grid size-8 place-items-center', degraded && 'opacity-60')}
     >
       <Meter
@@ -100,10 +116,10 @@ export function UsageRing({ usageWindow, now, degraded = false, captioned = fals
     >
       {captioned ? (
         // A fixed width, so the rings stand in one column down the rows whatever each caption says ("wk · 3d", "wk").
-        <div data-usage-ring={RING_HANDLE} className="flex w-12 flex-col items-center">
+        <div data-usage-ring={handle} className="flex w-12 flex-col items-center">
           {ring}
           <span data-ring-caption className="whitespace-nowrap text-[10px] tabular-nums leading-none text-muted-foreground">
-            {countdown === null ? SHORT_NAME : `${SHORT_NAME} · ${countdown}`}
+            {countdown === null ? shortName : `${shortName} · ${countdown}`}
           </span>
         </div>
       ) : ring}

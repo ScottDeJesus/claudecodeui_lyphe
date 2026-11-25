@@ -2388,7 +2388,7 @@ export type SandboxCommandService = {
  * slug shows instead); `digest` stays in data. Times are
  * epoch SECONDS. `reading.week` is a fraction 0..1 — window POINTS once multiplied by 100, never
  * dollars (INV-4299) — or null for a week the pacer could not measure, which draws as unknown and
- * never as zero; `reading.at` is when that reading was filed. `token` is the stored sign-in token's
+ * never as zero; `reading.at` is when that reading was filed. `reading.fable` is the same fraction for Fable's own weekly limit, absent or null when no Fable run has been read; `reading.fable_resets` is its reset, epoch seconds. `token` is the stored sign-in token's
  * state; `wall.kind: "refused"` is a token Claude would not accept. `why` is the door's own
  * sentence and is rendered as it arrives.
  */
@@ -2402,7 +2402,7 @@ export type ClaudeAccountRow = {
   live: boolean;
   in_use: boolean;
   wall: { kind: 'usage' | 'credit' | 'spend' | 'rate' | 'refused'; until: number | null } | null;
-  reading: { week: number | null; week_resets: number | null; at: number; source: string } | null;
+  reading: { week: number | null; week_resets: number | null; at: number; source: string; fable?: number | null; fable_resets?: number | null } | null;
   pace: { week: { projected: number; ceiling: number } | null } | null;
   room: boolean;
   why: string;

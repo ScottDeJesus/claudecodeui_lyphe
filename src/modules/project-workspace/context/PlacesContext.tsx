@@ -1,9 +1,10 @@
-import { FolderPlus, House, MessageSquare, Settings } from 'lucide-react';
+import { FolderPlus, House, MessageSquare, Settings, UserRound } from 'lucide-react';
 import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import { useAccountsContext } from '@/modules/accounts';
 import { useBackToWorkspace, useCurrentApplication, useSwitcherActions } from '@/modules/app-switcher';
 import { useCerberusNeeds } from '@/modules/cerberus';
 import { useChatHost } from '@/modules/chat-host';
@@ -268,6 +269,11 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     doors.navigate(doors.workspacePath());
   }, [covered, backToWorkspace, setActiveTab, doors]);
   const goChat = useCallback((id: string) => doors.openChatInWorkspace(id), [doors]);
+  const { toggleSwitcher } = useAccountsContext();
+  // The wheel has no button to stand beside: the switcher opens from the middle of the window.
+  const openAccounts = useCallback(() => {
+    toggleSwitcher({ x: window.innerWidth / 2, y: window.innerHeight / 2, clear: 0 });
+  }, [toggleSwitcher]);
 
   const places = useMemo<Place[]>(() => {
     const where: PlaceId | null = stationShowing ? 'station'
@@ -309,11 +315,15 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       ...pick('universe'),
       ...pick('schedules'),
       {
+        id: 'accounts', label: 'Accounts', icon: UserRound, ring: 'outer', here: false, keywords: 'accounts claude login usage fable week switch account',
+        mark: null, go: openAccounts,
+      },
+      {
         id: 'settings', label: t('rail.settings'), icon: Settings, ring: 'outer', here: false, keywords: 'open settings preferences',
         mark: marks.settings ?? null, go: () => openSettings(settingsTab ?? undefined),
       },
     ];
-  }, [stationShowing, homeShowing, activeTab, lastChatId, lastChatTitle, sessionId, views, homeName, stationName, marks, settingsTab, t, goHome, goStation, goScreen, goChat, openSettings]);
+  }, [stationShowing, homeShowing, activeTab, lastChatId, lastChatTitle, sessionId, views, homeName, stationName, marks, settingsTab, t, goHome, goStation, goScreen, goChat, openSettings, openAccounts]);
 
   const waiting = useMemo(
     () => places.filter((place) => place.mark !== null && !place.here && !(place.id === 'settings' && settingsQuiet)),

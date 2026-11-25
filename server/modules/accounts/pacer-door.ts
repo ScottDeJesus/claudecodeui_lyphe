@@ -21,6 +21,7 @@ import { isFiniteNumber, isRecord, resetEpoch } from './usage-windows.js';
  * {"used": fraction, "resets_at": epoch}}`. Fractions here are 0..1, the pacer's only unit; this
  * file is where a meter's PERCENT is divided by a hundred, so no reader of the store ever has to
  * ask which scale a number is in.
+ * When a caller hands one in, the door also takes Fable's own weekly window under "fable", the same shape as "week".
  *
  * A READING IS DROPPED, NEVER SENT, when there is no login to file it under, and when the week
  * is not a live window. A window whose reset has already passed is HISTORY (a rolled window): its
@@ -68,6 +69,7 @@ type NoteBody = {
   account: string;
   at: number;
   week: DoorWindow;
+  fable?: DoorWindow;
 };
 
 /**
@@ -118,9 +120,11 @@ export function note(
   const account = digest.trim();
   if (!account) return; // no login, no owner for the reading
   const week = doorWindow(windows, 'seven_day', checkedAt);
+  const fable = doorWindow(windows, 'seven_day_overage_included', checkedAt);
   if (week === null) return; // nothing here the door would keep
 
   const body: NoteBody = { account, at: Math.floor(checkedAt / 1000), week };
+  if (fable !== null) body.fable = fable;
   // ⚠ The spawn can throw SYNCHRONOUSLY — an argument carrying a NUL byte is `ERR_INVALID_ARG_VALUE`,
   // raised before any child exists. That is the same fact as a door that never answered: a reading
   // dropped, never a poll lost.

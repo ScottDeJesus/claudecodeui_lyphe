@@ -17,9 +17,9 @@ const FAN_UNDER_PX = 560;
 
 /**
  * Where each place stands on its ring: its slot, the same every time, so the hand learns the angle. The inner ring's five from the
- * top round clockwise, the outer's eight likewise.
+ * top round clockwise, the outer's nine likewise.
  */
-const SLOT: Record<PlaceId, number> = { home: 0, station: 1, roadmap: 2, bugs: 3, chat: 4, rnd: 0, cerberus: 1, analytics: 2, inbox: 3, api: 4, universe: 5, schedules: 6, settings: 7 };
+const SLOT: Record<PlaceId, number> = { home: 0, station: 1, roadmap: 2, bugs: 3, chat: 4, rnd: 0, cerberus: 1, analytics: 2, inbox: 3, api: 4, universe: 5, schedules: 6, accounts: 7, settings: 8 };
 
 /**
  * The bearings of the slots, in degrees clockwise from the top. At a desk the whole circle; on a phone the same places at the same
@@ -27,9 +27,9 @@ const SLOT: Record<PlaceId, number> = { home: 0, station: 1, roadmap: 2, bugs: 3
  * its left; the outer ring likewise).
  */
 const DESK_INNER = [0, 72, 144, 216, 288];
-const DESK_OUTER = [0, 45, 90, 135, 180, 225, 270, 315];
+const DESK_OUTER = [0, 40, 80, 120, 160, 200, 240, 280, 320];
 const FAN_INNER = [0, 31.2, 62.4, -62.4, -31.2];
-const FAN_OUTER = [9.75, 29.25, 48.75, 68.25, -68.25, -48.75, -29.25, -9.75];
+const FAN_OUTER = [0, 17.333, 34.667, 52, 69.333, -69.333, -52, -34.667, -17.333];
 
 /** The air between two sectors, in degrees. */
 const GAP = 1.2;
@@ -51,7 +51,7 @@ function dialFor(width: number, height: number, withActs: boolean): Dial {
     return {
       fan: true, cx: width / 2, cy, s, core, actsY, plateY: withActs ? actsY - 34 : cy - 240 * s - 34,
       inner: { r0: 72 * s, r1: 176 * s, at: 126 * s, half: 15.6, mids: FAN_INNER },
-      outer: { r0: 186 * s, r1: 240 * s, at: 213 * s, half: 9.75, mids: FAN_OUTER },
+      outer: { r0: 186 * s, r1: 240 * s, at: 213 * s, half: 8.667, mids: FAN_OUTER },
     };
   }
   // The wheel: 600 px across its rim at full size, the plate and the acts under it, the three centred in the window together.
@@ -61,7 +61,7 @@ function dialFor(width: number, height: number, withActs: boolean): Dial {
   return {
     fan: false, cx: width / 2, cy, s, core: 150 * s, plateY, actsY: plateY + 38,
     inner: { r0: 98 * s, r1: 214 * s, at: 156 * s, half: 36, mids: DESK_INNER },
-    outer: { r0: 226 * s, r1: 288 * s, at: 257 * s, half: 22.5, mids: DESK_OUTER },
+    outer: { r0: 226 * s, r1: 288 * s, at: 257 * s, half: 20, mids: DESK_OUTER },
   };
 }
 

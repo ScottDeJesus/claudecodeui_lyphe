@@ -179,6 +179,25 @@ export function rowWeek(row: ClaudeAccountRow, nowMs: number): ClaudeUsageWindow
   return windows.find((usageWindow) => usageWindow.key === WEEKLY.key) ?? unmeasuredWindow(WEEKLY);
 }
 
+/**
+ * Fable's own weekly window for a row, or `null` when no Fable run has been read for the account. Once its reset has passed with no reading since, the figure is unknown (`percent: null`), never the old one.
+ */
+export function rowFable(row: ClaudeAccountRow, nowMs: number): ClaudeUsageWindow | null {
+  const reading = row.reading;
+  if (!reading) return null;
+  // `points` takes `number | null`, and the wire's `fable` may be absent.
+  const fraction = points(reading.fable ?? null);
+  if (fraction === null) return null;
+  const resets = reading.fable_resets ?? null;
+  const resetPassed = typeof resets === 'number' && Number.isFinite(resets) && resets * 1000 <= nowMs;
+  return {
+    key: 'fable',
+    label: 'Fable',
+    percent: resetPassed ? null : fraction,
+    resetsAt: resetStamp(resets),
+  };
+}
+
 /** A reading this old is said with its age: five of the live meter's 3-minute polls, so nothing has refreshed it lately. */
 const READING_OLD_AFTER_MS = 15 * 60_000;
 
