@@ -72,6 +72,11 @@ says = "The schedules: the timed jobs of this box."
 steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Schedules", in = { role = "menu", name = "Places" } } }]
 landmark = { role = "heading", name = "Schedules" }
 
+[screen.accounts]
+says = "Accounts: the Claude sign-ins and their usage, a dialog over the page."
+steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Accounts", in = { role = "menu", name = "Places" } } }]
+landmark = { role = "dialog", name = "Account and usage" }
+
 [screen.settings]
 says = "Settings, opened from the Places menu; it opens on Agents."
 steps = [{ click = { role = "button", name = "Menu" } }, { click = { role = "menuitem", name = "Settings", in = { role = "menu", name = "Places" } } }]
