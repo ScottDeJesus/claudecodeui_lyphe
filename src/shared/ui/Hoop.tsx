@@ -228,7 +228,8 @@ export const Hoop = forwardRef<HoopHandle, HoopProps>(function Hoop(
             const press = painterRef.current?.pointerUp() ?? null;
             if (press !== null && 'open' in press) open(press.open);
             else if (press !== null && (pressRef.current.openOnTurn === true || (pressRef.current.openOnTurn === 'mouse' && event.pointerType === 'mouse'))) {
-              // Opened on the press: it stands at the front at once, so the hoop arrives settled rather than turning under the opened page.
+              // Opened on the press (any pointer where `openOnTurn` is true, a mouse where it is 'mouse'): it stands at the front at once, so
+              // the hoop arrives settled rather than turning under what it opened.
               const slot = slotsRef.current[press.turned];
               if (slot !== undefined) painterRef.current?.bring(slot.id);
               open(press.turned);

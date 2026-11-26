@@ -481,9 +481,11 @@ export function createHoopPainter(canvas: HTMLCanvasElement) {
 
     /** The slots, in their order. The slot at the front stays where it stands while its thing is still on the hoop: a new order moves the others, never turns the hoop. */
     setSlots(next: HoopSlot[]) {
-      const kept = slots[frontOf(target)]?.id ?? null;
-      // What is left of a turn under way, carried over so a turn the reader gave still ends where it was going.
-      const lead = rot - target;
+      const keptIndex = frontOf(target);
+      const kept = slots[keptIndex]?.id ?? null;
+      // Where the front slot stood before the new order: the hoop moves by just its change of place, so a turn under way, a drag held or
+      // a hoop at rest all go on from where they were.
+      const keptAt = places[keptIndex]?.at ?? 0;
       slots = next;
       lay();
       paths = slots.map(() => null);
@@ -491,9 +493,14 @@ export function createHoopPainter(canvas: HTMLCanvasElement) {
       const at = kept === null ? -1 : slots.findIndex((slot) => slot.id === kept);
       // A hoop first given its slots, or one whose front thing has gone, opens on the first that waits on the reader, else the first.
       const front = at !== -1 ? at : Math.max(0, slots.findIndex((slot) => slot.state === 'waiting'));
-      if (places.length > 0) {
+      if (places.length > 0 && (kept === null || at === -1)) {
         target = -places[front].at;
-        rot = kept === null || at === -1 ? target : target + lead;
+        rot = target;
+      } else if (places.length > 0) {
+        const shift = keptAt - places[at].at;
+        rot += shift;
+        target += shift;
+        if (drag !== null) drag.rot += shift;
       }
     },
 
