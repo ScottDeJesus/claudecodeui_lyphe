@@ -49,7 +49,8 @@ type SessionsHaloProps = {
  * breathing while it waits on the reader), the top edge lit for a reply unread, a bead at the foot for each subagent at work.
  *
  * Turned and pressed as every hoop is: the slot at the front is read out under it (its folder, its name, its state in the board's own
- * words), a press on another slot brings it round, and A PRESS ON THE SLOT AT THE FRONT, or Enter, OPENS ITS CHAT (`onOpenChat`).
+ * words), a press on another slot brings it round, and A PRESS ON THE SLOT AT THE FRONT, or Enter, OPENS ITS CHAT (`onOpenChat`). With a mouse a
+ * press on ANY slot opens its chat while the ring turns to it (`openOnTurn`); a finger turns first and opens on the second press.
  *
  * THE ORDER is the feed's: folders in the order the list draws them, each folder's chats in its own order, the chats in no folder last. It
  * reads one page of the feed, as the board does before "Load more"; a list longer than a page shows its first page.
@@ -109,6 +110,8 @@ export function SessionsHalo({ enabled, width, lean, names, reading, link, coreR
     return [...inFolders, ...loose];
   }, [items, busySessionIds, awaitingInputSessionIds, subagentRunningSessionIds, subagentModels, liveHostSessionIds, t]);
 
+  // A mouse press on any slot opens its chat as the ring turns to it; a finger still turns first, so a swipe that ends on a slot opens nothing.
+  const finePointer = useMemo(() => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches, []);
   return (
     <Hoop
       slots={slots}
@@ -121,6 +124,7 @@ export function SessionsHalo({ enabled, width, lean, names, reading, link, coreR
       coreRadius={coreRadius}
       current={current}
       onOpen={onOpenChat}
+      openOnTurn={finePointer}
       marks={{ 'data-sessions-halo': slots.length }}
     >
       {children}
