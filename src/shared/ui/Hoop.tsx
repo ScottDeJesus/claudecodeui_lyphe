@@ -40,6 +40,7 @@ type HoopProps = {
    * While something already hangs open from the hoop: a press on another slot opens that one too as it comes round, where a press on a
    * slot otherwise only turns it to the front and a second press opens it.
    * 'mouse' opens on the turn only for a press made with a mouse; a finger or pen still turns first.
+   * A slot opened so stands at the front at once, with no turn drawn: the hoop arrives settled on the opened thing.
    */
   openOnTurn?: boolean | 'mouse';
   /** A picture only: no slider, no press, no reading, and nothing for assistive tech (the caller's own press round it says what it is). */
@@ -157,8 +158,8 @@ export const Hoop = forwardRef<HoopHandle, HoopProps>(function Hoop(
     painterRef.current?.setMost(most ?? Math.PI * 2);
   }, [most, slots]);
   // The thing the hoop stands turned to, brought to the front once for each such thing: as soon as the hoop holds it, and never again
-  // after, so a turn the reader gave the hoop stays where they left it. One the hoop is already turning to (a press brought it round)
-  // is left to finish its turn.
+  // after, so a turn the reader gave the hoop stays where they left it. One already at the front (a press that opened it stood it
+  // there) is left where it stands.
   const broughtRef = useRef<string | null>(null);
   useEffect(() => {
     // Nothing to stand turned to: the next thing given is brought round, even the one that was before.
@@ -226,7 +227,12 @@ export const Hoop = forwardRef<HoopHandle, HoopProps>(function Hoop(
           onPointerUp={decorative ? undefined : (event) => {
             const press = painterRef.current?.pointerUp() ?? null;
             if (press !== null && 'open' in press) open(press.open);
-            else if (press !== null && (pressRef.current.openOnTurn === true || (pressRef.current.openOnTurn === 'mouse' && event.pointerType === 'mouse'))) open(press.turned);
+            else if (press !== null && (pressRef.current.openOnTurn === true || (pressRef.current.openOnTurn === 'mouse' && event.pointerType === 'mouse'))) {
+              // Opened on the press: it stands at the front at once, so the hoop arrives settled rather than turning under the opened page.
+              const slot = slotsRef.current[press.turned];
+              if (slot !== undefined) painterRef.current?.bring(slot.id);
+              open(press.turned);
+            }
             // A finger leaves nothing under it once it has lifted.
             if (event.pointerType !== 'mouse') painterRef.current?.pointerLeave();
           }}

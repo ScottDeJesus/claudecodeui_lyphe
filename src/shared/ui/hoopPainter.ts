@@ -479,9 +479,11 @@ export function createHoopPainter(canvas: HTMLCanvasElement) {
       hole = coreRadius;
     },
 
-    /** The slots, in their order. The slot at the front stays at the front while its thing is still on the hoop. */
+    /** The slots, in their order. The slot at the front stays where it stands while its thing is still on the hoop: a new order moves the others, never turns the hoop. */
     setSlots(next: HoopSlot[]) {
       const kept = slots[frontOf(target)]?.id ?? null;
+      // What is left of a turn under way, carried over so a turn the reader gave still ends where it was going.
+      const lead = rot - target;
       slots = next;
       lay();
       paths = slots.map(() => null);
@@ -491,8 +493,7 @@ export function createHoopPainter(canvas: HTMLCanvasElement) {
       const front = at !== -1 ? at : Math.max(0, slots.findIndex((slot) => slot.state === 'waiting'));
       if (places.length > 0) {
         target = -places[front].at;
-        if (kept === null || at === -1) rot = target;
-        else rot += fold(target - rot) - (target - rot);
+        rot = kept === null || at === -1 ? target : target + lead;
       }
     },
 
