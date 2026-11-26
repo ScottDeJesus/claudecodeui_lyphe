@@ -110,8 +110,6 @@ export function SessionsHalo({ enabled, width, lean, names, reading, link, coreR
     return [...inFolders, ...loose];
   }, [items, busySessionIds, awaitingInputSessionIds, subagentRunningSessionIds, subagentModels, liveHostSessionIds, t]);
 
-  // A mouse press on any slot opens its chat as the ring turns to it; a finger still turns first, so a swipe that ends on a slot opens nothing.
-  const finePointer = useMemo(() => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches, []);
   return (
     <Hoop
       slots={slots}
@@ -124,7 +122,7 @@ export function SessionsHalo({ enabled, width, lean, names, reading, link, coreR
       coreRadius={coreRadius}
       current={current}
       onOpen={onOpenChat}
-      openOnTurn={finePointer}
+      openOnTurn="mouse"
       marks={{ 'data-sessions-halo': slots.length }}
     >
       {children}

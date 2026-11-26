@@ -39,8 +39,9 @@ type HoopProps = {
   /**
    * While something already hangs open from the hoop: a press on another slot opens that one too as it comes round, where a press on a
    * slot otherwise only turns it to the front and a second press opens it.
+   * 'mouse' opens on the turn only for a press made with a mouse; a finger or pen still turns first.
    */
-  openOnTurn?: boolean;
+  openOnTurn?: boolean | 'mouse';
   /** A picture only: no slider, no press, no reading, and nothing for assistive tech (the caller's own press round it says what it is). */
   decorative?: boolean;
   /** The thing at the front was pressed (or Enter on the hoop), or another while `openOnTurn` says so: it opens. */
@@ -225,7 +226,7 @@ export const Hoop = forwardRef<HoopHandle, HoopProps>(function Hoop(
           onPointerUp={decorative ? undefined : (event) => {
             const press = painterRef.current?.pointerUp() ?? null;
             if (press !== null && 'open' in press) open(press.open);
-            else if (press !== null && pressRef.current.openOnTurn) open(press.turned);
+            else if (press !== null && (pressRef.current.openOnTurn === true || (pressRef.current.openOnTurn === 'mouse' && event.pointerType === 'mouse'))) open(press.turned);
             // A finger leaves nothing under it once it has lifted.
             if (event.pointerType !== 'mouse') painterRef.current?.pointerLeave();
           }}
