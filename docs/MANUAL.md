@@ -1230,7 +1230,7 @@ standard asks for and what the ten contexts already in this repo do. The provide
 `ChatHostProvider` → `AppSwitcherProvider` → `AccountsProvider` → `CompanionHost` → `WorkspaceFrame`. The layer and the FAB are mounted by
 `src/modules/project-workspace/WorkspaceFrame.tsx`: it gives its main-region wrapper the `relative`
 the layer needs, renders the layer as that wrapper's last child and the FAB as the container's last child but one (Kaylee's disc, `CompanionFab`, is the last: MAN-9125), after the command
-palette and `ChatHostFloating` (MAN-7478) — outside the main region, so the button floats over an open application
+palette — outside the main region, so the button floats over an open application
 instead of being covered by it. It builds the one `door` (`useChatDoor`), hands it to the FAB and to `ProjectCommandPalette` as `chatDoor={door}` and to the hotkey as `door.toggle`, and reports `useCurrentApplication() !== null` to chat-host's `reportCovered` in a layout effect (MAN-7464).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
@@ -5852,6 +5852,8 @@ cannot announce.
 
 **Where they are drawn.** `BugBoardOpening.tsx` lists them in one fixed order as label and value (`KeyValueList`): Building (`building`), Asking (`awaitingAnswer`), Waiting to start (`queued`, the To Do count — the operator's ruled words, never "Queued"; key `kanban.ring.vitals.queued`), then Lessons and Memories, each said "· every board" beside its number. The vitals strip that once drew them in the board header was deleted by the bug screen's redraw (689bdd2b); the case the-board-strips-to-do-count-reads-waiting-to-start keeps the To Do words.
 
+**The first row: Fixers at once, beside the board's switch.** Left: the caption (`kanban.board.fixersLabel`), the number as a figure, and the kit's `Slider` (MAN-10238) with a stop for each number from `CARD_WIDTH_MIN` to `CARD_WIDTH_MAX`. Right: the word On or Off and the switch, the word in the switch's own cell (the case the-board-headers-one-switch-reads-runs-itself-in-word-and-name-at-both-widths reads it there). The number is the dispatcher's one `width` for every board (`useFixerWidth`, MAN-10239), so the slider is named `fixersName`, or `fixersNameShared` ("…, shared by all boards") when `KanbanPanel` passes `shared`: a second unarchived board exists. It saves when the knob is let go (`onCommit`), never on a move, and it does not wait on the switch: off, it sets what applies when the board is turned on. A refused save draws the old number and `fixersRefused` with the server's sentence in a `role="alert"` line under the row (`data-bug-fixers-problem="refused"`). A number that could not be read draws a dash, the slider empty and disabled and said as `fixersUnknown`, `fixersUnread` and Retry (`data-bug-fixers-problem="unread"`). `data-bug-fixers` on the cell carries the drawn number for scripts. `KanbanPanel` also passes `open`, so the number is asked for each time the Opening opens.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-vitals.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/BugBoardOpening.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
 
 ## MAN-590 — The lessons lane
@@ -10430,7 +10432,7 @@ The module imports neither app-switcher nor project-workspace. project-workspace
 | placement | the chat is drawn in | host |
 |---|---|---|
 | `home` | the chat tab | `ChatHostSlot`'s home `div` |
-| `panel` | a fixed frame beside the FAB, in the page | `ChatHostPanel` (MAN-7491) |
+| `panel` | a fixed frame in the page, beside the chat's button | `ChatHostPanel` (MAN-7491) |
 | `window` | a Document Picture-in-Picture window | `ChatHostWindow` (MAN-7490) |
 
 - The placement is never stored: every load opens `home`. why: only furniture is remembered (the panel's size, MAN-7491).
@@ -10440,14 +10442,15 @@ The module imports neither app-switcher nor project-workspace. project-workspace
 ## `useChatHost()`
 | member | does |
 |---|---|
-| `placement`, `pipWindow`, `unread` | read |
-| `open()` | floats the chat. MUST run inside the press. Nothing when no chat is mounted, when the chat floats, or while a window is opening |
+| `placement`, `pipWindow`, `unread`, `canPopOut`, `folded` | read |
+| `open(host?)` | floats the chat; `'panel'` skips the window. MUST run inside the press. Nothing when no chat is mounted or while a window is opening; a chat already floating is brought forward (window focused, panel unfolded) |
+| `popOut()`, `toggleFold()` | panel → window; fold the panel down to its button and back — MAN-10247 |
 | `collapse()` | brings the chat home: closes the window (its `pagehide` moves the chat home), or moves the chat home from the panel. While a window is opening it abandons the request: the window is closed the moment it arrives |
 | `reportAnchor(rect \| null)` | the FAB's drawn rect; `null` when there is none |
 | `reportCovered(covered)` | whether an application covers the main region |
 
 `open()`, in order:
-1. `'documentPictureInPicture' in window` → `requestWindow({ width: 420, height: 680 })`, synchronously, first in the press. why: it spends the press's user activation.
+1. Unless `open('panel')`: `'documentPictureInPicture' in window` → `requestWindow({ width: 420, height: 680 })`, synchronously, first in the press. why: it spends the press's user activation.
 2. No API, a refusal, a throw, or a resolve with no window → placement `panel` (unless a `collapse` abandoned the request).
 3. A window that arrives after a `collapse`, after the chat unmounted, or already closed is closed, not adopted.
 
@@ -10516,11 +10519,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostWi
 
 ## MAN-7491 — The chat host — the panel: geometry, stacking, storage
 
-The chat's `panel` placement: a frame beside the FAB, in the page, over an application. Files in `src/modules/chat-host/`: `ChatHostPanel.tsx`, `ChatHostHeader.tsx`, `ChatHostPlaceholder.tsx`, `hooks/useFloatingPanel.ts`, `hooks/usePanelViewport.ts`, `utils/panelGeometry.ts`, `utils/anchorStore.ts`, `utils/chatHostStorage.ts`. Placements and the node: MAN-7489. Per-file rules and probes: MAN-7467, MAN-7478, MAN-7446.
+The chat's `panel` placement: a frame in the page, over every page, beside the chat's button (MAN-10247). Files in `src/modules/chat-host/`: `ChatHostPanel.tsx`, `ChatHostHeader.tsx`, `ChatHostPlaceholder.tsx`, `hooks/useFloatingPanel.ts`, `hooks/usePanelViewport.ts`, `utils/panelGeometry.ts`, `utils/anchorStore.ts`, `utils/chatHostStorage.ts`. Placements and the node: MAN-7489. Per-file rules and probes: MAN-7467, MAN-7478, MAN-7446. The panel carries `data-ast-keeps-opening={FLOATING_CHAT_REGION}`, the name the chat's button carries too, and claims on pointer/mouse down capture the presses React delivers from its header's portalled layers (`claimPressForKeepsOpeningRegion`; `ChatHostSlot` claims the chat's own the same way). Every outside-press close in the kit and the modules asks `shouldOutsidePressClose(event, ownParts)` (`src/shared/utils.ts`): a press in a keeps-opening region closes a pop-out only when that region (every element sharing its mark name) holds one of the pop-out's parts.
 
 ## Stacking
-- `position: fixed`, at `z-[45]`, rendered by `ChatHostFloating`, which `WorkspaceFrame` places in the shell's fixed container just before the FAB.
-- Above the application layer (z-40). Below the FAB and the radial (60), and below the mobile sidebar drawer (z-50).
+- `position: fixed`, at `z-[45]`, rendered by `ChatHostFloating`, which `WorkspaceFrame` mounts beside `HeldWorkspace`, outside the shell's container.
+- Compared at the root: over every page and everything inside the shell (application layer, mobile sidebar drawer); under the button (46) and under the layer portalled to `body` at 50.
 - Dialogs and menus stay above it: they portal to `body`.
 - Frame: the kit's `Card`, `border-input`, `--shadow-lift`. Parts, top to bottom: `ChatHostHeader`, the body the chat's node is adopted into (`moveTo(body, true)` in a layout effect), the kit's `ResizeGrip`.
 
@@ -10559,10 +10562,10 @@ The chat's `panel` placement: a frame beside the FAB, in the page, over an appli
 ## Storage — `utils/chatHostStorage.ts`
 - `localStorage` key `'chat-host'`, value `{ panel: { width, height } }`. Per browser, never the server.
 - `readPanelSize()` → size or null. `writePanelSize(size)` refuses a non-size. Neither throws; a bad or absent record means the default size.
-- Never stored: the placement, and the panel's position (the FAB answers it).
+- Never stored: the placement. The pair's place (the button's point and the panel's hold on it) is stored under `'chat-host-place'` by `utils/floatingPlaceStorage.ts` (MAN-10247).
 
 ## Header and placeholder
-- `ChatHostHeader({ header, onCollapse })`: one 40 px row. The `header` slot fills it (project-workspace's `FloatingChatHeader`: MAN-7493), then a 32 px collapse button with a 40 px hit area. The panel and the window share it.
+- `ChatHostHeader({ header, onCollapse, onPopOut?, moveHandle? })`: one 40 px row. The `header` slot fills it (project-workspace's `FloatingChatHeader`: MAN-7493), then a 32 px pop-out button (panel only, where the browser has the window) and a 32 px collapse button, each with a 40 px hit area. In the panel the row is the move handle. The panel and the window share it.
 - `ChatHostPlaceholder({ placement, onBringBack })`: the chat tab's stand-in while the chat floats: an `EmptyState` naming the host, and Bring it back. Words: the `chatHost` block of `src/modules/i18n/locales/<lang>/common.json`, all eleven locales.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePanelViewport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/anchorStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chatHostStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/panelGeometry.ts
@@ -14181,11 +14184,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/cp
 
 ## MAN-9985 — The Kanban intake door — POST /api/kanban-intake/cards, a machine door for eis_backend's problem reports
 
-`server/modules/kanban-intake/` — one route by which a trusted machine puts a card on a board. Its one caller is eis_backend's `POST /api/eis/problem-reports` (Restorly's "Something not working?" panel, the owner's account only). Mounted in `server/index.ts` at `/api/kanban-intake` with NO `authenticateToken` — the caller holds no user JWT. It sits after `app.use('/api', validateApiKey)`: a no-op while `API_KEY` is unset (2026-11-18: unset); set it and every eis_backend call is 401 `Invalid API key`, because eis_backend sends no `x-api-key`.
+`server/modules/kanban-intake/` — one route by which a trusted machine puts a card on a board. Its one caller is eis_backend's `POST /api/eis/problem-reports` (Restorly's "Something not working?" panel, from any account). Mounted in `server/index.ts` at `/api/kanban-intake` with NO `authenticateToken` — the caller holds no user JWT. It sits after `app.use('/api', validateApiKey)`: a no-op while `API_KEY` is unset (2026-11-18: unset); set it and every eis_backend call is 401 `Invalid API key`, because eis_backend sends no `x-api-key`.
 
 - **The guard** is the router's first middleware: header `X-Kanban-Intake-Secret`, compared constant-time (`secretsMatch`) with `KANBAN_INTAKE_SECRET` read from eis_backend's env file — `KANBAN_INTAKE_ENV_FILE`, default `/opt/shadow-connector/.eis_backend.env` — at call time, its parse cached by the file's mtime and size so a rotation needs no restart. No usable secret in the file → 503; a missing or wrong header → 401 (one sentence for both). A path spelled in another case reaches the same guard (a prefix mount).
-- **The verb:** `POST /cards` `{ boardId, title, description?, tags?, priority? }` (title ≤ 200, description ≤ 8000, ≤ 8 tags of ≤ 40 characters, duplicates collapse; `priority` one of `KANBAN_PRIORITIES` — `low` | `medium` | `high`, trimmed, `medium` when absent or null, anything else a 400; other keys ignored) → 201 `{ card }`; the first bad field → 400 `{ error: <sentence naming it> }`. It goes through `kanbanCardsService.createCard` (status `todo`: only the owner's reports reach it, and his report is his approval; the parsed priority) then `addTag` per tag, every write with actor `restorly` — so ids, `card.created` / `tag.added` events and the board broadcasts are the service's own. An unknown board is the service's 404.
-- **Proof:** `curl -X POST :3011/api/kanban-intake/cards` with no header and with a wrong one → 401; a real card filed through eis_backend lands on `b-143` tagged `bug` with both events by `restorly`.
+- **The verb:** `POST /cards` `{ boardId, title, description?, tags?, priority?, status?, reporter? }` (title ≤ 200, description ≤ 8000, ≤ 8 tags of ≤ 40 characters, duplicates collapse; `priority` one of `KANBAN_PRIORITIES` — `low` | `medium` | `high`, trimmed, `medium` when absent or null, anything else a 400; `status` one of `INTAKE_STATUSES` — `not_ready` (Backlog) | `todo` (To do), trimmed, `todo` when absent or null, anything else 400 `status must be one of not_ready, todo`; `reporter` a trimmed name of 1 to 60 characters on one line (`REPORTER_MAX_CHARS`; any C0/C1 control character, U+2028 or U+2029 is refused), none when absent or null, anything else 400 `reporter must be one line of at most 60 characters`; other keys ignored) → 201 `{ card }`; the first bad field → 400 `{ error: <sentence naming it> }`. It goes through `kanbanCardsService.createCard` with the title `cardTitle(title, reporter)` — the title alone with no reporter, else `<reporter>: <title>` cut to at most 200 with a closing `…` (a cut never leaves half an emoji, so it may land one unit short) (the door renders the name because the Bugs view draws a card by its title) — and the parsed status and priority: the caller chooses Backlog or To do, To do when it names none, then `addTag` per tag, every write with actor `restorly` — so ids, `card.created` / `tag.added` events and the board broadcasts are the service's own. An unknown board is the service's 404.
+- **Proof:** `curl -X POST :3011/api/kanban-intake/cards` with no header and with a wrong one → 401; a real card filed through eis_backend lands on `b-143` tagged `bug` with both events by `restorly`; a card filed with `"status":"not_ready","reporter":"Lupe Marquez"` answers 201 with `card.status` `not_ready` and `card.title` `Lupe Marquez: <title>`, then is archived (`POST /api/kanban/cards/<id>/archive`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-intake/
 
@@ -14359,3 +14362,40 @@ Both lists come from the dispatcher's document (`hooks/dispatcher`); no plan car
 All through `t()` under `dispatcher.decided.*` in `en/common.json`: `title`, `fresh`, `freshCount`, `by.{builder,designer,rule}`, `wholeFeature`, `what`, `choice`, `why`, `undo`, `earlier`, `gaps`, `gapsBelow` (+ `gapsBelow_one`), `priority.{high,medium,low}`, `ticket`, `ticketCopied`, `ticketNotCopied`. Every string reaches the DOM as a text node: titles, choices, reasons and gap titles are free text souls wrote.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanDecided.tsx
+
+## MAN-10239 — `useFixerWidth` — the bug board's Fixers-at-once number: the dispatcher's one width, one file, one order of answers
+
+`src/modules/kanban/hooks/useFixerWidth.ts`: how many bug fixers run at once, for the slider in the board Opening's first row (`BugBoardOpening.tsx`, MAN-10002; the kit's `Slider`, MAN-10238).
+
+## What the number is
+- The dispatcher's `width` in `~/.claude/charters/cards.toml` (MAN-10005): ONE number for every board that runs itself, the same one Settings → Agents draws as cards walked at once (`useBugBoardSettings`, MAN-10000). No per-board number exists.
+- Read and written through `api.settings.bugBoard()` / `saveBugBoard({width})`: `GET` / `PUT /api/kanban-dispatch/settings`, which run `dispatcher card config` (MAN-10009). A raise wakes the daemon in the verb, so waiting cards start without the board's switch being touched; a lower number stops no fixer at work.
+- Its bounds are `CARD_WIDTH_MIN` / `CARD_WIDTH_MAX` in `src/shared/constants.ts` (source: `WIDTH_MIN` / `WIDTH_MAX` in `hooks/dispatcher/card_config.py`). An answer outside them is no answer (`widthOf`), never a default.
+
+## `useFixerWidth(watching)` answers `{saved, shown, saving, problem, move, keep, refresh}`
+| name | what |
+|---|---|
+| `watching` | the Opening is open: the number is read when it turns true, and on window `focus` / `visibilitychange` while it is |
+| `saved` | the number the server last read off the file; `null` until a read answers, and again after a read that answered none |
+| `shown` | the draft, else `saved`: the knob's place while it is held or while its save is out |
+| `move(next)` | draws, writes nothing; clears a `refused` line |
+| `keep(next)` | the knob's release: writes, then draws what the server read back |
+| `problem` | `kind` `unread` or `refused`, with the server's own `sentence` (`refusalSentence`) or `null` when it sent none |
+
+## Rules
+- ONE FILE, ONE ORDER OF ANSWERS. Saves go one at a time (`writing`). A release during a save is kept in `pending` and sent next, and skipped when the file already holds it. Every save bumps `generation`, which retires any read asked before it.
+- A refused or unanswered save sets `problem.kind` to `refused`, drops the draft so the old number is drawn, then reads the file again: a save whose answer was lost may have landed. A read that answers a number keeps the `refused` line; one that answers none replaces it with `unread`.
+- `unread` means no number: `saved` is `null`, and the header draws a dash, the slider empty and disabled, and Retry (`refresh`). An unknown number is never drawn or said as 1.
+- `keep` does nothing while `saved` is `null`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useFixerWidth.ts
+
+## MAN-10240 — `useAnalyticsSection` — the question is compared by id and days, and the question already out is never read twice
+
+`src/modules/analytics/hooks/useAnalyticsSection.ts`, the mount effect (`[id, days, read]`).
+
+- The effect replaces `asked.current` only when `id` or `days` moved, and starts no read when the same question is asked while its read is out (`same && inFlight.current`).
+- why: a dev build runs the effect twice on mount. The second run used to store an equal but new object, so the first answer failed `question === asked.current`, was dropped as "no longer asked", and the route was read again. Every section cost two reads; Repeats, whose read takes seconds, drew after 15 to 19 s, and `web-walk reach cloudcli` (20 s a screen) stopped reaching `analytics-repeats` (measured 2026-11-25: two `GET /api/analytics/repeats` at 8.9 s and 15.1 s; after the cure one, drawn at 6.7 s).
+- Unchanged: a moved id or window still drops the old answer and asks the current one; Refresh and `visibilitychange` during a read still owe ONE more read.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/hooks/useAnalyticsSection.ts

@@ -4,7 +4,7 @@ import { Check, CheckSquare, Copy, Edit2, GitBranch, Loader2, MoreHorizontal, Pi
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Badge, buttonVariants, Dialog, DialogContent, DialogTitle, LLMProviderLogo, SignalLoop, Tooltip } from '@/shared/ui';
-import { cn,copyTextToClipboard } from '@/shared/utils';
+import { cn, copyTextToClipboard, shouldOutsidePressClose } from '@/shared/utils';
 import { LLM_PROVIDER_LABELS, PAGE_ANCHOR } from '@/shared/constants';
 import type { LLMProvider, Project, ProjectSession, SessionWithProvider } from '@/shared/types';
 import { api } from '@/shared/api';
@@ -156,7 +156,7 @@ function SidebarSessionItem({
 
     const handlePointerDown = (event: MouseEvent) => {
       const container = editingContainerRef.current;
-      if (container && !container.contains(event.target as Node)) {
+      if (container && shouldOutsidePressClose(event, [container])) {
         onCancelEditingSession();
       }
     };

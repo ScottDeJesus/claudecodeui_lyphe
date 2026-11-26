@@ -2,7 +2,8 @@
  * A chat's own weekly window, filed with the pacer under the account the chat runs on.
  *
  * Every Claude child streams `rate_limit_event`s carrying `rate_limit_info.unifiedWindows`, whose
- * `seven_day` entry is the weekly window of the ACCOUNT ITS CREDENTIAL BELONGS TO. A CloudCLI chat's
+ * `seven_day` entry is the weekly window of the ACCOUNT ITS CREDENTIAL BELONGS TO. Fable's own weekly
+ * window, `seven_day_overage_included`, rides along when the event carries it. A CloudCLI chat's
  * process is launched on the account the house chose (`claude-launch-account.ts`, kept in the
  * launch profile), so its events are a reading of THAT account, never of whatever login the box
  * holds now: after a switch the live login is not the account an open chat rides (the account
@@ -28,7 +29,7 @@ import type { ClaudeUsageWindow } from '@/shared/types.js';
 type WindowFigures = { percent: number; resetsAt: number };
 
 /** One account's week, as last filed. */
-type AccountFigures = { week: WindowFigures };
+type AccountFigures = { week: WindowFigures; fable?: WindowFigures };
 
 /** The pacer's own band (`readings.MAX_FRACTION`): 1.5 is the wall, the half beyond it an overshoot. */
 const MAX_PERCENT = 150;
@@ -74,7 +75,13 @@ function windowOf(
 /** Did the week move since this account's last reading — a new figure or a new reset? A first reading always has. */
 function moved(before: AccountFigures | undefined, now: AccountFigures): boolean {
   if (before === undefined) return true;
-  return before.week.percent !== now.week.percent || before.week.resetsAt !== now.week.resetsAt;
+  if (before.week.percent !== now.week.percent || before.week.resetsAt !== now.week.resetsAt) return true;
+  if (now.fable === undefined) return false;
+  return (
+    before.fable === undefined ||
+    before.fable.percent !== now.fable.percent ||
+    before.fable.resetsAt !== now.fable.resetsAt
+  );
 }
 
 /**
@@ -88,9 +95,11 @@ function moved(before: AccountFigures | undefined, now: AccountFigures): boolean
 export function noteChatWindows(account: string | null, unifiedWindows: unknown): void {
   if (!account || !isRecord(unifiedWindows)) return;
   const week = windowOf(unifiedWindows.seven_day, 'seven_day', 'weekly');
+  const fable = windowOf(unifiedWindows.seven_day_overage_included, 'seven_day_overage_included', 'weekly · Fable');
   if (week === null) return;
-  const figures: AccountFigures = { week: week.figures };
+  const figures: AccountFigures =
+    fable === null ? { week: week.figures } : { week: week.figures, fable: fable.figures };
   if (!moved(filed.get(account), figures)) return;
   filed.set(account, figures);
-  notePacerReading(account, [week.row], Date.now(), 'chat');
+  notePacerReading(account, fable === null ? [week.row] : [week.row, fable.row], Date.now(), 'chat');
 }

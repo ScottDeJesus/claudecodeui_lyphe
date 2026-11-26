@@ -1,8 +1,8 @@
 /**
  * The Kanban intake door: the one route by which a trusted machine puts a card on a board.
  *
- * Who calls it: eis_backend's `POST /api/eis/problem-reports`, only for the owner's account, filing a
- * "Something not working?" report. Each report becomes one card.
+ * Who calls it: eis_backend's `POST /api/eis/problem-reports`, filing a Restorly "Something not working?"
+ * report from any account. Each report becomes one card.
  *
  * Why no `authenticateToken`: the machine holds no user JWT. This router's first middleware is the
  * credential instead: a shared secret in the `X-Kanban-Intake-Secret` header.
@@ -13,9 +13,16 @@
  * own env file, so a
  * rotation needs no restart and no second copy exists.
  *
- * What lands: cards go to To do (`todo`), since only the owner's reports reach this door and his report is his approval, at the priority the body names (`low` | `medium` | `high`),
- * `medium` when it names none; an unknown priority is a 400. Every write through this door is
- * stamped with the actor `restorly`, so the activity spine never reads them as the operator's own acts.
+ * What lands: the caller chooses the lane, Backlog (`not_ready`) or To do (`todo`), and To do when it names
+ * none (the owner's report is his approval; anyone else's waits in Backlog for triage). The priority is the one
+ * the body names (`low` | `medium` | `high`), `medium` when it names none; an unknown status or priority is a 400.
+ *
+ * Why the reporter travels as its own field rather than inside the title: the door renders it, so every caller
+ * gets the same "<reporter>: <title>" shape within the title bound, and the Bugs view draws a card by its title,
+ * so the name has to be in the title to be seen at all.
+ *
+ * Every write through this door is stamped with the actor `restorly`, so the activity spine never reads them as
+ * the operator's own acts.
  */
 
 import express from 'express';
@@ -23,7 +30,7 @@ import type { NextFunction, Request, RequestHandler, Response, Router } from 'ex
 
 import { kanbanCardsService } from '@/modules/kanban/index.js';
 import { KANBAN_PRIORITIES } from '@/shared/kanban-types.js';
-import type { KanbanPriority, KanbanWriteContext } from '@/shared/kanban-types.js';
+import type { KanbanPriority, KanbanStatus, KanbanWriteContext } from '@/shared/kanban-types.js';
 
 import { createIntakeSecretReader, kanbanIntakeEnvFile, secretsMatch } from './kanban-intake.secret.js';
 
@@ -41,6 +48,14 @@ const TAGS_MAX = 8;
 const TAG_MAX_CHARS = 40;
 /** An intake body that names no priority files at medium, as the door always has. */
 const DEFAULT_PRIORITY: KanbanPriority = 'medium';
+/** The lanes a machine may file into: Backlog for a report that waits for triage, To do for an approved one. */
+const INTAKE_STATUSES: readonly KanbanStatus[] = ['not_ready', 'todo'];
+/** An intake body that names no status files in To do, as the door always has. */
+const DEFAULT_STATUS: KanbanStatus = 'todo';
+/** A reporter is a person's name on one line, short enough to leave the title room. */
+const REPORTER_MAX_CHARS = 60;
+/** Closes a title cut to fit, so a reader sees it was cut. */
+const TITLE_CUT_MARK = '…';
 
 /** A valid intake body, trimmed, defaulted and de-duplicated: what the handler files. */
 type IntakeCard = {
@@ -49,6 +64,8 @@ type IntakeCard = {
   description: string;
   tags: string[];
   priority: KanbanPriority;
+  status: KanbanStatus;
+  reporter: string | null;
 };
 
 /**
@@ -99,6 +116,48 @@ function parsePriority(raw: unknown): { priority: KanbanPriority } | { error: st
   return { error: `priority must be one of ${KANBAN_PRIORITIES.join(', ')}` };
 }
 
+/** Narrows a string to a lane this door files into. */
+function isIntakeStatus(value: string): value is KanbanStatus {
+  return (INTAKE_STATUSES as readonly string[]).includes(value);
+}
+
+/** The lane an intake body names, trimmed; To do when it names none; or the sentence for a bad one. */
+function parseStatus(raw: unknown): { status: KanbanStatus } | { error: string } {
+  if (raw === undefined || raw === null) return { status: DEFAULT_STATUS };
+
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (isIntakeStatus(trimmed)) return { status: trimmed };
+
+  return { error: `status must be one of ${INTAKE_STATUSES.join(', ')}` };
+}
+
+/** The reporter an intake body names, trimmed; null when it names none; or the sentence for a bad one. */
+function parseReporter(raw: unknown): { reporter: string | null } | { error: string } {
+  if (raw === undefined || raw === null) return { reporter: null };
+
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  // Every C0/C1 control (\n, \r, VT, FF, NEL among them) and the two Unicode separators: a name is one plain line.
+  const isOneLine = !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(trimmed);
+  if (trimmed !== '' && trimmed.length <= REPORTER_MAX_CHARS && isOneLine) return { reporter: trimmed };
+
+  return { error: `reporter must be one line of at most ${REPORTER_MAX_CHARS} characters` };
+}
+
+/**
+ * The card's title: the body's title alone, or "<reporter>: <title>" cut to the title bound with a closing mark.
+ * A cut never keeps half of a surrogate pair (an emoji would store as U+FFFD), so it may land one unit short.
+ * Pure, so the one shape every caller gets reads in one place.
+ */
+export function cardTitle(title: string, reporter: string | null): string {
+  if (reporter === null) return title;
+
+  const named = `${reporter}: ${title}`;
+  if (named.length <= TITLE_MAX_CHARS) return named;
+
+  const kept = named.slice(0, TITLE_MAX_CHARS - TITLE_CUT_MARK.length).replace(/[\uD800-\uDBFF]$/, '');
+  return kept + TITLE_CUT_MARK;
+}
+
 /**
  * The intake body's fields, validated: the parsed card, or the sentence naming the first field that failed.
  * Pure, so the rules read in one place and the handler only routes the answer.
@@ -123,10 +182,24 @@ function parseIntakeCard(body: Record<string, unknown>): IntakeCard | string {
   const parsedPriority = parsePriority(body.priority);
   if ('error' in parsedPriority) return parsedPriority.error;
 
-  return { boardId, title, description, tags, priority: parsedPriority.priority };
+  const parsedStatus = parseStatus(body.status);
+  if ('error' in parsedStatus) return parsedStatus.error;
+
+  const parsedReporter = parseReporter(body.reporter);
+  if ('error' in parsedReporter) return parsedReporter.error;
+
+  return {
+    boardId,
+    title,
+    description,
+    tags,
+    priority: parsedPriority.priority,
+    status: parsedStatus.status,
+    reporter: parsedReporter.reporter,
+  };
 }
 
-/** The door's router: the secret guard first, then the one POST that files a card in To do. */
+/** The door's router: the secret guard first, then the one POST that files a card in the lane the body names. */
 export function createKanbanIntakeRouter(): Router {
   const router = express.Router();
   const readSecret = createIntakeSecretReader(kanbanIntakeEnvFile());
@@ -160,7 +233,12 @@ export function createKanbanIntakeRouter(): Router {
       const context: KanbanWriteContext = { actor: INTAKE_ACTOR };
       const created = kanbanCardsService.createCard(
         parsed.boardId,
-        { title: parsed.title, description: parsed.description, status: 'todo', priority: parsed.priority },
+        {
+          title: cardTitle(parsed.title, parsed.reporter),
+          description: parsed.description,
+          status: parsed.status,
+          priority: parsed.priority,
+        },
         context
       );
 

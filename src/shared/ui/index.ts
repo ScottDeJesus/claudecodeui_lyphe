@@ -240,6 +240,10 @@ export { Stepper } from '@/shared/ui/Stepper';
 // `Stepper`, which is the numeric minus/plus control above. The cerberus tab's Enroll dialog draws
 // Name it · Install · Say hello with it.
 export { Steps } from '@/shared/ui/Steps';
+// Astrolabe's slider: one number out of a short run of stops, a square knob on a ticked hairline track over the browser's own range
+// input, which tells `onCommit` once when the knob is let go. The kanban module's board Opening sets how many bug fixers run at once
+// with it; it is the design system's control, so it stands here with one module drawing it.
+export { Slider } from '@/shared/ui/Slider';
 export { Switch } from '@/shared/ui/Switch';
 export { Tabs } from '@/shared/ui/Tabs';
 export { Track } from '@/shared/ui/Track';

@@ -8,6 +8,7 @@ import type { AccountSwitcherAnchor } from '@/modules/accounts/context/AccountsC
 import { accountInUse } from '@/modules/accounts/utils/accountInUseUsage';
 import { Button, Card } from '@/shared/ui';
 import { OWNS_ESCAPE, overlayInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
+import { shouldOutsidePressClose } from '@/shared/utils';
 
 /** The switcher's own id, so what opened it can point at it with `aria-controls`. */
 export const ACCOUNT_PANEL_ID = 'account-panel';
@@ -90,7 +91,7 @@ export function AccountPopover({ anchor }: { anchor: AccountSwitcherAnchor }) {
     if (signInOpen) return undefined;
     const closeOnOutsidePointer = (event: PointerEvent) => {
       const target = event.target as Element | null;
-      if (target === null || cardRef.current?.contains(target) || target.closest(OWN_SURFACE)) return;
+      if (target === null || target.closest(OWN_SURFACE) || !shouldOutsidePressClose(event, [cardRef.current])) return;
       closeSwitcher();
     };
     const closeOnEscape = (event: KeyboardEvent) => {

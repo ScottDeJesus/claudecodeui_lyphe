@@ -6,6 +6,7 @@ import { ChevronDown } from 'lucide-react';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { Card } from '@/shared/ui';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
+import { shouldOutsidePressClose } from '@/shared/utils';
 
 // File-local: the panel's stance, measured at the press.
 type PopoverPlacement = { left: number; width: number; maxHeight: number; top?: number; bottom?: number };
@@ -99,8 +100,7 @@ export default function SidebarSessionPickerPopover({
 
     const close = () => setPlacement(null);
     const closeOnOutsidePointer = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      if (!shouldOutsidePressClose(event, [triggerRef.current, panelRef.current])) return;
       close();
     };
     const closeOnEscape = (event: KeyboardEvent) => {

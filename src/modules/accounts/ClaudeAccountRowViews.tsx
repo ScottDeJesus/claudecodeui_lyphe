@@ -2,7 +2,7 @@ import { Check, KeyRound, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { UsageRing } from '@/modules/accounts/UsageRing';
-import { readingAgeWords, rowWeek } from '@/modules/accounts/utils/accountInUseUsage';
+import { readingAgeWords, rowFable, rowWeek } from '@/modules/accounts/utils/accountInUseUsage';
 import { ActionMenu, Button } from '@/shared/ui';
 import type { ClaudeAccountRow } from '@/shared/types';
 import { cn, formatShortDate } from '@/shared/utils';
@@ -93,6 +93,8 @@ export function AccountRowView({ account, nowMs, busy, held, switched, onUse, on
   // The week as every surface draws it: one whose reset has passed with no reading since is the week that began
   // there — unknown, counting down to its next reset — so the ring never shows a closed week's figure.
   const week = rowWeek(account, nowMs);
+  // Fable's own weekly limit, when a Fable run has been read for the account: it can fill while the week has room.
+  const fable = rowFable(account, nowMs);
   // An old or unread figure says so; a recent one says nothing.
   const ageWords = readingAgeWords(account, nowMs);
   // A refused token's saved expiry promises what the warn word denies: the row shows the wall, not the date.
@@ -109,6 +111,7 @@ export function AccountRowView({ account, nowMs, busy, held, switched, onUse, on
     >
       {/* `owner`: three rows draw three "This week" rings, and a screen reader must hear whose each one is. */}
       <UsageRing usageWindow={week} now={nowMs} captioned owner={account.slug} />
+      {fable && <UsageRing usageWindow={fable} now={nowMs} captioned owner={account.slug} shortName="fable" longName="Fable this week" handle="fable" />}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="truncate text-[13px] font-medium leading-tight text-foreground" title={name}>{name}</div>
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">

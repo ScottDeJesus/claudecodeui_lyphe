@@ -10,6 +10,7 @@ import { StationDock } from '@/modules/station/StationDock';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { Button } from '@/shared/ui';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
+import { shouldOutsidePressClose } from '@/shared/utils';
 
 /** How far outside the core's outer ring the bead orbits, in px: clear of the ring's press. Held still at a small core's corner, it sits just on the ring. */
 const BEAD_GAP = 10;
@@ -113,8 +114,7 @@ export function StationDraftAlert({ ringRadius, still = false }: { ringRadius: n
     const doc = hostWindow.document;
     const closeOnOutsidePointer = (event: PointerEvent) => {
       if (pressInside.current === event) return;
-      const target = event.target as Node | null;
-      if (target !== null && (popRef.current?.contains(target) || beadRef.current?.contains(target))) return;
+      if (!shouldOutsidePressClose(event, [popRef.current, beadRef.current])) return;
       setOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {

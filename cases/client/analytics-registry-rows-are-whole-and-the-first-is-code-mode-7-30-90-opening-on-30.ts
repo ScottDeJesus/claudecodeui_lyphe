@@ -3,7 +3,8 @@
 //
 // The Analytics area's sections are the rows of sections/registry.ts (analytics-code-mode, interface G), and the panel
 // draws its strip and its windows from them and nothing else. A row is whole when its id is its own, its name is a key
-// under analytics. that en/common.json spells, its windows are whole days in rising order holding the one it opens on,
+// under analytics. that en/common.json spells, its windows are whole days in rising order holding the one it opens on
+// (a section read as it stands now offers none, and still opens on a whole number of days),
 // and its Body is lazy (its own chunk) and resolves to a component. The first row, where the area opens, is Code Mode:
 // code-mode, analytics.sections.codeMode, 7, 30 and 90 days, opening on 30.
 //
@@ -47,9 +48,10 @@ runCase(async () => {
     ids.add(id);
     if (typeof row.titleKey !== "string" || !row.titleKey.startsWith("analytics.") || typeof spelled(row.titleKey) !== "string") wrong.push(id + "'s titleKey " + JSON.stringify(row.titleKey) + " is not a string under analytics. in en/common.json");
     const w = Array.isArray(row.windows) ? row.windows : [];
-    const whole = w.length > 0 && w.every((d: unknown, i: number) => Number.isInteger(d) && (d as number) > 0 && (i === 0 || (d as number) > w[i - 1]));
+    const whole = Array.isArray(row.windows) && w.every((d: unknown, i: number) => Number.isInteger(d) && (d as number) > 0 && (i === 0 || (d as number) > w[i - 1]));
     if (!whole) wrong.push(id + "'s windows " + JSON.stringify(row.windows) + " are not whole days in rising order");
-    if (!w.includes(row.defaultDays)) wrong.push(id + "'s defaultDays " + JSON.stringify(row.defaultDays) + " is not one of its windows");
+    const opensOn = w.length > 0 ? w.includes(row.defaultDays) : Number.isInteger(row.defaultDays) && row.defaultDays > 0;
+    if (!opensOn) wrong.push(id + "'s defaultDays " + JSON.stringify(row.defaultDays) + (w.length > 0 ? " is not one of its windows" : " is not a whole number of days, which a section with no window still opens on"));
     const body = row.Body;
     if (body?.$$typeof !== Symbol.for("react.lazy")) { wrong.push(id + "'s Body is not a React lazy"); continue; }
     if (body._payload?._status === -1 && typeof body._payload._result === "function") {

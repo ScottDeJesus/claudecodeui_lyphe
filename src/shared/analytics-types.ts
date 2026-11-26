@@ -218,3 +218,41 @@ export type RepeatsAnalytics = {
   series: RepeatsDay[];
   families: RepeatsFamily[];
 };
+
+/**
+ * The measure an adopted feature's design named (the dispatcher's rnd_measures row), key for key as
+ * dispatcher rnd readings --json prints it. Its command is never on the wire.
+ */
+export type RndMeasure = {
+  says: string;
+  promised: string;
+  baseline: number;
+  unit: string;
+  better: 'lower' | 'higher';
+  section: string | null;
+  set_at: string;
+  set_by: string;
+};
+
+/** One reading of a measure: the number its command printed, and how it stands against the baseline, derived by the dispatcher. */
+export type RndReading = { value: number; detail: string | null; against: 'better' | 'level' | 'worse' };
+
+/**
+ * One feature Adopt made from an R&D candidate. state: none, no measure named; not_built, a measure and the
+ * plan not complete; read, the command answered (reading); failed, it did not (fault, one sentence).
+ */
+export type RndFeatureReading = {
+  candidate: string;
+  plan: string;
+  title: string;
+  epic: string | null;
+  word: string | null;
+  adopted_at: string;
+  measure: RndMeasure | null;
+  state: 'none' | 'not_built' | 'read' | 'failed';
+  reading: RndReading | null;
+  fault: string | null;
+};
+
+/** What GET /api/analytics/rnd carries as data: every adopted feature, newest adoption first. generated_at is ISO. */
+export type RndReadingsAnalytics = { generated_at: string; features: RndFeatureReading[] };

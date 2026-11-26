@@ -46,6 +46,12 @@ export function rowsOf(picture: RndPicture, view: RndView): RndCandidate[] {
   return VIEW_WORDS[view].flatMap((word) => picture.candidates.filter((candidate) => candidate.word === word));
 }
 
+/** The word a row and its Opening wear: proved while Opus places it reads Placing, in the spiking tone; else its own. */
+export function statusOf(candidate: RndCandidate): { word: RndWord | 'placing'; tone: 'info' | 'positive' | 'neutral' } {
+  if (candidate.word === 'proved' && candidate.placing?.state === 'out') return { word: 'placing', tone: 'info' };
+  return { word: candidate.word, tone: WORD_TONE[candidate.word] };
+}
+
 /**
  * The number a view wears, from the picture's own standing: how many stand at its first word. On Verdicts that is the proved
  * alone, the yeses waiting for his Adopt; the adopted are done, and are counted on their own rule under them.

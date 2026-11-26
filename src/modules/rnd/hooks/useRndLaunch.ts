@@ -6,12 +6,12 @@ import { api } from '@/shared/api';
 import type { AgentLaunchCensus, AgentLaunchRow, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 
 /** The launch table's row each of the place's launches runs at (charters/launch.toml, the one home of their model and effort). */
-const ROW_OF: Record<RndLaunchKind, string> = { scout: 'rnd.scout', spike: 'rnd.spike' };
+const ROW_OF: Record<RndLaunchKind, string> = { scout: 'rnd.scout', spike: 'rnd.spike', adopt: 'rnd.adopt' };
 
 type CensusRead = { census: AgentLaunchCensus | null; failure: string | null };
 
 /**
- * THE SCOUT'S AND THE SPIKE'S LAUNCH ROWS, as the settings sheet's slots. Read once from GET /api/agent-launch when the panel opens
+ * THE SCOUT'S, THE SPIKE'S AND ADOPT'S PLACER'S LAUNCH ROWS, as the settings sheet's slots. Read once from GET /api/agent-launch when the panel opens
  * and replaced by the census each save answers with; the sheet holds no copy of its own (INV-5703). save answers the response, so
  * useRndWrites says a refusal where the sheet is.
  */
@@ -63,8 +63,9 @@ export function useRndLaunch(): {
     if (census === null) return { launch: null, launchFailure: failure, save };
     const scout = census.rows.find((row) => row.name === ROW_OF.scout);
     const spike = census.rows.find((row) => row.name === ROW_OF.spike);
-    if (scout === undefined || spike === undefined) return { launch: null, launchFailure: t('rnd.launchMissing'), save };
-    return { launch: { scout: slotsOf(census, scout), spike: slotsOf(census, spike) }, launchFailure: null, save };
+    const adopt = census.rows.find((row) => row.name === ROW_OF.adopt);
+    if (scout === undefined || spike === undefined || adopt === undefined) return { launch: null, launchFailure: t('rnd.launchMissing'), save };
+    return { launch: { scout: slotsOf(census, scout), spike: slotsOf(census, spike), adopt: slotsOf(census, adopt) }, launchFailure: null, save };
   }, [read, save, t]);
 }
 

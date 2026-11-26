@@ -571,7 +571,6 @@
     "launchMissing": "The launch table has no rnd.scout or rnd.spike row yet.",
     "weeklyOn": "{{day}}s at {{time}}",
     "dailyAt": "every day at {{time}}",
-    "noMilestone": "No milestone",
     "loading": "Reading what the scout has filed…",
     "unreachable": {
       "title": "R&D is not answering",
@@ -617,12 +616,14 @@
       "waiting": "Waiting",
       "spiking": "Spiking",
       "proved": "Proved",
+      "placing": "Placing",
       "adopted": "Adopted",
       "rejected": "Rejected"
     },
     "row": {
       "meta": "{{host}} · {{age}}",
-      "spiking": "{{host}} · spike started {{age}}"
+      "spiking": "{{host}} · spike started {{age}}",
+      "placing": "{{host}} · Opus is placing it · {{age}}"
     },
     "empty": {
       "noSources": {
@@ -668,27 +669,22 @@
       "rejectedBecause": "Rejected because",
       "became": "Became",
       "becameValue": "{{plan}} · {{word}} · under {{epic}}",
-      "adoptedNote": "It is the roadmap’s now; there is nothing more to do here."
+      "measure": "Measured by",
+      "measureNone": "No measure named yet",
+      "placing": "Placing",
+      "placingValue": "Opus is choosing its epic, title and goal · asked {{ago}}",
+      "placeFailed": "Last Adopt failed",
+      "placedWhy": "Why there",
+      "adoptedNote": "Its design is sent; it comes to you for Accept on the feature’s card in the Roadmap."
     },
     "act": {
       "spike": "Spike",
       "spikeAgain": "Spike again",
       "openChat": "Open chat",
       "adopt": "Adopt",
+      "placing": "Placing…",
       "reject": "Reject",
       "reopen": "Bring back"
-    },
-    "adopt": {
-      "title": "Adopt",
-      "accent": "as an idea",
-      "about": "“{{title}}” becomes an idea on the roadmap, under the epic you choose. Its question, its verdict and its evidence go with it.",
-      "epic": "Epic",
-      "epicPlaceholder": "Choose an epic…",
-      "noEpics": "The roadmap has no epic to adopt under. Add one on the Roadmap, then come back.",
-      "goal": "Goal",
-      "goalHelper": "Optional. In your own words, what this should do for us.",
-      "cancel": "Cancel",
-      "confirm": "Adopt"
     },
     "reject": {
       "title": "Reject",
@@ -719,6 +715,8 @@
       "scoutAbout": "The weekly reader. It reads the sources and files candidates; it changes nothing.",
       "spike": "Spike",
       "spikeAbout": "The chat that tries one candidate and answers yes or no.",
+      "adopt": "Adopt's placer",
+      "adoptAbout": "The one call that places a proved candidate on the roadmap — its epic, title and goal — before its design starts.",
       "modelLabel": "{{who}} model",
       "effortLabel": "{{who}} effort",
       "web": "Web search",
@@ -1039,6 +1037,14 @@
       "autonomyOn": "On",
       "autonomyOff": "Off",
       "autonomySwitch": "Turn this board on or off",
+      "fixersLabel": "Fixers at once",
+      "fixersName": "Bug fixers running at once",
+      "fixersNameShared": "Bug fixers running at once, shared by all boards",
+      "fixersValue": "{{number}} at once",
+      "fixersUnknown": "not known",
+      "fixersRefused": "Not saved, still {{number}}. {{reason}}",
+      "fixersUnread": "The number of fixers could not be read. {{reason}}",
+      "fixersNoAnswer": "The server did not answer.",
 
       "newBoard": "New board",
       "rename": "Rename",
@@ -4993,6 +4999,9 @@
   },
   "chatHost": {
     "panelLabel": "Floating chat",
+    "popOut": "Pop out to its own window",
+    "fold": "Fold the chat down to its core",
+    "unfold": "Bring the chat back",
     "collapse": "Collapse chat",
     "resize": "Resize chat",
     "panelTitle": "Chat is in the floating panel",
@@ -5453,6 +5462,7 @@
     "sections": {
       "codeMode": "Code Mode",
       "repeats": "Repeats",
+      "rnd": "R&D",
       "webWalk": "Web walks"
     },
     "frame": {
@@ -5463,6 +5473,27 @@
       "takenOn": "Numbers taken {{date}} at {{time}}.",
       "newer": "Reading newer numbers…",
       "refresh": "Refresh"
+    },
+    "rnd": {
+      "title": "Adopted from R&D",
+      "count": "{{total}}",
+      "worse": "{{count}} of {{total}} worse",
+      "empty": {
+        "title": "Nothing adopted from R&D yet",
+        "message": "Adopt a proved idea in R&D, and its feature shows here with what its design promised and its number now."
+      },
+      "now": "Now",
+      "noReading": "no reading",
+      "promised": "Promised",
+      "against": {
+        "better": "better than the spike’s {{baseline}}",
+        "level": "level with the spike’s {{baseline}}",
+        "worse": "worse than the spike’s {{baseline}}"
+      },
+      "none": "No measure named yet",
+      "notBuilt": "Not built yet",
+      "failed": "The reading failed",
+      "open": "Open {{section}}"
     },
 "repeats": {
       "unknown": "not known",

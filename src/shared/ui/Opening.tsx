@@ -5,7 +5,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Badge } from '@/shared/ui/Badge';
 import { OWNS_ESCAPE, modalInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
 import type { AstrolabePoint } from '@/shared/types';
-import { cn } from '@/shared/utils';
+import { cn, shouldOutsidePressClose } from '@/shared/utils';
 
 /** Where the plate stands from its mark: beside it, over or under it, or a sheet at the foot where the room is too narrow. */
 type OpeningSide = 'left' | 'right' | 'above' | 'below';
@@ -58,7 +58,7 @@ type OpeningProps = {
  *
  * IT FOLDS BACK on its back arrow, on Escape and on a press anywhere else, except on a press inside anything it put up itself (a
  * select's list, a dialog it opened: they are its own in the React tree even when portalled), and on a press on the object it hangs
- * from (`data-ast-keeps-opening`), which turns to another thing without closing it first. It owns Escape while it is open
+ * from or in the floating chat (`data-ast-keeps-opening`, `shouldOutsidePressClose`): the object turns to another thing without closing it first. It owns Escape while it is open
  * (`OWNS_ESCAPE`) and stands down while a dialog or a panel of its own is in front of it. Focus moves into it when it opens; giving
  * it back to the object is the opener's (`onClose`).
  *
@@ -204,8 +204,7 @@ export function Opening({ open, anchor, onClose, backLabel, source, title, name,
     };
     const onDown = (event: PointerEvent) => {
       if (pressInside.current === event) return;
-      const target = event.target as Element | null;
-      if (target !== null && (plateRef.current?.contains(target) || target.closest?.('[data-ast-keeps-opening]'))) return;
+      if (!shouldOutsidePressClose(event, [plateRef.current])) return;
       closeRef.current();
     };
     view.addEventListener('keydown', onKey, { capture: true });

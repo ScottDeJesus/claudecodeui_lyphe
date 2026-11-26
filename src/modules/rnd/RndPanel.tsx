@@ -2,7 +2,6 @@ import { CloudOff, Rss, Settings, Telescope } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AdoptDialog } from '@/modules/rnd/AdoptDialog';
 import { CandidateOpening } from '@/modules/rnd/CandidateOpening';
 import { CandidateRow } from '@/modules/rnd/CandidateRow';
 import { RejectDialog } from '@/modules/rnd/RejectDialog';
@@ -11,7 +10,6 @@ import type { RndLaunchKind } from '@/modules/rnd/RndSettingsSheet';
 import { OPENING_BESIDE_PX, RND_VIEWS, countOf, rowsOf, scoutLine } from '@/modules/rnd/rndWords';
 import type { RndView } from '@/modules/rnd/rndWords';
 import { useRnd } from '@/modules/rnd/hooks/useRnd';
-import { useRndEpics } from '@/modules/rnd/hooks/useRndEpics';
 import { useRndLaunch } from '@/modules/rnd/hooks/useRndLaunch';
 import { stampRndSeen } from '@/modules/rnd/hooks/useRndSeen';
 import { useRndWrites } from '@/modules/rnd/hooks/useRndWrites';
@@ -25,7 +23,7 @@ import { Badge, Banner, Button, EmptyState, Rule, ScrollArea, SegmentedControl, 
 import { cn, formatRelativeTime } from '@/shared/utils';
 
 /** The question open over the open candidate. */
-type Asking = 'adopt' | 'reject';
+type Asking = 'reject';
 
 /**
  * THE R&D PLACE: what the scout found, and what he decided about each thing. One list, four views of it by where a candidate
@@ -45,7 +43,7 @@ type Asking = 'adopt' | 'reject';
  *
  * A ROW OPENS IN PLACE: its Opening hangs from the row's far end, beside the list where the room holds it whole (from 63rem of
  * room the list keeps the plate's width free), under the row where it does not, a sheet at the foot on a phone. A question
- * (Adopt, Reject) closes by itself when the candidate's word moves on, and the Opening when the candidate leaves the view.
+ * (Reject; Adopt asks nothing, Opus places it) closes by itself when the candidate's word moves on, and the Opening when the candidate leaves the view.
  *
  * FOCUS GOES BACK WHERE IT CAME FROM: a folded Opening hands it to its row and a closed question to the act that asked it, so a
  * keyboard reads on down the list and never from the page's top.
@@ -83,7 +81,6 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
   // The wheel's goChat: the station's "Open the chat" door, the one every open of a chat goes through.
   const onOpenChat = useStationDoors().openChatInWorkspace;
   const onSpike = (name: string) => writes.spike(name, projectPath, sendMessage, onOpenChat);
-  const epics = useRndEpics();
   const weeklyWords = (expression: string) => sayWeekly(expression, t, i18n.language);
   const { launch, launchFailure, save: saveLaunch } = useRndLaunch();
   const onLaunch = (kind: RndLaunchKind, slot: 'model' | 'effort', next: string | null) => writes.saveLaunch(() => saveLaunch(kind, slot, next));
@@ -118,7 +115,6 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
   const openedRefusal = opened !== undefined && refusal !== null && refusal.where === opened.name ? refusal.sentence : null;
   const scoutRefusal = refusal !== null && refusal.where === 'scout' ? refusal.sentence : null;
   // A question stands only while its act is one the candidate's word allows: the write that answers it moves the word on.
-  const askingAdopt = asking === 'adopt' && opened !== undefined && opened.word === 'proved';
   const askingReject = asking === 'reject' && opened !== undefined && opened.word !== 'rejected' && opened.word !== 'adopted';
 
   const closeOpening = () => {
@@ -255,17 +251,14 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
         side={openSide}
         busy={openedBusy}
         // A refusal is said where its question is: in the Opening only while no question is open over it.
-        refusal={askingAdopt || askingReject ? null : openedRefusal}
+        refusal={askingReject ? null : openedRefusal}
         onClose={foldBack}
         onSpike={() => opened !== undefined && onSpike(opened.name)}
         onOpenChat={() => opened !== undefined && opened.spike !== null && onOpenChat(opened.spike.session)}
-        onAdopt={() => setAsking('adopt')}
+        onAdopt={() => opened !== undefined && onAdopt(opened.name)}
         onReject={() => setAsking('reject')}
         onReopen={() => opened !== undefined && onReopen(opened.name)}
       >
-        {opened !== undefined && askingAdopt && (
-          <AdoptDialog candidate={opened} epics={epics} busy={openedBusy} refusal={openedRefusal} onAdopt={(arc, goal) => onAdopt(opened.name, arc, goal)} onClose={() => setAsking(null)} />
-        )}
         {opened !== undefined && askingReject && (
           <RejectDialog candidate={opened} busy={openedBusy} refusal={openedRefusal} onReject={(why) => onReject(opened.name, why)} onClose={() => setAsking(null)} />
         )}

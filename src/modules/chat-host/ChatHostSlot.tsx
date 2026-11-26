@@ -1,11 +1,17 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 import { ChatHostPlaceholder } from '@/modules/chat-host/ChatHostPlaceholder';
 import { useChatHost, useChatHostMechanics } from '@/modules/chat-host/context/ChatHostContext';
+import { ChatCoreButtonProvider } from '@/shared/context/ChatCoreButtonContext';
 import { HostWindowProvider } from '@/shared/context/HostWindowContext';
-import { cn } from '@/shared/utils';
+import { claimPressForKeepsOpeningRegion, cn } from '@/shared/utils';
+
+/** Claims a press for the floating panel the chat stands in (none while it is docked), so a pop-out opened outside the chat stays up. */
+function claimPressForFloatingChat(event: SyntheticEvent<HTMLDivElement>) {
+  claimPressForKeepsOpeningRegion(event.nativeEvent, event.currentTarget);
+}
 
 /**
  * Used by project-workspace's WorkspaceMain, in the chat tab's place: the chat's home, and the portal it leaves through.
@@ -46,7 +52,7 @@ export function ChatHostSlot({
   children: ReactNode;
 }) {
   const { placement, collapse } = useChatHost();
-  const { node, moveTo, subscribeMove, hostWindowValue, setHomeElement, publishFacts } = useChatHostMechanics();
+  const { node, moveTo, subscribeMove, hostWindowValue, setHomeElement, publishFacts, buttonPlace } = useChatHostMechanics();
   const homeRef = useRef<HTMLDivElement | null>(null);
 
   // Whether the chat's node has left this slot's home for a floating host. State because the home's height
@@ -85,7 +91,16 @@ export function ChatHostSlot({
         className={cn('flex min-h-0 flex-col', chatAway ? 'h-0 overflow-hidden' : 'h-full')}
       />
       {chatAway && placement !== 'home' && <ChatHostPlaceholder placement={placement} onBringBack={collapse} />}
-      {createPortal(<HostWindowProvider value={hostWindowValue}>{children}</HostWindowProvider>, node)}
+      {createPortal(
+        <HostWindowProvider value={hostWindowValue}>
+          {/* Every press React delivers through the chat, its menus portalled to `body` among them, is the floating panel's. */}
+          <div className="contents" onPointerDownCapture={claimPressForFloatingChat} onMouseDownCapture={claimPressForFloatingChat}>
+            {/* The floating chat's button, for the chat's core to draw itself on: null while no button stands. */}
+            <ChatCoreButtonProvider value={buttonPlace}>{children}</ChatCoreButtonProvider>
+          </div>
+        </HostWindowProvider>,
+        node,
+      )}
     </>
   );
 }

@@ -5,14 +5,16 @@ import type { ComponentType, LazyExoticComponent } from 'react';
  * ONE SECTION OF THE ANALYTICS AREA, as the panel needs it: its id (the server's reader id, and the option's value on the
  * strip), the key of its name under `analytics.sections`, the windows it offers in days with the one it opens on, and its
  * `Body`, which is handed the chosen window and reads its own answer through `useAnalyticsSection` inside
- * `AnalyticsSectionFrame`.
+ * `AnalyticsSectionFrame`. A section read as it stands now offers no window (`windows: []`): the panel draws no window
+ * control for it and hands it its `defaultDays`. Every `Body` is also handed the panel's `openSection`, for a row that
+ * points at another section.
  */
 export type AnalyticsSection = {
   id: string;
   titleKey: string;
   windows: readonly number[];
   defaultDays: number;
-  Body: LazyExoticComponent<ComponentType<{ days: number }>>;
+  Body: LazyExoticComponent<ComponentType<{ days: number; openSection: (id: string) => void }>>;
 };
 
 /**
@@ -41,5 +43,12 @@ export const ANALYTICS_SECTIONS: AnalyticsSection[] = [
     windows: [7, 30, 90],
     defaultDays: 30,
     Body: lazy(() => import('@/modules/analytics/sections/repeats/RepeatsSection').then((m) => ({ default: m.RepeatsSection }))),
+  },
+  {
+    id: 'rnd',
+    titleKey: 'analytics.sections.rnd',
+    windows: [],
+    defaultDays: 30,
+    Body: lazy(() => import('@/modules/analytics/sections/rnd/RndReadingsSection').then((m) => ({ default: m.RndReadingsSection }))),
   },
 ];

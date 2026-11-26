@@ -852,3 +852,66 @@ export function coreContextTone(filled: number): 'quiet' | 'warn' | 'danger' {
 export function frameStartIn(width: number): number {
   return Math.max(0, Math.round((width - SCREEN_FRAME_PX) / 2));
 }
+
+// ---------------------------
+
+//----------------- OUTSIDE PRESS: WHAT A POP-OUT'S CLOSE ON A PRESS OUTSIDE IT SPARES ------------
+
+/**
+ * The mark of a region whose press leaves up a pop-out opened from outside it: the floating chat's panel and button (so the
+ * reader types while reading a card), and a row or a core that turns an `Opening` to another thing without folding it first.
+ * Put on an element as `data-ast-keeps-opening=""`, or with a name when one region is drawn in several pieces (the floating chat's
+ * panel and button share `FLOATING_CHAT_REGION`): every element carrying the same name is one region. Every outside-press close
+ * asks `shouldOutsidePressClose`.
+ */
+const KEEPS_OPENING_SELECTOR = '[data-ast-keeps-opening]';
+
+/** Presses React delivered through a keeps-opening region's tree, keyed by the native event, with the region they belong to. */
+const pressesClaimedByRegion = new WeakMap<Event, Element>();
+
+/** The node a press landed on, read without `instanceof`, which fails for a node of another window (the picture-in-picture chat). */
+function pressedNode(event: Event): Node | null {
+  const target = event.target as Node | null;
+  return target !== null && typeof target.nodeType === 'number' ? target : null;
+}
+
+/** The nearest keeps-opening region holding a node, or null when it stands in none. */
+function keepsOpeningRegionOf(node: Node): Element | null {
+  const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  return element?.closest(KEEPS_OPENING_SELECTOR) ?? null;
+}
+
+/**
+ * Claims a press for the keeps-opening region `anchor` stands in, when it stands in one. Called from a React capture handler
+ * high in a tree that portals layers out of its region (the floating chat's menus land on `body`): React delivers a press on
+ * such a layer through the tree, so the claim makes it a press in the region although the DOM puts it elsewhere. Call it for
+ * `pointerdown` and `mousedown` both, since the closes listen to either.
+ */
+export function claimPressForKeepsOpeningRegion(event: Event, anchor: Element): void {
+  if (pressesClaimedByRegion.has(event)) return;
+  const region = keepsOpeningRegionOf(anchor);
+  if (region !== null) pressesClaimedByRegion.set(event, region);
+}
+
+/**
+ * Whether a press should close a pop-out whose own parts (its opener, its panel, anything it drew) are `ownParts`. Every
+ * outside-press close in the kit and the modules asks it. A press on one of its parts never closes it. A press in a
+ * keeps-opening region closes it only when the region holds one of its parts: a pop-out opened from inside the floating chat
+ * still closes on a press elsewhere in the chat, and one opened outside the chat stays up while the reader types in it.
+ */
+export function shouldOutsidePressClose(event: Event, ownParts: ReadonlyArray<Node | null | undefined>): boolean {
+  const target = pressedNode(event);
+  if (target === null) return true;
+  const parts = ownParts.filter((part): part is Node => part !== null && part !== undefined);
+  if (parts.some((part) => part.contains(target))) return false;
+  const region = pressesClaimedByRegion.get(event) ?? keepsOpeningRegionOf(target);
+  if (region === null) return true;
+  return keepsOpeningRegionMembers(region).some((member) => parts.some((part) => member.contains(part)));
+}
+
+/** Every element of the region an element marks: all that share its non-empty mark name, else the element alone. */
+function keepsOpeningRegionMembers(region: Element): Element[] {
+  const name = region.getAttribute('data-ast-keeps-opening');
+  if (!name) return [region];
+  return Array.from(region.ownerDocument.querySelectorAll(`[data-ast-keeps-opening="${CSS.escape(name)}"]`));
+}

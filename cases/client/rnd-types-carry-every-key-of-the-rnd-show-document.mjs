@@ -25,11 +25,12 @@ const KEYS = [
   ["scout", ["out", "last"]],
   ["scout.out", ["id", "launch", "trigger", "started_at"]],
   ["scout.last", ["id", "launch", "trigger", "started_at", "ended_at", "outcome", "filed"]],
-  ["candidates", ["name", "title", "what", "why", "question", "source_url", "source", "word", "filed_at", "filed_by", "scout", "spike", "verdict", "rejected", "adopted"]],
+  ["candidates", ["name", "title", "what", "why", "question", "source_url", "source", "word", "filed_at", "filed_by", "scout", "spike", "verdict", "rejected", "adopted", "placing"]],
   ["candidates.spike", ["session", "started_at"]],
   ["candidates.verdict", ["word", "evidence", "dir", "at"]],
   ["candidates.rejected", ["why", "at", "by"]],
-  ["candidates.adopted", ["plan", "epic", "at", "word"]],
+  ["candidates.adopted", ["plan", "epic", "at", "word", "why"]],
+  ["candidates.placing", ["state", "at", "why"]],
 ];
 const WORDS = [
   ["candidates.word", ["adopted", "proved", "rejected", "spiking", "waiting"]],

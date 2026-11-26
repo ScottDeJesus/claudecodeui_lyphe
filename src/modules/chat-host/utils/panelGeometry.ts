@@ -180,3 +180,77 @@ export function panelPlacement(anchorRect: Rect, size: Size, viewportSize: Size)
     grip: `${verticalGrip}-${fabInRightHalf ? 'left' : 'right'}`,
   };
 }
+
+/**
+ * The panel's hold on the FAB once a drag has formed the pair: where the panel's NEAR corner (the one opposite the grip) stands
+ * from the FAB's top-left, and which corner holds the grip. Kept, the two move as one body: a drag of the header and a drag of the
+ * FAB both carry the FAB's point, and the panel stands at the same offset from it afterwards.
+ */
+export type PanelArm = { dx: number; dy: number; grip: PanelPlacement['grip'] };
+
+/** The slack of the fit tests below, in px: an offset added and taken away again does not always come back to the same number. */
+const FIT_SLACK_PX = 0.5;
+
+/** The hold a drawn placement has on the FAB it stands beside. Read at the press of a drag, so the pair leaves exactly as it stood. */
+export function armOf(placement: PanelPlacement, anchorRect: Rect): PanelArm {
+  const nearX = placement.grip.endsWith('left') ? placement.left + placement.width : placement.left;
+  const nearY = placement.grip.startsWith('top') ? placement.top + placement.height : placement.top;
+  return { dx: nearX - finiteOrZero(anchorRect.left), dy: nearY - finiteOrZero(anchorRect.top), grip: placement.grip };
+}
+
+/**
+ * The panel where its hold on the FAB puts it, or null where that is not on screen, and `panelPlacement` answers instead: no hold
+ * yet, the near corner past a margin, or less room toward the grip than the panel's minimum (the size asked for, where that is
+ * smaller: a phone). The panel grows from its near corner toward the grip and shrinks to the room that side has, as it does beside
+ * the FAB, so a resize needs no rule of its own and a window shrunk under the panel shrinks it before it lets go.
+ */
+export function armedPlacement(anchorRect: Rect, arm: PanelArm | null, size: Size, viewportSize: Size): PanelPlacement | null {
+  if (arm === null) return null;
+  const viewport: Size = { width: finiteOrZero(viewportSize.width), height: finiteOrZero(viewportSize.height) };
+  const wanted = clampPanelSize(size, viewport);
+  const nearX = finiteOrZero(anchorRect.left) + finiteOrZero(arm.dx);
+  const nearY = finiteOrZero(anchorRect.top) + finiteOrZero(arm.dy);
+  const growsLeft = arm.grip.endsWith('left');
+  const growsUp = arm.grip.startsWith('top');
+  const roomAcross = growsLeft ? nearX - PANEL_MARGIN_PX : viewport.width - PANEL_MARGIN_PX - nearX;
+  const roomAlong = growsUp ? nearY - PANEL_MARGIN_PX : viewport.height - PANEL_MARGIN_PX - nearY;
+  const nearInside = (growsLeft ? nearX <= viewport.width - PANEL_MARGIN_PX + FIT_SLACK_PX : nearX >= PANEL_MARGIN_PX - FIT_SLACK_PX)
+    && (growsUp ? nearY <= viewport.height - PANEL_MARGIN_PX + FIT_SLACK_PX : nearY >= PANEL_MARGIN_PX - FIT_SLACK_PX);
+  const holds = roomAcross >= Math.min(wanted.width, PANEL_MIN.width) - FIT_SLACK_PX
+    && roomAlong >= Math.min(wanted.height, PANEL_MIN.height) - FIT_SLACK_PX;
+  if (!nearInside || !holds) return null;
+  const width = Math.min(wanted.width, roomAcross);
+  const height = Math.min(wanted.height, roomAlong);
+  return { left: growsLeft ? nearX - width : nearX, top: growsUp ? nearY - height : nearY, width, height, grip: arm.grip };
+}
+
+/** A carry's delta on one axis, held between how far the pair may go back and how far on; a pair with no room either way stays. */
+function heldDelta(delta: number, least: number, most: number): number {
+  return Math.min(Math.max(finiteOrZero(delta), Math.min(least, 0)), Math.max(most, 0));
+}
+
+/**
+ * Where the FAB's top-left goes when the pair is carried by `delta` from where it stood at the press: the header's drag. The two
+ * are one body, held on screen whole: the panel inside its margins and the FAB `anchorEdge` inside the viewport, so the header
+ * stays under the pointer until an edge stops it and nothing has to jump when it is let go.
+ */
+export function carriedAnchor(
+  anchorRect: Rect,
+  panel: Rect,
+  delta: { dx: number; dy: number },
+  viewportSize: Size,
+  anchorEdge: number,
+): { left: number; top: number } {
+  const viewport: Size = { width: finiteOrZero(viewportSize.width), height: finiteOrZero(viewportSize.height) };
+  const across = heldDelta(
+    delta.dx,
+    Math.max(PANEL_MARGIN_PX - panel.left, anchorEdge - anchorRect.left),
+    Math.min(viewport.width - PANEL_MARGIN_PX - panel.width - panel.left, viewport.width - anchorEdge - anchorRect.width - anchorRect.left),
+  );
+  const along = heldDelta(
+    delta.dy,
+    Math.max(PANEL_MARGIN_PX - panel.top, anchorEdge - anchorRect.top),
+    Math.min(viewport.height - PANEL_MARGIN_PX - panel.height - panel.top, viewport.height - anchorEdge - anchorRect.height - anchorRect.top),
+  );
+  return { left: anchorRect.left + across, top: anchorRect.top + along };
+}

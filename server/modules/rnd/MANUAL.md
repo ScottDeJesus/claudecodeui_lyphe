@@ -7,13 +7,13 @@
 | file | holds |
 |---|---|
 | `rnd.module.ts` | the composition root: the lane, the broadcast, the journal door (`[R&D]`, each message once), the spike's model door |
-| `rnd-state.service.ts` | `readRndState`: `rnd show --json` under `RND_MAX_BUFFER` (4 MiB), checked field by field into `RndPicture` (a field it cannot read throws a sentence naming its path; keys the contract does not name are dropped); `readRndCandidate`; `RND_REFUSAL_EXITS` |
+| `rnd-state.service.ts` | `readRndState`: `rnd show --json` under `RND_MAX_BUFFER` (4 MiB), checked field by field into `RndPicture` (a field it cannot read throws a sentence naming its path; keys the contract does not name are dropped); `readRndCandidate` (an adopted candidate's `adopted.measure`: `{says, promised}` from its design's `[measure]` row, or null until one is named — carried as the dispatcher prints it); `RND_REFUSAL_EXITS` |
 | `rnd.routes.ts` | the routes: fence, compose argv, relay, poke |
 | `rnd-spike.service.ts` | `startSpike` and the `/spike` prompt |
 
 THE LANE. `createPolledLane<RndPicture, RndStateEvent>`: snapshot `readDispatcherJson(['rnd','show','--json'], …, RND_MAX_BUFFER)`, frame `{kind: 'rnd_state', ...picture, at}`, `serialize` without `generated_at` (the roadmap lane's reason), `backstopMs: null` — NO timer. It reads when the store watch fires its `rnd` lane (MAN-9543: a store write the board gate lets through, a re-armed watch) and after every write route here that answered 200. `FIRST_READ_WAIT_MS` 5000; before the first reading GET answers 200 `{error: 'the R&D picture has not been read yet'}`.
 
-THE ROUTES. Every write runs over the bug hunters' relay (`runVerb`, `relayJson`, `relayLine`, `bodyOf`, `isArgText`, `sendBadRequest`, exported from `server/modules/kanban-dispatch/index.ts`), passing `RND_REFUSAL_EXITS` [1, 2] — the roadmap verbs' form, where 1 is a name the store does not hold: 200 the verb's first line as `{line}` (or its JSON object), 409 a refusal with the dispatcher's own sentence, 502 a fault, 400 a fence that ran nothing. A name or a positional/flag value must not begin with a dash (`isArgText`); free text (goal, why, label) travels as `--flag=<text>`, one argv element, at most 4000 characters. `COMMAND_TIMEOUT_MS` 30 s (`rnd scout --now` opens a launch before it answers).
+THE ROUTES. Every write runs over the bug hunters' relay (`runVerb`, `relayJson`, `relayLine`, `bodyOf`, `isArgText`, `sendBadRequest`, exported from `server/modules/kanban-dispatch/index.ts`), passing `RND_REFUSAL_EXITS` [1, 2] — the roadmap verbs' form, where 1 is a name the store does not hold: 200 the verb's first line as `{line}` (or its JSON object), 409 a refusal with the dispatcher's own sentence, 502 a fault, 400 a fence that ran nothing. A name or a positional/flag value must not begin with a dash (`isArgText`); free text (why, label) travels as `--flag=<text>`, one argv element, at most 4000 characters. `COMMAND_TIMEOUT_MS` 30 s (`rnd scout --now` opens a launch before it answers).
 
 | route | body | dispatcher |
 |---|---|---|
@@ -22,7 +22,7 @@ THE ROUTES. Every write runs over the bug hunters' relay (`runVerb`, `relayJson`
 | POST /sources | `{url, label?}` | `rnd source add <url> [--label=<words>]` |
 | DELETE /sources | `{url}` | `rnd source remove <url>` |
 | POST /scout | | `rnd scout --now` |
-| POST /candidates/:name/adopt | `{arc, goal?, as?}` | `rnd adopt <name> --arc <arc> [--as <plan>] [--goal=<words>]` |
+| POST /candidates/:name/adopt | `{}` (nothing in it is read) | `rnd adopt <name> --by app:card` — answers `PLACING candidate …` at once; Opus places it and its design starts (`rnd_place`, MAN-10128) |
 | POST /candidates/:name/reject | `{why}` | `rnd reject <name> --why=<words>` |
 | POST /candidates/:name/reopen | | `rnd reopen <name>` |
 | POST /candidates/:name/spike | `{projectPath}` | see below; answers `{sessionId, prompt, model}` |

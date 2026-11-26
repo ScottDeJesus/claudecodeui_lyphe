@@ -3,7 +3,7 @@ import { useId } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { OPENING_WIDTH_PX, WORD_TONE, hostOf } from '@/modules/rnd/rndWords';
+import { OPENING_WIDTH_PX, hostOf, statusOf } from '@/modules/rnd/rndWords';
 import type { RndCandidate } from '@/shared/rnd-types';
 import type { AstrolabePoint } from '@/shared/types';
 import { Banner, Button, Excerpt, KeyValueList, Opening, Rule } from '@/shared/ui';
@@ -25,12 +25,12 @@ type CandidateOpeningProps = {
   onClose: () => void;
   onSpike: () => void;
   onOpenChat: () => void;
-  /** Opens the Adopt question. */
+  /** Adopt: Opus places it on the roadmap and its design starts; nothing is asked. */
   onAdopt: () => void;
   /** Opens the Reject question. */
   onReject: () => void;
   onReopen: () => void;
-  /** The question open over it (Adopt, Reject): drawn inside, so a press in one never reads as a press outside. */
+  /** The question open over it (Reject): drawn inside, so a press in one never reads as a press outside. */
   children?: ReactNode;
 };
 
@@ -85,9 +85,16 @@ function factsOf(candidate: RndCandidate, t: TFunction): Array<readonly [string,
     if (candidate.verdict.dir !== null) facts.push([t('rnd.opening.dir'), said(candidate.verdict.dir)]);
   }
   if (candidate.rejected !== null) facts.push([t('rnd.opening.rejectedBecause'), said(candidate.rejected.why)]);
+  if (candidate.placing !== null) {
+    const { state, at, why } = candidate.placing;
+    if (state === 'out') facts.push([t('rnd.opening.placing'), said(t('rnd.opening.placingValue', { ago: at === null ? '' : formatRelativeTime(at) }))]);
+    else facts.push([t('rnd.opening.placeFailed'), said(why ?? '')]);
+  }
   if (candidate.adopted !== null) {
-    const { plan, word, epic } = candidate.adopted;
-    facts.push([t('rnd.opening.became'), t('rnd.opening.becameValue', { plan, word, epic })]);
+    const { plan, word, epic, why, measure } = candidate.adopted;
+    facts.push([t('rnd.opening.became'), said(t('rnd.opening.becameValue', { plan, word, epic }))]);
+    facts.push([t('rnd.opening.measure'), measure === null ? said(t('rnd.opening.measureNone')) : said(measure.promised, measure.says)]);
+    if (why !== null) facts.push([t('rnd.opening.placedWhy'), said(why)]);
   }
   return facts;
 }
@@ -120,6 +127,8 @@ export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal
 
   const acts = () => {
     if (candidate === null) return null;
+    // While Opus places it the press is out already: Adopt waits, wearing what is happening.
+    const placing = candidate.placing?.state === 'out';
     const reject = (
       <Button variant="ghost" className="finger:h-11" disabled={busy} onClick={onReject} data-rnd-act="reject">
         {t('rnd.act.reject')}
@@ -150,7 +159,7 @@ export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal
     if (candidate.word === 'proved') {
       return (
         <>
-          <Button className="finger:h-11" busy={busy} onClick={onAdopt} data-rnd-act="adopt">{t('rnd.act.adopt')}</Button>
+          <Button className="finger:h-11" busy={busy || placing} disabled={placing} onClick={onAdopt} data-rnd-act="adopt">{t(placing ? 'rnd.act.placing' : 'rnd.act.adopt')}</Button>
           {again}
           {reject}
         </>
@@ -172,7 +181,7 @@ export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal
       backLabel={t('rnd.opening.back')}
       source={caption}
       title={candidate?.title}
-      status={candidate === null ? undefined : { word: t('rnd.word.' + candidate.word), tone: WORD_TONE[candidate.word] }}
+      status={candidate === null ? undefined : { word: t('rnd.word.' + statusOf(candidate).word), tone: statusOf(candidate).tone }}
       width={OPENING_WIDTH_PX}
       marks={{ 'data-rnd-opening': candidate?.name ?? '', 'data-rnd-opening-word': candidate?.word ?? '' }}
     >

@@ -6,20 +6,20 @@ import { hostOf } from '@/modules/rnd/rndWords';
 import type { RndScoutsRun, RndSettings, RndSource } from '@/shared/rnd-types';
 import { Banner, Button, EmptyState, Field, Input, Rule, SegmentedControl, Sheet, Spinner, Switch } from '@/shared/ui';
 
-/** The two launches the place owns: the weekly scout, and the chat that spikes one candidate. */
-export type RndLaunchKind = 'scout' | 'spike';
+/** The three launches the place owns: the weekly scout, the chat that spikes one candidate, and Adopt's placer. */
+export type RndLaunchKind = 'scout' | 'spike' | 'adopt';
 
 /** One slot of a launch row, as AgentLaunchChoice reads it: the table's words, the one in force, whether the row pins it, and what clearing the pin falls back to. */
 export type RndLaunchSlot = { choices: string[]; current: string | null; pinned: boolean; defaultWord: string | null };
 
-/** The launch table's rows rnd.scout and rnd.spike, each as its two slots. The table is their one home: the sheet shows them and holds no copy. */
+/** The launch table's rows rnd.scout, rnd.spike and rnd.adopt, each as its two slots. The table is their one home: the sheet shows them and holds no copy. */
 export type RndLaunch = Record<RndLaunchKind, { model: RndLaunchSlot; effort: RndLaunchSlot }>;
 
 type RndSettingsSheetProps = {
   open: boolean;
   onClose: () => void;
   settings: RndSettings;
-  /** The two rows, or null until the launch table has been read. */
+  /** The three rows, or null until the launch table has been read. */
   launch: RndLaunch | null;
   /** The sentence a failed read of the launch table answered with, or null. */
   launchFailure: string | null;
@@ -104,7 +104,7 @@ export function RndSettingsSheet({ open, onClose, settings, launch, launchFailur
   const launchId = useId();
   const webId = useId();
   const scoutsRunId = useId();
-  const kinds: readonly RndLaunchKind[] = ['scout', 'spike'];
+  const kinds: readonly RndLaunchKind[] = ['scout', 'spike', 'adopt'];
   // The source Remove was last pressed on, until it is put back or the line is closed: what Undo restores, label and all.
   const [removed, setRemoved] = useState<RndSource | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);

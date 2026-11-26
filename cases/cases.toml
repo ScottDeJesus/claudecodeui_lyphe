@@ -29,4 +29,5 @@ house = "the house's own Python (hooks/plan_runner, hooks/launch_table), run as 
 souls = "the house's skills and soul shims a chat and every soul load (~/.claude/skills, ~/.claude/agents generated from ~/.claude/charters), read live and regenerated into a scratch folder by a .mjs case"
 hunting = "the bug hunters' state as it stands on this box — the live dispatcher store's hunt rows and tickets with their sittings' launch logs, charters/hunts.toml, the crontab, the Schedules registry and the board, read only and never written"
 walk = "the house's walk command (~/.claude/scripts/web-walk, hooks/web_walk/node/) and the app's own walk folder (walk/screens.toml, walk/app.mjs), run as a child process against the running dev app, every picture and report under the case's scratch folder"
+rnd = "the live dispatcher store's R&D rows and the readings dispatcher rnd readings draws from them (~/.claude/hooks/dispatcher), run as a child process, read only and never written"
 casestore = "the house's regression-case verbs (~/.claude/hooks/cases), read over a scratch dispatcher home holding a seeded suite, run as child processes (lib/cases_stats_house.mjs)"
