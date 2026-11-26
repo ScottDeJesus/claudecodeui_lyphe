@@ -3,7 +3,7 @@ import type { Router } from 'express';
 import { resolveLaunchRow } from '@/modules/agent-launch/index.js';
 import { sessionsDb } from '@/modules/database/index.js';
 import { sessionsService } from '@/modules/providers/index.js';
-import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
+import { WS_OPEN_STATE, broadcastSessionUpserted, connectedClients } from '@/modules/websocket/index.js';
 import { sessionlessEnv } from '@/shared/child-env.js';
 import { dispatcherBin } from '@/shared/dispatcher-command.js';
 import type { DispatcherStoreWatch } from '@/shared/dispatcher-store-watch.service.js';
@@ -54,7 +54,7 @@ export function createRndModule(storeWatch: DispatcherStoreWatch): RndModule {
   };
 
   const lane = createPolledLane<RndPicture, RndStateEvent>({
-    snapshot: () => readRndState(commands),
+    snapshot: async () => withSpikeChats(await readRndState(commands)),
     frame: (picture) => ({ kind: 'rnd_state', ...picture, at: Date.now() }),
     // The roadmap lane's reason: `generated_at` moves at every read, so compared whole the lane would speak after each one.
     serialize: (picture) => JSON.stringify({ ...picture, generated_at: undefined }),
@@ -75,8 +75,12 @@ export function createRndModule(storeWatch: DispatcherStoreWatch): RndModule {
   const spikeDependencies = {
     commands,
     resolveModel,
-    createSession: (projectPath: string, prompt: string): string =>
-      sessionsService.createAppSession('claude', projectPath, prompt, false).sessionId,
+    // Made as the page's New chat makes one: on the simple list, then announced, so the spike's chat is listed like any other.
+    createSession: (projectPath: string, prompt: string): string => {
+      const { sessionId } = sessionsService.createAppSession('claude', projectPath, prompt, true);
+      broadcastSessionUpserted(sessionId).catch((error: unknown) => logErrorOnce(`a spike chat was made but not announced: ${String(error)}`));
+      return sessionId;
+    },
     deleteSession: (sessionId: string): void => {
       sessionsDb.deleteSessionById(sessionId);
     },
@@ -104,4 +108,34 @@ export function createRndModule(storeWatch: DispatcherStoreWatch): RndModule {
       lane.stop();
     },
   };
+}
+
+/**
+ * Each spike's chats as this app names them. `session` is the spike's own chat, stamped by the R&D place with the app's id;
+ * `launched_from` is the chat a spike with no chat of its own was launched from, stamped by the /spike skill with the CLI's
+ * `$CLAUDE_CODE_SESSION_ID` (a provider id). Both are read through the sessions table (`resolveAppSessionId`, as the
+ * dispatcher lanes read their stamps) so the card opens by the app's id. The place's own chat runs /spike too and its skill
+ * stamps that chat as the launcher: a launcher that is the spike's own chat is dropped. The launcher's name rides along for
+ * "Launched from"; a chat no row carries keeps its stamp and no name.
+ */
+function withSpikeChats(picture: RndPicture): RndPicture {
+  const candidates = picture.candidates.map((candidate) => {
+    const { spike } = candidate;
+    if (spike === null) return candidate;
+    const own = spike.session === null ? null : appChatOf(spike.session);
+    const launcher = spike.launched_from === null ? null : appChatOf(spike.launched_from);
+    const outside = launcher === null || (own !== null && launcher.id === own.id) ? null : launcher;
+    return {
+      ...candidate,
+      spike: { ...spike, session: own?.id ?? null, launched_from: outside?.id ?? null, launched_from_name: outside?.name ?? null },
+    };
+  });
+  return { ...picture, candidates };
+}
+
+/** One stamp as the app's chat: its app id and name, or the stamp itself and no name when no row carries it. */
+function appChatOf(stamp: string): { id: string; name: string | null } {
+  const appSessionId = sessionsDb.resolveAppSessionId(stamp);
+  const row = sessionsDb.getSessionById(appSessionId);
+  return row === null || row === undefined ? { id: stamp, name: null } : { id: appSessionId, name: row.custom_name ?? null };
 }

@@ -653,6 +653,8 @@
       "back": "Back to the candidates",
       "filed": "filed {{ago}}",
       "spikeStarted": "Spike started",
+      "launchedFrom": "Launched from",
+      "launchedFromElsewhere": "a chat outside this app",
       "what": "What it is",
       "why": "Why it might help",
       "question": "The spike’s question",

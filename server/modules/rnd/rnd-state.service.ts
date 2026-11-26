@@ -68,7 +68,7 @@ export type RndCandidate = {
   filed_at: string;
   filed_by: string | null;
   scout: number | null;
-  spike: { session: string; started_at: string | null } | null;
+  spike: { session: string | null; launched_from: string | null; launched_from_name: string | null; started_at: string | null } | null;
   verdict: { word: (typeof VERDICT_WORDS)[number]; evidence: string | null; dir: string | null; at: string | null } | null;
   rejected: { why: string | null; at: string | null; by: string | null } | null;
   adopted: {
@@ -200,7 +200,13 @@ export function readRndCandidate(value: unknown, path: string): RndCandidate {
     scout: orNull(candidate['scout'], at('scout'), count),
     spike: orNull(candidate['spike'], at('spike'), (spike, where) => {
       const fields = record(spike, where);
-      return { session: text(fields['session'], `${where}.session`), started_at: textOrNull(fields['started_at'], `${where}.started_at`) };
+      return {
+        session: textOrNull(fields['session'], `${where}.session`),
+        launched_from: textOrNull(fields['launched_from'], `${where}.launched_from`),
+        // The launching chat's name is the relay's to add (rnd.module.ts withSpikeChats): the document never carries it.
+        launched_from_name: null,
+        started_at: textOrNull(fields['started_at'], `${where}.started_at`),
+      };
     }),
     verdict: orNull(candidate['verdict'], at('verdict'), (verdict, where) => {
       const fields = record(verdict, where);
