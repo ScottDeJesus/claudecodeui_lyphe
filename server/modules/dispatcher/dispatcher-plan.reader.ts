@@ -27,8 +27,8 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  */
 export type DocumentPlan = Omit<DispatcherPlan, 'session_app_id'>;
 
-/** The ten words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'hidden', 'complete', 'gaps'];
+/** The eleven words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'hidden', 'complete', 'gaps', 'gap-needs-you'];
 
 /** The three words a phase's status may be (`phase_chain`'s own column). */
 export const PHASE_STATUSES: readonly DispatcherPhase['status'][] = ['not started', 'running', 'done'];

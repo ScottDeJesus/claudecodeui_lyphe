@@ -47,7 +47,8 @@ export type RoadmapFeatureStep =
   | 'stalled'
   | 'starting'
   | 'shipped'
-  | 'gaps';
+  | 'gaps'
+  | 'gap-needs-you';
 
 /** An epic's (arc's) word. Consumers: the roadmap lane's reader and the screen. */
 export type RoadmapEpicWord = 'empty' | 'not started' | 'in progress' | 'complete';

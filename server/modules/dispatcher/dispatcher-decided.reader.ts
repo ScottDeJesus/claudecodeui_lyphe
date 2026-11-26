@@ -52,5 +52,11 @@ function gapOf(raw: unknown, where: string): DispatcherGap {
     title: need(field(gap, 'title'), isText, `${where}.title`),
     ticket: need(field(gap, 'ticket'), isCount, `${where}.ticket`),
     priority: need(field(gap, 'priority'), isText, `${where}.priority`),
+    needs_you: needsYouOf(field(gap, 'needs_you'), `${where}.needs_you`),
   };
+}
+
+/** A gap's `needs_you`: absent (a dispatcher build older than the fix rounds) or null reads null. */
+function needsYouOf(value: unknown, where: string): string | null {
+  return value === undefined ? null : need(value, isTextOrNull, where);
 }
