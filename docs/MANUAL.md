@@ -7112,11 +7112,11 @@ sync must never look like confident rows.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceViews.ts
 
-## MAN-647 — The registry is the source of truth, and opening the tab scans nothing
+## MAN-647 — The registry is the source of truth, and the tab scans nothing itself
 section: schedules/002 The registry is the source of truth, and opening the tab scans nothing
 
-`GET /api/schedules` answers a `CronRegistrySnapshot` read from the store and nothing else.
-`readRegistry` shells nothing and opens no file: the cron half is `cronJobsDb.listJobs()`, the last
+`GET /api/schedules` first awaits `syncWhenStale()` (`schedules-sync.service.ts`): it joins a sync already running, or runs one when the newest sync record is missing, unreadable or older than 15 minutes (`READ_SYNC_AFTER_MS`); it never throws. It then answers a `CronRegistrySnapshot` read from the store.
+`readRegistry` itself shells nothing and opens no file: the cron half is `cronJobsDb.listJobs()`, the last
 sync `cronJobsDb.lastSync()`, and the scheduled-prompt half is read LIVE from
 `scheduledMessagesDb.listPendingForUser(userId)` — which is why the route passes it the
 authenticated `req.user.id` (a person's pending prompts are not another's to see, and that
@@ -7127,7 +7127,7 @@ On the client, `useSchedules` reads **once on mount, never on a timer**, and the
 minute tick is a render clock that fetches nothing — it only lets the sync's age cross the
 one-hour stale line while the tab stays open. A `crontab -l` on the read path, to confirm a line
 still exists, would be exactly the live derivation this feature exists to replace, and would put a
-subprocess on every tab open. **The sync is the only thing that looks at the box.**
+subprocess on every tab open. **The sync is the only thing that looks at the box**, and a read starts one only when the last is stale.
 
 ## MAN-648 — The two tables, and where they really live
 section: schedules/003 The two tables, and where they really live
@@ -7265,10 +7265,13 @@ crontab cannot mark the whole registry missing.
 ## MAN-654 — When it runs
 section: schedules/006 The sync check/009 When it runs
 
-Two ways, and neither decides anything itself — they start the same run:
+Five ways, and none of them decides anything itself:
 
-- **its own cron line, every fifteen minutes**: `30 3 * * * /home/lyphe/.claude/scripts/cron-registry-sync sync >> /home/lyphe/.claude/state/cron-registry.log 2>&1`;
-- **the Refresh button** on the tab, which is `POST /api/schedules/sync` behind the same guard.
+- **a crontab write**: the house crontab on PATH (`scripts/crontab`, MAN-10310) starts one detached `cron-registry-sync sync` after every crontab write that succeeded, its output appended here;
+- **the door's own write**: `cron-registry-sync add` and `remove` on the live crontab end with one sync inside the lock they hold (that run records its row and prints no line here);
+- **a stale read**: the Schedules registry GET syncs first when the newest sync is older than 15 minutes (`syncWhenStale`);
+- **the Refresh button**: `POST /api/schedules/sync`;
+- **its own cron line, daily at 03:30**: `30 3 * * * /home/lyphe/.claude/scripts/cron-registry-sync sync >> /home/lyphe/.claude/state/cron-registry.log 2>&1`, the backstop for a change no write announced.
 
 The sync is **itself a tracked job**. Nothing special-cases its own line: the first run adopts it
 like any other, and afterwards it is a row like any other — which is why the header's counts

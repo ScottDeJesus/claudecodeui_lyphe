@@ -25192,3 +25192,20 @@ measured 2026-11-26 by chain chain-pollers-hooks--dev-watchdogs--cerberus-keeper
 probe-key: b5c17de0526ebbac795f3ec4169ecf7db1ba3e0c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-client-prod.service, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/handover-cases.mjs
+
+## INV-11984 — probe — LOW — the operator's own shell resolves /usr/bin/crontab, so his crontab writes start no sync
+
+LOW — the operator's own shell resolves /usr/bin/crontab, so his crontab writes start no sync
+
+```probe
+D=$(mktemp -d) && cat > "$D/p.sh" <<'EOF'
+env -i HOME=$HOME USER=$USER TERM=dumb bash -lic 'command -v crontab' </dev/null 2>/dev/null | tail -1 | grep -o '/[^ ]*crontab$' || echo none
+EOF
+bash "$D/p.sh"
+# expect: /home/lyphe/.claude/scripts/crontab (while the gap stands: /usr/bin/crontab)
+```
+
+measured 2026-11-26 by chain chain-pollers-hooks--write-triggers--registry-20261126-223051-65ca, finding L2, LOW
+probe-key: e04355068638d230809e603ca4820100eb3fe0cb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-cli.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-crontab.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-sync.service.ts, /home/lyphe/.claude/scripts/crontab, /home/lyphe/.claude/state/cron-registry.log
