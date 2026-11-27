@@ -12013,7 +12013,7 @@ Constants, `roadmap.module.ts` unless named
 | `BACKSTOP_MS` | 60000 | the longest the lane goes without a reading when nothing poked it (the store watch, MAN-9543, pokes it on a write to a table the board draws, and on no regression case's run — so a case's standing in the picture follows this backstop, up to a minute, not each run); `roadmap show` is 0.5 s wall and 0.44 s of CPU, and reads the store, about 10,200 per-launch `result.json` (most of that CPU) and, for the few phases walking, their chain record and the walker's pid |
 | `READ_TIMEOUT_MS` | 20000 | one command, read and writes alike; a write may kick the daemon first |
 | `FIRST_READ_WAIT_MS` | 5000 | how long a GET waits for this boot's first reading |
-| `ROADMAP_MAX_BUFFER` | 1 MiB, in `roadmap-state.service.ts` | the document is 190 KB (2026-10-03: two roadmaps, 51 features) |
+| `ROADMAP_MAX_BUFFER` | 16 MiB, in `roadmap-state.service.ts` | a guard against a runaway printer, not a measure of the document: it carries every feature's tasks and goals whole and grows with the store (190 KB for 51 features on 2026-10-03; 1 053 038 bytes for 293 features on 2026-11-27, when the old 1 MiB ceiling refused it and the lane landed no picture) |
 | `CASES_MAX_BUFFER` | 1 MiB, in `roadmap-cases.service.ts` | a case is about 890 bytes; MAN-7658 |
 
 - `sessionlessEnv()` (`@/shared/child-env.ts`) = `userFacingEnv({ PATH })` minus `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION`; the `PATH` fallback (`/usr/local/bin:/usr/bin:/bin`, for a process with none: the verbs look up `systemctl --user`) is its own. why: this server is no Claude session; `accept` refuses inside one and `tell` stamps it onto the outing. A promote queues a design owned by no session. The dispatcher lane and dispatch-souls call the same function.
@@ -12115,7 +12115,7 @@ Differs
 | | roadmap | dispatcher |
 |---|---|---|
 | frame | `roadmap_state` | `dispatcher_state` |
-| read | `roadmap show --json`, ceiling 1 MiB (`ROADMAP_MAX_BUFFER`) | `status --json`, ceiling 16 MiB (`STATUS_MAX_BUFFER`) |
+| read | `roadmap show --json`, ceiling 16 MiB (`ROADMAP_MAX_BUFFER`) | `status --json`, ceiling 16 MiB (`STATUS_MAX_BUFFER`) |
 | reading | refuses a field it cannot read, by path; two tolerances: an absent `cases` key reads as six zeros (MAN-7631) and an absent `runtime_s` reads `0`; no plan resolved or filtered out (keys the contract does not name are dropped, MAN-7631) | tolerant `…Since` readers for keys an older build lacks; resolves `session_app_id`; drops plans ended over 24 h and their empty arcs (MAN-5634) |
 | second read | `GET /cases?feature=<name>`, on request and never polled: `cases list --plan <name> --state active --json` through the cases door, `door: 'cases'` (MAN-7658) | none |
 | writes | nine acts, a JSON body per route, argv composed by `writeArgv`, relayed by `relayRoadmapWrite` (MAN-7630) | verbs named by the URL (`/plans/:name/<verb>`, `/arcs/:name/<verb>`), relayed by `runDispatcherVerb` (MAN-5636) |

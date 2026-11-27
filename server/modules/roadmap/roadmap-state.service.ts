@@ -47,15 +47,16 @@ import type {
 const DOCUMENT = 'dispatcher roadmap show --json';
 
 /**
- * How much the document may weigh. A goal is free text and the document carries every one whole, so
- * the picture grows with the operator's own words — 190 KB for two roadmaps of fifty-one features
- * when measured — and a megabyte is five times that. Stated rather than left to `execFile`'s default,
- * for the reason `STATUS_MAX_BUFFER` is (`dispatcher-state.transport.ts`): a document past it reaches
- * the journal as `did not answer:` and the document's own opening, and a line that quotes the
- * document is this number too low. That opening begins with the dispatcher's clock, so each tick's
- * line differs and the once-per-message journal bound does not hold for it.
+ * How much the document may weigh. It carries every feature's tasks and goals whole, so it grows with
+ * the store and with no code change: 190 KB for fifty-one features when this ceiling was first stated,
+ * 1 053 038 bytes for 293 features on 2026-11-27, when the old 1 MiB ceiling refused it and the lane
+ * landed no picture. The number is therefore not a measure of the document but a guard against a
+ * runaway printer: sixteen times the 2026-11-27 document (the same 16 MiB the analytics verbs read
+ * under). At the growth measured between those two dates it is months of headroom, not years. Stated rather than left to `execFile`'s default, for the reason `STATUS_MAX_BUFFER`
+ * is (`dispatcher-state.transport.ts`); a document past it reaches the journal as the ceiling it
+ * crossed (`dispatcher-command.ts`'s `describeFailure`), one sentence for as long as it stays too big.
  */
-const ROADMAP_MAX_BUFFER = 1024 * 1024;
+const ROADMAP_MAX_BUFFER = 16 * 1024 * 1024;
 
 const FEATURE_WORDS: readonly RoadmapFeatureWord[] = ['idea', 'proposed', 'designing', 'in flight', 'shipped'];
 const FEATURE_STEPS: readonly RoadmapFeatureStep[] = [
