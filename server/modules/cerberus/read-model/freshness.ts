@@ -116,6 +116,24 @@ export function statusAt(
 }
 
 /**
+ * The first moment after `x` at which a check that reads fresh at `x` reads stale with nothing written: one past
+ * what the row it stands on vouches for. Null when `x` is not fresh, or no row is at or before it.
+ *
+ * Consumers: `check-views.ts`, which reports it to `inputs.flipsAt`.
+ */
+export function staleFrom(
+  rows: CerberusStoredResultRow[],
+  x: number,
+  staleAfterMs: number,
+  liveLastAt: number | null
+): number | null {
+  const index = lastIndexAtOrBefore(rows, x);
+  if (index < 0) return null;
+  const vouchedUntil = freshUntil(rows, index, staleAfterMs, liveLastAt);
+  return x <= vouchedUntil ? vouchedUntil + 1 : null;
+}
+
+/**
  * The first moment of the moments `a..last` that falls in a lapse, or null when none does. A lapse is
  * the stretch of moments after a row's vouching ends and before the next row: `(freshUntil, next.at)`,
  * and after the last row, `(freshUntil, now)` — which a window ending at or before `now` reaches the

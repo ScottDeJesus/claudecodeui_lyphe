@@ -6,7 +6,7 @@ import { UPDATE_STEP_LABELS } from '@/modules/claude-updates/updateWording';
 /**
  * Claude's update in two lines, or null while there is nothing to say: what is on offer or being installed (`title`), what it is
  * (`detail`), and whether a job is installing it now (`working`). Read off the module's one shared report, so a second reader adds no
- * poll.
+ * read of its own.
  *
  * ABSENT IS THE DEFAULT. A package whose update this pipeline cannot install here is not an offer, and a process with nothing on disk to
  * move has nothing to announce.

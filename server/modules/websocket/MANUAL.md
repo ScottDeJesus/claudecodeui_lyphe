@@ -32,11 +32,13 @@ Live-run registry; the providers module's `sessionsService` reads it for `listRu
 The `session_upserted` delta builders; the providers module's sessions watcher fans its re-indexed rows out through them. `onSessionUpserted(listener)` subscribes to them and answers the unsubscribe: the listener is called with the app session id once per `session_upserted` event that goes out (a rename, a new chat, a re-index), each on its own try (one that throws is logged and the rest still hear it). A listener set and nothing else. Consumed by the companion module's station hint (MAN-9257).
 5. `runDetachedChatTurn` (and the `ProviderRuntimeGateway` type)
 Runs one chat turn with no socket attached. Callers: the scheduled-messages dispatcher (a scheduled message, the queued follow-up), the companion's send, auto-compaction, and keepalive re-adoption (`session-host/readopt-host.ts`, where the boot and a node's link-up both end), which gives each CLI that outlived the API its run back (`beforeRun` exists for that caller — it settles a run whose turn already finished before the provider is asked for anything). All compose it rather than re-implementing the dispatch, which is what keeps the session row lookup, the busy check and the run-completion safety net in one place. A run with no socket joins every tab that has its session open before the provider is asked (MAN-311). `echoUserMessage` writes the caller's content onto the run's stream as a user echo; the dispatcher sets it for a scheduled message and for a queued follow-up without attachments.
-6. `sendToUser(userId, payload)` and `isUserConnected(userId)`
-Per-account reach into the open `/ws` sockets (`websocket-state.service.ts`). `sendToUser` puts one JSON frame on every open socket of that account and no other's; `isUserConnected` answers whether any is open. Ids compare as strings, so a number id and a string id are the same account. Consumed by the companion module's store (her frames) and alert feed (nothing to say to an absent page).
+6. `sendToUser(userId, payload)`, `broadcastToAll(payload)` and `isUserConnected(userId)`
+Per-account reach into the open `/ws` sockets (`websocket-state.service.ts`). `sendToUser` puts one JSON frame on every open socket of that account and no other's; `isUserConnected` answers whether any is open. Ids compare as strings, so a number id and a string id are the same account. `broadcastToAll` is the door for a frame that names no account: one serialisation, sent to every open socket; a send that throws is logged and skipped (MAN-723). Consumed by the companion module's store (her frames) and alert feed (nothing to say to an absent page).
 7. `abortChatRun(sessionId, dependencies)` and `answerChatPermission(requestId, decision, dependencies)`
 The page's own stop and tool-approval answer as callable verbs (`chat-run-verbs.service.ts`), so a stop or an answer from the companion's `stop_session` / `answer_session` is the same act as from the chat. `abortChatRun` answers `'stopped'` or `'not_running'` and ends only the run it read (`completeRunIfCurrent`), never a successor started meanwhile. With no running run it asks the runtime whether the chat's process is mid-turn (a missed steer's turn, a background task's wake-up: turns no run is registered for) and stops that (`abortUnregisteredTurn`); a chat busy only with background work is `'not_running'`. `steerChatRun(sessionId, content, echo, dependencies)` folds a message into the run's turn and writes `echo` onto that run's writer after a fold (MAN-9068). `answerChatPermission` answers `void`: an unknown or already-settled `requestId` is silent, so a caller that must report success reads `getPendingApprovalsForSession` first.
-8. `startRunStallWatchdog()`
+8. `laneWatch`
+Lanes a socket watches by key (`define`, `handle`, `drop`, `sockets`); the providers module's subagent transcript tail defines one (MAN-10291).
+9. `startRunStallWatchdog()`
 Starts the sweep that turns a silent run into one `session.stuck` notification, and returns the function that stops it. Called once by `server/index.ts` inside the `listen` callback and stopped on shutdown, for the same reason the plan runner is: the notification is about runs this process is only now able to host. It lives in this module because the registry it reads owns runs — no provider knows it exists. What counts as silence, and which runs are deliberately never announced, is [docs/MANUAL.md (notifications)](../../../docs/MANUAL.md) §"A silent run is noticed from outside".
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-verbs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts
@@ -66,11 +68,12 @@ section: README/003 Service Map
 | `services/chat-session-audience.service.ts` | Which gateway sockets have a chat session open (`sessionsOpenBySocket`, a `WeakMap`): `markSocketSubscribed` (`chat.subscribe` adds), `markSocketShowing` (a chat view's `chat.presence` replaces), `joinOpenTabsToRun` (called through `chatRunRegistry.joinOpenTabs` by `dispatchRun` for a run with no socket, after its `beforeRun` hook and while the run still runs: every open tab of the session is sent the `chat_subscribed` ack with `isProcessing: true` and the events written so far, then joins the run's audience), and `echoUserMessageOnRun` (the user's words written onto a detached run's stream, for `runDetachedChatTurn`'s `echoUserMessage`) |
 | `services/chat-run-registry.service.ts` | Tracks live provider runs per app session id: seq numbering, event replay buffer, provider-id mapping, completion state, and `lastEventAt` — the silence clock every recorded event resets. On the terminal `complete` it stamps `last_completed_at` once per run end (and `last_read_at` with it when the chat is on screen), then broadcasts `session_upserted` — except for a re-adopted run whose last turn end its host journal shows was already recorded (`completeRunIfCurrent(..., { alreadyRecorded: true })`, decided in `session-host/readopt-host.ts`), which closes without stamping. `onRunChanged(listener)` hands each listener `(appSessionId, { states })` at a run's start (`states: true`) and after each event the run records (`true` for `complete`, `permission_request`, `permission_resolved` and `permission_cancelled`, `false` for the rest): the station's hint coalesces them (MAN-9257). `onRunCompleted(listener)` hands each listener `(appSessionId, { aborted, alreadyRecorded })`, `alreadyRecorded` true for exactly the run that closes without stamping: the dispatcher and `focus-feed` read `aborted`, `node-readopt` the session id alone; the chat namer (MAN-9067) skips both |
 | `services/chat-session-writer.service.ts` | Gateway writer handed to provider runtimes: remaps provider session ids to app ids, swallows `session_created`, assigns `seq` |
+| `services/lane-watch.service.ts` | `laneWatch`: the `watch.start` / `watch.stop` lanes, kept per socket and dropped on close (MAN-10291) |
 | `services/run-stall-watchdog.service.ts` | Polls the registry's running runs and announces one that has gone quiet past the threshold. A poller rather than a timer per run, so a run that ended cannot leak one |
 | `services/shell-websocket.service.ts` | Handles `/shell` PTY lifecycle, reconnect buffering, auth URL detection |
 | `services/plugin-websocket-proxy.service.ts` | Bridges client socket to plugin socket |
 | `services/websocket-writer.service.ts` | Adapts raw WebSocket to writer interface (`send`, `setSessionId`, `getSessionId`) for non-chat writer consumers |
-| `services/websocket-state.service.ts` | Holds shared chat client set and open-state constant, plus the socket-to-account map (`registerSocketUser`) behind `sendToUser` and `isUserConnected` |
+| `services/websocket-state.service.ts` | Holds shared chat client set and open-state constant, plus the socket-to-account map (`registerSocketUser`) behind `sendToUser` and `isUserConnected`; `broadcastToAll` sends one frame to every open socket |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-verbs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-audience.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/plugin-websocket-proxy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/run-stall-watchdog.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/shell-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-auth.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-server.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-writer.service.ts
 
@@ -282,6 +285,8 @@ Which account each socket belongs to lives beside it in `websocket-state.service
 
 Ids are stored and compared as strings. A socket whose request names no user is registered to no one and receives no `sendToUser` frame.
 
+`broadcastToAll(payload)`, exported the same way, is the door for a frame that names no account: it serializes the payload once and sends it to every OPEN socket in `connectedClients`, whoever's page it is. A send that throws is logged and skipped, so every other socket still gets its frame; a payload JSON cannot carry is logged and sent nowhere, never thrown into a caller whose write already landed. Its riders are the paced hints of MAN-453 (`createPacedHint`, `server/shared/paced-hint.service.ts`, told by a `createFileLane` on a directory, `server/shared/file-lane.service.ts`): `modules/jev/jev.module.ts` sends `jev_changed` when the Jev ledger (`JEV_LEDGER_PATH`, default `~/.claude/state/jev_ledger.jsonl`) is appended to, at most once per 10 s; `modules/heal/heal.module.ts` sends `heal_changed` when the heal ledger (`HEAL_LEDGER_PATH`, default `~/.claude/state/heal_reflex/friction.db`) or its WAL CHANGES, at most once per 60 s; a reader's open creates and removes the WAL and writes only `-shm`, so a read raises none. The older broadcasters below still walk `connectedClients` with their own loops.
+
 That shared set is consumed by:
 
 1. `modules/projects/services/projects-with-sessions-fetch.service.ts`
@@ -358,3 +363,34 @@ To add a new websocket route:
 5. Keep `index.ts` as barrel-only export surface.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+
+## MAN-10291 — Lane watches — watch.start / watch.stop, the tab-side view count, useLaneWatch
+
+Server lanes a browser watches by key: `laneWatch` (`server/modules/websocket/services/lane-watch.service.ts`), exported from `server/modules/websocket/index.ts`; the client side is `useLaneWatch(lane, key, wanted)` (`src/shared/hooks/useLaneWatch.ts`).
+
+## Frames
+| frame | direction | fields | effect |
+|---|---|---|---|
+| `watch.start` | client → server | `lane`, `key` (string ≤512 chars, or null) | adds the socket to the lane's key; the lane's `first` hook runs when the key gains its first watcher |
+| `watch.stop` | client → server | `lane`, `key` | the socket leaves the key; `last` runs when the key loses its last watcher; a stop for a key the socket does not watch is ignored |
+
+## Rules
+- RULE: a lane nobody `define`d, and a key that is not a non-empty string ≤512 chars or null, is ignored — no `protocol_error`. why: the frame is the browser's; unknown lanes must not grow the maps.
+- RULE: a repeated `watch.start` from one socket for one key is the same watch, and one `watch.stop` ends it. why: every view re-sends its start on a reconnect and a flushed outbox can repeat one; counting them at the server would hold a watch until the socket closed. Views are counted in the tab instead (Client, below).
+- `drop(ws)` ends every watch the socket held; the gateway calls it from the socket's close handler.
+- `sockets(lane, key)` is the owner's recipient list for a frame.
+- `define(lane, { first?, last? })` names a lane and its hooks; a second `define` replaces the hooks.
+- `handle(ws, frame)` returns false for any other `type`, which stays the gateway's (`chat-websocket.service.ts` routes `watch.start` / `watch.stop` to it).
+
+## Client
+`useLaneWatch` counts the mounted views of the tab that want each lane and key (`holdersByWatch`, module level). The first view sends `watch.start`, and every view sends it again on `websocket_reconnected` (a new socket has no watches; the server dedupes them). Only the last view to stop wanting the key, change it or unmount sends `watch.stop`, so closing one of two views of a key (a chat's pinned row and a card drawer's step) leaves the other watched. The lane's frames are heard through `useServerFrame`.
+
+## Lanes
+| lane | owner | frame | key |
+|---|---|---|---|
+| `subagent_transcript` | `subagent-transcript-watch.service.ts`, defined in `dispatch-souls.module.ts` | `subagent_transcript_changed` | See MAN-6226 |
+
+## `createFileLane` `matches`
+`server/shared/file-lane.service.ts` takes an optional `matches(name)`, tested when `names` misses, for a directory whose files are named by an id the key does not carry (an agent's own `*.jsonl`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/subagent-transcript-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/lane-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/file-lane.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useLaneWatch.ts

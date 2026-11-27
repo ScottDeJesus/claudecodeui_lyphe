@@ -1,9 +1,9 @@
 {
   "name": "cerberus-warden",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "private": true,
   "cerberus": {
-    "note": "a node chat's last turn is read through the one request rule the API uses (a request that reports no tokens is skipped for the one before it, so a restart arms the idle deadline from the chat's real context); also names what 0.12.0 shipped without a note: a CLI that cannot start now says why, naming a working folder it cannot enter"
+    "note": "the http kind fills every {nonce} in a url with one fresh token per run, so a probe of a caching dev server (Vite) is answered by a fresh compile, never from cache; a url without {nonce} is sent as before"
   },
   "type": "module",
   "engines": {

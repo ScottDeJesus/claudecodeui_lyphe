@@ -1,16 +1,17 @@
 /**
  * The Claude updates client: the report the tab draws, and the three things it can be asked to do.
  *
- * ONE REPORT, ONE POLLER, N SUBSCRIBERS. The picture is held at module scope behind one shared
- * poller, because two screens read it — the Settings tab and the sidebar footer's row — and a hook
+ * ONE REPORT, ONE READER, N SUBSCRIBERS. The picture is held at module scope behind one shared
+ * reader, because two screens read it — the Settings tab and the sidebar footer's row — and a hook
  * that fetched on its own would put two requests on the wire for one answer. It is `useCliVersion`'s idiom on purpose: one module-scope report and `lastBody`,
- * one timer, one in-flight read, and answers claimed in TOKEN order so an older read landing last
+ * one in-flight read, and answers claimed in TOKEN order so an older read landing last
  * cannot overwrite a newer picture with the one it replaced.
  *
- * TWO CADENCES. Between jobs the report is re-read every 60 s; while a job is being carried out —
- * `installing`, `installed`, `restarting`, `rolling-back` — every 1.5 s, because those states are
- * minutes at most and this is the one screen a person is watching the answer change on. The timer is
- * re-armed the moment the picture says the cadence is not the one it is armed at.
+ * TOLD, NOT TICKED. Every write of the job or the check is told by `claude_updates_changed`: the API's
+ * own writes, and the detached runner's install steps and the npm output it appends to `job.log`, which
+ * the server hears on the directory. The server paces it to one frame per quarter second; each mounted
+ * consumer's frame asks the shared reader, which holds one read in flight and remembers one more. A reconnect asks once too:
+ * frames were missed while the socket was down.
  *
  * A FAILED READ KEEPS THE LAST PICTURE. The handover of this very server is the case that makes it
  * matter: the tab must ride out the gap between the old process retiring and the new one answering
@@ -23,32 +24,24 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
 import { api, errorMessage } from '@/shared/api';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
 import type {
   ClaudeUpdateApplyRequest,
   ClaudeUpdateJob,
   ClaudeUpdatesReport,
 } from '@/shared/claude-update-types';
 
-/** How often the report is re-read between jobs. */
-const POLL_MS = 60_000;
-
-/** How often it is re-read while a job is being carried out. */
-const BUSY_POLL_MS = 1_500;
+/** The server's frame after every job or check write: the runner's install steps among them. */
+const CLAUDE_UPDATES_FRAMES = ['claude_updates_changed'] as const;
 
 /** The report as last published — what every consumer draws. */
 let report: ClaudeUpdatesReport | null = null;
 
 /**
- * The last body VERBATIM. A poll that answers the same JSON republishes nothing, so an idle app does
- * not re-render the footer row once a minute for a picture that did not move.
+ * The last body VERBATIM. A read that answers the same JSON republishes nothing, so a frame for a
+ * write that did not move the picture does not re-render the footer row.
  */
 let lastBody = '';
-
-/** The shared poller, or null while nobody is subscribed. */
-let timer: ReturnType<typeof setInterval> | null = null;
-
-/** The period `timer` is armed at, so a cadence change can tell it is one. */
-let timerMs = 0;
 
 /** The read in flight, so a mount during one joins it instead of opening a second. */
 let inFlight: Promise<boolean> | null = null;
@@ -59,7 +52,10 @@ let newestRead = 0;
 /** The newest token that has ANSWERED. An older answer landing after it is dropped, not published. */
 let newestAnswer = 0;
 
-/** Every mounted consumer. The poller starts for the first and stops for the last. */
+/** A frame heard while a read was out: that read may predate the write the frame names, so one more runs when it lands. */
+let rereadAfterInFlight = false;
+
+/** Every mounted consumer. The first one's mount reads the report; each one's frame asks again. */
 const listeners = new Set<() => void>();
 
 /** What an action answers with: it was taken, or the server's own words for why it was not. */
@@ -68,8 +64,7 @@ export type ClaudeUpdateActionResult = { ok: true } | { ok: false; message: stri
 /**
  * Whether a job is one still being carried out.
  *
- * The report refreshes fast on exactly these four states and slowly on every other, so this is one
- * predicate rather than a list of state names repeated in the tab, the footer row and the poller.
+ * One predicate rather than a list of state names repeated in the tab and the footer row.
  */
 export function isUpdateJobActive(job: ClaudeUpdateJob | null): job is ClaudeUpdateJob {
   if (job === null) return false;
@@ -95,21 +90,6 @@ export function canPressRestart(job: ClaudeUpdateJob | null): boolean {
   return job.state === 'restarting' && job.steps.some((s) => s.key === 'restart' && s.state === 'pending');
 }
 
-/** The poll period the picture in hand calls for: fast while a job is being carried out. */
-function cadenceMs(): number {
-  return isUpdateJobActive(report?.job ?? null) ? BUSY_POLL_MS : POLL_MS;
-}
-
-/** Points the one timer at the period the picture now calls for. A no-op when it is already there. */
-function rearm(): void {
-  if (timer === null) return;
-  const ms = cadenceMs();
-  if (ms === timerMs) return;
-  timerMs = ms;
-  clearInterval(timer);
-  timer = setInterval(() => void read(), ms);
-}
-
 /**
  * Reads the route and publishes it when it says something new.
  *
@@ -117,7 +97,7 @@ function rearm(): void {
  * "we could not ask", and a console error would put a transient network blip — a handover's own gap,
  * most of all — into a screen's evidence.
  *
- * `force` is what a CALLER waiting on the answer needs. Joining the poll already in flight would
+ * `force` is what a CALLER waiting on the answer needs. Joining a read already in flight would
  * hand it a picture taken before whatever it just did, so `refresh()` and every action open their
  * own request and resolve against a reading no older than the call.
  *
@@ -145,21 +125,33 @@ function read(force = false): Promise<boolean> {
       newestAnswer = token;
       lastBody = body;
       report = parsed;
-      // The picture may have just moved into (or out of) a job's four states, and the cadence is
-      // read off the picture: the timer has to be pointed at what is true now.
-      rearm();
       for (const listener of listeners) listener();
       return true;
     } catch {
       // Nothing to say: the picture that is already here is the best one available.
       return false;
     } finally {
-      // Only if this is still the newest read: a forced one starting mid-poll takes the slot, and
+      // Only if this is still the newest read: a forced one starting mid-read takes the slot, and
       // clearing it unconditionally would drop the newer request a later joiner should get.
-      if (newestRead === token) inFlight = null;
+      if (newestRead === token) {
+        inFlight = null;
+        if (rereadAfterInFlight) {
+          rereadAfterInFlight = false;
+          void read();
+        }
+      }
     }
   })();
   return inFlight;
+}
+
+/** A frame's read: one read in flight, one remembered, so a write that lands mid-read is still read. */
+function readOnFrame(): void {
+  if (inFlight) {
+    rereadAfterInFlight = true;
+    return;
+  }
+  void read();
 }
 
 /**
@@ -206,20 +198,12 @@ async function act(send: () => Promise<Response>): Promise<ClaudeUpdateActionRes
   return result;
 }
 
-/** Subscribes one consumer, starting the shared poller for the first and stopping it for the last. */
+/** Subscribes one consumer; the first one's mount reads the report, and a read in flight is joined. */
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (timer === null) {
-    void read();
-    timerMs = cadenceMs();
-    timer = setInterval(() => void read(), timerMs);
-  }
+  if (listeners.size === 1) void read();
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && timer !== null) {
-      clearInterval(timer);
-      timer = null;
-    }
   };
 }
 
@@ -247,8 +231,10 @@ export function useClaudeUpdates(): {
   setAutoInstall(enabled: boolean): Promise<ClaudeUpdateActionResult>;
 } {
   const current = useSyncExternalStore(subscribe, getSnapshot);
+  // Every mounted consumer asks; the shared reader holds one read in flight and remembers one more.
+  useServerFrame(CLAUDE_UPDATES_FRAMES, readOnFrame);
 
-  /** Reads the report again — the manual half of the poll. Answers whether the read landed. */
+  /** Reads the report again, forced past any read in flight. Answers whether the read landed. */
   const refresh = useCallback(() => read(true), []);
 
   /** Asks npm now instead of waiting for the next tick. */

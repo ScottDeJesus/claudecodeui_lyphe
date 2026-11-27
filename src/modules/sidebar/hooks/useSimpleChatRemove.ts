@@ -140,7 +140,7 @@ export function useSimpleChatRemove(input: { onClosed: (sessionId: string) => vo
   const cancelDelete = useCallback(() => setPendingDelete(null), []);
 
   // The busy set is the client's computed running model — chat_subscribed/complete frames plus
-  // a GET /sessions/running re-sync every 5s — so reacting to it dropping the id is the whole
+  // running_sessions_state frames (a GET /sessions/running read on mount, reconnect and tab show) — so reacting to it dropping the id is the whole
   // wait: no polling timer, no ref loop. This IS the "external system" the lint rule below asks
   // an effect to be reserved for: the busy set lives outside React, and closing is a side
   // effect (a fetch), not a value this component could derive during render.

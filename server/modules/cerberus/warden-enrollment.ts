@@ -2,6 +2,7 @@ import { cerberusEnrollDb, cerberusNodesDb, getCerberusConnection } from '@/modu
 import type { CerberusNodeCert } from '@/shared/cerberus-types.js';
 
 import { centerPublicKey, fingerprintOf, signText } from './center-key.js';
+import { hintChanged } from './cerberus-broadcast.js';
 import type { WardenAuthResult } from './warden-auth.js';
 
 /**
@@ -70,7 +71,10 @@ export function enrollNode(request: EnrollRequest, hello: EnrollmentHello, now: 
         return true;
       })
       .immediate();
-    return spent ? { cert } : { refusal: 'token used' };
+    if (!spent) return { refusal: 'token used' };
+    // After the commit: the Enroll dialog reads its token's state on this frame, and nothing else announces the spend.
+    hintChanged({ nodes: [request.name] });
+    return { cert };
   } catch (error) {
     console.error(`[Cerberus] enrolling node ${request.name} failed: ${error instanceof Error ? error.message : String(error)}`);
     return { refusal: 'enrollment failed' };

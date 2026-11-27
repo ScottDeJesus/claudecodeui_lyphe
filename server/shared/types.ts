@@ -234,6 +234,19 @@ export type GatewayEventKind =
   | 'session_host_liveness'
   | 'universe_activity'
   | 'universe_map'
+  | 'memory_changed'
+  | 'accounts_changed'
+  | 'drafts_changed'
+  | 'claude_updates_changed'
+  | 'cli_version_changed'
+  | 'heal_changed'
+  | 'jev_changed'
+  | 'deepseek_usage_changed'
+  | 'subagent_transcript_changed'
+  | 'running_sessions_state'
+  | 'accounts_usage_state'
+  | 'deepseek_balance_state'
+  | 'app_release_state'
   | 'pong'
   | 'protocol_error';
 
@@ -360,6 +373,108 @@ export type SessionHostLivenessEvent = {
 
 /** Sent to every open socket after a note is created, replaced or deleted. It names no note and no account: a client that hears it reads its own list again. It carries no `seq` and no `sessionId`, so it can never become a transcript row. */
 export type NotesChangedEvent = { kind: 'notes_changed'; at: number };
+
+/**
+ * A hint frame sent to every open socket when what one route answers has moved: `{ kind, at }` and
+ * nothing else, so a client that hears it reads that route again. No `seq` and no `sessionId`, so it
+ * never becomes a transcript row (MAN-453). Paced by `createPacedHint`.
+ */
+export type ServerHintEvent<TKind extends ServerHintKind> = { kind: TKind; at: number };
+
+/** The hint kinds, each named for the route its listeners read again. */
+export type ServerHintKind =
+  | 'memory_changed'
+  | 'accounts_changed'
+  | 'drafts_changed'
+  | 'claude_updates_changed'
+  | 'cli_version_changed'
+  | 'heal_changed'
+  | 'jev_changed'
+  | 'deepseek_usage_changed';
+
+/** The memory-intake queue changed: a candidate staged or reviewed. */
+export type MemoryChangedEvent = ServerHintEvent<'memory_changed'>;
+/** The Claude accounts store changed: a switch, a seed, a removal. */
+export type AccountsChangedEvent = ServerHintEvent<'accounts_changed'>;
+/** A queued draft was appended, cleared, claimed, restored or deleted. */
+export type DraftsChangedEvent = ServerHintEvent<'drafts_changed'>;
+/** The Claude update job or its stored check was written. */
+export type ClaudeUpdatesChangedEvent = ServerHintEvent<'claude_updates_changed'>;
+/** The installed CLI version, or the runs still on an older one, moved. */
+export type CliVersionChangedEvent = ServerHintEvent<'cli_version_changed'>;
+/** The heal reflex's ledger committed a write (`friction.db` or its WAL changed). */
+export type HealChangedEvent = ServerHintEvent<'heal_changed'>;
+/** The Jev ledger was appended to; paced to one frame per ten seconds. */
+export type JevChangedEvent = ServerHintEvent<'jev_changed'>;
+/** A transcript the DeepSeek usage counts was written. */
+export type DeepseekUsageChangedEvent = ServerHintEvent<'deepseek_usage_changed'>;
+/** A watched subagent transcript moved. Sent only to the sockets watching `key`, never to all. */
+export type SubagentTranscriptChangedEvent = { kind: 'subagent_transcript_changed'; at: number; key: string };
+
+/**
+ * A state frame: `{ kind, at }` plus the whole body its route answers, so a listener sets its state
+ * from the frame and never reads the route for it. No `seq` and no `sessionId`. `TBody` is the
+ * route's own answer type, named by the lane that sends it.
+ */
+export type ServerStateEvent<TKind extends ServerStateKind, TBody extends object> = { kind: TKind; at: number } & TBody;
+
+/** The state kinds, each carrying the body of one route. */
+export type ServerStateKind = 'running_sessions_state' | 'accounts_usage_state' | 'deepseek_balance_state' | 'app_release_state';
+
+/** GET /api/providers/sessions/running's answer. */
+export type RunningSessionsStateEvent<TBody extends object> = ServerStateEvent<'running_sessions_state', TBody>;
+
+/**
+ * One in-flight run, as the sidebar's Running list needs it: the registry's
+ * status fields plus the project the session belongs to, so the list never
+ * depends on which sessions a client has paged in.
+ */
+export type RunningSessionListItem = {
+  sessionId: string;
+  provider: LLMProvider;
+  startedAt: number;
+  lastSeq: number;
+  cliVersion: string | null;
+  projectId: string | null;
+  projectPath: string | null;
+  projectDisplayName: string;
+  sessionTitle: string;
+  lastActivity: string | null;
+  /** A question or permission prompt in this run is waiting on the user. */
+  awaitingInput: boolean;
+};
+
+/**
+ * The body of `GET /api/providers/sessions/running`, and of the `running_sessions_state` frame that carries it
+ * (`running-sessions.lane.ts`).
+ *
+ * `subagentSessionIds` is a TOP-LEVEL list rather than a field on each run, and that is the whole
+ * point of it: a conversation whose turn has ended is no longer a run and cannot appear in
+ * `sessions`, which is exactly the state the sidebar's purple dot exists to show. A list beside
+ * them can name a session the run registry has already forgotten.
+ */
+export type RunningSessionsPayload = {
+  sessions: RunningSessionListItem[];
+  /** Conversations with an agent still running, whether or not they carry a live run. */
+  subagentSessionIds: string[];
+  /**
+   * For each of those conversations, the model of every agent it has running, `''` for one whose model is not recorded yet: what
+   * the sessions board draws a dot for, in the model's colour. The same conversations as `subagentSessionIds`, from the same pass.
+   */
+  subagentModels: Record<string, string[]>;
+  /** Conversations with a question or permission prompt waiting, whether or not they carry a live run. */
+  awaitingInputSessionIds: string[];
+};
+/** The usage window's reading, under `usage`. */
+export type AccountsUsageStateEvent<TBody extends object> = ServerStateEvent<'accounts_usage_state', TBody>;
+/** GET /api/deepseek/balance's answer for one server reading. */
+export type DeepseekBalanceStateEvent<TBody extends object> = ServerStateEvent<'deepseek_balance_state', TBody>;
+/** GET /api/app-release's answer: the newest release. */
+export type AppReleaseStateEvent<TBody extends object> = ServerStateEvent<'app_release_state', TBody>;
+/** One published release of the app, as the update prompt and the About tab draw it. */
+export type AppReleaseInfo = { title: string; body: string; htmlUrl: string; publishedAt: string };
+/** GET /api/app-release's body and app_release_state's: `tag` is GitHub's tag name verbatim (`v1.2.3`); both fields are null when the repository has published no release. */
+export type AppReleaseReading = { tag: string | null; release: AppReleaseInfo | null };
 
 /** Sent to every open socket after a followup is filed, closed or reopened. It names the chat by its APP session id under `appSessionId` — deliberately NOT `sessionId`: the workspace flags a chat for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen (`useProjectsState`), and a chat's items moving is no news in the transcript. A widget re-reads when the id is its own chat's and ignores the frame otherwise. It carries no `seq`, so it can never become a transcript row. */
 export type FollowupsChangedEvent = { kind: 'followups_changed'; appSessionId: string; at: number };

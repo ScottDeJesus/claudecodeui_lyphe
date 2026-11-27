@@ -81,6 +81,8 @@
           "server/shared/mcp-command.ts",
           "server/shared/polled-lane.service.ts",
           "server/shared/directory-watch.service.ts",
+          "server/shared/file-lane.service.ts",
+          "server/shared/paced-hint.service.ts",
           "server/shared/dispatcher-store-watch.service.ts",
           "server/shared/dispatcher-board-gate.service.ts",
           "server/shared/kanban-types.ts",

@@ -5,9 +5,11 @@ import type { CerberusGatewayState, CerberusReadInputs } from '@/shared/cerberus
 import { asyncHandler, readPathParam } from '@/shared/utils.js';
 
 import { listCatalog, retireEntry, setAuto, writeEntry } from './catalog.service.js';
+import { armFlipDeadline, judgeFlipsWith } from './cerberus-broadcast.js';
 import { getDefinition, putDefinition, retireCheck, setLabel } from './definitions.service.js';
 import { createDiagnosisRouter } from './diagnosis/diagnosis.routes.js';
 import { enrollmentStatus, mintEnrollment } from './enrollments.service.js';
+import { collectFlips, judgeFlip } from './flip-judge.js';
 import { createMute, liftMute } from './mutes.service.js';
 import { activity } from './read-model/activity.js';
 import { checkDetail, checkIndex } from './read-model/check-detail.js';
@@ -71,11 +73,16 @@ function optionalWholeNumber(request: Request, name: string): number | undefined
 /** Creates the router for `cerberus.module.ts`. Each handler is one verb and its shape. */
 export function createCerberusRouter({ readInputs, gatewayState }: CerberusRouteDependencies): Router {
   const router = express.Router();
+  judgeFlipsWith((at) => judgeFlip(at, readInputs));
 
   router.get(
     '/overview',
     asyncHandler(async (_request: Request, response: Response) => {
-      response.json(buildOverview(readInputs()));
+      // A tab's read: the earliest instant it forecasts a turn with nothing written arms the flip deadline.
+      const inputs = readInputs();
+      const flips = collectFlips(inputs.now);
+      response.json(buildOverview({ ...inputs, flipsAt: flips.flipsAt }));
+      armFlipDeadline(flips.earliest());
     })
   );
 
@@ -92,7 +99,10 @@ export function createCerberusRouter({ readInputs, gatewayState }: CerberusRoute
       const node = readPathParam(request.params.node, 'node');
       const lookup = optionalWholeNumber(request, 'lookup');
       const end = optionalWholeNumber(request, 'end');
-      response.json(checkDetail(node, readCheckKey(request), { lookupAt: lookup, end }, readInputs()));
+      const inputs = readInputs();
+      const flips = collectFlips(inputs.now);
+      response.json(checkDetail(node, readCheckKey(request), { lookupAt: lookup, end }, { ...inputs, flipsAt: flips.flipsAt }));
+      armFlipDeadline(flips.earliest());
     })
   );
 

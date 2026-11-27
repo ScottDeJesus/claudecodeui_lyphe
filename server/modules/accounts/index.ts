@@ -10,6 +10,7 @@
 // (`claude-chat-readings.ts`, source "chat").
 
 export { createAccountsModule } from './accounts.module.js';
+export { startAccountsLanes } from './accounts-lanes.js';
 export { launchCredential } from './account-door.js';
 export { identity as liveAccountEmail } from './account-identity.service.js';
 export { chosenAccount } from './chosen-account.js';

@@ -31,6 +31,7 @@ import type { UpdateActionResult } from './update-actions.service.js';
 import type { ReportReadings } from './update-check.report.js';
 import { createHeldVersions } from './update-held-versions.js';
 import type { ConfigStore } from './update-held-versions.js';
+import { announceUpdateFileWritten } from './update-written.js';
 
 /** The `app_config` key the switch lives under: one JSON value, `{"enabled": boolean}`. */
 const AUTO_INSTALL_CONFIG_KEY = 'claude_updates_auto_install';
@@ -249,9 +250,10 @@ export function createAutoInstall(dependencies: AutoInstallDependencies): {
       return { enabled, waiting: waitingFor(await decide(readings, readActivityRecent)) };
     },
 
-    /** Writes the switch. Takes effect at the next tick, which re-reads it. */
+    /** Writes the switch, then tells every open tab. Takes effect at the next tick, which re-reads it. */
     setEnabled(enabled: boolean): void {
       config.set(AUTO_INSTALL_CONFIG_KEY, JSON.stringify({ enabled }));
+      announceUpdateFileWritten();
     },
 
     tick,

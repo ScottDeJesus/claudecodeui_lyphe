@@ -3,11 +3,24 @@
 // follow: a health URL that 302s to a login page must not read as healthy because the login page
 // returned 200. `node:http` is used instead of `fetch` because fetch carries a hidden 10-second
 // connect timeout that would silently undercut any `timeout` above it.
+//
+// Every `{nonce}` in the url is replaced with one fresh token per run, so a caching server (Vite's
+// module cache) has to answer the GET itself. The token is never echoed: nothing returned names the url.
 
+import crypto from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
 
 import { deadlineMs, describeNetworkError, elapsedMs, finishProbe, formatSeconds, missingField, unrunnable } from '../probe-support.mjs';
+
+const NONCE_PLACEHOLDER = '{nonce}';
+const NONCE_BYTES = 8;
+
+// The url to send: every `{nonce}` filled with the same fresh hex token, any other url untouched.
+function withFreshNonce(url) {
+  if (typeof url !== 'string' || !url.includes(NONCE_PLACEHOLDER)) return url;
+  return url.replaceAll(NONCE_PLACEHOLDER, crypto.randomBytes(NONCE_BYTES).toString('hex'));
+}
 
 // One GET, resolving with `{ status }`, `{ timedOut }` or `{ error }`. The body is never read: the
 // status line is the measurement, and a large body must not hold the probe past its answer.
@@ -37,12 +50,13 @@ function requestOnce(target, timeoutMs) {
 export async function run(spec, _memory) {
   const missing = missingField(spec, ['url']);
   if (missing) return unrunnable(spec, missing);
-  if (!URL.canParse(spec.url) || !/^https?:$/.test(new URL(spec.url).protocol)) {
+  const url = withFreshNonce(spec.url);
+  if (!URL.canParse(url) || !/^https?:$/.test(new URL(url).protocol)) {
     return unrunnable(spec, "The definition's url can't be read");
   }
 
   const startedAt = performance.now();
-  const answer = await requestOnce(new URL(spec.url), deadlineMs(spec));
+  const answer = await requestOnce(new URL(url), deadlineMs(spec));
   const tookMs = elapsedMs(startedAt);
 
   if (answer.timedOut) {

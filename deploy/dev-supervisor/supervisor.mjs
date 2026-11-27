@@ -3,11 +3,13 @@
 // The watcher this replaces killed first and booted after, which made every edit a gap and every
 // broken edit an outage. A save is HELD while the serving API reports itself busy (Kaylee in a turn, his press,
 // her voice, his last words, a chat run), so no builder's edit cuts him off mid-sentence; his own restart and a
-// requested reboot are never held. Mechanism, log lines and failure table: ./README.md.
+// requested reboot are never held. A dead, failed or silent child is booted again, three times in a row at most
+// (./heal.mjs). Mechanism, log lines and failure table: ./README.md.
 import path from 'node:path';
 import process from 'node:process';
 
 import { BOOT_TIMEOUT_MS, spawnServer } from './child.mjs';
+import { createHeals, createSilenceWatch, MAX_HEALS, RETRY_DELAY_MS, SILENCE_MS } from './heal.mjs';
 import { blockersOf, createSaveHold, describe, parseHoldReport } from './hold.mjs';
 import { watchServerDir } from './watch.mjs';
 
@@ -41,6 +43,13 @@ const saves = createSaveHold({
 /** Node's own record of how a child ended — no second copy of that fact is kept here. */
 const exitReason = (child) => child.signalCode ?? String(child.exitCode);
 
+// The heals of a dead, failed or silent child (./heal.mjs).
+const heals = createHeals();
+const GIVING_UP = `it died ${MAX_HEALS} times on this code, waiting for the next change`;
+let retryTimer = null;  // the one pending retry of a boot that failed with nothing serving
+const silenced = new WeakSet();  // children killed for silence: their last SILENCE_MS was hung, not served
+const silence = createSilenceWatch({ onSilent: killSilent });
+
 /**
  * One line for a boot that never became the serving server, and returns the detail it logged.
  * The requester of a reboot that failed is owed the journal's own words, not a second summary of
@@ -59,18 +68,51 @@ function reportFailedBoot(attempt, failure) {
     return detail;
 }
 
-/** Reports a serving child that dies on its own. Deliberately does NOT boot a replacement. */
+/**
+ * A serving child that dies on its own is booted again. A held save goes first, as it always did; otherwise a heal,
+ * while the budget lasts (./heal.mjs): three deaths in a row with no stable server between them is a crash loop on
+ * this code, and the supervisor then waits for the next change instead of feeding it.
+ */
 function watchForCrash(attempt, pid) {
+    const servingSince = Date.now();
     attempt.child.once('exit', () => {
         // A retirement, or our own shutdown: both already have their line.
         if (stopping || serving !== attempt) return;
         serving = null;
-        // No restart here on purpose: a server that crashes after READY crashes again on the same
-        // code, and a crash loop is exactly what the watchdog's three-heal rule exists to catch.
-        log(`server pid ${pid} exited (${exitReason(attempt.child)}) — waiting for the next change`);
+        const reason = exitReason(attempt.child);
         // Nothing is serving, so nothing is left to protect: a save held for it goes now.
         saves.ask();
+        // That save's boot, or one already booting or queued, puts code back on the port: no heal is owed. Not `busy`:
+        // a cycle that is only retiring this child's predecessor, or stopping a failed boot, brings nothing back.
+        if (pending !== null || queued) { log(`server pid ${pid} exited (${reason}): a boot is already on its way`); return; }
+        const servedMs = Date.now() - servingSince - (silenced.has(attempt) ? SILENCE_MS : 0);
+        const heal = heals.next(servedMs);
+        if (heal === null) { log(`server pid ${pid} exited (${reason}): ${GIVING_UP}`); return; }
+        log(`server pid ${pid} exited (${reason}): heal ${heal} of ${MAX_HEALS}, booting it again`);
+        requestCycle('immediate');
     });
+}
+
+/** A boot that failed with nothing serving is tried once more after RETRY_DELAY_MS, while the heals last. */
+function healFailedBoot() {
+    const heal = heals.next(0);
+    if (heal === null) { log(GIVING_UP); return; }
+    log(`heal ${heal} of ${MAX_HEALS}, booting again in ${RETRY_DELAY_MS / 1000} s`);
+    clearRetry();
+    retryTimer = setTimeout(() => { retryTimer = null; requestCycle('immediate'); }, RETRY_DELAY_MS);
+}
+
+function clearRetry() {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+}
+
+/** The serving child stopped beating: killed through its own handle, so its exit takes the crash rule above. */
+function killSilent(attempt) {
+    if (stopping || attempt !== serving) return;
+    log(`server pid ${attempt.child.pid} silent for ${SILENCE_MS / 1000} s, killing it`);
+    silenced.add(attempt);
+    attempt.child.kill('SIGKILL');
 }
 
 /**
@@ -95,6 +137,7 @@ function handOver(next, pid) {
 
 async function retire(previous, next, pid) {
     const oldPid = previous.child.pid;
+    silence.drop(previous);
     // Awaited to its exit, never merely signalled: see handOver above for what a live predecessor
     // costs the sessions of a successor that re-adopts too early.
     await previous.stop();
@@ -106,6 +149,7 @@ async function retire(previous, next, pid) {
 
 /** A child's message: its restart-hold report, or (from the serving one only) a request for its own handover. */
 function onChildMessage(attempt, message) {
+    silence.heard(attempt, message);
     const reasons = parseHoldReport(message);
     if (reasons !== null) {
         reportedReasons.set(attempt, reasons);
@@ -141,7 +185,7 @@ async function bootOnce(kind) {
     // this is. (A reboot request's boot carries the saves held when it was asked for; without this the cycle's end would
     // release them into a second restart straight after the takeover.)
     saves.carry();
-    attempt.child.once('exit', () => children.delete(attempt));
+    attempt.child.once('exit', () => { children.delete(attempt); silence.drop(attempt); });
     // From spawn, not from READY: the first report a child makes lands right behind its `ready`.
     attempt.child.on('message', (message) => onChildMessage(attempt, message));
     pending = attempt;
@@ -162,6 +206,7 @@ async function bootOnce(kind) {
         // must not queue behind the stall it explains.
         if (!stopping) {
             const detail = reportFailedBoot(attempt, failure);
+            if (serving === null) healFailedBoot();
             // The child that asked for this cycle is still on the port, and it is owed the answer:
             // the same words the journal just got, so both sides name one failure. Its channel is
             // checked, never `send` — the method outlives the channel (supervised-boot.ts:19-29).
@@ -242,6 +287,9 @@ async function cycle(kind) {
 function onChange(relativePath) {
     if (stopping) return;
     log(`change: ${relativePath}`);
+    // New code earns new heals, and a retry of the old code is moot.
+    clearRetry();
+    heals.clear();
     saves.add();
 }
 
@@ -275,6 +323,8 @@ async function shutdown(signal) {
     log(`stopping (${signal})`);
     closeWatcher();
     saves.close();
+    silence.close();
+    clearRetry();
     // Every live child, not just the two the state machine names: one may be mid-retirement and
     // reachable only from retire()'s own frame. Awaited, never fired and forgotten — exiting first
     // would orphan a server on the port with its own SIGKILL timer dead alongside this process.

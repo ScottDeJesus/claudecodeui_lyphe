@@ -57,7 +57,20 @@ export { buildCloudCliSessionName } from './services/sessions.service.js';
 export { sessionUserStateService } from './services/session-user-state.service.js';
 
 export { initializeSessionsWatcher } from './services/sessions-watcher.service.js';
+
+// createRunningSessionsLane: used by server/index.ts, which starts it after `listen` and stops it on shutdown; it sends
+// `running_sessions_state` to every open socket whenever the running-sessions answer changes.
+export { createRunningSessionsLane } from './services/running-sessions.lane.js';
 export { closeSessionsWatcher } from './services/sessions-watcher.service.js';
+
+// onSessionsFlushed: used by the deepseek module, whose usage hint tells every tab that a transcript moved
+// (the DeepSeek ledger's own hook decides which transcripts it counts; Node does not filter).
+export { onSessionsFlushed } from './services/sessions-watcher.service.js';
+
+// subscribeTranscriptFeed: the transcript feed's door — every add, change and unlink of a provider transcript the sessions
+// watcher sees, with its size and the size known before it. The session index is its first subscriber.
+export { subscribeTranscriptFeed } from './services/transcript-feed.service.js';
+export type { TranscriptFileEvent, TranscriptFeedListener } from './services/transcript-feed.service.js';
 
 // readoptKeepaliveSessions: used by server/index.ts to give every CLI that outlived
 // the API its registry run back, before the server starts listening (D-11).
@@ -100,3 +113,7 @@ export { readClaudeTranscriptBySessionId } from './list/claude/claude-transcript
 // through the same doors a tool approval uses (an answer, a recall). It lists NOTHING: a plan's prompt
 // is pending in no chat, so no chat lists it and no sidebar dot marks it.
 export { registerPermissionGateway } from './provider.registry.js';
+
+// defineSubagentTranscriptWatch: used by the dispatch-souls module, which hands in where a launch's record directory is,
+// so the `subagent_transcript` lane tails a soul's transcript as it tails an agent's.
+export { defineSubagentTranscriptWatch } from './services/subagent-transcript-watch.service.js';

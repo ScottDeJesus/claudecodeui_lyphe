@@ -104,6 +104,14 @@ function readVendorBalance(payload: unknown): { available: boolean; currency: st
 }
 
 /**
+ * The body `GET /api/deepseek/balance` answers for one reachable reading. The one place that shape is
+ * built: the route's answer and the `deepseek_balance_state` frame are both this, never two copies.
+ */
+export function reachableBalance(reading: DeepseekUsageReading): DeepseekBalance {
+  return { reachable: true, ...reading };
+}
+
+/**
  * The DeepSeek balance service.
  *
  * Used by `deepseek.routes.ts` for the account panel's balance line, which is the only consumer.
@@ -168,7 +176,7 @@ export function createDeepseekService(dependencies: DeepseekServiceDependencies)
       // health, and the recorder's own failures are already one `console.warn` deep.
     }
 
-    return { reachable: true, ...report };
+    return reachableBalance(report);
   }
 
   return { balance };

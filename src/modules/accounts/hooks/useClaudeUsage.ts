@@ -1,29 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
-import type { ClaudeUsage } from '@/shared/types';
+import { useLaneWatch } from '@/shared/hooks/useLaneWatch';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
+import type { ClaudeUsage, ServerEvent } from '@/shared/types';
 
-/**
- * How often usage is re-read on its own. D7's floor.
- *
- * Three minutes, not one: these figures come from the provider through the server's own cache
- * and move slowly, and the reading a person actually cares about is the one taken when they
- * open the panel — which `refresh()` takes on the spot.
- */
-const USAGE_POLL_MS = 180_000;
+/** The server lane this hook watches (`server/modules/accounts/accounts-lanes.ts`); one live login per host, so no key. */
+const USAGE_LANE = 'accounts_usage';
+const USAGE_FRAME_KIND = 'accounts_usage_state';
+const USAGE_FRAME_KINDS = [USAGE_FRAME_KIND] as const;
+
+type UsageFrame = ServerEvent & { usage: ClaudeUsage };
+
+/** The frame's reading, checked where it enters: a body without a boolean `reachable` is no reading. */
+function isUsageFrame(event: ServerEvent): event is UsageFrame {
+  if (event.kind !== USAGE_FRAME_KIND) return false;
+  const usage = event.usage;
+  return typeof usage === 'object' && usage !== null && 'reachable' in usage && typeof usage.reachable === 'boolean';
+}
 
 /**
  * The usage windows for whichever account is live.
  *
  * Used by the accounts module's AccountsProvider, which hands the whole reading to every home of the panel.
- * The provider holds the ONE instance, so a panel opening and closing never starts or stops a poller.
+ * The provider holds the ONE instance, so a panel opening and closing never starts or stops the server's watch.
  */
 export function useClaudeUsage() {
   // The last reading the route answered with. Held for the same reason the account picture
   // is: `null` (not asked yet) and `{reachable:false}` (asked, no reading) are different
   // things to say, and neither of them is zero.
   const [data, setData] = useState<ClaudeUsage | null>(null);
-  // Mount flag: a poll that resolves after the provider unmounted (a sign-out, or the workspace leaving the tree) must not set state.
+  // Mount flag: a read that resolves after the provider unmounted (a sign-out, or the workspace leaving the tree) must not set state.
   const mountedRef = useRef(true);
 
   const refresh = useCallback(async () => {
@@ -41,14 +48,21 @@ export function useClaudeUsage() {
   useEffect(() => {
     mountedRef.current = true;
     void refresh();
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, USAGE_POLL_MS);
     return () => {
       mountedRef.current = false;
-      window.clearInterval(timer);
     };
   }, [refresh]);
+
+  // While mounted the server reads the window for this tab and sends each reading that moved; a
+  // reconnect reads the route once, for whatever the drop missed.
+  useLaneWatch(USAGE_LANE, null, true);
+  useServerFrame(USAGE_FRAME_KINDS, (event) => {
+    if (!isUsageFrame(event)) {
+      void refresh();
+      return;
+    }
+    if (mountedRef.current) setData(event.usage);
+  });
 
   return { data, refresh };
 }

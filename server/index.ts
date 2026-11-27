@@ -22,6 +22,7 @@ import {
     releaseKeepaliveOwnership,
     startSessionAutoClose,
     whenNodeSessionsReadopted,
+  createRunningSessionsLane,
 } from '@/modules/providers/index.js';
 import { chatRunRegistry, createWebSocketServer, startRunStallWatchdog } from '@/modules/websocket/index.js';
 import { stopChatCompaction, withChatCompaction } from '@/modules/compaction/index.js';
@@ -61,11 +62,12 @@ import {
 import { createSchedulesModule } from './modules/schedules/index.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
-import { createAccountsModule } from './modules/accounts/index.js';
+import { createAccountsModule, startAccountsLanes } from './modules/accounts/index.js';
 import { readClaudeActivity } from './modules/claude-activity/index.js';
 import { createClaudeUpdatesModule } from './modules/claude-updates/index.js';
 import { createRestartHoldRoutes, followChatRuns, restartHold } from './modules/restart-hold/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
+import { createAppReleaseModule } from './modules/app-release/index.js';
 import { createBootReportModule } from './modules/boot-report/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createKanbanModule } from './modules/kanban/index.js';
@@ -373,6 +375,9 @@ createCodeModeModule();
 // Installed CLI version + what the live runs are on (protected)
 app.use('/api/cli-version', authenticateToken, createCliVersionModule());
 
+// The app's newest release, read from GitHub once per host and pushed as `app_release_state` (protected)
+app.use('/api/app-release', authenticateToken, createAppReleaseModule());
+
 // The money left on this host's DeepSeek account (protected) — an account of its own, read from
 // the vendor directly with the key in this host's .env.
 app.use('/api/deepseek', authenticateToken, createDeepseekModule());
@@ -406,21 +411,26 @@ app.use('/api/rnd', authenticateToken, rnd.router);
 const kanbanDispatch = createKanbanDispatchModule(dispatcherStoreWatch);
 app.use('/api/kanban-dispatch', authenticateToken, kanbanDispatch.router);
 
+// The accounts' pushes, told by the same store watch: `accounts_changed` on a write to the door's
+// account files, and the usage window's lane, which reads the vendor only while a tab watches it.
+startAccountsLanes(dispatcherStoreWatch, (message) => console.error(message));
+
 // The heal reflex's ledger, the switches that steer it, and the door to a heal on demand
 // (protected — this is the operator's own friction record, and this app is reachable from a LAN).
-// Built inline, unlike the two above: the lane holds no timer and no socket, so there is nothing
-// for `listen` or a shutdown to start or stop.
+// Built inline, unlike the two above: what the lane arms as it is built — a watch on the ledger's
+// directory and a paced hint whose one unref'd timer sends `heal_changed` through `broadcastToAll` —
+// holds no process open, so there is nothing for `listen` or a shutdown to start or stop.
 const heal = createHealModule();
 app.use('/api/heal', authenticateToken, heal.router);
 
-// The Analytics area: one reader per section, each asking the module that owns its numbers. Inline for
-// heal's reason: no timer, no socket.
+// The Analytics area: one reader per section, each asking the module that owns its numbers. Built
+// inline: it arms no timer and opens no socket, so `listen` and a shutdown have nothing to start or stop.
 const analytics = createAnalyticsModule();
 app.use('/api/analytics', authenticateToken, analytics.router);
 
 // The launch table — the model and effort every soul, the card sorter and the tweak builder launch at — and the doors that pin a
 // row or move a default (protected: a save regenerates the shims every session reads). Built inline
-// like the heal lane, and for the same reason: no timer, no socket. The server never opens the table;
+// like the Analytics area, and for its reason: no timer, no socket. The server never opens the table;
 // the routes run its own CLI and carry back the census it prints.
 app.use('/api/agent-launch', authenticateToken, createAgentLaunchModule().router);
 
@@ -469,6 +479,8 @@ app.use('/api/scheduling-report', authenticateToken, schedulingReport.router);
 // pins each one in its own chat's rows (protected). Built out here for the same
 // reason `dispatcher` is: its poll starts after `listen` and stops on shutdown.
 const dispatchSouls = createDispatchSoulsModule();
+// The running sessions, sent as running_sessions_state whenever the answer changes; started after `listen` with the lanes below.
+const runningSessions = createRunningSessionsLane();
 app.use('/api/dispatch-souls', authenticateToken, dispatchSouls.router);
 
 // Kaylee, the voice companion (protected): one conversation per account, beside every chat and tied to none.
@@ -896,6 +908,9 @@ async function startServer() {
             // The launcher souls, read off their own state root and broadcast the same way.
             dispatchSouls.start();
 
+            // The running sessions, read again on each run change, watcher flush, launcher change and notification.
+            runningSessions.start();
+
             // The estate's HEADs, watched so a commit is what announces the next map.
             universe.start();
 
@@ -957,6 +972,7 @@ async function startServer() {
             dispatcherStoreWatch.stop();
             claudeUpdates.stop();
             dispatchSouls.stop();
+            runningSessions.stop();
             universe.stop();
             stopRunStallWatchdog?.();
             stopNotificationHistory?.();

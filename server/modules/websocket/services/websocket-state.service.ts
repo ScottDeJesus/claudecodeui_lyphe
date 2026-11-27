@@ -70,6 +70,40 @@ export function sendToUser(userId: string | number, payload: unknown): void {
 }
 
 /**
+ * Sends one JSON frame to every open gateway socket, whoever's page it is. Consumed by the hint and
+ * state frames that name no account (`jev_changed`, `heal_changed` and their kin, MAN-453): every tab
+ * that hears one reads its own route again.
+ *
+ * Serialised once, for the reason `sendToUser` gives; a payload with no JSON form is logged and sent
+ * nowhere, never thrown into a caller whose write already landed.
+ */
+export function broadcastToAll(payload: unknown): void {
+  let frame: string | undefined;
+  try {
+    frame = JSON.stringify(payload);
+  } catch (error) {
+    console.error('[Gateway] broadcastToAll could not serialise its payload', { error: error instanceof Error ? error.message : String(error) });
+    return;
+  }
+  if (frame === undefined) {
+    console.error('[Gateway] broadcastToAll was given a payload with no JSON form');
+    return;
+  }
+
+  for (const client of connectedClients) {
+    if (client.readyState !== WS_OPEN_STATE) {
+      continue;
+    }
+    // Per socket: one page whose send throws is skipped, and every other page still gets its frame.
+    try {
+      client.send(frame);
+    } catch (error) {
+      console.error('[Gateway] broadcastToAll could not write to one socket', { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+}
+
+/**
  * Whether any gateway socket of this account is open. Consumed by the companion's alert feed, which
  * has nothing to say to a page that is not there.
  */

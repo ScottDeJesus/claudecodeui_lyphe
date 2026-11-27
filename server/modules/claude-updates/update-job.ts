@@ -24,8 +24,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { ClaudeUpdateJob, ClaudeUpdatePackageKey, ClaudeUpdateStep, ClaudeUpdateStepKey } from '@/shared/claude-update-types.js';
 import { expandHome } from '@/shared/utils.js';
 
-const JOB_FILE = 'job.json';
-const LOG_FILE = 'job.log';
+import { announceUpdateFileWritten } from './update-written.js';
+
+export const JOB_FILE = 'job.json';
+export const LOG_FILE = 'job.log';
 
 /**
  * The two files an Agent SDK install rewrites, and the only paths this pipeline ever names to git.
@@ -89,6 +91,7 @@ export function writeJob(dir: string, job: ClaudeUpdateJob): void {
   const temp = `${target}.tmp-${process.pid}`;
   fs.writeFileSync(temp, JSON.stringify({ ...job, logTail: [] }, null, 2), { mode: 0o600 });
   fs.renameSync(temp, target);
+  announceUpdateFileWritten();
 }
 
 /**

@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
 import type { DeepseekBalance } from '@/shared/types';
-
-/**
- * How often the balance is re-read on its own. The usage cadence, deliberately: this is the same
- * kind of fact as the windows beside it — a figure the provider owns, that moves slowly, and that
- * a person wants fresh at the moment they open the panel rather than every minute.
- */
-const BALANCE_POLL_MS = 180_000;
 
 /**
  * How recently a read must have LANDED for the next one to be refused outright.
  *
- * The poll's cadence bounds the timer, but opening the panel is the other trigger — and the row is
- * a button a person presses while thinking, so ten open/close cycles used to spend ten vendor
+ * Opening the panel asks for a fresh figure, and the row is a button a person presses while thinking, so ten open/close cycles used to spend ten vendor
  * calls. Five seconds sits far below the time it takes to close a panel and reconsider, and far
  * above the vendor's own ~0.3 s answer, so every press that could show a different figure still
  * reads and only the ones that cannot are free. The age line under the figure is what makes that
@@ -25,6 +18,9 @@ const BALANCE_POLL_MS = 180_000;
  * answering nothing costs a press no more than a route that is answering everything.
  */
 const FORCED_READ_FLOOR_MS = 5_000;
+
+/** The frame each server reading of the account sends (MAN-453), carrying the route's own body. */
+const DEEPSEEK_BALANCE_FRAMES = ['deepseek_balance_state'] as const;
 
 /**
  * Whether a body is the report the route promises.
@@ -45,7 +41,7 @@ function isBalanceReport(body: unknown): body is DeepseekBalance {
  * The money left on this host's DeepSeek account.
  *
  * Used by the accounts module's AccountsProvider, which owns the ONE instance and hands the reading
- * to every home of the panel, so opening one starts no second poller.
+ * to every home of the panel, so opening one starts no second reader.
  *
  * It is a hook of its own rather than a third read inside `useClaudeUsage` because it is a
  * different account, a different server route and a different origin: the account lane is down
@@ -55,7 +51,7 @@ export function useDeepseekBalance() {
   // The last reading the server answered with. `null` (not asked yet) and `{reachable:false}`
   // (asked, and there was no reading) are different things to say, and neither of them is zero.
   const [data, setData] = useState<DeepseekBalance | null>(null);
-  // Mount flag: a poll that resolves after the provider unmounted (a sign-out, or the workspace leaving the tree) must not set state.
+  // Mount flag: a read that resolves after the provider unmounted (a sign-out, or the workspace leaving the tree) must not set state.
   const mountedRef = useRef(true);
   // The read already on the wire, if any. Toggling the panel is the ordinary way to use this row,
   // and every open asks for a fresh figure — without this, ten open/close cycles put ten requests
@@ -106,14 +102,22 @@ export function useDeepseekBalance() {
   useEffect(() => {
     mountedRef.current = true;
     void refresh();
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, BALANCE_POLL_MS);
     return () => {
       mountedRef.current = false;
-      window.clearInterval(timer);
     };
   }, [refresh]);
+
+  // Every later figure is the server's own reading, pushed as it lands. A reconnect missed some, so it
+  // reads once; a frame is a landed read, so it also holds the floor against a press right after it.
+  useServerFrame(DEEPSEEK_BALANCE_FRAMES, (event) => {
+    if (event.kind !== 'deepseek_balance_state') {
+      void refresh();
+      return;
+    }
+    if (!isBalanceReport(event)) return;
+    lastReadAtRef.current = Date.now();
+    if (mountedRef.current) setData(event);
+  });
 
   return { data, refresh };
 }

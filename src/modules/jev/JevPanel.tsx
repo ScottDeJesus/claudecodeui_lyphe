@@ -26,7 +26,7 @@ import { cn } from '@/shared/utils';
  *
  * FOUR NON-DENSE STATES, EACH ITS OWN FACT. Not asked yet is a spinner; a reader that could not be
  * asked is a plug-out with the reason and the way back; a ledger that has never been written is an
- * empty state over the controls — the switches are the answer to "why not" — and a poll that fails
+ * empty state over the controls — the switches are the answer to "why not" — and a read that fails
  * after a good read keeps the last summary under a warn line rather than blanking the screen.
  */
 export function JevPanel() {
@@ -92,7 +92,7 @@ export function JevPanel() {
       ) : (
         <ScrollArea className="min-h-0 flex-1">
           <div className={cn(SCREEN_FRAME, 'flex min-w-0 flex-col gap-8 py-5')} data-jev-body>
-            {/* A poll that failed after a good read: said over the last summary, in the frame with it. */}
+            {/* A read that failed after a good one: said over the last summary, in the frame with it. */}
             {error && <Banner tone="warn">{error}</Banner>}
             {!data.ledger.present ? (
               <EmptyState

@@ -1632,6 +1632,13 @@ export type CerberusReadInputs = {
   links: Map<string, CerberusLinkState>;
   gateway: CerberusGatewayState;
   memory: (node: string, key: string) => CerberusCheckMemory;
+  /**
+   * Told every instant after `now` at which a status, a link or a cell's kind this read decided turns with
+   * nothing written: a fresh row going stale, a mute beginning or running out, a node falling silent, a pause
+   * beginning or ending. Only a tab's read passes it (`GET /overview`, `GET /checks/:node/:service/:id`), which
+   * hands the earliest to `armFlipDeadline`; every other reader leaves it out.
+   */
+  flipsAt?: (at: number) => void;
 };
 
 /**

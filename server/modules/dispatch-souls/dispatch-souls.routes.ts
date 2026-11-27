@@ -48,6 +48,11 @@ export type DispatchSoulsRouterDependencies = {
 /** A launch id as the launcher writes it: a plain name, never a way out of the state directory. */
 const LAUNCH_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+/** A launch id the launcher writes: the pattern, and never a `..` that walks out of the launch root. */
+export function isLaunchId(launchId: string): boolean {
+  return LAUNCH_ID_PATTERN.test(launchId) && !launchId.includes('..');
+}
+
 /**
  * The launch ids the pacer's door takes (`state.SAFE_ID_RE`: no dot — it names a file in the pacer's own folder), and none that starts
  * with a dash: the launcher mints `dispatch-<agent>-…`, and an id led by `-` would be read by the door's argument parser as an option
@@ -80,7 +85,7 @@ export function createDispatchSoulsRouter(dependencies: DispatchSoulsRouterDepen
 
   router.get('/launches/:launchId/transcript', async (request, response) => {
     const launchId = request.params.launchId;
-    if (!LAUNCH_ID_PATTERN.test(launchId) || launchId.includes('..')) {
+    if (!isLaunchId(launchId)) {
       response.status(400).json({ error: 'Invalid launchId.' });
       return;
     }

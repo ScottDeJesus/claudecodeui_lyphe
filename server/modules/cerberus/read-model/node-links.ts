@@ -45,7 +45,8 @@ export function resolveNodeLink(
   row: CerberusNodeRow,
   state: CerberusLinkState | undefined,
   now: number,
-  pauses: CerberusPauseWindow[]
+  pauses: CerberusPauseWindow[],
+  flipsAt?: (at: number) => void
 ): ResolvedNodeLink {
   const lastHeardAt = state?.lastHeardAt ?? row.last_heartbeat_at;
 
@@ -54,6 +55,8 @@ export function resolveNodeLink(
     silentSince = lastHeardAt + SILENT_AFTER_MS;
   }
   if (silentSince !== null && silentSince > now) silentSince = null;
+
+  if (flipsAt) reportLinkFlips(lastHeardAt, state?.silentSince ?? null, now, pauses, flipsAt);
 
   // The silence moves out of a pause first, and only then is judged against now.
   const settled = buildNodeOverlay(silentSince, pauses);
@@ -70,6 +73,28 @@ export function resolveNodeLink(
 }
 
 /**
+ * Tells `flipsAt` each instant after `now` at which this node's link turns with nothing written: the live
+ * silence still ahead, the moment a node not heard from goes silent (one past 90 s after it was last heard),
+ * and a pause beginning or ending.
+ */
+function reportLinkFlips(
+  lastHeardAt: number | null,
+  liveSilentSince: number | null,
+  now: number,
+  pauses: CerberusPauseWindow[],
+  flipsAt: (at: number) => void
+): void {
+  if (liveSilentSince !== null && liveSilentSince > now) flipsAt(liveSilentSince);
+  if (liveSilentSince === null && lastHeardAt !== null && now - lastHeardAt <= SILENT_AFTER_MS) {
+    flipsAt(lastHeardAt + SILENT_AFTER_MS + 1);
+  }
+  for (const pause of pauses) {
+    if (pause.from > now) flipsAt(pause.from);
+    if (pause.to > now) flipsAt(pause.to);
+  }
+}
+
+/**
  * What to lay over one node's checks as of `inputs.now`, with the pauses read from `from` on: `from`
  * is the earliest moment the caller draws. The hub and a node with no row get nothing — the hub is
  * never silent or paused.
@@ -82,5 +107,5 @@ export function nodeOverlayOf(node: string, inputs: CerberusReadInputs, from: nu
   const row = cerberusNodesDb.get(node);
   if (row === null) return NO_OVERLAY;
   const { now } = inputs;
-  return resolveNodeLink(row, inputs.links.get(node), now, pauseWindows(node, from, now + 1)).overlay;
+  return resolveNodeLink(row, inputs.links.get(node), now, pauseWindows(node, from, now + 1), inputs.flipsAt).overlay;
 }

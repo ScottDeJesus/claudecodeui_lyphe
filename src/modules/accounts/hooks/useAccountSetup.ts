@@ -21,7 +21,7 @@ export function useAccountSetup() {
     setSetup(null);
     // The window just ran the door's save-and-check for that account, so the picture it drew when it
     // opened is stale — a token may now be saved, checking, or refused. The provider owns the app's ONE
-    // account poller, and this tells it to read now rather than at its next minute tick.
+    // account reader, and this tells it to read now.
     announceAccountsChanged();
   }, []);
 

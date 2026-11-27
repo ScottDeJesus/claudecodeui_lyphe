@@ -3,6 +3,7 @@ import type { QueuedSessionMessageRecord, ScheduledMessageRow } from '@/modules/
 import { announceScheduledMessagesChanged } from '@/modules/scheduled-messages/services/scheduled-messages.service.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
+import { tellDraftsChanged } from '@/modules/user/index.js';
 import { readQueuedChatMessage } from '@/shared/utils.js';
 
 /**
@@ -49,6 +50,7 @@ async function sendClaimedQueuedMessage(
   const message = readQueuedChatMessage(candidate.queuedMessage);
   if (!message) {
     sessionDraftsDb.deleteEmptyDraft(candidate.userId, candidate.sessionId);
+    tellDraftsChanged();
     return;
   }
 
@@ -74,6 +76,7 @@ async function sendClaimedQueuedMessage(
       error: result.error,
     });
     sessionDraftsDb.restoreQueuedMessage(candidate);
+    tellDraftsChanged();
     return;
   }
   if (result.error) {
@@ -85,6 +88,7 @@ async function sendClaimedQueuedMessage(
     });
   }
   sessionDraftsDb.deleteEmptyDraft(candidate.userId, candidate.sessionId);
+  tellDraftsChanged();
 }
 
 /** Sends every persisted queued turn whose session is currently idle. */
@@ -99,6 +103,7 @@ export async function dispatchQueuedMessages(runtime: ProviderRuntimeGateway): P
     if (!sessionDraftsDb.claimQueuedMessage(candidate)) {
       continue;
     }
+    tellDraftsChanged();
     claimed += 1;
     // Not awaited: the send resolves only when its whole turn ends, and a pass held open that long
     // kept every other session's queued turn (and every due scheduled message) waiting behind it.

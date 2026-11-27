@@ -175,7 +175,12 @@ boot failed — no previous server: <first error line>
 boot timed out after 30 s — <previous server kept|no previous server>
 reboot failed — told pid <n>                     the requester keeps serving
 change during boot — restarting boot
-server pid <n> exited (<code|signal>) — waiting for the next change
+server pid <n> exited (<code|signal>): heal <k> of 3, booting it again
+server pid <n> exited (<code|signal>): it died 3 times on this code, waiting for the next change
+server pid <n> exited (<code|signal>): a boot is already on its way   (a released save, or a boot already booting or queued)
+heal <k> of 3, booting again in 5 s
+it died 3 times on this code, waiting for the next change
+server pid <n> silent for 45 s, killing it
 boot aborted: <message>                          never expected: see below
 stopping (<signal>)
 ```
@@ -220,6 +225,10 @@ answer). Everything the children themselves write is relayed untouched.
 | `BOOT_TIMEOUT_MS` | 30 000 | `child.mjs` | a healthy boot is ~1-4 s here; this only has to outlast the slowest honest one |
 | `STOP_TIMEOUT_MS` | 75 000 | `child.mjs` | SIGTERM, then SIGKILL, for a SERVING child. Most of it is Kaylee's: the child lets her turn in flight finish before it exits (`COMPANION_TURN_BOUND_MS` 60 s, then her CLI's 5 s grace; `server/index.ts`), and the rest of its shutdown runs beside that wait. Inside systemd's 90 s stop window. With no turn in flight the exit takes 1-2 s. **Read once, at unit start**: a change here is live after `sudo systemctl restart cloudcli-server-dev` |
 | `BOOT_STOP_TIMEOUT_MS` | 10 000 | `child.mjs` | the same for a child that never became ready (a failed or superseded boot): it holds no conversation, so a boot that ignores SIGTERM still goes quickly |
+| `MAX_HEALS` | 3 | `heal.mjs` | boots of a dead, failed or silent child in a row with no stable server between them; then it waits for the next change |
+| `STABLE_MS` | 60 000 | `heal.mjs` | a server that served this long clears the heal count |
+| `RETRY_DELAY_MS` | 5 000 | `heal.mjs` | before a boot that failed with nothing serving is tried again |
+| `SILENCE_MS` | 45 000 | `heal.mjs` | three of the child's 15 s beats (`BEAT_INTERVAL_MS`, `server/supervised-boot.ts`) missed |
 
 Each lives in the module that consumes it, because `watchServerDir(dir, onChange)` and
 `spawnServer({ repo, handover })` take no tuning arguments. One line each to change. The child's 3 s
@@ -236,8 +245,9 @@ settle before it tells `quiet` (`QUIET_SETTLE_MS`) is the only other number in t
 | **Held more than 30 minutes** | chat runs stop counting (`held 30 min — chat runs no longer hold the restart` if anything else still holds); the save goes as soon as Kaylee's turn, his press, her voice and the tail are all clear |
 | **A child that never reports** (an older build, or one that crashed before its first report) | counts as quiet: the save restarts it at once, which is how every save behaved before the hold |
 | **Boot timeout** | after 30 s the pending child is stopped and the old one kept; `boot timed out after 30 s` |
-| **Crash after READY** | one line, then the supervisor waits for the next change. It never auto-restarts — a server that crashes on this code crashes again on it, and a crash loop is what the watchdog's three-heal rule exists to catch |
-| **First boot fails** (nothing serving) | `boot failed — no previous server: …`. The supervisor stays alive, so `Restart=always` does not turn a broken edit into a 5-second crash loop. Nothing is listening, so the API canary fails and `/usr/local/bin/cloudcli-dev-watchdog.sh` heals the unit on its own 60 s timer — that script is never edited by this package |
+| **Crash after READY** (the serving child exits on its own) | a held save goes first, as ever. Otherwise the supervisor boots it again at once: `server pid <n> exited (<reason>): heal <k> of 3, booting it again`, then `serving pid <new>`. Three heals in a row with no server lasting 60 s between them is a crash loop on this code: `server pid <n> exited (<reason>): it died 3 times on this code, waiting for the next change`. A settled save clears the count |
+| **First boot fails** (nothing serving: a failed boot, or one that timed out) | `boot failed — no previous server: …` (or `boot timed out after 30 s — no previous server`), then `heal <k> of 3, booting again in 5 s` and one boot 5 s later; a save before then cancels the retry and boots instead. The same three heals as a crash: when they are spent, `it died 3 times on this code, waiting for the next change`. The supervisor stays alive throughout, so `Restart=always` only ever restarts the supervisor itself (5 s, backing off to 60 s) and the unit never latches failed |
+| **Hung child** (the serving child stops answering: a wedged event loop, a SIGSTOP) | from READY on a child sends `{ type: 'alive' }` every 15 s; 45 s with no message from a child that has beaten (three beats missed) is `server pid <n> silent for 45 s, killing it`, a SIGKILL to that child's own handle, and its exit takes the crash row above, its 45 s of silence not counted as time served. A child that never beats (an older build) is never judged |
 | **Predecessor crashes mid-boot** | its exit line prints, then the booting child — which deferred its duties on the word it was given at spawn — is released the moment it is READY (`handover complete — serving pid <n>`, then `[keepalive] taking over`). Measured against a stand-in: without that release the API serves with its keepalive hosts unadopted for good |
 | **Requested reboot** (a serving child asking for its own handover: the update pipeline's restart, and his **Restart server** press) | never held. The cycle exactly: boot beside, READY, retire the requester, `handover complete — serving pid <new>`. Honoured only while the requester is still the `serving` child, so an answer can never land on a child that has already been replaced. With a save held, the cycle runs anyway and its boot carries the held save (`this boot carries the <n> held saves`): one restart, not two |
 | **Requested reboot that fails to boot** | the requester is still serving, so it is told: `reboot-failed` carrying the boot's first error line (or `boot timed out after 30 s`), and the journal says `reboot failed — told pid <n>`. Nothing was retired and `:3011` keeps its server. What the requester does with that answer is its own affair — the update pipeline rolls the Agent SDK back from its `restarting` state; nothing in this package rolls anything back |
@@ -316,8 +326,7 @@ Prove a handover: `bash .verify/handover/smoke.sh` → `HANDOVER old=<pid> new=<
 ## See also
 
 - [docs/MANUAL.md (hosting)](../../docs/MANUAL.md) §"Rules that bite" — the one rule this puts on a person
-  editing `server/`, and §"What runs" for the unit's place among the dev services and the watchdog
-  that heals a first boot this package deliberately does not retry.
+  editing `server/`, and §"What runs" for the unit's place among the dev services.
 - [docs/MANUAL.md (verification)](../../docs/MANUAL.md) §"The handover cases" — the five cases that
   drive every row of the failure table above against the live unit, what each one edits, and the
   seam probe that reaches the modes a working supervisor never produces.

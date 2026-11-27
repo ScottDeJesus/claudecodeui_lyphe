@@ -17,6 +17,8 @@ import path from 'node:path';
 
 import type { ClaudeUpdateNote } from '@/shared/claude-update-types.js';
 
+import { announceUpdateFileWritten } from './update-written.js';
+
 const CHECK_FILE = 'check.json';
 
 /** What one package's last good check left behind: the version npm named, and the notes beside it. */
@@ -172,4 +174,5 @@ export function writeStoredCheck(dir: string, check: StoredCheck): void {
   const temp = `${target}.tmp-${process.pid}`;
   fs.writeFileSync(temp, JSON.stringify(check, null, 2), { mode: 0o600 });
   fs.renameSync(temp, target);
+  announceUpdateFileWritten();
 }

@@ -175,6 +175,9 @@ export type ReleaseInfo = {
   publishedAt: string;
 };
 
+/** GET /api/app-release's body, also carried by the app_release_state frame: GitHub's tag verbatim (`v1.2.3`) and the release; both null when none is published. Read by useVersionCheck. */
+export type AppReleaseReading = { tag: string | null; release: ReleaseInfo | null };
+
 /** How this CloudCLI install was obtained; decides whether the UI offers a self-update action. */
 export type InstallMode = 'git' | 'npm';
 
@@ -267,6 +270,47 @@ export type ServerEvent = {
   seq?: number;
   [key: string]: unknown;
 };
+
+/**
+ * The hint kinds: frames of `{ kind, at }` only, naming nothing, so a hook that hears one reads its
+ * own route again (through `useServerFrame`). None carries `seq` or `sessionId`.
+ */
+export type ServerHintKind =
+  /** The memory-intake queue changed: read the candidates again. */
+  | 'memory_changed'
+  /** The Claude accounts store changed: read the accounts again. */
+  | 'accounts_changed'
+  /** A queued draft moved: hydrate the composer's draft card again. */
+  | 'drafts_changed'
+  /** The Claude update job or check was written: read the update state again. */
+  | 'claude_updates_changed'
+  /** The installed CLI version, or the runs on an older one, moved: read the version report again. */
+  | 'cli_version_changed'
+  /** The heal ledger committed: read the heal summary again. */
+  | 'heal_changed'
+  /** The Jev ledger was appended to: read the Jev summary again. */
+  | 'jev_changed'
+  /** A DeepSeek-counted transcript was written: read the DeepSeek usage again. */
+  | 'deepseek_usage_changed'
+  /** A watched subagent transcript moved; carries `key` and reaches only the sockets watching it. */
+  | 'subagent_transcript_changed';
+
+/**
+ * The state kinds: `{ kind, at }` plus the whole body the named route answers, so a hook sets its
+ * state from the frame instead of reading the route. None carries `seq` or `sessionId`.
+ */
+export type ServerStateKind =
+  /** GET /api/providers/sessions/running's answer. */
+  | 'running_sessions_state'
+  /** The Claude usage window, under `usage`. */
+  | 'accounts_usage_state'
+  /** GET /api/deepseek/balance's answer for one server reading. */
+  | 'deepseek_balance_state'
+  /** GET /api/app-release's answer. */
+  | 'app_release_state';
+
+/** One hint frame as it arrives. `key` is present only on `subagent_transcript_changed`. */
+export type ServerHintFrame = { kind: ServerHintKind; at: number; key?: string };
 
 
 // ---------------------------

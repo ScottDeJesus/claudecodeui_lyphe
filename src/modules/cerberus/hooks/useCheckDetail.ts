@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useMinute } from '@/modules/cerberus/hooks/useMinute';
+import { quietWordOf, rewindowCells } from '@/modules/cerberus/utils/rewindowCells';
 import { api } from '@/shared/api';
 import type { CerberusCheckDetail } from '@/shared/cerberus-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-
-/** How often an open check is read again with no frame: the "Checked 17:52:10" and the cells age by themselves. */
-const CLOCK_READ_MS = 30_000;
 
 /**
  * Why a read of a check did not answer. `gone` is a 404 — the check is not an active one any more
@@ -43,9 +42,10 @@ function frameNamesCheck(event: { kind?: string; checks?: unknown }, checkPath: 
  * lands, so typing a time never blanks the sheet.
  *
  * Re-read on a `cerberus_changed` frame that names THIS check (a mute, a label or a stored result
- * moved it), on a reconnect, and every 30 s while mounted — the cells slide and "Checked …" ages
- * with no event at all. Subscribed BEFORE the first read, as the providers are, so a frame landing
- * between the two starts its own read.
+ * moved it, or time alone turned it: center hints that instant too) and on a reconnect. The live
+ * strip (no `end`) is moved on the minute from the answer held (`rewindowCells`), with nothing read.
+ * Subscribed BEFORE the first read, as the providers are, so a frame landing between the two starts
+ * its own read.
  *
  * `detail` is `null` until a read for THIS check has answered: an answer for another check is never
  * shown, so switching rows in the sheet never flashes the old row's cells. `loading` is that same
@@ -157,16 +157,20 @@ export function useCheckDetail({ node, service, id, lookupAt, end }: {
       if (frameNamesCheck(event, checkPath) || event.kind === 'websocket_reconnected') void refresh();
     });
     void refresh();
-    const clock = window.setInterval(() => void refresh(), CLOCK_READ_MS);
     return () => {
       mountedRef.current = false;
       unsubscribe();
-      window.clearInterval(clock);
     };
   }, [refresh, subscribe, checkPath, readKey]);
 
   // An answer is for the check whose node and key it carries; any other is the row just left.
-  const detail = answer !== null && answer.check.node === node && answer.check.key === `${service}/${id}` ? answer : null;
+  const held = answer !== null && answer.check.node === node && answer.check.key === `${service}/${id}` ? answer : null;
+  // The live strip moves on the minute from the answer held; a strip standing at an asked `end` stays where it stands.
+  const minute = useMinute();
+  const detail = useMemo(
+    () => (held === null || end !== undefined ? held : { ...held, cells: rewindowCells(held.cells, minute, { status: quietWordOf(held.check, minute), worst: null }) }),
+    [held, end, minute]
+  );
   const error = failure !== null && failure.checkPath === checkPath ? failure.kind : null;
 
   return { detail, loading: node !== '' && detail === null && error === null, error, refresh };

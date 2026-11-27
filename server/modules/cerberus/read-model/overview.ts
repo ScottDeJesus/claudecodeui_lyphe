@@ -177,7 +177,7 @@ export function buildOverview(inputs: CerberusReadInputs): CerberusOverview {
     const state = inputs.links.get(row.id);
     // The restarts that touch the strip being drawn; a node is never silent inside one.
     const pauses = pauseWindows(row.id, stripStart(now, OVERVIEW_CELLS), now + 1);
-    const link = resolveNodeLink(row, state, now, pauses);
+    const link = resolveNodeLink(row, state, now, pauses, inputs.flipsAt);
     const reading = readNode(row.id, link.overlay, inputs);
     lastResultAt = later(lastResultAt, reading.newestResultAt);
     nodes.push({

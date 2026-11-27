@@ -13,8 +13,7 @@ import type {
   FetchHistoryOptions,
   FetchHistoryResult,
   LLMProvider,
-  NormalizedMessage,
-} from '@/shared/types.js';
+  NormalizedMessage, RunningSessionListItem } from '@/shared/types.js';
 import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 import { AppError, sliceTailPage } from '@/shared/utils.js';
 
@@ -57,25 +56,6 @@ type RecentSessionsPage = {
   hasMore: boolean;
 };
 
-/**
- * One in-flight run, as the sidebar's Running list needs it: the registry's
- * status fields plus the project the session belongs to, so the list never
- * depends on which sessions a client has paged in.
- */
-export type RunningSessionListItem = {
-  sessionId: string;
-  provider: LLMProvider;
-  startedAt: number;
-  lastSeq: number;
-  cliVersion: string | null;
-  projectId: string | null;
-  projectPath: string | null;
-  projectDisplayName: string;
-  sessionTitle: string;
-  lastActivity: string | null;
-  /** A question or permission prompt in this run is waiting on the user. */
-  awaitingInput: boolean;
-};
 
 type SessionDetails = {
   /** Canonical app-facing session id (may differ from the looked-up id when a provider-native id was given). */

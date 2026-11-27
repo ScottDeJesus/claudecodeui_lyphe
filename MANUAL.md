@@ -59,6 +59,11 @@ job is picked up only once a server is serving. The reboot channel is `supervise
 | `update-check.report.ts` | the report's composition: `installed`/`loaded`/`latest` never inferred from one another; `updateAvailable` and `notesReason` decided here |
 | `update-check.service.ts` | the cadence (a tick every 5 min, a check every 30 min, first tick 5 s after `start()`), `checkNow()` (joins an in-flight check, never rejects), the one journal line per check |
 
+**The senders of `claude_updates_changed`** (MAN-453; paced, at most one per 250 ms; armed by `startUpdatesHint` in `claude-updates.module.ts`):
+- `update-written.ts` is the one seam: `writeJob` (`update-job.ts`), `writeStoredCheck` (`update-check.store.ts`) and the auto-install switch's `setEnabled` call `announceUpdateFileWritten()` after their write; the module registers the hint through `onUpdateFileWritten`.
+- The detached runner has no sockets: the module watches `job.json` and `job.log` in the updates directory (`RUNNER_FILES`, `createFileLane`) and tells the same hint.
+- `chatRunRegistry.onRunChanged` tells it when `states` is true: `autoInstall.waiting` moves with Claude activity, no file write.
+
 **Rules:**
 - A failed registry read keeps the last-good `latest` and stores the failure in `latestError` (per
   package) / `checkError` and the journal line (per attempt) — a lost read is never a lost `check.json`.
@@ -197,7 +202,7 @@ each:
 **`POST /apply`** (body `{ targets: { cli?, sdk? } }`): 400 `bad-request` when the body carries no
 `targets` object; else `applyUpdate(targets)` — a refusal answers its own `status`/`refusal`
 (400 or 409), a success re-reads and answers the full report at 202 (a job has started, not
-finished — the tab polls this route from here on). **`POST /restart`**: `restartServer()`; a
+finished — every tab re-reads the report on `claude_updates_changed` from here on). **`POST /restart`**: `restartServer()`; a
 refusal is 409 with `{error, message}`; success is 202 `{ requested: true }` — the process about
 to be replaced cannot honestly say more than that.
 
@@ -297,7 +302,7 @@ group — `GET /api/claude-updates`, `POST /api/claude-updates/{check,apply,rest
 | file | owns |
 |---|---|
 | `index.ts` | the module's whole export surface: `ClaudeUpdatesSettingsTab`, `ClaudeUpdateFooterRow` |
-| `hooks/useClaudeUpdates.ts` | the client contract: `{ report, refresh, check, apply, restart, setAutoInstall }`; `isUpdateJobActive(job)` — true on `installing`/`installed`/`restarting`/`rolling-back`; `canPressRestart(job)` — true with no active job, or a job in `restarting` whose `restart` step is `pending`; and the one module-scope report with its poller |
+| `hooks/useClaudeUpdates.ts` | the client contract: `{ report, refresh, check, apply, restart, setAutoInstall }`; `isUpdateJobActive(job)` — true on `installing`/`installed`/`restarting`/`rolling-back`; `canPressRestart(job)` — true with no active job, or a job in `restarting` whose `restart` step is `pending`; and the one module-scope report with its shared reader |
 | `ClaudeUpdatesSettingsTab.tsx` | Settings → Updates: title (drawn even before the first report, with the one Try again press), clock line + Check now, `AutoInstallRow` (left out when `report.autoInstall` is absent), one `PackageUpdateCard` per package, the actions row, `UpdateJobPanel`, the last press's refusal |
 | `AutoInstallRow.tsx` | the automatic-install switch + its `Not installed yet — <waiting>` status line (MAN-7516); composes `SettingRow` + the library `Switch`, not `SettingsToggle` (the settings module already imports this tab) |
 | `PackageUpdateCard.tsx` | one package: state line, `reason`, SDK `loaded` line, CLI mid-turn plural line, Roll back |
@@ -306,9 +311,10 @@ group — `GET /api/claude-updates`, `POST /api/claude-updates/{check,apply,rest
 | `ClaudeUpdateFooterRow.tsx` | `ClaudeUpdateFooterRow`, the one form of the update mark: the sidebar footer row, off its `useUpdatesFooterLine` hook. The views rail draws no update mark; the row is in the list column, so it returns with the list |
 | `updateWording.ts` | `UPDATE_STEP_LABELS`, `JOB_STATE_SENTENCES` — one place, because both the job panel and the footer row draw them |
 
-**One report, one poller.** Every surface subscribes to the single module-scope slot; the read's
-cadence follows the report's own `job` — 60 s idle, 1.5 s while `isUpdateJobActive(job)`, the timer
-re-armed when that changes — and nothing is published until the body changes, so a poll answering
+**One report, one reader.** Every surface subscribes to the single module-scope slot; the first
+mount reads, and every mounted consumer reads again on `claude_updates_changed` (MAN-453) and on a
+reconnect. A frame heard while a read is out runs one more read when it lands, so a write that lands
+mid-read is not missed. Nothing is published until the body changes, so a read answering
 the same bytes moves no renderer. A failed read keeps the last picture. Each action posts and then
 forces a read, resolving `{ ok: true }` or `{ ok: false, message }` — the refusal's own sentence
 (`ClaudeUpdateRefusal`, 400/409) drawn under the buttons that asked; `refresh()` is that forced read
@@ -746,6 +752,8 @@ Every unit above has `hostWindow` in the dependency list of each effect that bin
 
 - Both exit 1 with the failed checks listed; neither sends a model turn or writes app data.
 - Sibling probes touched by the same change: `.verify/lightbox-zoom.mjs`, `.verify/export-menu-layer.mjs` (MAN-7426, INV-4356).
+
+**Canvas loops rest.** This holds for the kit's Hoop and the roadmap stack, and for any new canvas loop. A canvas that animates without stopping never asks for a frame at every vsync while nothing moves it: at rest its next frame is asked of a timer `CANVAS_REST_FRAME_MS` (100 ms, src/shared/constants.ts) on, so the page produces about ten frames a second. A loop that asks for every frame, even one it then leaves undrawn, makes the browser run its whole frame for the page at each vsync; on a phone profile (4x CPU) such loops held the home 98% busy (measured 2026-11-26). The kit's painters go through `paceCanvasPainter` (src/shared/utils.ts): every display frame for `PAINT_AWAKE_MS` (2.5 s) after any painter method but `frame` and the reads the caller names, the timer otherwise, a wake during the wait asking for a frame at once.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCoalescedCall.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeviceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useEventFeed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Dialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
 
@@ -7722,7 +7730,7 @@ A refusal stores nothing.
 | Delete, server held more than the card | error line carries the full deleted text |
 | session switch during a clear | the text goes to the origin session's draft (`writeDraftText`); the open card and composer are left alone |
 | session switch during a send (upload, session allocation) | `submitMessage` empties the composer and draft only while the sending chat is open: `draftScopeRef.current` is its `submitScope` or its new session id (a new chat's scope moves from `project:<id>` to that id). Switched away: the open chat's text, draft and edit are left alone; the sending chat's draft is emptied only if it still holds the sent text; only this send's edit anchor is cleared |
-| card refresh | `hydrateChatDrafts` every 5 s and on `visibilitychange` to visible |
+| card refresh | `hydrateChatDrafts` on each `drafts_changed` (told after append, clear, claim, restore and delete; `useDraftsChangedFrame`), on a reconnect and on `visibilitychange` to visible |
 - Those two error lines are English literals; only `input.queue.*` keys are translated (en, es, ko, zh-CN).
 - The files waiting in the composer (the intake, the sentence naming a file it did not take, the upload at send) are `useAttachmentIntake`'s and `uploadAttachmentFiles`', in `src/shared` (MAN-9406); this hook hands the intake its `setAttachedFiles`, empties the sentence in a layout effect when `draftScope` changes, and again when a send goes ahead.
 
@@ -7760,7 +7768,11 @@ Rim arithmetic: MAN-9223 §"Layers". The head's variables: MAN-9434. Proof: MAN-
 | layer | `translate: 0 var(--kaylee-bob, 0%)` and `rotate: var(--kaylee-roll, 0deg)` (the portrait writes both variables); `will-change: transform, translate, rotate`; her lean stays the layer's `transform: rotate(var(--kaylee-tilt, 0deg))` |
 | clips' lifts | `kaylee-laugh`, `kaylee-giggle`, `kaylee-gasp`: layer `translate` from the bob to −1.5% of its height; `kaylee-sigh`, `kaylee-nod`: from the bob to +2%. Every rest stop is `var(--kaylee-bob, 0%)` (0% with none), every lift stop absolute: the layer never steps at a clip's edge and a laugh is not doubled (MAN-9434) |
 
-### Marks — `data-state` on the svg
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
+
+## MAN-10293 — src/modules/companion CompanionAvatar — Kaylee's face: props, the layers, the — Marks — `data-state` on the svg
+section: src/modules/companion CompanionAvatar — Kaylee's face: props, the layers, the marks, ring numbers, accessible name, fixture/001 Marks — `data-state` on the svg
+
 | state | mark on | portrait's face under reduced motion |
 |---|---|---|
 | `idle`, `asleep`, `loading` | none | `mood.neutral.closed` (with motion: blinks and glances) |
@@ -7792,7 +7804,11 @@ Rim arithmetic: MAN-9223 §"Layers". The head's variables: MAN-9434. Proof: MAN-
 - A button around her may replace it with its own label.
 - `FILES_NAMED` and `baseName` live in `utils/presenceWords.ts`; `CompanionStatus.tsx` imports them.
 
-### Proof — `.verify/kaylee-avatar-states.mjs`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
+
+## MAN-10294 — src/modules/companion CompanionAvatar — Kaylee's face: props, the layers, the — Proof — `.verify/kaylee-avatar-states.mjs`
+section: src/modules/companion CompanionAvatar — Kaylee's face: props, the layers, the marks, ring numbers, accessible name, fixture/002 Proof — `.verify/kaylee-avatar-states.mjs`
+
 - `node .verify/kaylee-avatar-states.mjs` (live page on :5183). Mounts the app's own `CompanionAvatar` on fixture props with the face id read from `GET /api/companion` (throws if none): 18 cells (the 14 states; speaking at levels 0.02 / 0.08 / 0.4 on "ah", and 0.4 on "ee" and "oo") at 28 and 115 px = 36 faces, each in a round disc on `--card`; light and dark; once with full motion, once with `prefers-reduced-motion: reduce` emulated on the same page. Every cell prints its `data-frame` (and `over=` during a crossfade). PASS/FAIL per line, exit 1 on any FAIL.
 | check | reads |
 |---|---|
@@ -7808,6 +7824,8 @@ Rim arithmetic: MAN-9223 §"Layers". The head's variables: MAN-9434. Proof: MAN-
 | errors | nothing logged |
 - Shots: `.verify/shots/kaylee-avatar-{motion,reduced}-{light,dark}.png`.
 - 2026-11-01, the 158-frame face: 38 PASS, 0 FAIL, light and dark; `once`: 4 requests (the manifest and the 256 px tier's `sheet-256-0.webp`, `-1` and `-2`).
+
+**Canvas loops rest.** Kaylee's face draws every display frame while she works, speaks or listens, and on the timer while her state is idle or asleep or the face is off screen (`CompanionAvatar`). A canvas that animates without stopping never asks for a frame at every vsync while nothing moves it: at rest its next frame is asked of a timer `CANVAS_REST_FRAME_MS` (100 ms, src/shared/constants.ts) on, so the page produces about ten frames a second. A loop that asks for every frame, even one it then leaves undrawn, makes the browser run its whole frame for the page at each vsync; on a phone profile (4x CPU) such loops held the home 98% busy (measured 2026-11-26). The kit's painters go through `paceCanvasPainter` (src/shared/utils.ts): every display frame for `PAINT_AWAKE_MS` (2.5 s) after any painter method but `frame` and the reads the caller names, the timer otherwise, a wake during the wait asking for a frame at once.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
 
@@ -15939,7 +15957,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ChatCo
 
 ## MAN-9880 — server/modules/heal — the heal lane at /api/heal: the routes, the worker command behind each, the faults and bounds, and GET /sessions
 
-`createHealModule()` (`heal.module.ts`) returns `{ router, service }`; `server/index.ts` mounts the router at `/api/heal` behind `authenticateToken`. `heal.routes.ts` validates and translates; `heal.service.ts` owns the one transport: `execFile` of the worker `HEAL_REFLEX_BIN` (default `~/.claude/scripts/heal-reflex`, `~` expanded), `cwd` the home, `env` `userFacingEnv()`, the argv an array, so a value never becomes a shell string. This server opens no ledger and writes no row. `service` is also handed to the companion's house, narrowed to `summary` and `kind` (MAN-9142).
+`createHealModule()` (`heal.module.ts`) returns `{ router, service }`; `server/index.ts` mounts the router at `/api/heal` behind `authenticateToken`. `heal.routes.ts` validates and translates; `heal.service.ts` owns the one transport: `execFile` of the worker `HEAL_REFLEX_BIN` (default `~/.claude/scripts/heal-reflex`, `~` expanded), `cwd` the home, `env` `userFacingEnv()`, the argv an array, so a value never becomes a shell string. This server opens no ledger and writes no row. The module reads `HEAL_LEDGER_PATH` and watches `friction.db` and `friction.db-wal` (change events only); a paced hint sends `heal_changed` to every tab through `broadcastToAll`, at most one per 60 s (kinds: MAN-453). The client's `HealContext` re-reads `/summary` on that frame and on reconnect; nothing polls. `service` is also handed to the companion's house, narrowed to `summary` and `kind` (MAN-9142).
 
 ## routes
 | route | fence | runs | ceiling |
@@ -17245,3 +17263,32 @@ State: live. `RndReadingsSection` reads `GET /api/analytics/rnd` once through `u
 Words: `analytics.sections.rnd`, `analytics.rnd.*` in `en/common.json`. Strip options are 44 px wide at touch (`src/shared/ui/verve/data.css`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/analytics/sections/rnd.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/rnd/RndFeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/rnd/rndReadingFigures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/sections/rnd/RndReadingsSection.tsx
+
+## MAN-10292 — server/modules/app-release — the newest release read once per host, GET /api/app-release and app_release_state
+
+The app's update notice reads the newest release from the server, never from the browser. `server/modules/app-release/`.
+
+## Parts
+| File | Does |
+| --- | --- |
+| `app-release.service.ts` | `readLatestRelease(repo)`: GET `https://api.github.com/repos/<repo>/releases/latest`, 10 s timeout. 404 → `{ tag: null, release: null }`. Other non-2xx, a non-object body or a timeout throws |
+| `app-release.module.ts` | `createAppReleaseModule()`: a `createPolledLane` over the read, `GET /`, the retry timer. Mounted at `/api/app-release` behind `authenticateToken` in `server/index.ts` |
+| `index.ts` | barrel |
+
+## Contract
+| Fact | Value |
+| --- | --- |
+| Route | `GET /api/app-release` → `AppReleaseReading` (`server/shared/types.ts`, mirrored in `src/shared/types.ts`): `{ tag, release: { title, body, htmlUrl, publishedAt } }`; both null when no release is published |
+| 503 | no reading landed within 5 s (`FIRST_READ_WAIT_MS`) of the request |
+| Frame | `app_release_state` (`ServerStateKind`), sent through `broadcastToAll` when the reading changes |
+| Repo | env `APP_RELEASE_REPO`, default `siteboon/claudecodeui`; read only in `createAppReleaseModule`; a value that is not `owner/name` throws at boot |
+| Interval | `RELEASE_POLL_MS` 21 600 000 (6 h), paces successful reads only |
+| Retry | a failed read arms one timer: 30 s, doubling per failure to 30 min, reset by a success; the timer calls `lane.poke()` |
+| Client | `api.appRelease`; `useVersionCheck()` (no arguments) reads the route once, then takes each `app_release_state` frame; a reconnect reads again. No `src` code names `api.github.com` |
+
+## Rules
+1. The server holds the one reading per host: a client never asks GitHub (anonymous quota, console errors; INV-6114).
+2. Never lengthen the retry into the 6 h interval: one failed boot read would hide the notice for six hours.
+3. A `cli_version_changed`-style hint is not used here: the frame carries the reading itself.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/app-release/app-release.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/app-release/app-release.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/app-release/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVersionCheck.ts

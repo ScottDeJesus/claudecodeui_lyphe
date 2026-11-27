@@ -78,7 +78,7 @@ section: 01-websocket-transport/003 The pieces
 | `server/modules/websocket/services/websocket-server.service.ts` | Creates the one `WebSocketServer`, attaches the heartbeat, routes by pathname |
 | `server/modules/websocket/services/websocket-auth.service.ts` | `verifyWebSocketClient` — the upgrade-time gate for every path |
 | `server/modules/auth/auth.middleware.ts` | `authenticateWebSocket` — first DB user in platform mode, JWT verification in OSS mode |
-| `server/modules/websocket/services/websocket-state.service.ts` | `connectedClients`, the set of open `/ws` sockets, and `WS_OPEN_STATE`; the socket-to-account map (`registerSocketUser`) behind `sendToUser` and `isUserConnected` |
+| `server/modules/websocket/services/websocket-state.service.ts` | `connectedClients`, the set of open `/ws` sockets, and `WS_OPEN_STATE`; the socket-to-account map (`registerSocketUser`) behind `sendToUser` and `isUserConnected`; `broadcastToAll` sends one frame to every open socket |
 | `server/modules/websocket/services/chat-run-verbs.service.ts` | `abortChatRun`, `answerChatPermission`, `steerChatTurn` — the `chat.abort`, `chat.permission-response` and `chat.steer` actions as verbs; the companion module calls the first two, and `steerChatRun`, its own door into a running turn (MAN-9068) |
 | `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the eight inbound handlers, `protocol_error`, the call to the attachment trust boundary (`filterAttachmentsToUploadStore`, MAN-9407), `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
@@ -1606,7 +1606,8 @@ section: 03-conversation-handoff/002 The pieces
 | `server/modules/websocket/services/chat-websocket.service.ts` | `handleChatSend`, `handleChatEditSend`, `handleChatSubscribe`, `handleChatAbort`, `dispatchRun`, `runDetachedChatTurn` |
 | `server/modules/websocket/services/chat-run-verbs.service.ts` | `abortChatRun` — stops the session's running turn and settles the run it stopped with `completeRunIfCurrent`; `chat.abort` and a detached turn that interrupts the run in its way both call it |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | `buildSessionUpsertedEvent` — the single builder of the sidebar delta |
-| `server/modules/providers/services/sessions-watcher.service.ts` | Watches provider directories, debounces, broadcasts upserts in batches |
+| `server/modules/providers/services/sessions-watcher.service.ts` | Watches provider directories (subagent transcripts included), hands every event to the transcript feed, subscribes the session index to it, debounces, broadcasts upserts in batches |
+| `server/modules/providers/services/transcript-feed.service.ts` | The transcript feed: in-memory size ledger, settle deadline, `subscribeTranscriptFeed` on the providers barrel (MAN-348) |
 | `server/modules/providers/services/session-synchronizer.service.ts` | Shared full scan, per-file indexing, `pruneOrphanedSessions` |
 | `server/modules/providers/list/claude/claude-sessions.provider.ts` | `resolveEditAnchor` — walks `parentUuid` back to the previous assistant row; `fetchHistory` reads a compacted chat as one conversation through `stitchCompactedHistory` (MAN-8054); only records that are turns become rows (`server/shared/claude-transcript-rows.ts`: `isClaudeTurnLookalike` refuses the CLI's `api-request-blob`, `isResumePlaceholderRow` the "No response requested." stand-in); a plain-mode send with an image is a content array the CLI does not expand, so its text block loses the `/plain ` prefix in `stripTransparentWrapperPrefix` (`server/shared/local-commands.ts`) as the tagged form does — otherwise the optimistic echo (the typed words) never retires against it and the message draws twice |
 | `server/modules/providers/list/codex/codex-sessions.provider.ts` | `resolveEditAnchor` and `rewindSession` — forks the thread and repoints the session row |
@@ -1839,7 +1840,7 @@ What remains is a `Map<sessionId, SessionActivity>` of `{ statusText, canInterru
 | --- | --- |
 | `markSessionProcessing` | The composer, just before `chat.send`; a `chat_subscribed` ack with `isProcessing: true`; a `status` frame carrying text; a `permission_request` |
 | `markSessionIdle` | `complete`; `protocol_error`; a `chat_subscribed` ack with `isProcessing: false` |
-| `syncProcessingSessions` | Every 5 s, and when the tab becomes visible again, from `GET /api/providers/sessions/running`, which returns `chatRunRegistry.listRunningRuns()` beside `subagentSessionIds` — the conversations a subagent is still running in, live run or not — and `awaitingInputSessionIds`, the conversations a question is waiting in, live run or not |
+| `syncProcessingSessions` | On each `running_sessions_state` frame (no timer), and from a read of `GET /api/providers/sessions/running` on mount, on `websocket_reconnected` and when the tab becomes visible again. Frame and route carry the same body (`RunningSessionsPayload`), applied by one function (`applyRunningSessions`). The body is `chatRunRegistry.listRunningRuns()` beside `subagentSessionIds` — the conversations a subagent is still running in, live run or not — and `awaitingInputSessionIds`, the conversations a question is waiting in, live run or not |
 
 Three guards make it stable:
 
@@ -1848,13 +1849,13 @@ Three guards make it stable:
   (`statusCheckSentAtRef`). Without it, an ack describing the previous state clears a send
   that started while the subscribe was in flight.
 - **A 10 s local grace.** `syncProcessingSessions` keeps entries the server did not report
-  if they are younger than `LOCAL_ACTIVITY_GRACE_MS = 10_000`, so the poll cannot race a
+  if they are younger than `LOCAL_ACTIVITY_GRACE_MS = 10_000`, so a frame or read cannot race a
   send that has not reached the registry yet.
-- **One read in flight.** `refreshRunningSessions` skips a tick while its previous read is out
+- **One read in flight.** `refreshRunningSessions` skips a call while its previous read is out
   (`refreshingRef`, which keeps when the read began); a read older than `RUNNING_READ_GUARD_MS`
-  (35 s: the api's 30 s `REQUEST_TIMEOUT_MS` and a tick) no longer blocks the next tick, and only the
+  (35 s: the api's 30 s `REQUEST_TIMEOUT_MS` and five seconds) no longer blocks the next read, and only the
   read that owns the entry frees it. The server holds this read up to `RUNS_READOPTED_WAIT_MS` (76 s)
-  while a successor waits for its predecessor to drain; a held read added every tick fills the
+  while a successor waits for its predecessor to drain; held reads added at a 5 s tick (the cadence before the frame) filled the
   browser's six HTTP/1.1 connections to the origin, and every other request of the tab (her speech,
   her picture) waits behind them. Measured 2026-11-04 against a proxy holding the read 70 s: 6 reads held
   and `GET /api/companion` 4.5–5.0 s; with one in flight, 1 held and 7–30 ms. A read that reaches the
@@ -2028,12 +2029,25 @@ section: 03-conversation-handoff/012 Transcripts on disk
 by the provider id until the app claims them.**
 
 `sessions-watcher.service.ts` watches four provider directories with chokidar on native file
-events (inotify, one watch per file and directory; `depth: 6`, `ignoreInitial`) — never polling,
-whose one stat watcher per entry stalled a freshly booted API for seconds while it armed — never
-descends into or reports what `createWatcherIgnoredMatcher(rootPath)` ignores (below the root only:
-`.DS_Store`, names ending `.tmp` / `.swp`, any whole path segment `node_modules`, `.git`, `dist`,
-`build`, `subagents`, `tool-results`), keeps only `*.jsonl` files —
-`opencode.db` for OpenCode — and calls `sessionSynchronizerService.synchronizeProviderFile`.
+events (inotify, one watch per file and directory; `depth: 6`, `followSymlinks: false`,
+`ignoreInitial: false`) — never polling, whose one stat watcher per entry stalled a freshly booted
+API for seconds while it armed — never descends into or reports what
+`createWatcherIgnoredMatcher(rootPath)` ignores (below the root only: `.DS_Store`, names ending
+`.tmp` / `.swp`, any whole path segment `node_modules`, `.git`, `dist`, `build`, `tool-results`;
+`subagents/` is watched, so subagent transcripts reach the feed) and keeps only `*.jsonl` files —
+`opencode.db` for OpenCode.
+
+Every kept event goes to the transcript feed (`transcript-feed.service.ts`; other modules subscribe
+through `subscribeTranscriptFeed` on the providers barrel). An add before the watcher's `ready` is the
+first scan and only `seen()`: the feed records the size and publishes nothing, so a boot indexes
+nothing the initial sync did not. A later add, a change and an unlink are `report()`ed. The feed keeps
+an in-memory size ledger of regular files only (lstat's `isFile()`, never a symlink; a change is judged on the feed's own lstat because chokidar's change stats follow links, and a file turned link is dropped as an unlink), publishes each
+event with `size` and `previousSize`, and after each add or change arms that file's one unreferenced
+250 ms settle deadline, whose single lstat publishes the write chokidar drops within milliseconds of
+the one before. The session index is its first subscriber: `initializeSessionsWatcher` subscribes it
+before arming the first root, `closeSessionsWatcher` unsubscribes it and closes the feed; an add or
+change calls `sessionSynchronizerService.synchronizeProviderFile` (an unlink is not its business, and
+the Claude synchronizer's `isSubagentTranscript` refuses subagent files).
 Indexed ids are queued and flushed with a 500 ms debounce and a 2 s maximum wait
 (`PROJECTS_UPDATE_DEBOUNCE_MS`, `PROJECTS_UPDATE_MAX_WAIT_MS`), then handed to
 `broadcastSessionUpsertedBatch`, which walks the client set once for the whole batch.
@@ -2068,7 +2082,7 @@ The sidebar's `session_upserted` reducer in `useProjectsState.ts` then does five
    not processing; otherwise marks the row for attention.
 5. Navigates to `/session/:appId` when the URL still holds the provider-native alias.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-watcher.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-watcher.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/transcript-feed.service.ts
 
 ## MAN-349 — Forking and resuming
 section: 03-conversation-handoff/013 Forking and resuming
@@ -4312,8 +4326,19 @@ Escape never stops the running turn: the shared `Dialog` marks the key from a wi
 which runs before `useEscapeToAbortSession`'s document-level stop-on-Escape. The view reads the subagent's own file on
 disk — never `ChatMessage.subagentActivity`, which the history path caps at 200 entries from the head
 and a launcher soul carries none of at all — through `useSubagentTranscript`
-(`hooks/useSubagentTranscript.ts`), which re-reads it every two seconds while the row is running or
-the server reports the file still growing (`inFlight`), and stops re-reading once it is finished. An
+(`hooks/useSubagentTranscript.ts`), which reads it when the view opens and whenever the row starts or stops running. While the row is
+running or the last answer says the file is still being written (`inFlight`), the view watches it:
+`useLaneWatch('subagent_transcript', key, true)` sends `watch.start` on the socket (again on every
+reconnect; `watch.stop` when it stops watching), the key being `agent:<appSessionId>:<toolUseId>` or
+`soul:<launchId>`. The server's tail (`server/modules/providers/services/subagent-transcript-watch.service.ts`,
+a lane of `laneWatch`, `server/modules/websocket/services/lane-watch.service.ts`) watches the directory the
+route reads (the parent session's `subagents/` folder, by `subagentsDirectoryOf`, or the soul's launch
+record directory, by `soulRecordDirectory`), one file lane per directory shared by every key under it,
+and sends `{ kind: 'subagent_transcript_changed', at, key }` at most once a second, only to the sockets
+watching that key. The view reads again on each frame whose key is its own. After each frame the tail
+arms one timer for the four-hour window `inFlight` is bounded by (`IN_FLIGHT_BELIEVED_FOR_MS`) and sends
+one last frame when it lapses, so the view's final read of an agent that died mid-write sees `inFlight`
+false. The view holds no timer: a failed read is retried by the next frame or by the reconnect. An
 `Agent` row resolves through `GET
 /api/providers/sessions/:sessionId/subagents/:toolUseId/transcript`; a soul row through `GET
 /api/dispatch-souls/launches/:launchId/transcript` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)
@@ -6295,18 +6320,27 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe
 section: 09-universe/005 The two taps/007 Tap 2 — the transcripts
 
 A live byte-offset tail over `~/.claude/projects/**/*.jsonl`, which hands over complete lines and knows nothing
-about what is written in them (`universe-transcript-tail.ts:1-17`). Offsets are in memory and never on disk,
-deliberately: shared with the durable cursors next door, they would replay months of history on first paint
-(`:12-16,180-187`). A 15 s walk finds files it has never seen; a 400 ms poll reads the HOT set — the files
-written to inside a two-minute window — because the corpus is over four thousand files and statting all of them
-four times a second is a core burnt to learn nothing (`:20-32,218-240`).
+about what is written in them (`universe-transcript-tail.ts` header). Offsets are in memory and never on disk,
+deliberately: shared with the durable cursors next door, they would replay months of history on first paint. The tail is told: the transcript feed hands it every add, change and unlink with the size the file reached, and
+the tail reads from its offset to that size at once. It reads only what the feed tells it of, so while nothing is
+written it does no work.
 
-The meaning is the tap's (`universe-transcript.tap.ts:10-18`). `ADMITTED_TOOLS` (`:27`) admits
+**The feed is the only read path.** `createTranscriptTail` takes `subscribe` (`subscribeTranscriptFeed`, passed by the
+tap): every add, change and unlink of a `*.jsonl` under the root arrives as a `TranscriptFileEvent` with its size, and
+`onFeedEvent` reads to that size at once. `unlink` forgets the offset; `add` starts it at 0; `change` uses the held
+offset, else `previousSize`, else `size`; a shrunk file's offset clamps to the new size. `readTo` is the one reader: one
+read per file at a time, an event landing mid-read raises that file's target and the running read continues to it. A
+transcript older than the process starts at the feed's `previousSize`, never at 0, so its history is never read. Each
+pass reads at most `MAX_READ_BYTES` (4 MB) and hands over only whole lines: a half-flushed line waits for the event
+that completes it, and a record longer than the window is skipped to the next line break with one journal line.
+`stop()` unsubscribes and clears offsets and targets.
+
+The meaning is the tap's (`universe-transcript.tap.ts`). `ADMITTED_TOOLS` admits
 `Edit|Write|MultiEdit|NotebookEdit`, which name a file and become an **edit**, and `Skill|Agent|Task`, which
 name a tracked definition and become an **execution**; a tool named `mcp__<server>__<tool>` is admitted by the
-SHAPE of its name and becomes an execution against that server's endpoint (`:29-30,68-97`). **It drops `Read`
+SHAPE of its name and becomes an execution against that server's endpoint (`rowsForToolUse`). **It drops `Read`
 and `Bash`** — thousands a day, which would bury the edits that mean something, because a read is not an edit
-and a shell command is not a file (`:13-17,75-76`). **It reads only records that are turns.** The CLI's
+and a shell command is not a file. **It reads only records that are turns.** The CLI's
 `api-request-blob` stores the request body it is about to send — an earlier assistant message with its tool
 calls among it — and wears that message's shape; read as a turn it would pulse every star a second time, so
 `emit` skips it (`isClaudeTurnLookalike`, `server/shared/claude-transcript-rows.ts`).
@@ -6814,6 +6848,11 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 `ServerEventKind` = `MessageKind` (emitted by provider runtimes) + `GatewayEventKind`
 (added by the gateway). The frontend needs exactly one switch over it.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
+
+## MAN-10287 — Server → client: the `kind` on every frame — `text`
+section: README/003 The protocol, in two tables/004 Server → client: the `kind` on every frame/001 `text`
+
 | `kind` | Source | Meaning |
 | --- | --- | --- |
 | `text` | provider | A block of assistant prose. |
@@ -6837,6 +6876,27 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
 | `kanban_event` | gateway | The board frame: one Kanban write has committed, and this is what it left behind — the event, the card (null for a board-level write) and the board's lane totals after it. Built only by `writeKanban` (`modules/kanban/kanban-write.service.ts`), after the transaction commits. `boardId` is null for a write against the estate (a lesson staged with no card), and every consumer tests it first. |
 | `notes_changed` | gateway | A note was created, replaced or deleted. `{ kind, at }` only: it names no note and no account, so a client that hears it reads its own list again. No `seq` and no `sessionId`, so it never becomes a transcript row. |
+| `memory_changed` | gateway | Hint: the memory-intake queue changed (a candidate staged or reviewed); a listener reads its candidates again. Sent by `modules/memory-intake/memory.service.ts` through `broadcastToAll` after a stage, a review or a recorded refusal, at most once per 500 ms; `MemoryIntakeProvider` reads on it. |
+| `accounts_changed` | gateway | Hint: the Claude accounts store changed; a listener reads the accounts again. Sent by `modules/accounts/accounts-lanes.ts` through `broadcastToAll` when the store watch's `accounts` lane is poked (a write to `accounts.json` or `chosen.json`), at most one per 2 s. |
+| `drafts_changed` | gateway | Hint: a queued draft was appended, cleared, claimed, restored or deleted; the composer hydrates its draft card again. Sent by `modules/user/drafts-hint.service.ts` through `broadcastToAll` after the user service's append and clear and the dispatcher's claim, restore and delete, at most once per 250 ms; a typing save does not speak. The card reconciles on it through `useDraftsChangedFrame`. |
+| `claude_updates_changed` | gateway | Hint: the Claude update job or its stored check was written; a listener reads the update state again. Sent by `modules/claude-updates/claude-updates.module.ts` through `broadcastToAll` after `writeJob` and `writeStoredCheck` in this process, and on its watch of `job.json` and `job.log` for the detached runner's writes, at most once per 250 ms; every `useClaudeUpdates` consumer reads on it. |
+| `cli_version_changed` | gateway | Hint: the installed CLI version, or the runs still on an older one, moved; a listener reads the version report again. Sent by `modules/cli-version/cli-version.module.ts` through `broadcastToAll`, at most once per second: when the installed version changes (`cli-version-watch.ts` watches the spawned binary's directory and its real file's, and a touch runs the cached probe) and when a chat run starts or ends; `useCliVersion` reads `GET /api/cli-version` again on it. |
+| `heal_changed` | gateway | Hint: the heal ledger committed (`friction.db` or its WAL CHANGED; a reader's open and close is no change). Sent by `modules/heal/heal.module.ts` through `broadcastToAll`, at most once per 60 s; `HealProvider` reads `/api/heal/summary` on it and on reconnect. |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
+
+## MAN-10288 — Server → client: the `kind` on every frame — `jev_changed`
+section: README/003 The protocol, in two tables/004 Server → client: the `kind` on every frame/002 `jev_changed`
+
+| `kind` | Source | Meaning |
+| --- | --- | --- |
+| `jev_changed` | gateway | Hint: the Jev ledger was appended to. Sent by `modules/jev/jev.module.ts` through `broadcastToAll`, at most once per 10 s (a write inside the gap is told at its end); the Jev panel reads on it while visible, the accounts' Jev balance on every one. |
+| `deepseek_usage_changed` | gateway | Hint: a transcript moved. Sent by `modules/deepseek/deepseek.module.ts` through `broadcastToAll` on each flush of the sessions watcher (`onSessionsFlushed`), for any transcript (which ones DeepSeek counts is the usage ledger's rule, `hooks/deepseek_usage`), at most once per 10 s (a flush inside the gap is told at its end); the DeepSeek view reads its usage again on it while the tab is shown. |
+| `subagent_transcript_changed` | gateway | Hint plus `key` (`agent:<appSessionId>:<toolUseId>` or `soul:<launchId>`): a watched subagent transcript moved. Sent only to the sockets watching that key. Declared; its sender is the subagent-transcript seam's. |
+| `running_sessions_state` | gateway | State: `{ kind, at }` plus the body of `GET /api/providers/sessions/running`. Sent by `modules/providers/services/running-sessions.lane.ts` through `broadcastToAll` when the answer changes (a run's `lastSeq` and `lastActivity` aside): read again on a run's start, end or ask, a sessions-watcher flush, a launcher change and a notification, plus one deadline at the earliest believed agent's four-hour lapse. `SessionProtectionContext` sets its state from it and reads the route on mount, on reconnect and when the tab is shown. |
+| `accounts_usage_state` | gateway | State: `{ kind, at, usage }`, the Claude usage window's reading. Sent by `modules/accounts/accounts-lanes.ts` through `broadcastToAll` while a socket watches the `accounts_usage` lane, when the reading moved: on an account-file poke and three minutes after the last reading. |
+| `deepseek_balance_state` | gateway | State: `{ kind, at }` plus the body of `GET /api/deepseek/balance` for one reachable reading, built by the route's own `reachableBalance`. Sent by `modules/deepseek/deepseek.module.ts` through `broadcastToAll` from the balance service's `onReading`, after the reading is booked: once per reading, the server's own 180 s one or one a tab's read caused. The accounts panel takes every figure after its first read from it (MAN-511). |
+| `app_release_state` | gateway | State: `{ kind, at }` plus the body of `GET /api/app-release`, the newest release (`{ tag, release }`). Sent by `modules/app-release` through `broadcastToAll` when its one read of GitHub per host, every six hours, answers something new; `useVersionCheck` reads the route once and takes every later reading from this frame, so no tab asks GitHub. |
 | `followups_changed` | gateway | A chat's follow-up was filed, closed or reopened. Names the chat by its app session id under `appSessionId` — deliberately not `sessionId`, which would set the workspace's unread mark (`useProjectsState`). A widget re-reads when the id is its own chat's and ignores the frame otherwise. No `seq`. |
 | `scheduled_messages_changed` | gateway | A chat's scheduled messages changed: one was scheduled, cancelled or dismissed, claimed by the dispatcher as its turn starts, or failed to send. Names the chat by its app session id under `sessionId` and nothing else, so a composer showing that chat re-reads the list through the authenticated per-user GET and every other composer ignores it. The unread mark (`useProjectsState`) and the transcript handler (`useChatRealtimeHandlers`) each name this kind and leave it alone. No `seq`. |
 | `cerberus_changed` | gateway | A hint from the Cerberus center to read again: what moved (`nodes`, and `checks` as `<node>/<key>`, split at the first `/`), never the result itself. Coalesced to at most one a second, except a warden update's moments, sent at once with `updates: true`. Also marks a fix run's or a diagnosis's start and end. |
@@ -6844,6 +6904,14 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `cerberus_diag_step` | gateway | One step a running diagnosis just said, for one `diagId`, never coalesced. A sheet open on the diagnosis appends it by `step.n`; every other screen ignores it. `GET /api/cerberus/diagnoses/:id` answers whatever a client missed. |
 | `simple_list_changed` | gateway | The simple chat list's shape changed: a folder was made, renamed, folded or deleted, or a chat changed place or folder. `{ kind, at }` only; names nothing, so a client that hears it re-reads the feed. Never a transcript row (MAN-7519). |
 | `session_archive_changed` | gateway | Chats were closed or reopened (`isArchived`): the rows stay, with their transcripts and follow-ups, but the lists of chats gain or lose them. Built only by `session-archive-broadcast.service.ts`, which the close, the reopen and the sleep-time auto-close all go through. The ids ride the `sessionIds` array, not a `sessionId` key, so the unread mark ignores the frame; a reopen reaches the project tree as the `session_upserted` the same door sends. |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
+
+## MAN-10289 — Server → client: the `kind` on every frame — `session_toolsets_changed`
+section: README/003 The protocol, in two tables/004 Server → client: the `kind` on every frame/003 `session_toolsets_changed`
+
+| `kind` | Source | Meaning |
+| --- | --- | --- |
 | `session_toolsets_changed` | gateway | The toolsets switched on for a chat changed after a switch. Sent by the toolsets service; the composer's hook reads the view again. |
 | `session_host_liveness` | gateway | Which chats have a live session host (the CLI's tmux session). One shape, `{ kind, change: 'snapshot' \| 'live' \| 'asleep', sessionIds, at }`: a `snapshot` is sent once per connection, held until the keepalive hosts are re-adopted, then a `live` or `asleep` names the chats that gained their first or lost their last host. The ids ride an array, never a `sessionId` key, so the workspace's attention rule cannot mark the chat; no `seq`, so never a transcript row. Read by `SessionHostLivenessContext`, which grays the simple list's asleep rows (session-host, MAN-695). |
 | `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `soul_launch_state`. |
@@ -6878,6 +6946,7 @@ Handled by `server/modules/websocket/services/chat-websocket.service.ts`.
 | `chat.subscribe` | Watch one or more sessions, replaying from `lastSeq`; each is also recorded as open on this socket, so a run that starts later with no socket joins it (MAN-311). |
 | `chat.permission-response` | Answer a `permission_request`. |
 | `chat.presence` | Which session this socket is watching, whether its tab is visible, which page it is (`clientId`), whether its window has the keyboard (`focused`) and, from the station, what its stage holds (`view`). |
+| `watch.start` / `watch.stop` | Start or end watching one `key` of a server `lane`; a repeated start from one socket is one watch; an unknown lane is ignored (MAN-10291). |
 
 Note the asymmetry, which trips people up: **server frames are discriminated by `kind`,
 client frames by `type`.**

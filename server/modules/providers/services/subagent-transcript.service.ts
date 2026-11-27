@@ -6,6 +6,7 @@ import {
   findSubagentTranscriptByToolUse,
   readTranscriptActivity,
 } from '@/modules/providers/list/claude/claude-transcript-activity.js';
+import { subagentsDirectoryOf } from '@/modules/providers/services/session-agents.service.js';
 import type { SubagentTranscriptResult } from '@/shared/types.js';
 
 /**
@@ -42,6 +43,19 @@ function readCompactions(sessionId: string) {
 }
 
 export const subagentTranscriptService = {
+  /**
+   * The directory a live agent of this chat writes its sidechain into, or `null` for a chat that is not
+   * Claude's or has no transcript yet. The live transcript's only: an agent launched before a compaction
+   * has finished, so there is nothing of it left to tail.
+   */
+  subagentsDirectory(sessionId: string): string | null {
+    const session = readSession(sessionId);
+    if (!session || session.provider !== 'claude' || !session.jsonl_path) {
+      return null;
+    }
+    return subagentsDirectoryOf(session.jsonl_path, session.provider_session_id ?? sessionId);
+  },
+
   async readByToolUse(sessionId: string, toolUseId: string): Promise<SubagentTranscriptResult> {
     const session = readSession(sessionId);
     if (!session || session.provider !== 'claude') {

@@ -192,6 +192,8 @@ drawn in the payload's own words as a `limit:<kind>` row.
 | `windows: []` + `degraded` | *No figures are available under this account.* |
 | `reachable: false` | *Usage is unknown — \<the reason, in English\>* |
 
+**How a tab hears the meter.** The server reads the window only while some socket watches it, and puts `accounts_usage_state` on the wire only when the window moved since the last frame it sent, kept across the lane restarting each time its last watcher leaves and the next arrives (`sendUsageIfMoved`, `server/modules/accounts/accounts-lanes.ts`): `useClaudeUsage` reads `GET /api/usage` once on mount (and on `websocket_reconnected`) and holds `useLaneWatch('accounts_usage', null, true)`; the lane (`server/modules/accounts/accounts-lanes.ts`, `createPolledLane` with `backstopMs` 180 000) starts on the lane's first watcher and stops on its last, and sends `accounts_usage_state` `{ kind, at, usage }` to every socket when the reading moved (`checkedAt`, stamped from the clock on a pending or degraded answer, is left out of that comparison and kept on the wire). Its reads are a poke from the store watch's `accounts` lane (a write to `accounts.json` / `chosen.json`), a poke from every reading that reached the provider and landed in `readUsage` (`onVendorReading(listener)`, `usage.service.ts`; also one a tab's `GET /api/usage` took, so the 180 s backstop counts from it; a cache answer tells nothing; a reading the lane itself took through `readUsageForLane` pokes nothing, the `isLaneReading` flag being set while it runs), and one more three minutes after the last: the vendor's percentages move with use and no file announces them, so this is the one poll, at the floor the meter always kept, and `readUsage`'s own cache still answers inside a window. Each read that reaches the provider logs `[usage] reading the usage window from the provider`, so the journal says how often this host asked.
+
 Which accounts the meter reads: the LIVE login alone. An account in use by its saved sign-in token (`chosen`, not `live`) and every account not in use are never metered: the usage endpoint gave no figure for a saved token (2026-11-24: `403 oauth_scope_insufficient`, then `429 rate_limit_error` on two tries), and no read that spends usage is allowed (operator, 2026-11-24: "i dont want it if it has to take usage"). Their figure is what the chats and streams on them file (`pacer-door.ts` `note`, sources `chat`/`stream`); that figure reaches the meters, the rail ring and the core ring `degraded` once it is 15 minutes old (reason `old`, or `unaged` with no stamp), so they dim and say *As of …*, and the account row says its age beside its state (`readingAgeWords`, MAN-8862).
 
 `GET /api/usage` carries `account`: the digest of the live login the figures were read from (`liveAccountDigest()`, read beside the token; `''` when it cannot be told), on cached, pending and degraded answers alike, so the panel can tell whether the numbers belong to the account in use (the client's test and its fallback: MAN-8862). An `expiresAt` (epoch ms) already passed means the token is never sent: the pass is renewed first (`renewSavedLogin` runs `claude auth status` on the saved login, MAN-461), and the fetch goes on in the same call with the new one; a pass that could not be renewed — and a login the CLI itself cleared (`accessToken: ""`, what it writes when the refresh token is refused) — is degraded `expired`, status 0, no fetch, with *the saved login has expired and could not be renewed; sign in again with claude /login*. A login file that cannot be read is `credentials`. A `401`/`403` — the endpoint refusing a token the clock still counted live — earns one renewal and one retry, only when the file then holds a different token; otherwise it is `auth`. With `CLAUDE_CONFIG_DIR` set the token is read from that directory and `account` is `''`, because `~/.claude.json` would name another login.
@@ -435,8 +437,9 @@ hooks/deepseek_usage.summarize(range, feed, now)   →   scripts/deepseek-usage 
   `range` ∈ `today|7d|30d|all` and `feed` an integer 0..500, else 400. The service
   (`deepseek-usage.service.ts`) runs `scripts/deepseek-usage` through `execFile` — an argument array,
   never a shell — and relays the JSON; `unreachable` → 503, `unreadable` → 502.
-- `useDeepseekUsage.ts` calls `api.deepseek.usage(range, 50)` every `DEEPSEEK_USAGE_POLL_MS` (10 s)
-  while the tab is visible, and at once on a range change; a failed poll keeps the last good reading.
+- `useDeepseekUsage.ts` calls `api.deepseek.usage(range, 50)` on mount, at once on a range change, on each
+  `deepseek_usage_changed` (a sessions-watcher flush, paced by the server to one per 10 s, MAN-453) and on reconnect
+  while the tab is visible, and when the tab is shown again; it holds no timer. A failed read keeps the last good reading.
 
 The DeepSeek view is six sections in this order, each a `JevSection` and each root carrying
 `data-deepseek-section="<key>"`, under `data-deepseek-usage`:
@@ -1299,7 +1302,7 @@ section: auth-session/000
 
 How a page keeps its login, the few things that may end it, and the trace every ending leaves.
 
-**Where the session lives.** One JWT in `localStorage['auth-token']`, shared by every tab of the origin, and a second copy in each tab's `AuthContext` memory (the WebSocket reconnect and the refresh timer read that one). `useSharedSessionFollower` keeps the copies equal through the `storage` event: another tab's refresh is adopted, another tab's sign-out is followed. A token lasts 10 years (`expiresIn: '3650d'`, `auth.middleware.ts` — operator, 2026-09-29: "Can we keep it like infinite?"); the server puts a new one in `X-Refreshed-Token` on any response once the presented one is past half-life, and `AuthContext` also calls `POST /api/auth/refresh` at half-life. Origins do not share storage: `http://100.103.222.79:5183` and `http://127.0.0.1:5183` are two sessions.
+**Where the session lives.** One JWT in `localStorage['auth-token']`, shared by every tab of the origin, and a second copy in each tab's `AuthContext` memory (the WebSocket reconnect and the refresh timer read that one). `useSharedSessionFollower` keeps the copies equal through the `storage` event: another tab's refresh is adopted, another tab's sign-out is followed. A token lasts 10 years (`expiresIn: '3650d'`, `auth.middleware.ts` — operator, 2026-09-29: "Can we keep it like infinite?"); the server puts a new one in `X-Refreshed-Token` on any response once the presented one is past half-life, and `AuthContext` also calls `POST /api/auth/refresh` at half-life, the timer held to `LONGEST_TIMER_MS` (2^31−1 ms, 24.8 days): `setTimeout` fires a longer delay at once, and the 3650-day half-life (~5 years) refreshed every token on arrival. why: each adopted token changes `connect`'s identity, so `WebSocketContext` closed and reopened the socket (measured 2026-11-26, 4x CPU, 30 s: 21 closes, 23 refreshes, 577 API requests; held: 0, 0, 84). A real refresh still reconnects the socket. Origins do not share storage: `http://100.103.222.79:5183` and `http://127.0.0.1:5183` are two sessions.
 
 **What may end a session** — this list is complete, and each one leaves a trace record:
 - `stored-token-expired` — `getStoredAuthToken()` read the stored token and it is past `exp` + 60 s by the page's clock. The only ending that involves no request.
@@ -1570,7 +1573,7 @@ Per package, three versions from three places, none inferred from another:
 
 ## Client read — `hooks/useClaudeUpdates.ts`
 
-- One module-scope store, one poller: every 60 s, every 1.5 s while `job.state` is `installing`, `installed`, `restarting` or `rolling-back`.
+- One module-scope store, one shared reader: reads on mount, on each `claude_updates_changed` (MAN-453), on a reconnect and when the tab is shown again; a frame heard mid-read runs one more read when it lands. No timer.
 - Publishes only on a changed body; answers are taken in token order; a failed read keeps the last picture.
 - Returns `{ report, refresh, check, apply, restart, setAutoInstall }`. A report without `autoInstall` (an older server's) is still drawn — the tab leaves out only the row, so the cards and the manual press stay. Each action resolves `{ ok: true }` or `{ ok: false, message }` (the refusal's message), then forces a read. `refresh()` resolves true or false.
 - Requests go through the `claudeUpdates` group of `src/shared/api.ts`.
@@ -2091,7 +2094,7 @@ section: cli-version/001 The rules that bite
    2.1.280`, a kept host says so in one line of its own, and the retirement is the same
    wind-down as a supersede (`end_input`, then SIGTERM over the host's own socket), so the
    conversation is untouched and its next message spawns fresh and resumes. There is no timer: the
-   change trigger rides the probe the client already polls and the send path already asks, and a
+   change trigger rides the `cli_version_changed` frame's re-read and the send path's ask, and a
    machine with no client open is covered at the next boot. `null` on either side retires nothing,
    and a turn in flight is never touched — that case is the banner's, below.
 
@@ -2100,10 +2103,10 @@ section: cli-version/002 The client's one reading
 
 `src/shared/hooks/useCliVersion.ts` is the only place in the app that reads the route, and the only
 place the comparison is made — two screens making two comparisons is two chances to disagree
-about one fact. The report is held at MODULE scope behind a single 60 s poller and published through
-`useSyncExternalStore`. Not a per-component `useState`: the sidebar mounts this hook once per session
-row, so a hook that fetched on its own would put one request per conversation on the wire every
-minute for the same picture. The poller starts with the first subscriber and stops with the last, and
+about one fact. The report is held at MODULE scope behind a single reader and published through
+`useSyncExternalStore`. Every mounted consumer's `useServerFrame` calls that reader on `cli_version_changed` (sent by `server/modules/cli-version/cli-version.module.ts` when the installed version changes or a run starts or ends) and on `websocket_reconnected`; one frame is read once, forced, however many consumers heard it. Not a per-component `useState`: the sidebar mounts this hook once per session
+row, so a hook that fetched on its own would put one request per conversation on the wire for every
+frame, for the same picture. The first subscriber reads the report (no frame is heard while nobody is mounted), and
 module scope is per DOCUMENT — a reload or a second tab starts with nothing and asks again, which is
 correct for a reading of right now.
 
@@ -2120,21 +2123,21 @@ is not stale either: it is not in `running[]` at all.
 
 **And stale no longer means "somebody must press something" for an idle conversation.** A run is listed
 while a turn is in flight, and a process between turns the server replaces ITSELF — on a version
-change or at boot (rule 9), which is the same reading being polled here; what is left for a person is
+change or at boot (rule 9), which is the same reading reported here; what is left for a person is
 the turn that is running NOW, which is the banner's own case. The two surfaces still read one hook
 and one comparison — the client is told the same fact it always was, and the server has stopped
 waiting for it.
 
 **A read publishes only when the body CHANGED, and only in TOKEN order.** The last body is kept
-verbatim, so a poll that answers the same JSON republishes nothing and an idle app does not re-render
-every session row once a minute. Each read takes a token, and one whose answer lands after a newer
+verbatim, so a read that answers the same JSON republishes nothing and a frame that moved nothing this page draws does not re-render
+every session row. Each read takes a token, and one whose answer lands after a newer
 one has already answered is dropped rather than published: two requests can be open at once, and the
 older finishing last would otherwise put back the picture it replaced. A read that throws publishes
 nothing and logs nothing — the route answers 200 even when it has no version to give, so a throw here
 is this app's own network, and keeping the last picture is the honest reading of "we could not ask".
 
 **`refresh()` is a FORCED read, and its answer is the point.** It opens its own request instead of
-joining the poll already in flight — that one was taken before whatever the caller just did — and
+joining the read already in flight — that one was taken before whatever the caller just did — and
 resolves `true` when a reading arrived, `false` when none did. A caller acting on the answer must be
 able to tell "the route says nothing is stale" from "we could not ask". The token is claimed only
 once the body is known to be a report, so a 200 carrying something else (a proxy interstitial, a
@@ -2398,6 +2401,16 @@ MAN-460 describes, at a different vendor, reached by a route of its own. It answ
 this host does not hold, a key the vendor refused, a timeout and an unreadable body are five facts in
 words, never an error wall.
 
+The browser hears the server's reading; it does not ask on a clock. The server reads the account
+itself (`startBalanceRecording` in `deepseek.module.ts`: 15 s after boot, then every
+`DEEPSEEK_BALANCE_RECORD_MS`, 180 s), and every reachable reading — the server's own, or one a tab's
+read caused — is sent to every open socket as `deepseek_balance_state`: `{ kind, at }` plus the very
+body this route answers for that reading, built by the route's own `reachableBalance`
+(`deepseek.service.ts`), never a copy. `useDeepseekBalance` reads the route once on mount and once
+after a socket reconnect (frames were missed while it was down), and takes every later figure from
+the frame. A reading that found no figure (one of the five unknowns) sends no frame: the tab that
+asked is answered by the route.
+
 It is the SECOND surface on this box built around one credential, and the other is not a route:
 `DEEPSEEK_API_KEY` is declared once in `.env.example`, and what puts builds on `deepseek-flash` in
 the first place is the switch under **Settings → Agents → Claude**
@@ -2524,8 +2537,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/load-env.ts, /home/lyphe/
 section: deepseek-balance/002 The client's one reading
 
 `src/modules/accounts/hooks/useDeepseekBalance.ts` is the only place in the app that reads the route.
-It polls every 180 s — the usage cadence, deliberately, since both are slow provider-owned facts —
-and `AccountsProvider.refreshReadings` forces a fresh reading when the popover opens (`AccountRailButton`'s `togglePanel`; on OPEN only: closing the panel
+It holds no timer: it reads on mount and once on reconnect, and takes every later figure from
+`deepseek_balance_state` — the server's own reading (every 180 s, MAN-511) or one any tab's read caused, pushed to
+every socket — and `AccountsProvider.refreshReadings` forces a fresh reading when the popover opens (`AccountRailButton`'s `togglePanel`; on OPEN only: closing the panel
 reads nothing) and when the Accounts widget is unfolded, because the balance is the figure a person opens the panel for and a number that only
 moves on a timer reads as stale at exactly that moment.
 
@@ -2557,11 +2571,12 @@ cannot serve requests; an absent one says nothing. A `checkedAt` that names no i
 Each field is judged on its own, so one missing figure never blanks the rest. The Jev balance beside it
 (`useJevBalance`) follows the same rule where the wire becomes the readout's shape: each of `credit_usd`, `spent_usd` and
 `left_usd` is a finite number or `null`, `balance: null` is still "No credit seeded", and a `balance` that is absent or not an
-object reads "Balance unknown" rather than an absence.
+object reads "Balance unknown" rather than an absence. The Jev balance holds no timer: it reads on mount, on every
+`jev_changed` (an append to the Jev ledger, paced by the server to one frame per 10 s, MAN-453) and on reconnect.
 
 `AccountsProvider` owns the ONE instance and hands the reading to `AccountPanelBody`, which draws it
 between the meters and the account rows — in the popover and in the Accounts widget alike: label, figure, and the line under it. Opening either
-starts no second poller. The panel draws the reading's age as that faint line where the figure has
+starts no second reader. The panel draws the reading's age as that faint line where the figure has
 nothing else to explain: the panel is where someone checks the money after something stopped, and a
 frozen tab would otherwise hold a five-minute-old number that looks fresh.
 `DeepseekBalanceReadout` is deliberately not a `Meter` — a balance has no limit to be a share of —
@@ -2609,7 +2624,7 @@ section: deepseek-balance/004 The usage door
   503 (the reader never answered), `unreadable` → 502 (it answered, and not with the one JSON object
   its contract promises). A fault's message is the child's own fault line, or the fixed string
   `deepseek-usage failed`.
-- The API tab is its reader: `useDeepseekUsage` polls `api.deepseek.usage` and `DeepseekUsagePanel`
+- The API tab is its reader: `useDeepseekUsage` reads `api.deepseek.usage` on mount, on `deepseek_usage_changed` and on reconnect and `DeepseekUsagePanel`
   draws the payload — the whole usage surface is MAN-471.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/deepseek/deepseek.routes.ts
@@ -3467,7 +3482,7 @@ THE INPUTS, measured with strace over `dispatcher status --json` and `dispatcher
 | `dispatch-chains/<chain>/chain.json`, `walker.pid` | both — a RUNNING phase's stage rows, tries and `busy` come off its chain record, which the walker rewrites with no store write | one directory watch per chain of a phase running in the last picture (`followChains`, called from the status lane's reading); a chain newly watched pokes once, closing the gap before the watch armed |
 | `epics.flag` | status | the dial, in the state root `$DISPATCHER_HOME` names (`epic_dial.flag_path`): the live home's is `~/.claude/state`, where the watch below serves it too; a scratch home's has a watch of its own on its state root |
 | `park_at_peak.flag`, `weekly_stop.flag`, `deepseek_features.flag` | status | one watch on `~/.claude/state`, filtered to those names |
-| `claude_account/accounts.json`, `chosen.json` | status | watch on that directory |
+| `claude_account/accounts.json`, `chosen.json` | status; and the `accounts` lane, attached by `server/modules/accounts/accounts-lanes.ts`: each poke tells the paced hint `accounts_changed` (at most one per 2 s, to every socket) and, while a tab watches the usage window, pokes its lane, since a switch changes whose window it is | watch on that directory (`ACCOUNT_LANES`) |
 | `pacer/cpu-wait/<launch>.json` | status (`cpu_wait` on plans, arcs, planner entries) | watch on that folder (its absence is waited out by the parent's watch): the runner writes an agent's marker while the box's CPU holds it back (MAN-9802), with no store write at all. Quiet — a marker is rewritten only when its words change |
 | `pacer/readings.sqlite`(`-wal`), `pacer/rates.json` | status (`route.pace`, `pace_hold`) | watch on `pacer/`, SLOW: a 10 s window (`PACER_SETTLE_MS`), because every agent step appends a reading. The SQLite files on `change` only; `rates.json` on any event, since it is replaced atomically |
 | `dispatcher-*.timer` units under `/run/user/<uid>/systemd/transient` | status (`schedule`: an armed hour) | watch on that directory: an armed hour appearing, firing or being stopped by hand |
@@ -4825,7 +4840,7 @@ so the run's identity, its subscription and its watchdog sit at module scope in
 binds to them through `useSyncExternalStore` — which is why leaving the tab and coming back shows
 the run in flight rather than an armed button. Module scope is per document, though, so a reload, a second
 window and an HMR update each get an empty one: `findLiveRun.ts` asks the SERVER instead, reading
-`/api/providers/sessions/running` fresh at the press rather than trusting the 5-second poll behind
+`/api/providers/sessions/running` fresh at the press rather than trusting the `running_sessions_state` push behind
 the sidebar's activity chip. A running session IS a delegation run when its `summary` is the
 command or — every sidebar row can be renamed, including this one while it runs — when its first
 user row is, read as two bounded head pages rather than as a transcript (the largest conversation
@@ -4960,7 +4975,7 @@ section: hosting/001 What runs
 | `cloudcli-client-dev.service` | `node_modules/.bin/vite --host 0.0.0.0 --port 5183 --strictPort` — the client with HMR, its responses compressed by `vite-plugins/compressResponses.js` (see Rules) | `0.0.0.0:5183`, minus the Docker bridges (see below) |
 | `cloudcli-client-prod.service` | `vite preview --host 0.0.0.0 --port 5184 --strictPort --outDir .prod-client/current` — the BUILT client: ~50 requests on a fresh load instead of ~700 unbundled modules, Brotli-precompressed at build time (the page document included), every `/assets/*` file cached for a year and everything else revalidated by ETag, by `vite-plugins/precompressedAssets.js`. Same `.env`, so it proxies `/api`, `/ws`, `/shell` and `/plugin-ws` to :3011 exactly as :5183 does. No HMR: an edit reaches it through the rebuild below | `0.0.0.0:5184`, minus the Docker bridges |
 | `cloudcli-client-prod-build.timer` → `.service` | every 2 min, `scripts/prod-client-build.sh`: builds only when a build input (`src`, `public`, `shared`, `index.html`, `vite.config.js`, `vite-plugins`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, `.env`, `package.json`, `package-lock.json`) changed since the last build's START (~30 s, `Nice=10`; one build at a time under `flock`, a failed build leaves nothing behind), into `.prod-client/builds/<id>`, then re-points the `.prod-client/current` symlink in one rename. The previous build's hashed assets are carried forward for two days, so a tab opened before a swap can still load its lazy chunks. `--force` builds regardless | — |
-| `cloudcli-dev-watchdog.timer` → `.service` | every 60 s, `/usr/local/bin/cloudcli-dev-watchdog.sh` re-asserts the bridge drops on :5183 and :5184, probes `/api/cli-version` on :3011 (any HTTP answer = alive; three misses 5 s apart = dead) `/src/main.tsx` on :5183 (200; two misses) and `/` on :5184 (200; two misses), and restarts the one unit whose canary failed — the supervisor survives a boot that never listened and never boots a replacement of its own, so a FIRST boot that fails leaves `:3011` unanswered with the supervisor still running (a later boot that fails is harmless: the previous server keeps serving), and Vite's transform can wedge, and in every case systemd still reads `active`. After three heals in a row it stops healing and leaves the unit `failed` with one distinct journal line | — |
+| Cerberus's keepers on eis1 | four checks (`cloudcli/dev-client.compiles`, `cloudcli/prod-client.ok`, `cloudcli/bridge.dropped`, `eis-app/dev.compiles`) whose auto-run entries run `deploy/heal/dev-unit.sh` to restart a client whose fresh module stops compiling — Vite's transform can wedge while systemd still reads `active` — and `deploy/heal/bridge-drop.sh` to put missing bridge drops back (MAN-10290); the API is kept by its supervisor (`deploy/dev-supervisor/README.md`) | — |
 | `cloudcli-sessions-tmux.service` | `/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity` — a do-nothing session holding the tmux server that the chat CLI of every project running on no node is spawned into, in a cgroup of its own so the API's restart cannot reach them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cloudcli/sessions` (mode 0700; `CLOUDCLI_SESSIONS_DIR` moves the directory). `sudo systemctl stop cloudcli-sessions-tmux` is the deliberate "end every live chat session of a project on no node" switch, and `CLOUDCLI_SESSION_KEEPALIVE=0` (or `off`/`false`) in the API's `.env` — unset here, so the feature is on — puts new turns of a project on no node back inside the API process; a turn of a project assigned to a node is refused instead (MAN-689) | — (unix sockets under `~/.cloudcli/sessions`) |
 | `cerberus-warden-sessions.service` | `/usr/bin/tmux -L cerberus-warden -f /dev/null new-session -d -s _keepalive sleep infinity` as `User=` the warden's account — the node-side twin of `cloudcli-sessions-tmux.service`, on its own tmux socket and directory: a do-nothing session holding the tmux server that the Cerberus warden spawns the chat CLIs of a project assigned to its node into, in a cgroup apart from `cerberus-warden.service`'s, so a warden restart or `--refresh` never reaches them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cerberus-warden/sessions` (mode 0700). On this machine (eis1) both session units run: a turn's CLI is in `tmux -L cerberus-warden` when its project is assigned to eis1, else in `tmux -L cloudcli-sessions`. Rendered and `enable --now`ed by `warden/enroll.sh` beside the warden's own unit, never restarted by `--refresh`; `sudo systemctl stop cerberus-warden-sessions` is the deliberate "end every live session on this node" switch (`ExecStop=-… kill-server`). The unit: MAN-7897 | — (unix sockets under `~/.cerberus-warden/sessions`) |
 | `cerberus-warden.service` | `/usr/bin/node /home/lyphe/.cerberus-warden/launcher.mjs` as `User=lyphe`, the operator's account and never root — the launcher, a copy `enroll.sh` makes outside every release: it runs whatever `current` names (`warden/src/main.mjs run`, the Cerberus warden) and takes a release that does not say hello within 60 s back to the one it replaced. The warden runs the probes center pushes down its link and sends their results back, and relays the Claude sessions center places on its node (MAN-7897). `Restart=always`, `RestartSec=5`, starts at boot. Neither `deploy/systemd/install.sh` nor a hand copy installs it: `warden/enroll.sh` renders every `warden/systemd/*.service` (this unit and `cerberus-warden-sessions.service`) into `/etc/systemd/system/`. Installed once with the command Cerberus prints for a new node (`POST /api/cerberus/enrollments`): `curl -fsSL http://100.103.222.79:3012/cerberus/enroll.sh \| sudo sh -s -- --name <node> --token <token>`. Each newer release (`npm run build:warden`, after a minor bump of `warden/package.json`) reaches it with the same URL and `sudo sh -s -- --refresh`: the script swaps `current`, copies the release's `launcher.mjs` out to the warden's home and restarts this unit, never the sessions unit. The unit: MAN-7837; the install: MAN-7826 | none — it listens on no TCP port and dials the warden gateway at `100.103.222.79:3012` (`CERBERUS_LISTEN`, above) |
@@ -4970,8 +4985,8 @@ The API and both client units read `.env` (`SERVER_PORT=3011`, `VITE_PORT=5183`,
 `PATH` (the app's shell tab and every spawned Claude session inherit the API unit's environment —
 a chat CLI sits in the keepalive's cgroup but is handed that same environment when it is spawned),
 `Restart=always`, `StartLimitBurst=5` in a 120 s window (a crash loop latches `failed` instead of
-restarting unseen forever; the watchdog resets and retries), and start at boot. The dev client and
-the watchdog live in `/etc/systemd/system/` only — no copy of either is kept in this repo. Two
+restarting unseen forever; Cerberus's restart entry runs `systemctl reset-failed` before it restarts), and start at boot. The API unit differs: `StartLimitIntervalSec=0` (never latches `failed`), `RestartSec=5` with `RestartSteps=4` and `RestartMaxDelaySec=60` backing off to 60 s, because the supervisor heals its own child (`deploy/dev-supervisor/README.md`). The dev client's unit lives in `/etc/systemd/system/` only — no copy of it is kept in this
+repo. Two
 more units this repo ships (the three production-client units are covered above), each installed
 with [`deploy/systemd/install.sh`](../deploy/systemd/install.sh) and each carrying its own exact
 commands in its header comment:
@@ -5128,11 +5143,11 @@ section: hosting/002 Rules that bite/002 ArchPulse's port 8005 must never be pro
   the mechanism's one home. Either way the API canary counts any HTTP status as alive and
   needs three misses ten seconds apart before it acts — a stall under load must never read as
   death.
-- **A crash loop ends in `failed`, not in a thrash.** `StartLimitBurst=5` in 120 s latches the
-  unit; the watchdog resets and retries at most three times in a row, then stands down and says
-  so. `systemctl is-failed cloudcli-server-dev` is then a truthful signal; clear the cause and
-  `systemctl reset-failed` + `restart` by hand (which also clears the watchdog's count on the
-  next passing probe).
+- **A crash loop ends in a wait, not in a thrash.** The API unit never latches `failed`
+  (`StartLimitIntervalSec=0`, restart delay backing off 5 s → 60 s). The supervisor boots its dead,
+  failed or silent child again at most three times in a row on the same code, then waits for the
+  next change (`deploy/dev-supervisor/README.md`). The client units still latch `failed` at
+  `StartLimitBurst=5` in 120 s; the watchdog resets and retries those at most three times, then stands down.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/child-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/keepPageOnReconnect.js
 
@@ -5159,8 +5174,7 @@ section: hosting/002 Rules that bite/003 The `.verify/` probes drive this same i
   behind it, and `systemctl start` is a no-op on a unit already reading `active` — exit 0,
   nothing revived. The truthful probe is `tmux -L <socket> ls` (`no server running on
   /tmp/tmux-1000/<socket>` when it is gone), and `systemctl restart` is the only cure. Measured
-  on this host 2026-09-08. Nothing watches this fork's keepalive — `cloudcli-dev-watchdog.sh`
-  does not know it — so it stays silently dead until a human restarts it.
+  on this host 2026-09-08. Nothing watches this fork's keepalive, so it stays silently dead until a human restarts it.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/child-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/keepPageOnReconnect.js
 
@@ -5168,12 +5182,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md,
 section: hosting/003 Runbook
 
 ```
-systemctl status cloudcli-server-dev cloudcli-client-dev cloudcli-dev-watchdog.timer cloudcli-sessions-tmux
+systemctl status cloudcli-server-dev cloudcli-client-dev cloudcli-sessions-tmux
 sudo iptables -S INPUT | grep -E '518[34]'   # the bridge drops (docker0, br-+) on both client ports
+deploy/heal/bridge-drop.sh check 5183 5184      # the same rules counted: "4 of 4 bridge drops in place"
 systemctl status cloudcli-client-prod cloudcli-client-prod-build.timer
 scripts/prod-client-build.sh --force            # rebuild :5184 now instead of waiting for the timer
 readlink .prod-client/current                   # the build :5184 is serving
-cat /run/cloudcli-dev-watchdog/*.heals 2>/dev/null   # consecutive heals per unit, absent when healthy
 tmux -L cloudcli-sessions ls                 # the truthful liveness probe (see "A dead tmux keepalive…"); `_keepalive` alone = no chat CLI running
                                              # one `<app session id>-<base36>` per live CONVERSATION (every message joins it; it closes two hours after the last one, never mid-task); a restart re-adopts or retires the rest, so a lingering one means the gate is off (see "A server heal…")
 ls -A ~/.cloudcli/sessions                   # `.sock`/`.ndjson`/`.json` per host above, so empty only when that list is `_keepalive` alone
@@ -5948,8 +5962,8 @@ served by a proxy any more. The accounts and usage reads are the sibling module'
 MAN-460. The shapes on the wire are read from their declarations, not from a copy
 here (see §"Where the shapes live").
 
-**One provider, one poller.** `App.tsx` mounts `MemoryIntakeProvider` inside `ProtectedRoute`, so
-the queue is never asked for against the login screen. The provider holds the READING alone: the
+**One provider, one reader.** `App.tsx` mounts `MemoryIntakeProvider` inside `ProtectedRoute`, so
+the queue is never asked for against the login screen. It reads on mount, on `memory_changed` (MAN-453) and a reconnect, and when the tab is shown again; no timer. The provider holds the READING alone: the
 readers are `useInboxWaiting` (the rail's Inbox badge, through `useRailBadges`), the
 chat gutter and the panel; the writers are the panel, the gutter's body and the heal module's rule cards (Inbox → Heal → Rules, MAN-9688), each through
 `useMemoryReview`. The write lifecycle lives there rather than in the context for exactly that reason: a value carrying the in-flight id and the held
@@ -9383,7 +9397,7 @@ file back is the second save), COALESCE three times. A runner that bounds a case
 | **BROKEN** | `export { doesNotExist };` + a call to it | The API never stops answering: `canary_samples_ge80pct=true canary_misses=0 boot_failed_lines=1 names_error=true old_pid_kept=true recovered_new_pid=true index_restored=true`. The call is what breaks the boot — esbuild elides a bare unresolved export from a `.ts` file, so the export alone boots cleanly. |
 | **COALESCE** | two newlines, a second apart | However the supervisor splits them, one server is left: `surviving_children=1 zombies=0 old_pid_gone=true single_bound=true index_restored=true`, `canary_misses` 0 or 1. Two saves a second apart are one boot by the debounce, and the case waits one more debounce after the handover for a second cycle to show itself. One boot or two handovers is not a distinction the CASE line makes — the supervisor's `boot:` lines, which `COALESCE.json` carries, do. The supervisor's `change during boot` restart is out of this case's reach, and out of any save's: a second change fires a debounce after a save made once the first had fired, and a boot (30 s at most) and a retirement (10 s at most) end inside that. Only a `reboot` request from the serving API lands on a pending boot, and no case provokes one. |
 | **READOPT** | one newline, under a live session whose background work has not finished | The successor re-adopts only once the predecessor is *gone*: `complete_count=1 handover_ok=true readopted_ge1=true readopt_from_new_pid=true readopt_after_retire=true bg_completed_lines=1 host_gone=true index_restored=true`. Adopting sooner would SIGHUP the very host it inherited; the journal's own ordering against `retired pid <old>` is what proves it did not. |
-| **RESTART** | nothing — `sudo -n systemctl restart cloudcli-server-dev` | The unit still lands the supervisor as MainPID with one child under it: `canary_back_within_5s=true supervisor_is_main=true single_child=true watchdog_sha_same=true`. This one is a real outage, unlike a handover, and it is timed from *before* the command is issued. |
+| **RESTART** | nothing — `sudo -n systemctl restart cloudcli-server-dev` | The unit still lands the supervisor as MainPID with one child under it: `canary_back_within_5s=true supervisor_is_main=true single_child=true`. This one is a real outage, unlike a handover, and it is timed from *before* the command is issued. |
 | `restore` | nothing — it puts the file back | The escape hatch, not a case: prints `RESTORED changed` or `RESTORED unchanged`, waits out the handover a real restore provokes, and measures nothing. |
 
 Four things to know before running one:
@@ -14399,3 +14413,37 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/hooks/useFixe
 - Unchanged: a moved id or window still drops the old answer and asks the current one; Refresh and `visibilitychange` during a read still owe ONE more read.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/hooks/useAnalyticsSection.ts
+
+## MAN-10290 — Cerberus keepers on eis1 — four checks of the dev clients, EIS App's dev server and the bridge drops, their auto-run entries, and deploy/heal
+
+What keeps the CloudCLI clients, EIS App's dev server and the Docker bridge drops on eis1 healthy: four Cerberus checks on node `eis1`, each with one auto-run catalog entry, and the two scripts under `deploy/heal/` those entries run. Everything is written through Cerberus's own API (`PUT /api/cerberus/definitions/eis1`, MAN-7812; `POST /api/cerberus/catalog` and `PUT /api/cerberus/catalog/:id/auto`), never into the store's file. Unit names, ports and urls live in those rows and in the entries' arguments; the scripts name none of their own.
+
+## The checks
+| key | kind | what it reads | every / timeout | label |
+|---|---|---|---|---|
+| `cloudcli/dev-client.compiles` | http | `http://127.0.0.1:5183/src/main.tsx?t={nonce}` | 60 s / 10 s | CloudCLI dev client compiles a fresh module |
+| `cloudcli/prod-client.ok` | http | `http://127.0.0.1:5184/` | 60 s / 10 s | CloudCLI production client answers |
+| `cloudcli/bridge.dropped` | exec | `/home/lyphe/.claude/claudecodeui_lyphe/deploy/heal/bridge-drop.sh check 5183 5184` | 300 s / 10 s | Docker bridges are kept off the CloudCLI client ports |
+| `eis-app/dev.compiles` | http | `http://localhost:5190/src/main.jsx?t={nonce}` | 60 s / 5 s | EIS App dev server compiles a fresh module |
+
+No pass or warn is written: http passes on `status == 200`, exec on `exit == 0`. `{nonce}` is filled by the warden's http kind with one fresh token per run (MAN-7818), so Vite has to compile the module instead of answering from its cache: a wedged transform fails the check while systemd still reads the unit `active`. An ok http check reads `HTTP 200 in <n> ms`; an ok bridge check reads `4 of 4 bridge drops in place`.
+
+## The entries
+Every entry: node `eis1`, `when: failing`, `limit: { runs: 3, per: 3600 }`, `recheck: true`, auto on.
+| id | check | cmd | timeout |
+|---|---|---|---|
+| `restart-the-cloudcli-dev-client` | `cloudcli/dev-client.compiles` | `/home/lyphe/.claude/claudecodeui_lyphe/deploy/heal/dev-unit.sh cloudcli-client-dev.service http://127.0.0.1:5183/src/main.tsx 200` | 120 s |
+| `restart-the-cloudcli-production-client` | `cloudcli/prod-client.ok` | `/home/lyphe/.claude/claudecodeui_lyphe/deploy/heal/dev-unit.sh cloudcli-client-prod.service http://127.0.0.1:5184/ 200` | 120 s |
+| `restart-the-eis-app-dev-server` | `eis-app/dev.compiles` | `/home/lyphe/.claude/claudecodeui_lyphe/deploy/heal/dev-unit.sh eis-app-dev.service http://localhost:5190/src/main.jsx 200` | 120 s |
+| `put-the-bridge-drops-back` | `cloudcli/bridge.dropped` | `/home/lyphe/.claude/claudecodeui_lyphe/deploy/heal/bridge-drop.sh fix 5183 5184` | 30 s |
+
+`cloudcli/http.ok` has no entry: Cerberus runs inside the API it would restart. That API's own death, failed boot or silence is healed by its supervisor (`deploy/dev-supervisor/README.md`), and its unit by systemd's restart policy.
+
+## The scripts
+- `deploy/heal/dev-unit.sh <unit> <canary-url> <wanted-status>`: one probe is a GET of the url with `?t=<fresh token>`, 10 s at most. A unit up less than 40 s is waited on ("… has been up only <n>s, waiting for it to finish starting"); then after 3 s a healthy probe exits 0 ("<unit> answers again; not restarting"); otherwise `sudo -n systemctl reset-failed` and `restart` ("restarting <unit> (<url> answered <status or nothing>, wanted <status>)"), then a probe each second for 30 s: "<unit> answers again after <n>s" exit 0, or "<unit> was restarted but <url> still does not answer" exit 1.
+- `deploy/heal/bridge-drop.sh check|fix <port>...`: the rules both client units insert at start (INPUT, tcp, the port, `-i docker0` and `-i br-+`, DROP; two per port). `check` reads `sudo -n /usr/sbin/iptables -S INPUT` once and ends "<n> of <m> bridge drops in place", exit 0 when all are there; `fix` inserts each missing one, a line per rule, then the check line.
+
+## Reading them
+`GET /api/cerberus/checks/eis1/<key>` carries the check, its `fixes` and its last `run` (by `auto` or `you`, `result`, `lines`). Measured 2026-11-26 on eis1: `eis-app-dev.service` stopped by hand at 14:19:01; the check failed ("Connection refused"), the auto run restarted the unit ("restarting eis-app-dev.service (http://localhost:5190/src/main.jsx answered nothing, wanted 200)", "eis-app-dev.service answers again after 2s", exit 0) and the check read ok 37 s after the stop.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/heal/bridge-drop.sh, /home/lyphe/.claude/claudecodeui_lyphe/deploy/heal/dev-unit.sh

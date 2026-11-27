@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, readApiJson } from '@/shared/api';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
 import type { DeepseekRange, DeepseekUsageSummary } from '@/shared/types';
 
-/**
- * How often the view asks the reader again.
- *
- * Ten seconds, for the reason the Jev view polls at ten: each poll spawns one Python process on this
- * host — the reader is a command that also syncs the ledger, not a table the browser can query — and
- * the screen is a ledger of what has already been spent rather than a live meter. Faster than this
- * is a process a second for a number nobody acts on that fast.
- */
-export const DEEPSEEK_USAGE_POLL_MS = 10_000;
+/** The frame a moved transcript sends (MAN-453): the ledger may have a new row. */
+const DEEPSEEK_USAGE_FRAMES = ['deepseek_usage_changed'] as const;
 
 /** How many feed rows the view asks for. The feed is the newest-first tail, not the whole ledger. */
 const DEEPSEEK_USAGE_FEED = 50;
@@ -30,19 +24,21 @@ export type DeepseekUsageRead = {
  * The tag is the whole reason this is one value rather than three: a reading of another window is not
  * this window's numbers, so the moment the range moves the data is absent without anyone having to
  * clear it — no frame draws yesterday's totals under a `30d` label. `data` is likewise the reading
- * kept ACROSS a failed poll, because a fault beside real numbers is a true screen while a blank one
+ * kept ACROSS a failed read, because a fault beside real numbers is a true screen while a blank one
  * is not.
  */
 type SettledReading = { range: DeepseekRange; data: DeepseekUsageSummary | null; error: string | null };
 
 /**
- * The DeepSeek view's whole read: `api.deepseek.usage` on a timer, in the shape of `useJevPanel`.
+ * The DeepSeek view's whole read: `api.deepseek.usage` on mount, on each `deepseek_usage_changed`
+ * (paced by the server to one per 10 s) and on a reconnect while the tab is shown, and when the tab is
+ * shown again — in the shape of `useJevPanel`.
  *
  * ONE question per window at a time and the newest answer wins, which is what the two tokens are
- * for: a poll issued before a press must not land after the press's own read and put the pre-press
- * numbers back on screen for ten seconds. The interval stands down while the tab is hidden — a
- * backgrounded timer is throttled to near-nothing anyway, and the reader it would wake is a process
- * this host pays for — and `visibilitychange` is what asks the moment the operator comes back.
+ * for: a frame's read issued before a press must not land after the press's own read and put the
+ * pre-press numbers back on screen. Each read spawns the ledger's reader, a process this host pays
+ * for, which is why a frame heard while the tab is hidden is let pass and `visibilitychange` is what
+ * asks the moment the operator comes back.
  */
 export function useDeepseekUsage(range: DeepseekRange): DeepseekUsageRead {
   const [settled, setSettled] = useState<SettledReading | null>(null);
@@ -50,11 +46,11 @@ export function useDeepseekUsage(range: DeepseekRange): DeepseekUsageRead {
   // Mount flag: a read that resolves after this panel is gone must not set state on the run that
   // replaced it.
   const mountedRef = useRef(true);
-  // Which read this is. Two can be open at once — the interval's and the one the refresh press asks
-  // for — so each takes a token.
+  // Which read this is. Two can be open at once — a frame's and the one the refresh press asks for —
+  // so each takes a token.
   const newestReadRef = useRef(0);
   // The newest token that has ANSWERED. An older answer landing after it is dropped rather than
-  // published: a poll that left BEFORE a press must not land after it and put the pre-press numbers
+  // published: a read that left BEFORE a press must not land after it and put the pre-press numbers
   // back on screen.
   const newestAnswerRef = useRef(0);
 
@@ -87,18 +83,12 @@ export function useDeepseekUsage(range: DeepseekRange): DeepseekUsageRead {
 
   useEffect(() => {
     mountedRef.current = true;
-    // A new window is a new question and it is asked AT ONCE rather than at the next tick: the press
-    // that moved the range is answered in the same breath as the label that moved with it.
+    // A new window is a new question and it is asked AT ONCE: the press that moved the range is
+    // answered in the same breath as the label that moved with it.
     void refresh();
 
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      void refresh();
-    }, DEEPSEEK_USAGE_POLL_MS);
-
-    // Coming back to the tab is the one moment the ledger has been written under a screen that would
-    // otherwise never ask again — what a person reads on return is a reading of now, not of whenever
-    // the browser last let the timer through.
+    // Coming back to the tab is the one moment the ledger may have been written under a screen that
+    // let its frames pass while hidden — what a person reads on return is a reading of now.
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
@@ -106,10 +96,15 @@ export function useDeepseekUsage(range: DeepseekRange): DeepseekUsageRead {
 
     return () => {
       mountedRef.current = false;
-      window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [refresh]);
+
+  // Told, not ticked: a moved transcript is the only thing that can add a row. A hidden tab lets the
+  // frame pass, since showing the tab reads anyway and the reader is a process this host pays for.
+  useServerFrame(DEEPSEEK_USAGE_FRAMES, () => {
+    if (document.visibilityState === 'visible') void refresh();
+  });
 
   // A reading of another window is absent, not stale: the data is derived from the window it
   // answered, so the range moving empties the screen before any effect can run. That absence is also

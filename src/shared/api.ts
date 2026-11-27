@@ -1668,6 +1668,10 @@ export const api = {
   // so the caller reads the body's `installed`/`reason` rather than the status.
   cliVersion: () => get('/api/cli-version'),
 
+  // The app's newest release, read by the server from GitHub once per host (server/modules/app-release).
+  // A 503 means the server has not read it yet; the app_release_state frame brings it when it lands.
+  appRelease: () => get('/api/app-release'),
+
   // The money left on this host's DeepSeek account (docs/MANUAL.md (deepseek-balance)). A different account
   // from the Claude accounts the door holds, and a different origin: the server reads it from the
   // vendor with the key it holds, so the key never reaches this side. Answers 200 always, for the

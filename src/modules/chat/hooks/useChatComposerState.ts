@@ -35,6 +35,7 @@ import { useFileMentions } from '@/modules/chat/hooks/useFileMentions';
 import { useInputHistory } from '@/modules/chat/hooks/useInputHistory';
 import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
 import { useRestartOnInstalledCli } from '@/modules/chat/hooks/useRestartOnInstalledCli';
+import { useDraftsChangedFrame } from '@/modules/chat/hooks/useDraftsChangedFrame';
 import { useScopedAttachments } from '@/modules/chat/hooks/useScopedAttachments';
 import { useSteeredMessages } from '@/modules/chat/hooks/useSteeredMessages';
 import { isEngineHandledCommand, isImageAttachment } from '@/shared/utils';
@@ -233,8 +234,7 @@ export function useChatComposerState({
 
   // The window the chat is drawn in. The deferred submits and the scroll after a send are timers the
   // reader waits on, so they run there (a hidden opener throttles its timers to one a second); the
-  // confirm asks in the window the reader is looking at. The 5 s draft poll below stays on the
-  // opener's clock: it reconciles data and nothing the reader is waiting on.
+  // confirm asks in the window the reader is looking at.
   const hostWindow = useHostWindow();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // A chat that floats takes the reader's typing with it: the press that floated it had its focus
@@ -1187,8 +1187,9 @@ export function useChatComposerState({
     [handleSubmit],
   );
 
-  // The VPS dispatcher owns sending. While the card is visible, periodically reconcile it with the
-  // server, so the UI notices when the server claims it or another tab adds to it.
+  const reconcileOnDraftsFrameRef = useDraftsChangedFrame();
+  // The VPS dispatcher owns sending. While the card is visible it is reconciled with the server on each
+  // drafts_changed, so the UI notices when the server claims it or another tab adds to it.
   useEffect(() => {
     if (!sessionKey || !queuedDraft) {
       return;
@@ -1215,9 +1216,8 @@ export function useChatComposerState({
         return extendsQueuedMessage(card, stored) ? { ...stored, attachments: card.attachments } : stored;
       });
     };
-    const timer = setInterval(() => void reconcile(), 5_000);
-    // A hidden tab's timers are throttled (to about once a minute after a few minutes), so its
-    // card can be far behind; catch up as soon as it is shown.
+    reconcileOnDraftsFrameRef.current = reconcile;
+    // Being shown again is its own reason to ask: what a person reads on return is a reading of now.
     const reconcileWhenShown = () => {
       if (hostWindow.document.visibilityState === 'visible') {
         void reconcile();
@@ -1226,10 +1226,10 @@ export function useChatComposerState({
     hostWindow.document.addEventListener('visibilitychange', reconcileWhenShown);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      reconcileOnDraftsFrameRef.current = null;
       hostWindow.document.removeEventListener('visibilitychange', reconcileWhenShown);
     };
-  }, [hostWindow, queuedDraft, sessionKey]);
+  }, [hostWindow, queuedDraft, reconcileOnDraftsFrameRef, sessionKey]);
 
   // True while an Edit or Delete of the card waits on the server's answer; a second press meanwhile
   // would ask the server to clear what the first has not finished clearing.

@@ -59,14 +59,14 @@ const PILL_TARGET: Record<HealPillKey, string | 'settings'> = {
  */
 export function HealPanel({ projectChoices }: { projectChoices: readonly ProjectChoice[] }) {
   const { t } = useTranslation();
-  // The context owns the poll — one `--status` read a minute, plus a visibilitychange — and this
+  // The context owns the read — one `--status` read on each `heal_changed`, plus a visibilitychange — and this
   // panel draws what it last read. The state is the context's own union, never a second one here.
   const { state, refresh } = useHeal();
   const onRetry = () => void refresh();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // The dialog draws the summary's switches, so it lives only on a READY state. A poll that fails
+  // The dialog draws the summary's switches, so it lives only on a READY state. A read that fails
   // while it is open CLOSES it — adjusted during render, React's own pattern for state derived from a
-  // prop — rather than leaving `settingsOpen` true under an unmounted dialog that the next good poll
+  // prop — rather than leaving `settingsOpen` true under an unmounted dialog that the next good read
   // would pop back open, uninvited, with focus stolen to its X.
   if (settingsOpen && state.phase !== 'ready') setSettingsOpen(false);
   // The pill last pressed, null until one is: nothing on this tab is filtered on mount, so nothing

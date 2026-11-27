@@ -4,8 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { CerberusContext, type CerberusValue } from '@/modules/cerberus/context/CerberusContext';
 import { useCatalogRead } from '@/modules/cerberus/hooks/useCatalogRead';
 import { useDiagnosisVerbs } from '@/modules/cerberus/hooks/useDiagnosisVerbs';
+import { useMinute } from '@/modules/cerberus/hooks/useMinute';
 import { useWardensRead } from '@/modules/cerberus/hooks/useWardensRead';
 import { hm } from '@/modules/cerberus/utils/cerberusTime';
+import { rewindowOverview } from '@/modules/cerberus/utils/rewindowCells';
 import { api, refusalCode, refusalSentence, REQUEST_TIMEOUT_MS } from '@/shared/api';
 import type { CerberusNodeProject, CerberusNodeView, CerberusOverview, CerberusStartedBatch } from '@/shared/cerberus-types';
 import { useToast } from '@/shared/context/ToastContext';
@@ -20,25 +22,18 @@ import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove } from 
 const FRAME_READ_GAP_MS = 1_000;
 
 /**
- * How often the overview is read with no frame at all. Time itself is the cause here, and nothing
- * announces it: the minute cells slide, "12 s ago" ages, and a check whose results stopped goes
- * stale without a single row being written for center to hint about.
+ * How long the socket may stay down before the overview held is called stale. Every move of the fleet reaches
+ * this provider as a frame on that socket (a write's hint, or the moment time alone turned a check, which center
+ * hints too), so while it is down the picture cannot know it moved. A blip of a few seconds is noise; ninety is a
+ * monitor that cannot see, and must stop looking live. The reconnect reads at once, and its good answer takes the
+ * banner down.
  */
-const CLOCK_READ_MS = 30_000;
-
-/**
- * How long the overview held may go unanswered before a FAILED read calls it stale: three clock reads.
- * One dropped poll is noise; three in a row is a monitor that cannot see, and must stop looking live.
- * Every read here carries a 30 s deadline of its own (an abort timer in `refresh`, not the api layer's
- * `AbortSignal.timeout`, which older WebKit lacks), so one left hanging fails, and is judged, rather than
- * keeping the picture "fresh" forever.
- */
-const STALE_AFTER_MS = 3 * CLOCK_READ_MS;
+const STALE_AFTER_MS = 90_000;
 
 /**
  * How long after a landed write's failed re-read the overview is read again, in order: a blip that failed the
- * read is usually over within the first, and the second is for one that was not. After the last the clock's
- * own read (`CLOCK_READ_MS`) is the next chance.
+ * read is usually over within the first, and the second is for one that was not. After the last, the next
+ * frame or a reconnect is the next chance.
  */
 const REREAD_RETRY_PAUSES_MS = [1_000, 4_000];
 
@@ -118,14 +113,14 @@ function withFixFields(body: CerberusOverview): CerberusOverview {
  * already moved past.
  *
  * A FRAME IS A HINT, NOT A PICTURE. `cerberus_changed` says what moved and the answer to it is
- * always "read the overview again" — and reads overlap (a frame's, a write's, the clock's, the
- * mount's), so each takes a ticket and answers are published in TICKET order, never arrival order. A frame
+ * always "read the overview again" — and reads overlap (a frame's, a write's, a reconnect's,
+ * the mount's), so each takes a ticket and answers are published in TICKET order, never arrival order. A frame
  * of a warden update (`updates: true`) is the one kind read at once instead of held to the frame gap.
  */
 export function CerberusProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const { subscribe } = useWebSocket();
+  const { subscribe, isConnected } = useWebSocket();
 
   // The translator of the LATEST render, read through a ref: the three verbs below keep one
   // identity for the app's life, and a verb closing over `t` directly would be rebuilt on every
@@ -145,10 +140,9 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   // one keeps the fleet on screen, so this never turns true over one.
   const [unreachable, setUnreachable] = useState(false);
 
-  // True once a read fails while the overview held was answered over STALE_AFTER_MS before. Essential:
-  // it is what stops the fleet's Opening saying Live and puts the "last answer" banner over a fleet that
-  // may no longer be true. Set only by a failed read and cleared only by a good answer, so it never
-  // needs a timer of its own.
+  // True once the socket has been down for STALE_AFTER_MS with an overview held. Essential: it is what
+  // stops the fleet's Opening saying Live and puts the "last answer" banner over a fleet that may no
+  // longer be true. Set by the down spell's one deadline below and cleared only by a good answer.
   const [stale, setStale] = useState(false);
 
   // The catalog beside the overview, and the one read that brings it.
@@ -161,10 +155,6 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   // up to 10 s, and every Run now of those entries reads "Running…" for the wait. A list, since a press on
   // another entry inside that wait must not take the first one's label back.
   const [starting, setStarting] = useState<string[]>([]);
-
-  // When the overview held was last answered (epoch ms), 0 before any answer. A ref beside the state:
-  // a failed read judges against it, and a read that never changes the picture must not re-render.
-  const lastAnswerAtRef = useRef(0);
 
   // Mount flag: a read or a write that lands after this provider is gone must not set state or
   // raise a toast about a fleet nobody is looking at any more.
@@ -195,7 +185,6 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   const apply = useCallback((next: CerberusOverview) => {
     if (!mountedRef.current) return;
     overviewRef.current = next;
-    lastAnswerAtRef.current = Date.now();
     setOverview(next);
     setUnreachable(false);
     setStale(false);
@@ -206,11 +195,11 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
    * whose body has the overview's shape — replaces it; anything else, or a throw, leaves it as it
    * was and says "could not be read" only while there is none yet.
    */
-  const readOverview = useCallback(async (): Promise<boolean> => {
+  const readOverview = useCallback(async (attempt = 0): Promise<boolean> => {
     const ticket = ++newestReadRef.current;
     let answer: CerberusOverview | null = null;
     // The read's own deadline, over the headers AND the body: a half-open connection never fails by
-    // itself, and `stale` is judged only at a failed read. The timer outlives `response.json()`.
+    // itself. The timer outlives `response.json()`.
     const deadline = new AbortController();
     const deadlineTimer = window.setTimeout(() => deadline.abort(), REQUEST_TIMEOUT_MS);
     try {
@@ -229,12 +218,16 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
       // A failure judges BEFORE the ticket mark and never moves it: it published nothing, so an
       // older read still in flight whose answer is good must still be allowed to land. The last
       // good reading is worth more than a box about this minute's network, so only a fleet that has
-      // never been answered says it could not be read, and one held for over STALE_AFTER_MS says it
-      // is the last answer — both taken down by whichever good answer lands next. The next frame,
-      // the clock, or Try again reads again.
-      if (mountedRef.current) {
-        if (overviewRef.current === null) setUnreachable(true);
-        else if (Date.now() - lastAnswerAtRef.current > STALE_AFTER_MS) setStale(true);
+      // never been answered says it could not be read, taken down by whichever good answer lands
+      // next. A failure over a held overview reads again on REREAD_RETRY_PAUSES_MS, unless a newer good answer
+      // has landed meanwhile: the frame that started this read announced a change the screen must not miss.
+      // After the last pause, the next frame, a reconnect, or Try again reads again.
+      if (mountedRef.current && overviewRef.current === null) setUnreachable(true);
+      const pause = REREAD_RETRY_PAUSES_MS[attempt];
+      if (mountedRef.current && overviewRef.current !== null && pause !== undefined) {
+        window.setTimeout(() => {
+          if (mountedRef.current && newestAnswerRef.current < ticket) void readOverview(attempt + 1);
+        }, pause);
       }
       return false;
     }
@@ -260,8 +253,8 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
 
   /**
    * The re-read after a landed write failed: read again, on `REREAD_RETRY_PAUSES_MS`, until an answer to a read
-   * taken after the write (`after` is the newest ticket then) has been applied — this one's, or a frame's or the
-   * clock's. The write's verdict does not wait for it: a toast saying the write landed would otherwise sit over a
+   * taken after the write (`after` is the newest ticket then) has been applied — this one's, a frame's or a
+   * reconnect's. The write's verdict does not wait for it: a toast saying the write landed would otherwise sit over a
    * screen that still shows the old fleet for as long as the next read takes to come on its own.
    */
   const rereadAfterWrite = useCallback(async (after: number) => {
@@ -288,7 +281,7 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
    * alone — the body is not read, because the screen comes from the re-read — and a landed write is
    * followed by that re-read BEFORE this answers, so the card has already left Needs you when the
    * caller's toast speaks. A re-read that failed is tried again in the background (`rereadAfterWrite`), so
-   * the screen catches up in seconds, not at the next clock read. A refusal's body is read for the SERVER'S OWN WORDS ("until must be
+   * the screen catches up in seconds, not at the next frame. A refusal's body is read for the SERVER'S OWN WORDS ("until must be
    * within the next 24 hours"), which go under the toast when it carried any.
    *
    * A caller whose screen says one particular refusal in words of its own passes `saysOwnRefusal`: that
@@ -521,20 +514,31 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
       } else if (event.kind === 'websocket_reconnected') void refresh();
     });
     void refresh();
-    const clock = window.setInterval(() => void refresh(), CLOCK_READ_MS);
 
     return () => {
       mountedRef.current = false;
       unsubscribe();
-      window.clearInterval(clock);
       if (queuedRead !== null) window.clearTimeout(queuedRead);
     };
   }, [refresh, readOverview, readWardens, subscribe]);
 
+  // The socket's down spell, judged once: a deadline armed when it drops and dropped when it is back.
+  useEffect(() => {
+    if (isConnected) return undefined;
+    const timer = window.setTimeout(() => {
+      if (mountedRef.current && overviewRef.current !== null) setStale(true);
+    }, STALE_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, [isConnected]);
+
+  // The overview every reader is handed: the one held, its strips moved on the minute with nothing read.
+  const minute = useMinute();
+  const shownOverview = useMemo(() => (overview === null ? null : rewindowOverview(overview, minute)), [overview, minute]);
+
   // Anything that reads the fleet re-draws when a read lands. The verbs keep one identity, so
   // in practice only `overview`, `unreachable`, `stale`, `catalog`, `wardens` and `starting` ever make a new value here.
   const value = useMemo<CerberusValue>(() => ({
-    overview,
+    overview: shownOverview,
     unreachable,
     stale,
     catalog,
@@ -553,7 +557,7 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
     setAutoDiagnosis,
     runProposal,
     promote,
-  }), [overview, unreachable, stale, catalog, catalogFailed, refresh, mute, liftMute, setLabel, setProjectNode, starting, runEntry, setAuto, wardens, startUpdate, diagnose, setAutoDiagnosis, runProposal, promote]);
+  }), [shownOverview, unreachable, stale, catalog, catalogFailed, refresh, mute, liftMute, setLabel, setProjectNode, starting, runEntry, setAuto, wardens, startUpdate, diagnose, setAutoDiagnosis, runProposal, promote]);
 
   return <CerberusContext.Provider value={value}>{children}</CerberusContext.Provider>;
 }

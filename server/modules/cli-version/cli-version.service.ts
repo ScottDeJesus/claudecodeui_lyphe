@@ -13,12 +13,13 @@ const execFileAsync = promisify(execFile);
  * How long one successful `--version` answer stands before the binary is asked
  * again.
  *
- * The client polls this route, and spawning a process per poll would bill a
- * subprocess for a number that only changes when someone runs an installer.
+ * The route is read on every `cli_version_changed` frame and reconnect, and the binary watch
+ * (`cli-version-watch.ts`) probes on every touch of the file; spawning a process per read would
+ * bill a subprocess for a number that only changes when someone runs an installer.
  *
  * A success stands this long only while the binary behind it is the same file it
  * was read from — see `fingerprintOf`. The window is how often an installer
- * can be noticed without a spawn per poll, and it is not a claim that the file
+ * can be noticed without a spawn per read, and it is not a claim that the file
  * cannot change inside it: an install rewrites that file, the next ask sees a
  * different mtime and probes, so an upgrade is visible on the first ask after it
  * happened rather than on the first ask after the window ended.

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import type { HoopHandle, HoopLink, HoopSlot } from '@/shared/types';
 import { createHoopPainter, hoopHeightFor, hoopMiddle } from '@/shared/ui/hoopPainter';
-import { cn } from '@/shared/utils';
+import { cn, paceCanvasPainter } from '@/shared/utils';
 
 type HoopProps = {
   /** The things, in their order round the hoop: a run's things (a folder's, a lane's, a state's) side by side. */
@@ -114,6 +114,9 @@ export const Hoop = forwardRef<HoopHandle, HoopProps>(function Hoop(
     const painter = createHoopPainter(canvas);
     painterRef.current = painter;
     painter.setSlots(slotsRef.current);
+    // Every display frame while it turns or was just told something, ten a second by a timer at rest (`paceCanvasPainter`); the three reads
+    // tell it nothing.
+    const pace = paceCanvasPainter(painter, ['front', 'pointOf', 'azimuthOf'], (now) => loop(now));
 
     const theme = () => painter.readTheme(canvas);
     theme();
@@ -125,16 +128,15 @@ export const Hoop = forwardRef<HoopHandle, HoopProps>(function Hoop(
     stillness();
     calm.addEventListener('change', stillness);
 
-    let frame = 0;
     const loop = (now: number) => {
       // A page held under another is not seen, nor is a view folded away behind another: nothing is drawn until it is back.
       if (!isPageHeld() && canvas.offsetParent !== null) {
         const next = painter.frame(now);
         setShown((held) => (held.front === next.front && held.hover === next.hover ? held : next));
       }
-      frame = requestAnimationFrame(loop);
+      pace.next();
     };
-    frame = requestAnimationFrame(loop);
+    pace.next();
 
     // The wheel is the hoop's while the pointer is on it: a passive listener could not keep the page from scrolling under it.
     const onWheel = (event: WheelEvent) => {
@@ -143,7 +145,7 @@ export const Hoop = forwardRef<HoopHandle, HoopProps>(function Hoop(
     canvas.addEventListener('wheel', onWheel, { passive: false });
 
     return () => {
-      cancelAnimationFrame(frame);
+      pace.cancel();
       themed.disconnect();
       calm.removeEventListener('change', stillness);
       canvas.removeEventListener('wheel', onWheel);
