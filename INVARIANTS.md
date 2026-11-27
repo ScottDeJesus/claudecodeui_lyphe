@@ -25199,7 +25199,7 @@ LOW — the operator's own shell resolves /usr/bin/crontab, so his crontab write
 
 ```probe
 D=$(mktemp -d) && cat > "$D/p.sh" <<'EOF'
-env -i HOME=$HOME USER=$USER TERM=dumb bash -lic 'command -v crontab' </dev/null 2>/dev/null | tail -1 | grep -o '/[^ ]*crontab$' || echo none
+env -i HOME=$HOME USER=$USER TERM=dumb bash -lic 'readlink -f "$(command -v crontab)"' </dev/null 2>/dev/null | tail -1 | grep -o '/[^ ]*crontab$' || echo none
 EOF
 bash "$D/p.sh"
 # expect: /home/lyphe/.claude/scripts/crontab (while the gap stands: /usr/bin/crontab)
