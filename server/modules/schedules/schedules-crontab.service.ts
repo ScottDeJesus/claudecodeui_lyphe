@@ -199,9 +199,12 @@ export async function writeTab(text: string, tabfile?: string): Promise<void> {
 
   try {
     await fs.writeFile(staged, body, 'utf8');
+    // CRON_DOOR_WRITE tells the house's crontab on PATH (scripts/crontab) not to start its own
+    // registry sync: the door syncs inside the lock it already holds.
     await execFileAsync('crontab', [staged], {
       timeout: CRONTAB_TIMEOUT_MS,
       maxBuffer: CRONTAB_MAX_BUFFER,
+      env: { ...process.env, CRON_DOOR_WRITE: '1' },
     });
   } finally {
     if (staging.startsWith(SCRATCH_PREFIX)) {

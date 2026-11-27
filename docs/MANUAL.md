@@ -7268,7 +7268,7 @@ section: schedules/006 The sync check/009 When it runs
 
 Two ways, and neither decides anything itself — they start the same run:
 
-- **its own cron line, every fifteen minutes**: `*/15 * * * * /home/lyphe/.claude/scripts/cron-registry-sync sync >> /home/lyphe/.claude/state/cron-registry.log 2>&1`;
+- **its own cron line, every fifteen minutes**: `30 3 * * * /home/lyphe/.claude/scripts/cron-registry-sync sync >> /home/lyphe/.claude/state/cron-registry.log 2>&1`;
 - **the Refresh button** on the tab, which is `POST /api/schedules/sync` behind the same guard.
 
 The sync is **itself a tracked job**. Nothing special-cases its own line: the first run adopts it
@@ -7302,7 +7302,7 @@ table=live crontab=removed`, `list id=… kind=… state=… drift=… expressio
 `sync ok=y seen=… adopted=… missing=… changed=… ms=… ranAt=…`. A failure says so in the same
 shape (`add drift crontab=written registry=missing …`), never as a success line. Exit is `0` for work done, `1` for work that failed, `2` for a bad invocation (with
 the usage on stderr) — so a caller can never read "something went wrong" where "you typed it
-wrong" was meant. `list` prints the registry and nothing else; **the registry is the list**, and
+wrong" was meant. `add` and `remove` on the live crontab end with one `sync` inside the lock they hold, so the registry is current the moment the verb returns; the house crontab on PATH (scripts/crontab) syncs after every other crontab write. `list` prints the registry and nothing else; **the registry is the list**, and
 this page deliberately carries no copy of it.
 
 - `add` is idempotent on the command: one line and one row however many times it runs. `--log

@@ -7,6 +7,8 @@ import { createPacedHint } from '@/shared/index.js';
 import type { MemoryCandidateFull, MemoryCandidateLean } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
+import { ingestInboxSoon } from './memory-ingest.js';
+
 import {
   MAX_BODY_CHARS,
   MemoryRefusal,
@@ -348,7 +350,10 @@ function review(candidateId: string, approve: boolean): MemoryCandidateFull | nu
  */
 export function approveMemoryCandidate(candidateId: string): MemoryCandidateFull | null {
   try {
-    return review(candidateId, true);
+    const approved = review(candidateId, true);
+    // review() returns past its transaction's commit, so the note is on disk: the inbox run can take it now.
+    if (approved !== null) ingestInboxSoon(approved.assertedPath);
+    return approved;
   } catch (error) {
     if (error instanceof MemoryRefusal) {
       memoryCandidatesDb.recordRefusal({ id: candidateId, refusal: error.message });
