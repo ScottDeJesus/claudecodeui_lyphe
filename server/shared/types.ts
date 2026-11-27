@@ -234,6 +234,19 @@ export type GatewayEventKind =
   | 'session_host_liveness'
   | 'universe_activity'
   | 'universe_map'
+  | 'memory_changed'
+  | 'accounts_changed'
+  | 'drafts_changed'
+  | 'claude_updates_changed'
+  | 'cli_version_changed'
+  | 'heal_changed'
+  | 'jev_changed'
+  | 'deepseek_usage_changed'
+  | 'subagent_transcript_changed'
+  | 'running_sessions_state'
+  | 'accounts_usage_state'
+  | 'deepseek_balance_state'
+  | 'app_release_state'
   | 'pong'
   | 'protocol_error';
 
@@ -361,6 +374,108 @@ export type SessionHostLivenessEvent = {
 /** Sent to every open socket after a note is created, replaced or deleted. It names no note and no account: a client that hears it reads its own list again. It carries no `seq` and no `sessionId`, so it can never become a transcript row. */
 export type NotesChangedEvent = { kind: 'notes_changed'; at: number };
 
+/**
+ * A hint frame sent to every open socket when what one route answers has moved: `{ kind, at }` and
+ * nothing else, so a client that hears it reads that route again. No `seq` and no `sessionId`, so it
+ * never becomes a transcript row (MAN-453). Paced by `createPacedHint`.
+ */
+export type ServerHintEvent<TKind extends ServerHintKind> = { kind: TKind; at: number };
+
+/** The hint kinds, each named for the route its listeners read again. */
+export type ServerHintKind =
+  | 'memory_changed'
+  | 'accounts_changed'
+  | 'drafts_changed'
+  | 'claude_updates_changed'
+  | 'cli_version_changed'
+  | 'heal_changed'
+  | 'jev_changed'
+  | 'deepseek_usage_changed';
+
+/** The memory-intake queue changed: a candidate staged or reviewed. */
+export type MemoryChangedEvent = ServerHintEvent<'memory_changed'>;
+/** The Claude accounts store changed: a switch, a seed, a removal. */
+export type AccountsChangedEvent = ServerHintEvent<'accounts_changed'>;
+/** A queued draft was appended, cleared, claimed, restored or deleted. */
+export type DraftsChangedEvent = ServerHintEvent<'drafts_changed'>;
+/** The Claude update job or its stored check was written. */
+export type ClaudeUpdatesChangedEvent = ServerHintEvent<'claude_updates_changed'>;
+/** The installed CLI version, or the runs still on an older one, moved. */
+export type CliVersionChangedEvent = ServerHintEvent<'cli_version_changed'>;
+/** The heal reflex's ledger committed a write (`friction.db` or its WAL changed). */
+export type HealChangedEvent = ServerHintEvent<'heal_changed'>;
+/** The Jev ledger was appended to; paced to one frame per ten seconds. */
+export type JevChangedEvent = ServerHintEvent<'jev_changed'>;
+/** A transcript the DeepSeek usage counts was written. */
+export type DeepseekUsageChangedEvent = ServerHintEvent<'deepseek_usage_changed'>;
+/** A watched subagent transcript moved. Sent only to the sockets watching `key`, never to all. */
+export type SubagentTranscriptChangedEvent = { kind: 'subagent_transcript_changed'; at: number; key: string };
+
+/**
+ * A state frame: `{ kind, at }` plus the whole body its route answers, so a listener sets its state
+ * from the frame and never reads the route for it. No `seq` and no `sessionId`. `TBody` is the
+ * route's own answer type, named by the lane that sends it.
+ */
+export type ServerStateEvent<TKind extends ServerStateKind, TBody extends object> = { kind: TKind; at: number } & TBody;
+
+/** The state kinds, each carrying the body of one route. */
+export type ServerStateKind = 'running_sessions_state' | 'accounts_usage_state' | 'deepseek_balance_state' | 'app_release_state';
+
+/** GET /api/providers/sessions/running's answer. */
+export type RunningSessionsStateEvent<TBody extends object> = ServerStateEvent<'running_sessions_state', TBody>;
+
+/**
+ * One in-flight run, as the sidebar's Running list needs it: the registry's
+ * status fields plus the project the session belongs to, so the list never
+ * depends on which sessions a client has paged in.
+ */
+export type RunningSessionListItem = {
+  sessionId: string;
+  provider: LLMProvider;
+  startedAt: number;
+  lastSeq: number;
+  cliVersion: string | null;
+  projectId: string | null;
+  projectPath: string | null;
+  projectDisplayName: string;
+  sessionTitle: string;
+  lastActivity: string | null;
+  /** A question or permission prompt in this run is waiting on the user. */
+  awaitingInput: boolean;
+};
+
+/**
+ * The body of `GET /api/providers/sessions/running`, and of the `running_sessions_state` frame that carries it
+ * (`running-sessions.lane.ts`).
+ *
+ * `subagentSessionIds` is a TOP-LEVEL list rather than a field on each run, and that is the whole
+ * point of it: a conversation whose turn has ended is no longer a run and cannot appear in
+ * `sessions`, which is exactly the state the sidebar's purple dot exists to show. A list beside
+ * them can name a session the run registry has already forgotten.
+ */
+export type RunningSessionsPayload = {
+  sessions: RunningSessionListItem[];
+  /** Conversations with an agent still running, whether or not they carry a live run. */
+  subagentSessionIds: string[];
+  /**
+   * For each of those conversations, the model of every agent it has running, `''` for one whose model is not recorded yet: what
+   * the sessions board draws a dot for, in the model's colour. The same conversations as `subagentSessionIds`, from the same pass.
+   */
+  subagentModels: Record<string, string[]>;
+  /** Conversations with a question or permission prompt waiting, whether or not they carry a live run. */
+  awaitingInputSessionIds: string[];
+};
+/** The usage window's reading, under `usage`. */
+export type AccountsUsageStateEvent<TBody extends object> = ServerStateEvent<'accounts_usage_state', TBody>;
+/** GET /api/deepseek/balance's answer for one server reading. */
+export type DeepseekBalanceStateEvent<TBody extends object> = ServerStateEvent<'deepseek_balance_state', TBody>;
+/** GET /api/app-release's answer: the newest release. */
+export type AppReleaseStateEvent<TBody extends object> = ServerStateEvent<'app_release_state', TBody>;
+/** One published release of the app, as the update prompt and the About tab draw it. */
+export type AppReleaseInfo = { title: string; body: string; htmlUrl: string; publishedAt: string };
+/** GET /api/app-release's body and app_release_state's: `tag` is GitHub's tag name verbatim (`v1.2.3`); both fields are null when the repository has published no release. */
+export type AppReleaseReading = { tag: string | null; release: AppReleaseInfo | null };
+
 /** Sent to every open socket after a followup is filed, closed or reopened. It names the chat by its APP session id under `appSessionId` — deliberately NOT `sessionId`: the workspace flags a chat for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen (`useProjectsState`), and a chat's items moving is no news in the transcript. A widget re-reads when the id is its own chat's and ignores the frame otherwise. It carries no `seq`, so it can never become a transcript row. */
 export type FollowupsChangedEvent = { kind: 'followups_changed'; appSessionId: string; at: number };
 
@@ -398,8 +513,8 @@ export type DispatcherCardStage = { name: string; soul: string | null; launch_id
 export type DispatcherCard = { board: string; card: string; title: string; state: DispatcherCardState; flow: 'bug' | 'change' | 'tweak' | 'cure' | null; part: 'whole' | 'fix' | 'change'; sorted_by: string | null; confidence: number | null; hold: string | null; waits_on: number | null; waited_days: number | null; rides_as: 'high' | 'medium' | 'low' | null; chain_id: string | null; cases: DispatcherCardCase[]; stages: DispatcherCardStage[] };
 /** The two causes a phase's or a plan's `stalled` word carries (`report_stall`): `dispatcher_down` when no daemon holds the home, so nothing can record anything, and `ended_unrecorded` when one does and has not. Both are answered by Resume, which wakes or starts the daemon. */
 export type DispatcherStall = 'dispatcher_down' | 'ended_unrecorded';
-/** The plan's word, in ONE precedence: `gaps`, `complete`, `hidden`, `scheduled`, `paused`, `queued`, `stalled`, `live`, `parked`, else `idle`. `gaps` is a plan whose every phase is done while a gap ticket one of them left is still open (`gaps.shipped` is not yet true): it finished, and the house is healing what it could not close — it reads `complete` once the last such ticket ends. `hidden` is a plan the operator hid (`DispatcherPlan.hidden` says since when): held out of the queue and paused until he Shows it, and it outranks every word below it — an hour armed for it fires into a refusal, so a card reading `scheduled` over it would promise a start nothing makes. `stalled` is a released plan (approved, unpaused) whose only running work has ENDED with nothing to record it — never `live`, because nothing is moving it; `DispatcherPlan.stalled` says why. `scheduled` outranks the pause flag on purpose — a paused plan with an hour set is going to start by itself, and calling it merely `paused` would hide the one fact the operator needs. `paused` and `queued` are told apart by whether a walk ever launched: a paused plan that has run is stopped mid-plan, one that never launched is still waiting at the gate. */
-export type DispatcherPlanStatus = 'idle' | 'parked' | 'queued' | 'scheduled' | 'paused' | 'stalled' | 'live' | 'hidden' | 'complete' | 'gaps';
+/** The plan's word, in ONE precedence: `gap-needs-you`, `gaps`, `complete`, `hidden`, `scheduled`, `paused`, `queued`, `stalled`, `live`, `parked`, else `idle`. `gap-needs-you` is a plan whose every phase is done while a gap ticket its fix rounds could not close is open (`gaps.word`): the builder was sent back twice and the gap still stands, so it needs the operator — the ticket's card asks him — and it reads `complete` once the last such ticket ends. `gaps` is the same for a ticket filed before the fix rounds existed: the house is healing it. `hidden` is a plan the operator hid (`DispatcherPlan.hidden` says since when): held out of the queue and paused until he Shows it, and it outranks every word below it — an hour armed for it fires into a refusal, so a card reading `scheduled` over it would promise a start nothing makes. `stalled` is a released plan (approved, unpaused) whose only running work has ENDED with nothing to record it — never `live`, because nothing is moving it; `DispatcherPlan.stalled` says why. `scheduled` outranks the pause flag on purpose — a paused plan with an hour set is going to start by itself, and calling it merely `paused` would hide the one fact the operator needs. `paused` and `queued` are told apart by whether a walk ever launched: a paused plan that has run is stopped mid-plan, one that never launched is still waiting at the gate. */
+export type DispatcherPlanStatus = 'idle' | 'parked' | 'queued' | 'scheduled' | 'paused' | 'stalled' | 'live' | 'hidden' | 'complete' | 'gaps' | 'gap-needs-you';
 /** Since when the operator has had a plan hidden, and the epic whose press it was (`hooks/dispatcher/store_hidden.py`, `report.hidden_reading`): `at` is the hide's own store stamp — the moment the card's news let-go compares against — and `arc` is the epic's bare name when the press was the epic deck's (its plans then leave and return as one), else `null`. */
 export type DispatcherPlanHidden = { at: string; arc: string | null };
 /** The operator's planning brake on ONE feature or ONE epic (`dispatcher pause-planning <name>`; the dispatcher's own record, `hooks/dispatcher/store_planning.py`): `at` is the press's store stamp (`YYYY-MM-DDTHH:MM:SSZ`) and `by` the door that pressed it — `cli` (his terminal) or `app:card` (this app's card). It is NOT the walk's `paused` flag, which also means the gate's hold, a Hide, park-at-peak and the backoff. `DispatcherPlan.planning_paused` and `DispatcherArc.planning_paused` carry it, each `null` while that subject's OWN brake does not stand; read tolerantly (`planningPausedSince`), and a key that IS there and is neither `null` nor `{at, by}` text is refused by name. */
@@ -415,7 +530,7 @@ export type DispatcherDecidedBy = 'builder' | 'rule' | 'designer';
 /** One choice made FOR the operator since the plan's last load (`report.plan_dict.decided`, `store_decided.since_load`), oldest first. `id` is the row's own and `at` its stamp; `task` is the TITLE of the phase it was made in (never its key, INV-76), `null` for a choice of no phase. `what` is what was left open, `choice` what was done, `why` one line, `undo` what reverses it. */
 export type DispatcherDecided = { id: number; at: string; task: string | null; by: DispatcherDecidedBy; what: string; choice: string; why: string; undo: string };
 /** One gap a finished task left open, which the house is healing (`report.plan_dict.open_gaps`, `gaps.open_for`): `task` is the phase's title, `title` the finding's, `ticket` the open ticket's id and `priority` that ticket's own word as its board holds it — a string, because the board's vocabulary is the board's. While one is open the plan reads `gaps`, never `complete`. */
-export type DispatcherGap = { task: string; title: string; ticket: number; priority: string };
+export type DispatcherGap = { task: string; title: string; ticket: number; priority: string; /** Why its fix rounds could not close it, when they could not (`gaps.listed`); null for a ticket filed before them. */ needs_you: string | null };
 /** A phase whose walk waits on its designer (`report.phase_dict.ruling`, `decider.waiting`): `asked` while his ruling is owed. */
 export type DispatcherPhaseRuling = 'asked';
 /** One plan whole: its row, its waits, its armed hour, its books, its phases in position order and its log oldest first. `state` is the STORE's own state word — `designing`, `designed`, `questions`, `loaded`, `parked` — a string rather than a union, because the store's vocabulary belongs to the store. `goal` is null on a plan that has been opened and not yet designed. `session` is the session that opened it, `author` the soul that wrote its design. `schedule` is the armed hour read back out of systemd at this instant (`schedule.armed`), `{ start_at, unit }` with `start_at` the timer's own ISO stamp — so a timer stopped or fired by hand reads null here at once. `cost_usd`, `rounds` and `tokens*` sum this plan's phases — and `cost_usd` is PAID dollars, so a plan that rode the operator's Claude subscription reads `0` there while its tokens count everything it spent. `paid_vendor` names the vendor those dollars were billed by (`DeepSeek`, `Claude API`, or `""` for a mix or a swept record), read tolerantly. `launched` is whether a walk has ever gone out for it — see the field. */

@@ -7,8 +7,9 @@ import {
   RUNNING_BELIEVED_FOR_MS,
   hasFreshSubagentSidechains,
   readHistoryCompanionStamp,
-  runningSubagentModels,
+  runningSubagents,
 } from '@/modules/providers/services/session-agents.service.js';
+import type { RunningSubagent } from '@/modules/providers/services/session-agents.service.js';
 import type { LLMProvider } from '@/shared/types.js';
 
 /**
@@ -33,12 +34,12 @@ import type { LLMProvider } from '@/shared/types.js';
  * Nothing client-side can answer either: the chat a dot belongs to is usually not open, so its
  * transcript is not loaded anywhere. So the server answers.
  *
- * The sidechain reading's rule is `runningSubagentModels`', which is the pinned strip's: same
+ * The sidechain reading's rule is `runningSubagents`', which is the pinned strip's: same
  * container selection, same four-hour window. The two readings part in one place — the strip times
  * a row from `subagent.resume.at ?? message.timestamp`, this one from the launch — so a resume more
  * than four hours after its launch leaves the strip's row pinned while this answer stays dark.
  *
- * Cost is the reason this file has the shape it does. A poll every five seconds cannot read every
+ * Cost is the reason this file has the shape it does. A pass on every poke cannot read every
  * conversation, and it does not have to: the candidates are bounded to a window, and a transcript
  * read is skipped entirely unless something on disk says the session could hold a running agent
  * (`hasFreshSubagentSidechains`). What is left rides the same `sessionHistoryCache` the chat's own
@@ -55,8 +56,8 @@ import type { LLMProvider } from '@/shared/types.js';
 const MAX_CANDIDATES = 500;
 
 /**
- * How long one answer is reused. Two reasons, and both are real: several open tabs poll the same
- * endpoint five seconds apart, and the tail of a pass is a transcript parse. Short enough that a
+ * How long one answer is reused. Two reasons, and both are real: the lane's pokes arrive in bursts (a
+ * run's change and a watcher flush land together), and the tail of a pass is a transcript parse. Short enough that a
  * dot's appearance or disappearance is never the thing the reader waits on.
  */
 const ANSWER_TTL_MS = 2_000;
@@ -118,13 +119,13 @@ function candidateSessions(now: number): Candidate[] {
 }
 
 /**
- * The models of the agents one conversation has running, read through the history cache: empty when it has none.
+ * The agents one conversation has running, each with its model and launch, read through the history cache: empty when it has none.
  *
  * `transcriptPath: null` is not a case here — the candidate set is built from rows that carry one —
  * but a transcript that has since been deleted is: the cache answers null for it and the session is
  * simply not a hit.
  */
-async function sessionRunningSubagentModels(candidate: Candidate, now: number): Promise<string[]> {
+async function sessionRunningSubagents(candidate: Candidate, now: number): Promise<RunningSubagent[]> {
   const providerSessions = providerRegistry.resolveProvider(candidate.provider).sessions;
   const providerSessionId = candidate.providerSessionId ?? candidate.sessionId;
 
@@ -133,7 +134,7 @@ async function sessionRunningSubagentModels(candidate: Candidate, now: number): 
     transcriptPath: candidate.transcriptPath,
     // The same load, with the same options, as `sessionsService.fetchHistory` builds for a latest
     // page — deliberately, because it is the same cache entry: an open chat's own history read and
-    // this poll must never be two parses of one transcript.
+    // this pass must never be two parses of one transcript.
     loadFull: () => providerSessions.fetchHistory(candidate.sessionId, {
       limit: null,
       offset: 0,
@@ -143,7 +144,7 @@ async function sessionRunningSubagentModels(candidate: Candidate, now: number): 
     readCompanionStamp: () => readHistoryCompanionStamp(candidate.sessionId, candidate.transcriptPath, providerSessionId),
   });
 
-  return fullHistory ? runningSubagentModels(fullHistory.messages, now) : [];
+  return fullHistory ? runningSubagents(fullHistory.messages, now) : [];
 }
 
 /**
@@ -175,8 +176,11 @@ async function needsTranscriptRead(candidate: Candidate, now: number): Promise<b
   }
 }
 
+/** One sidechain pass: who has agents out, with their models, and the earliest launch among them (`null` when none has a time). */
+type SidechainReading = { running: Map<string, string[]>; earliestLaunchAt: number | null };
+
 /** The conversations whose own transcript shows an agent still out, each with the models of the agents it has out. */
-async function collectSidechainRunning(now: number): Promise<Map<string, string[]>> {
+async function collectSidechainRunning(now: number): Promise<SidechainReading> {
   const candidates = candidateSessions(now);
   // The cheap narrowing runs together — it is all directory reads — and the parses behind it run
   // one at a time: they are CPU-bound, and a box with a dozen live agents should parse a dozen
@@ -184,15 +188,19 @@ async function collectSidechainRunning(now: number): Promise<Map<string, string[
   const wanted = await Promise.all(candidates.map((candidate) => needsTranscriptRead(candidate, now)));
 
   const running = new Map<string, string[]>();
+  let earliestLaunchAt: number | null = null;
   for (let index = 0; index < candidates.length; index += 1) {
     if (!wanted[index]) {
       continue;
     }
     const candidate = candidates[index];
     try {
-      const models = await sessionRunningSubagentModels(candidate, now);
-      if (models.length > 0) {
-        running.set(candidate.sessionId, models);
+      const agents = await sessionRunningSubagents(candidate, now);
+      if (agents.length > 0) {
+        running.set(candidate.sessionId, agents.map((agent) => agent.model));
+      }
+      for (const { launchedAt } of agents) {
+        if (launchedAt !== null && (earliestLaunchAt === null || launchedAt < earliestLaunchAt)) earliestLaunchAt = launchedAt;
       }
     } catch (error) {
       // One unreadable conversation never takes the endpoint down with it: the dot is missing for
@@ -201,7 +209,7 @@ async function collectSidechainRunning(now: number): Promise<Map<string, string[
     }
   }
 
-  return running;
+  return { running, earliestLaunchAt };
 }
 
 /**
@@ -235,9 +243,12 @@ function collectDispatchedRunning(now: number): Map<string, string[]> {
   return souls;
 }
 
+/** One whole pass: every conversation with an agent out, and the instant that answer lapses with nothing written. */
+type RunningPass = { running: Map<string, string[]>; lapseAt: number | null };
+
 /** Every conversation with an agent out, with the models of all it has out: its own transcript's agents first, then what it dispatched. */
-async function collectRunning(now: number): Promise<Map<string, string[]>> {
-  const running = await collectSidechainRunning(now);
+async function collectRunning(now: number): Promise<RunningPass> {
+  const { running, earliestLaunchAt } = await collectSidechainRunning(now);
   try {
     for (const [appSessionId, models] of collectDispatchedRunning(now)) {
       running.set(appSessionId, [...(running.get(appSessionId) ?? []), ...models]);
@@ -247,26 +258,43 @@ async function collectRunning(now: number): Promise<Map<string, string[]>> {
     // dispatched dots this pass, never the sidechain dots the pass already holds.
     console.error('[SubagentRuns] Could not read the dispatched souls and chains:', error);
   }
-  return running;
+  return { running, lapseAt: earliestLaunchAt === null ? null : earliestLaunchAt + RUNNING_BELIEVED_FOR_MS };
 }
 
-let cachedAt = 0;
+/** When the pass behind `cached` STARTED: an answer is only as new as the moment its reading began. */
+let cachedStartedAt = 0;
 let cached: ReadonlyMap<string, readonly string[]> = new Map();
+let lastLapseAt: number | null = null;
 let inFlight: Promise<ReadonlyMap<string, readonly string[]>> | null = null;
+let inFlightStartedAt = 0;
 
-/** The one pass behind both answers below, cached briefly and never computed twice at once (`inFlight`): the endpoint is polled by every open tab. */
-async function runningNow(now: number): Promise<ReadonlyMap<string, readonly string[]>> {
-  if (now - cachedAt < ANSWER_TTL_MS) {
+/**
+ * The one pass behind both answers below, reused briefly and never computed twice at once (`inFlight`): the route and the
+ * running-sessions lane both ask it, and the lane's pokes come in bursts.
+ *
+ * `freshFrom` is the instant a caller's answer must not predate: a pass that began before it (cached or still out) is not
+ * taken. The lane passes the start of its reading, so a poke for a write it has just heard of (a soul ending, an agent
+ * reporting back) is never answered by a pass that read the disk before that write. The route passes nothing and takes any
+ * answer inside the reuse window.
+ */
+async function runningNow(now: number, freshFrom: number = 0): Promise<ReadonlyMap<string, readonly string[]>> {
+  if (cachedStartedAt >= freshFrom && now - cachedStartedAt < ANSWER_TTL_MS) {
     return cached;
   }
   if (inFlight) {
-    return inFlight;
+    if (inFlightStartedAt >= freshFrom) return inFlight;
+    // A pass that began too early is let finish (one pass at a time), and the question is asked again after it.
+    await inFlight.then(() => undefined, () => undefined);
+    return runningNow(Date.now(), freshFrom);
   }
 
+  const startedAt = Date.now();
+  inFlightStartedAt = startedAt;
   inFlight = collectRunning(now)
-    .then((running) => {
+    .then(({ running, lapseAt }) => {
       cached = running;
-      cachedAt = Date.now();
+      lastLapseAt = lapseAt;
+      cachedStartedAt = startedAt;
       return running;
     })
     .finally(() => {
@@ -281,10 +309,10 @@ async function runningNow(now: number): Promise<ReadonlyMap<string, readonly str
  * dispatched soul or chain — sorted.
  *
  * Every caller gets its own array: the cached answer is shared state, and a caller that sorted or
- * spliced it in place would be editing the answer the next poll reads.
+ * spliced it in place would be editing the answer the lane's next pass reads.
  */
-export async function listSubagentRunningSessionIds(now: number = Date.now()): Promise<string[]> {
-  return [...(await runningNow(now)).keys()].sort();
+export async function listSubagentRunningSessionIds(now: number = Date.now(), freshFrom: number = 0): Promise<string[]> {
+  return [...(await runningNow(now, freshFrom)).keys()].sort();
 }
 
 /**
@@ -294,10 +322,20 @@ export async function listSubagentRunningSessionIds(now: number = Date.now()): P
  *
  * Consumed by the running-sessions route (`provider.routes.ts`) as `subagentModels`.
  */
-export async function listSubagentRunningModels(now: number = Date.now()): Promise<Record<string, string[]>> {
+export async function listSubagentRunningModels(now: number = Date.now(), freshFrom: number = 0): Promise<Record<string, string[]>> {
   const models: Record<string, string[]> = {};
-  for (const [sessionId, held] of await runningNow(now)) {
+  for (const [sessionId, held] of await runningNow(now, freshFrom)) {
     models[sessionId] = [...held];
   }
   return models;
+}
+
+/**
+ * The instant the last pass's answer next changes with nothing written: the earliest launch among the agents it believed out,
+ * plus `RUNNING_BELIEVED_FOR_MS`, past which that agent is no longer believed. `null` when it believed none out by a launch time.
+ * The running-sessions lane arms its one deadline to it (`running-sessions.lane.ts`). A dispatched soul has no such instant: its
+ * end is the launcher's own change, which the lane hears.
+ */
+export function subagentRunsLapseAt(): number | null {
+  return lastLapseAt;
 }

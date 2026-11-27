@@ -4,7 +4,7 @@
 // read through t(). PlanDecided.tsx, its comments set aside, writes none of its English words in code; every
 // dispatcher.decided key it asks resolves in en/common.json to a non-empty string (a plural by its _one/_other pair; a key
 // built from a value, like by.<who>, by its parent block); English says the intent's words, "Decided for you",
-// "Gaps being healed" and "To undo"; and any other locale file that holds a dispatcher.decided block holds every key asked.
+// "Open gaps" and "To undo"; and any other locale file that holds a dispatcher.decided block holds every key asked.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +16,7 @@ const PIECE = path.join(REPO, "src/modules/dispatcher/PlanDecided.tsx");
 const LOCALES = path.join(REPO, "src/modules/i18n/locales");
 const HOME = "dispatcher.decided";
 // English the scaffold wrote in code; a key-like string (dispatcher.decided.earlier) is a key, never a word.
-const ENGLISH = /Decided for you|Gaps being healed|To undo|Was open|the builder|the designer|a rule|gaps? below|Show \d+ earlier|whole feature/;
+const ENGLISH = /Decided for you|Open gaps|To undo|Was open|the builder|the designer|a rule|gaps? below|Show \d+ earlier|whole feature/;
 const englishIn = (code) => [...code.matchAll(/(['"])([^'"\n]*)\1/g)].map((m) => m[2]).find((s) => !/^[\w.-]+$/.test(s) && ENGLISH.test(s));
 
 const at = (obj, dotted) => dotted.split(".").reduce((o, k) => (o && typeof o === "object" ? o[k] : undefined), obj);
@@ -48,7 +48,7 @@ runCase(async () => {
   for (const k of mine) if (!resolves(en, k)) wrong.push("en/common.json has no word for " + k);
   for (const b of myBlocks) { const v = at(en, b); if (!v || typeof v !== "object" || flat(v).length === 0) wrong.push("en/common.json has no block " + b + " for the key built from a value"); }
   const home = flat(at(en, HOME));
-  for (const phrase of ["Decided for you", "Gaps being healed", "To undo"]) if (!home.some((v) => v.includes(phrase))) wrong.push('en ' + HOME + ' never says "' + phrase + '"');
+  for (const phrase of ["Decided for you", "Open gaps", "To undo"]) if (!home.some((v) => v.includes(phrase))) wrong.push('en ' + HOME + ' never says "' + phrase + '"');
   let others = 0;
   for (const lang of fs.readdirSync(LOCALES).sort()) {
     if (lang === "en") continue;

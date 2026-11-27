@@ -8,7 +8,7 @@ import { createStackPainter } from '@/modules/roadmap/utils/stackPainter';
 import { ROADMAP_FEATURE_WORD_KEYS } from '@/shared/constants';
 import type { RoadmapStackHandle, RoadmapStackRest, RoadmapStackTarget, RoadmapStackTier, RoadmapStackWall } from '@/shared/types';
 import { useIsPageHeld } from '@/shared/context/HeldPageContext';
-import { cn } from '@/shared/utils';
+import { cn, paceCanvasPainter } from '@/shared/utils';
 
 type RoadmapStackProps = {
   /** What is in flight, laid out (`layoutStack`): its one ring. */
@@ -144,6 +144,9 @@ export function RoadmapStack({ tiers, arrival, open, onOpen, card, handleRef, re
     if (!box || !canvas) return undefined;
     const painter = createStackPainter(canvas);
     painterRef.current = painter;
+    // Every display frame while it moves or was just told something, ten a second by a timer at rest (`paceCanvasPainter`); `anchorOf` is
+    // asked each frame and tells it nothing.
+    const pace = paceCanvasPainter(painter, ['anchorOf'], (now) => loop(now));
 
     const measure = () => painter.resize(box.clientWidth, box.clientHeight, Math.min(2, window.devicePixelRatio || 1));
     const theme = () => painter.readTheme(canvas, groundBehind(box));
@@ -173,7 +176,6 @@ export function RoadmapStack({ tiers, arrival, open, onOpen, card, handleRef, re
     stillness();
     calm.addEventListener('change', stillness);
 
-    let frame = 0;
     // The open card's place as last written, so a still frame writes nothing to the page.
     let placed = '';
     const place = (holder: HTMLElement, css: string) => {
@@ -184,7 +186,7 @@ export function RoadmapStack({ tiers, arrival, open, onOpen, card, handleRef, re
     const loop = (now: number) => {
       // A page held under another is not seen: nothing is drawn for it until it is back.
       if (isPageHeld()) {
-        frame = requestAnimationFrame(loop);
+        pace.next();
         return;
       }
       const shown = painter.frame(now);
@@ -216,12 +218,12 @@ export function RoadmapStack({ tiers, arrival, open, onOpen, card, handleRef, re
           place(holder, `left:${left}px;top:${top}px;width:${width}px;max-height:${box.clientHeight - 16}px;`);
         }
       }
-      frame = requestAnimationFrame(loop);
+      pace.next();
     };
-    frame = requestAnimationFrame(loop);
+    pace.next();
 
     return () => {
-      cancelAnimationFrame(frame);
+      pace.cancel();
       sized.disconnect();
       themed.disconnect();
       document.removeEventListener('transitionend', settled);

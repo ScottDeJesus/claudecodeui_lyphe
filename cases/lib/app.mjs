@@ -275,3 +275,8 @@ function readIdentity(Database, databasePath) {
     database.close();
   }
 }
+
+/** appSocketUrl — the app's own socket on the running server (ws://…/ws?token=…), signed in with the checks token, for a case that speaks the socket's frames itself. */
+export async function appSocketUrl() {
+  return originOf("SERVER_PORT").replace(/\/$/, "").replace(/^http/, "ws") + "/ws?token=" + encodeURIComponent(await checksToken());
+}

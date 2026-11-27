@@ -17,6 +17,9 @@ import type { CronRegistrySnapshot, CronSyncReport } from '@/shared/types.js';
  * mapping and the empty-registry case all belong to the service; a route that mapped rows would be
  * a second place for the contract to be read from.
  *
+ * The read first syncs when the newest sync is stale (`syncWhenStale`), so a screen opened long
+ * after the last crontab write still reads the box as it is.
+ *
  * The sync handler is the same shape and holds no rules at all: it starts the module's own sync
  * and returns the report. A cron line and this button are the two ways the same run begins, and
  * neither of them decides anything here — which is why there is no file, no query and no command
@@ -27,6 +30,7 @@ import type { CronRegistrySnapshot, CronSyncReport } from '@/shared/types.js';
 export type SchedulesRouterDependencies = {
   readRegistry: (userId: number) => CronRegistrySnapshot;
   runSync: () => Promise<CronSyncReport>;
+  syncWhenStale: () => Promise<void>;
 };
 
 /**
@@ -46,7 +50,7 @@ function readUserId(request: express.Request): number | null {
 export function createSchedulesRouter(dependencies: SchedulesRouterDependencies): express.Router {
   const router = express.Router();
 
-  router.get('/', (request, response) => {
+  router.get('/', async (request, response) => {
     const userId = readUserId(request);
 
     if (userId === null) {
@@ -55,6 +59,8 @@ export function createSchedulesRouter(dependencies: SchedulesRouterDependencies)
     }
 
     try {
+      // A registry no write has synced for a while is synced before it is read (never a throw).
+      await dependencies.syncWhenStale();
       response.json(dependencies.readRegistry(userId));
     } catch (error) {
       response.status(500).json({ error: error instanceof Error ? error.message : String(error) });

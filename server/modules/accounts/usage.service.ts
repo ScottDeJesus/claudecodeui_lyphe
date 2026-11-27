@@ -510,6 +510,15 @@ async function measure(): Promise<{ reading: Reading; stamp: number | null; good
  * otherwise serve the OUTGOING account's percentages for up to three minutes after the operator takes
  * the helm, under the incoming account's name.
  */
+/** Called after each reading from the provider lands, whoever asked (the route or the lane). */
+const vendorReadingListeners = new Set<() => void>();
+
+/** Subscribes to readings that came from the provider; the returned function unsubscribes. */
+export function onVendorReading(listener: () => void): () => void {
+  vendorReadingListeners.add(listener);
+  return () => vendorReadingListeners.delete(listener);
+}
+
 export async function readUsage(): Promise<ClaudeUsage> {
   const now = Date.now();
   const { stamp } = readCredentials();
@@ -536,6 +545,8 @@ export async function readUsage(): Promise<ClaudeUsage> {
     ));
   }
 
+  // One line per vendor read: the trail that says when, and how often, this host asked the provider.
+  console.log('[usage] reading the usage window from the provider');
   polling = true;
   pollingSince = now;
   const mine = ++generation;
@@ -553,6 +564,15 @@ export async function readUsage(): Promise<ClaudeUsage> {
     current = { at: Date.now(), reading: outcome.reading, stamp: outcome.stamp };
     if (outcome.good) lastGood = outcome.good; // rebound whole, never mutated
     polling = false;
+    // A route read refreshes the cache too, so the usage lane is told: it frames the fresh reading now
+    // and counts its backstop from it, instead of being served this reading up to one window late.
+    for (const listener of vendorReadingListeners) {
+      try {
+        listener();
+      } catch (error) {
+        console.error(`[usage] a reading listener threw: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
   }
   // ⚠ NOT `now` — that was taken before the poll, and nothing bounds a read's wall clock, so a slow
   // fetch would otherwise have this answer judged against a clock from before it started.

@@ -25144,3 +25144,68 @@ Rules for `src/modules/gemini-spend/useGeminiUsage.ts` (manual: MAN-10233):
 5. A body is checked once where it enters (`isConnectorUsage`, `isMeterUsage`, `isSwitchAnswer`); a body of another shape is the door's sentence, never a guessed figure. `MeterUsage.cost_usd` (total and each day) is `number | null`: a null is unpriced spend, adds 0 and draws the unknown dash, and never reads as a door down.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/GeminiUsagePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/gemini-spend/useGeminiUsage.ts
+
+## INV-11971 — probe — . MAN-849 still says EIS App's dev server has "a 60 s wedge watchdog"
+
+. MAN-849 still says EIS App's dev server has "a 60 s wedge watchdog"
+
+```probe
+D=$(mktemp -d); cat > "$D/p.sh" <<'EOF'
+echo "wedge watchdog lines: $(docstore get MAN-849 | jq -r '.row.body' | grep -c -i 'wedge watchdog')"
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-26 by chain chain-pollers-hooks--dev-watchdogs--cerberus-keepers-20261126-141624-6bed, finding L3, LOW
+probe-key: cfde1e204f08e5eb429e5b5c5f540e6d273be4a7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-client-prod.service, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/handover-cases.mjs
+
+## INV-11972 — probe — . MAN-849 still says EIS App's dev server has "a 60 s wedge watchdog"
+
+. MAN-849 still says EIS App's dev server has "a 60 s wedge watchdog"
+
+```probe
+D=$(mktemp -d); cat > "$D/p.sh" <<'EOF'
+echo "wedge watchdog lines: $(docstore get MAN-849 | jq -r '.row.body' | grep -c -i 'wedge watchdog')"
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-26 by chain chain-pollers-hooks--dev-watchdogs--cerberus-keepers-20261126-141624-6bed, finding L3, LOW
+probe-key: 98e4a84c6a8134a70e9b02d9f65c656d47432ed2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-client-prod.service, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/handover-cases.mjs
+
+## INV-11973 — probe — . MAN-849 still says EIS App's dev server has "a 60 s wedge watchdog"
+
+. MAN-849 still says EIS App's dev server has "a 60 s wedge watchdog"
+
+```probe
+D=$(mktemp -d); cat > "$D/p.sh" <<'EOF'
+echo "wedge watchdog lines: $(docstore get MAN-849 | jq -r '.row.body' | grep -c -i 'wedge watchdog')"
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-26 by chain chain-pollers-hooks--dev-watchdogs--cerberus-keepers-20261126-141624-6bed, finding L3, LOW
+probe-key: b5c17de0526ebbac795f3ec4169ecf7db1ba3e0c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-client-prod.service, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/handover-cases.mjs
+
+## INV-11984 — probe — LOW — the operator's own shell resolves /usr/bin/crontab, so his crontab writes start no sync
+
+LOW — the operator's own shell resolves /usr/bin/crontab, so his crontab writes start no sync
+
+```probe
+D=$(mktemp -d) && cat > "$D/p.sh" <<'EOF'
+env -i HOME=$HOME USER=$USER TERM=dumb bash -lic 'readlink -f "$(command -v crontab)"' </dev/null 2>/dev/null | tail -1 | grep -o '/[^ ]*crontab$' || echo none
+EOF
+bash "$D/p.sh"
+# expect: /home/lyphe/.claude/scripts/crontab (while the gap stands: /usr/bin/crontab)
+```
+
+measured 2026-11-26 by chain chain-pollers-hooks--write-triggers--registry-20261126-223051-65ca, finding L2, LOW
+probe-key: e04355068638d230809e603ca4820100eb3fe0cb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-cli.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-crontab.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-sync.service.ts, /home/lyphe/.claude/scripts/crontab, /home/lyphe/.claude/state/cron-registry.log

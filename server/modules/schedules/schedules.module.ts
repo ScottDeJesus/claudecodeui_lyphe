@@ -10,7 +10,7 @@ import * as schedulesSync from './schedules-sync.service.js';
  * There is no `start()` and no `stop()`, and that absence is the design rather than an unfinished
  * module. Nothing here holds state and nothing here runs on a cadence — the registry is read when a
  * client asks for it, off tables the sync writes elsewhere, and the sync itself runs when the box's
- * own cron line or the Refresh button calls for it — so there is no background work to begin or to
+ * own cron line, a crontab write, a stale read or the Refresh button calls for it — so there is no background work to begin or to
  * end. That is exactly what lets the entrypoint mount this inline, next to kanban, instead of
  * holding it in a variable the way it holds the lanes whose polls must be started after `listen`
  * and stopped on shutdown.
@@ -24,5 +24,6 @@ export function createSchedulesModule(): Router {
   return createSchedulesRouter({
     readRegistry,
     runSync: schedulesSync.runSync,
+    syncWhenStale: schedulesSync.syncWhenStale,
   });
 }

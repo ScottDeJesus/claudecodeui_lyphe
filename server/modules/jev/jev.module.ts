@@ -3,8 +3,21 @@ import path from 'node:path';
 
 import type { Router } from 'express';
 
+import { broadcastToAll } from '@/modules/websocket/index.js';
+import { createFileLane, createPacedHint } from '@/shared/index.js';
+
+
 import { createJevRouter } from './jev.routes.js';
 import { createJevService } from './jev.service.js';
+
+/** The ledger every session's Jev hook appends to, unless the operator moved it with `JEV_LEDGER_PATH`. */
+const DEFAULT_LEDGER = '~/.claude/state/jev_ledger.jsonl';
+
+/**
+ * At most one `jev_changed` per ten seconds: every frame costs each open tab one reader process on
+ * this host, and the screen is a ledger of what Jev has done, not a meter.
+ */
+const JEV_HINT_GAP_MS = 10_000;
 
 /**
  * The Jev reader, unless the operator moved it. The env name is the runner-switch idiom
@@ -32,9 +45,10 @@ export type JevModule = { router: Router };
 /**
  * Builds the Jev lane for the server entrypoint: the two routes and the one reader behind them.
  *
- * This is the whole composition — no watcher, no timer, no socket. The reader runs per request, and
- * nothing here caches its answer between polls: the read costs about 0.1 s, and a cache would be a
- * staleness bug whose cure belongs in the reader that already owns the data (never in this lane).
+ * Beside the routes it arms one thing: a watch on the ledger's directory whose appends tell a paced
+ * hint, which sends `jev_changed` to every socket through `broadcastToAll` — at most one frame per
+ * 10 s, the gap kept by one unref'd timer armed only by an append. The reader runs per request and
+ * nothing here caches its answer: the read costs about 0.1 s, and a cache would be a staleness bug whose cure belongs in the reader that already owns the data (never in this lane).
  *
  * The environment is read HERE and nowhere below it, which is what lets the lane be proven against a
  * scratch reader — a caller that sets `JEV_BIN` before calling this gets the reader it named.
@@ -42,6 +56,7 @@ export type JevModule = { router: Router };
 export function createJevModule(): JevModule {
   const bin = expandHome(process.env.JEV_BIN || DEFAULT_BIN);
   const service = createJevService({ bin });
+  startLedgerHint(expandHome(process.env.JEV_LEDGER_PATH || DEFAULT_LEDGER));
 
   return {
     router: createJevRouter({
@@ -49,4 +64,15 @@ export function createJevModule(): JevModule {
       clearCache: () => service.clearCache(),
     }),
   };
+}
+
+/** Arms the ledger's watch: an append tells every open tab `jev_changed`, paced to one per gap. */
+function startLedgerHint(ledgerPath: string): void {
+  const hint = createPacedHint({ kind: 'jev_changed', minGapMs: JEV_HINT_GAP_MS, send: broadcastToAll });
+  createFileLane({
+    dir: path.dirname(ledgerPath),
+    names: new Set([path.basename(ledgerPath)]),
+    tell: () => hint.tell(),
+    logError: (message) => console.error(`[jev] ${message}`),
+  }).start();
 }

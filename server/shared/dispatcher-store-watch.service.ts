@@ -59,7 +59,7 @@ import { pacerHomeDir } from './utils.js';
  * therefore taken on `change` alone — and the daemon lock too, whose only write is its claim.
  */
 
-export type StoreWatchLane = 'status' | 'roadmap' | 'rnd';
+export type StoreWatchLane = 'status' | 'roadmap' | 'rnd' | 'accounts';
 
 /** A poke for these lanes, once a burst has gathered for this long. */
 type Poke = { kind: 'poke'; lanes: readonly StoreWatchLane[]; settleMs: number };
@@ -113,6 +113,8 @@ const BOTH_LANES: readonly StoreWatchLane[] = ['status', 'roadmap'];
  */
 const STORE_LANES: readonly StoreWatchLane[] = ['status', 'roadmap', 'rnd'];
 const STATUS_LANE: readonly StoreWatchLane[] = ['status'];
+/** The door's account files: the status document reports the account in use, and the accounts module tells every tab. */
+const ACCOUNT_LANES: readonly StoreWatchLane[] = ['status', 'accounts'];
 
 /** The database and its WAL: written by every commit, a regression case's run among them. */
 const DATABASE_FILES: ReadonlySet<string> = new Set(['dispatcher.db', 'dispatcher.db-wal']);
@@ -155,7 +157,12 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
   const dialWithFlags = path.resolve(stateRoot) === flagsDir;
   const transientDir = path.join(env.XDG_RUNTIME_DIR || `/run/user/${os.userInfo().uid}`, 'systemd', 'transient');
 
-  const pokes: Record<StoreWatchLane, Set<() => void>> = { status: new Set(), roadmap: new Set(), rnd: new Set() };
+  const pokes: Record<StoreWatchLane, Set<() => void>> = {
+    status: new Set(),
+    roadmap: new Set(),
+    rnd: new Set(),
+    accounts: new Set(),
+  };
 
   /** The one pending poke per lane: its due time and the timer that will fire it. */
   const pending = new Map<StoreWatchLane, { due: number; timer: NodeJS.Timeout }>();
@@ -270,7 +277,7 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
         ...(dialWithFlags
           ? []
           : [open(stateRoot, (_kind, name) => (name === DIAL_FILE ? quickly(STATUS_LANE) : null))]),
-        open(accountDir, (_kind, name) => (ACCOUNT_FILES.has(name) ? quickly(STATUS_LANE) : null)),
+        open(accountDir, (_kind, name) => (ACCOUNT_FILES.has(name) ? quickly(ACCOUNT_LANES) : null)),
         open(pacerDir, (kind, name) => {
           if (!PACER_FILES.has(name)) return null;
           // The readings database is a WAL one and its readers' open/close shows up as renames and as

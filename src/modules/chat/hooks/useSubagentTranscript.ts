@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
-import { useHostWindow } from '@/shared/context/HostWindowContext';
-import type { SubagentTranscriptResult, SubagentTranscriptTarget } from '@/shared/types';
+import { useLaneWatch } from '@/shared/hooks/useLaneWatch';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
+import type { ServerEvent, SubagentTranscriptResult, SubagentTranscriptTarget } from '@/shared/types';
 
-/**
- * How long between two reads of a transcript that is still being written. Two seconds: the file
- * behind this is appended to by another process, and a list of steps that arrives in one piece
- * every couple of seconds beats one that repaints per line.
- */
-const TRANSCRIPT_POLL_MS = 2000;
+/** The server's tail of watched transcripts (`subagent-transcript-watch.service.ts`). */
+const TRANSCRIPT_LANE = 'subagent_transcript';
+/** The frame the tail sends when a watched transcript moved; it names the key it is about. */
+const TRANSCRIPT_CHANGED_KIND = 'subagent_transcript_changed';
+const TRANSCRIPT_FRAME_KINDS: readonly string[] = [TRANSCRIPT_CHANGED_KIND];
 
 /**
  * One read's outcome, tagged with the target it belongs to. The tag is what makes a switch of
@@ -28,24 +28,61 @@ function keyOf(target: SubagentTranscriptTarget | null): string | null {
 }
 
 /**
+ * The key the server's tail knows this target by: `agent:<appSessionId>:<toolUseId>` or
+ * `soul:<launchId>`. `null` for an agent row with no chat open, which has nothing to watch.
+ */
+function laneKeyOf(sessionId: string | null, kind: SubagentTranscriptTarget['kind'] | null, id: string | null): string | null {
+  if (kind === null || id === null) return null;
+  if (kind === 'soul') return `soul:${id}`;
+  return sessionId === null ? null : `agent:${sessionId}:${id}`;
+}
+
+/**
+ * The read for this target, or `null` when it cannot be asked. ONE ROUTE PER KIND, and the two are
+ * mutually exclusive: an agent row is addressed through the chat's own session id, a launcher soul by
+ * its launch id. A soul read needs no chat session and is never sent down the agent route; an agent
+ * row with no chat open keeps its loading line rather than reading a stranger's.
+ */
+function transcriptRequest(
+  sessionId: string | null,
+  kind: SubagentTranscriptTarget['kind'] | null,
+  id: string | null,
+): (() => Promise<SubagentTranscriptResult>) | null {
+  if (kind === null || id === null) return null;
+  if (kind === 'soul') return () => api.subagentTranscripts.soul(id);
+  if (sessionId === null) return null;
+  return () => api.subagentTranscripts.agent(sessionId, id);
+}
+
+/** The key a frame names, read off the wire without trusting its shape. */
+function frameKeyOf(event: ServerEvent): string | null {
+  const key: unknown = Reflect.get(event, 'key');
+  return typeof key === 'string' ? key : null;
+}
+
+/**
  * One subagent's transcript, read on demand and kept live while there is more to arrive.
  *
  * READS ON DEMAND, NOT FROM THE STREAM. The history path caps a subagent's timeline at 200 entries
  * counted from its head, and a launcher soul has no entry there at all, so the only honest source
- * for a transcript view is the file itself — read once when the reader opens the row, then again
- * every `TRANSCRIPT_POLL_MS` while the row is running or the server says the file is still being
- * written. A finished transcript is read once and the timer is not re-armed: polling a file nobody
- * is writing would be a request per two seconds for an answer that cannot change.
+ * for a transcript view is the file itself: read when the reader opens the row and whenever the row
+ * starts or stops running.
  *
- * THE API MEMBER HANDS BACK THE BARE RESULT — all three routes, one of which wraps its answer in an
- * envelope — so this hook unwraps nothing, and a transcript that is not on disk is a `found: false`
+ * TOLD, NOT ASKED. While the row is running or the last answer says the file is still being written
+ * (`inFlight`), the view watches its key on the socket (`useLaneWatch`); the server tails the
+ * directory the route reads and sends `subagent_transcript_changed` with that key at most once a
+ * second, and once more when the `inFlight` window lapses with nothing written. The view reads again
+ * on each frame whose key is its own, and on a reconnect. A finished transcript is watched no longer.
+ * There is no timer: a failed read is retried by the next frame or by the reconnect.
+ *
+ * THE API MEMBER HANDS BACK THE BARE RESULT for both routes, one of which wraps its answer in an
+ * envelope, so this hook unwraps nothing, and a transcript that is not on disk is a `found: false`
  * reading rather than a thrown error. The one refusal that IS a failure is an id the route's own
  * registry does not hold.
  *
- * THE NEWEST READ WINS. Each effect takes a number, and an answer carrying an older one is dropped
+ * THE NEWEST READ WINS. Each read takes a number, and an answer carrying an older one is dropped
  * rather than written, so a slow first response cannot land after a fast second one and send the
- * list backwards. The timer is cleared on unmount and on a target change; a late answer from the
- * abandoned read is ignored.
+ * list backwards.
  *
  * Read by the chat module's `subagents/SubagentTranscriptView.tsx`, which is opened by the chat's own
  * rows and by the kanban card drawer's step transcripts, which open a `soul` target.
@@ -55,10 +92,6 @@ export function useSubagentTranscript(
   target: SubagentTranscriptTarget | null,
   running: boolean,
 ): { result: SubagentTranscriptResult | null; failed: boolean } {
-  // The poll refreshes a transcript the reader is watching, so it is paced on the window they are
-  // watching it in: a hidden opener throttles its timers (to one a minute after a while). Outside
-  // the chat (the kanban card drawer's step transcripts) this is the global window.
-  const hostWindow = useHostWindow();
   const [latest, setLatest] = useState<TranscriptRead | null>(null);
   /** The newest read's number. A ref, because bumping it must not repaint anything by itself. */
   const tokenRef = useRef(0);
@@ -66,58 +99,45 @@ export function useSubagentTranscript(
   const key = keyOf(target);
   const kind = target?.kind ?? null;
   const id = target?.id ?? null;
+  const laneKey = laneKeyOf(sessionId, kind, id);
+  const request = useMemo(() => transcriptRequest(sessionId, kind, id), [sessionId, kind, id]);
 
-  useEffect(() => {
-    if (key === null || kind === null || id === null) return;
-    // An agent row is addressed through the chat's own session id, and a gutter with no chat open
-    // has nothing to ask about: the view keeps its loading line rather than reading a stranger's.
-    if (kind === 'agent' && sessionId === null) return;
-    // Non-null by the guard above: an agent transcript is only ever read through a chat.
-    const agentSessionId = sessionId as string;
-
-    let cancelled = false;
-    let timer: number | undefined;
+  const read = useCallback(async (): Promise<void> => {
+    if (request === null || key === null) return;
     const token = ++tokenRef.current;
+    let next: SubagentTranscriptResult;
+    try {
+      next = await request();
+    } catch {
+      if (tokenRef.current !== token) return;
+      // The read itself failed: the route refused it, or the network dropped. Say so and KEEP the
+      // last result, because a transcript that had already rendered must not blank out on a blip.
+      setLatest((previous) => ({
+        key,
+        result: previous !== null && previous.key === key ? previous.result : null,
+        failed: true,
+      }));
+      return;
+    }
+    if (tokenRef.current !== token) return;
+    setLatest({ key, result: next, failed: false });
+  }, [request, key]);
 
-    const run = async (): Promise<void> => {
-      let next: SubagentTranscriptResult;
-      try {
-        // ONE ROUTE PER KIND, and the two are mutually exclusive. An agent row is addressed
-        // through the chat's own session id; a launcher soul by its launch id. A soul read needs
-        // no chat session, and is never sent down the agent route.
-        if (kind === 'soul') next = await api.subagentTranscripts.soul(id);
-        else next = await api.subagentTranscripts.agent(agentSessionId, id);
-      } catch {
-        if (cancelled || tokenRef.current !== token) return;
-        // The read itself failed — the route refused it, or the network dropped. Say so and KEEP
-        // the last result: a transcript that had already rendered must not blank out on a blip.
-        setLatest((previous) => ({
-          key,
-          result: previous !== null && previous.key === key ? previous.result : null,
-          failed: true,
-        }));
-        if (running) timer = hostWindow.setTimeout(() => void run(), TRANSCRIPT_POLL_MS);
-        return;
-      }
-      if (cancelled || tokenRef.current !== token) return;
-      setLatest({ key, result: next, failed: false });
-      // The next read is armed only while something is still on its way: the row is running, or
-      // the server says the file is still being written.
-      if (running || next.inFlight) {
-        timer = hostWindow.setTimeout(() => void run(), TRANSCRIPT_POLL_MS);
-      }
-    };
-
-    void run();
-
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) hostWindow.clearTimeout(timer);
-    };
-  // `hostWindow`: a move re-arms the poll on the window the transcript now stands in.
-  }, [key, kind, id, sessionId, running, hostWindow]);
+  // `running`: the row starting or stopping is news the file may not show yet, so it reads again.
+  useEffect(() => {
+    void read();
+  }, [read, running]);
 
   // A read under another key is another view's answer, so this one asks again from the top.
   const current = latest !== null && latest.key === key ? latest : null;
+  const isWatching = laneKey !== null && (running || current?.result?.inFlight === true);
+
+  useLaneWatch(TRANSCRIPT_LANE, laneKey, isWatching);
+  useServerFrame(TRANSCRIPT_FRAME_KINDS, (event) => {
+    if (!isWatching) return;
+    if (event.kind === TRANSCRIPT_CHANGED_KIND && frameKeyOf(event) !== laneKey) return;
+    void read();
+  });
+
   return { result: current?.result ?? null, failed: current?.failed ?? false };
 }

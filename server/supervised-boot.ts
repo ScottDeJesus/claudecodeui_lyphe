@@ -12,6 +12,9 @@ import type { RestartHoldReason } from './shared/restart-hold-types.js';
 // knob, NOT a third member of the supervisor<->child contract: nothing in production ever sets it.
 const TAKEOVER_WARN_MS = Number(process.env.CLOUDCLI_TAKEOVER_WARN_MS) || 80_000;
 
+// The supervisor kills a serving child that has beaten and then stays silent for three beats (deploy/dev-supervisor/heal.mjs).
+const BEAT_INTERVAL_MS = 15_000;
+
 export const supervised =
     process.env.CLOUDCLI_SUPERVISED === '1' && typeof process.send === 'function';
 
@@ -37,6 +40,22 @@ export function signalReady(): void {
     process.send?.({ type: 'ready', pid: process.pid }, (error: Error | null) => {
         if (error) console.warn('[keepalive] supervisor left before READY was sent — serving anyway');
     });
+    startBeat();
+}
+
+/** From READY on, an `alive` every BEAT_INTERVAL_MS: a wedged event loop sends none, which is how the supervisor sees a hung child. */
+function startBeat(): void {
+    if (!supervised) return;
+    // The first beat goes at READY, so a wedge inside the takeover duties that follow is judged too.
+    const sendBeat = (): void => {
+        if (!process.connected) { clearInterval(beat); return; }
+        process.send?.({ type: 'alive' }, (error: Error | null) => {
+            if (error) console.warn('[keepalive] supervisor left before a beat was sent');
+        });
+    };
+    const beat = setInterval(sendBeat, BEAT_INTERVAL_MS);
+    beat.unref();
+    sendBeat();
 }
 
 /**

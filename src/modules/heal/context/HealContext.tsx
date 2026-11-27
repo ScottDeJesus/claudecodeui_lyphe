@@ -3,15 +3,10 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState, type Rea
 import type { HealScreenState, HealSummary } from '@/modules/heal/healTypes';
 import { api, readApiJson } from '@/shared/api';
 import { createStableContext } from '@/shared/context/stableContext';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
 
-/**
- * How often the reflex's summary is re-read. The same floor the memory poller keeps, and for the same
- * reason: the ledger's numbers move only when an ending indexes or a chain lands, and the two things a
- * reader presses here — a cycle's Start/Stop, a switch — call `refresh()` themselves rather than waiting for the
- * tick. A summary is one process on this host and one JSON object, so a slow poll costs a skipped
- * reading rather than a queue of them.
- */
-const HEAL_POLL_MS = 60_000;
+/** The frame a commit to the heal ledger sends (MAN-453). */
+const HEAL_FRAMES = ['heal_changed'] as const;
 
 /** The arrays the panel and the pill bar walk without a guard. */
 const SUMMARY_ARRAYS = ['kinds', 'heals', 'ignore', 'cycles'] as const;
@@ -92,12 +87,12 @@ type HealContextValue = {
 
 /**
  * `null` on purpose, not a filled-in default: a default object makes the hook's guard below
- * unreachable and lets a consumer mounted outside the provider read a summary nobody polls.
+ * unreachable and lets a consumer mounted outside the provider read a summary nobody reads.
  */
 const HealContext = createStableContext<HealContextValue | null>(import.meta.hot, 'HealContext', null);
 
 /**
- * The app's ONE heal poller — above the Router, so the panel and the Inbox's waiting count read the
+ * The app's ONE heal reader — above the Router, so the panel and the Inbox's waiting count read the
  * same reading, and inside the auth gate, so it never asks against the login
  * screen. It holds the READING and nothing else: every control that changes something calls
  * `refresh()` and shows what the server read back, so no pressed button writes a value into this
@@ -106,14 +101,14 @@ const HealContext = createStableContext<HealContextValue | null>(import.meta.hot
 export function HealProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<HealScreenState>({ phase: 'loading' });
 
-  // Mount flag: a poll that resolves after this provider is gone must not set state.
+  // Mount flag: a read that resolves after this provider is gone must not set state.
   const mountedRef = useRef(true);
-  // Which read this is. Two can be open at once — the interval's and the one a pressed control asks
+  // Which read this is. Two can be open at once — a frame's and the one a pressed control asks
   // for — so each takes a token.
   const newestReadRef = useRef(0);
   // The newest token that has ANSWERED. An older answer landing after it is dropped rather than
-  // published: a poll that left BEFORE a press must not land after it and put the pre-press numbers
-  // back on screen for a minute (the hazard `MemoryIntakeContext.tsx:50-56` names).
+  // published: a read that left BEFORE a press must not land after it and put the pre-press numbers
+  // back on screen (the hazard `MemoryIntakeContext.tsx:50-56` names).
   const newestAnswerRef = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -136,29 +131,28 @@ export function HealProvider({ children }: { children: ReactNode }) {
     if (mountedRef.current) setState(next);
   }, []);
 
+  // A commit to the ledger is told by `heal_changed`, paced by the server to one frame a minute.
+  useServerFrame(HEAL_FRAMES, () => {
+    void refresh();
+  });
+
   useEffect(() => {
     mountedRef.current = true;
     void refresh();
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, HEAL_POLL_MS);
-    // A backgrounded tab's interval is throttled to near-nothing, so coming back to the app is its own
-    // reason to ask: what a person reads on return is a reading of now, not of whenever the browser
-    // last let the timer through.
+    // Coming back to the app is its own reason to ask: what a person reads on return is a reading of now.
     const onVisibility = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       mountedRef.current = false;
-      window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [refresh]);
 
   const value = useMemo<HealContextValue>(() => ({
     state,
-    // Only a READY summary is a summary. A failed poll leaves the gate with no count rather than a
+    // Only a READY summary is a summary. A failed read leaves the gate with no count rather than a
     // stale one, because a badge that outlives its reading is a number nobody can check.
     summary: state.phase === 'ready' ? state.summary : null,
     refresh,

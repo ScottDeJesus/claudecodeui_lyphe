@@ -957,3 +957,16 @@ export const CARD_WIDTH_MAX = 4;
 
 /** The keeps-opening region name the floating chat's panel and button share (`data-ast-keeps-opening`), so `shouldOutsidePressClose` reads the two as one region. */
 export const FLOATING_CHAT_REGION = 'floating-chat';
+
+// ---------------------------
+
+//----------------- A CANVAS LOOP AT REST ------------
+
+/**
+ * How often a canvas that animates without stopping draws while nothing is moving it, in ms: ten frames a second, by the clock. Enough
+ * for a breath, a tide, a crawl or a bead; a frame at every vsync instead makes the whole page produce every frame, which held a
+ * phone-profile (4x CPU) home 90% busy for as long as it stood open (measured 2026-11-26). At rest such a loop asks a timer, not the
+ * next frame, for its next picture. Read by `paceCanvasPainter` (the roadmap stack and the kit's Hoop) and by the companion's face for a
+ * body at rest.
+ */
+export const CANVAS_REST_FRAME_MS = 100;

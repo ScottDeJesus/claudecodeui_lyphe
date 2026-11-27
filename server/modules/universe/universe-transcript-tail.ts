@@ -1,61 +1,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import type { TranscriptFileEvent } from '@/modules/providers/index.js';
+
 /**
  * The byte-offset tail: files that are appended to, followed live, with no replay.
  *
  * This is the whole of the mechanics and none of the meaning — it hands over complete LINES and
  * knows nothing about what is written in them. It is separated from the transcript tap because the
- * two change for different reasons: the offsets, the hot set and the walk below would be untouched
- * by a new tool name, and the tap's mapping would be untouched by a change to how history is
- * skipped.
+ * two change for different reasons: the offsets and the windowed read below would be untouched by a
+ * new tool name, and the tap's mapping would be untouched by a change to how history is skipped.
+ *
+ * The tail is TOLD, never looking: the transcript feed hands it every add, change and unlink of a
+ * file with the size it reached, and the tail reads from its offset to that size. It reads only what
+ * the feed tells it of, so while nothing is written it does no work at all.
  *
  * Offsets are in MEMORY and never on disk, which is the point rather than an omission. The durable
  * cursors next door (`ep_cursors`) are right for a prose index and wrong for a live tap: shared with
  * them, this would replay months of history into the canvas on first paint, and two consumers
- * advancing one cursor would starve each other.
+ * advancing one cursor would starve each other. A transcript older than the process starts at the
+ * size the feed knew before its first change, so its history is never read.
  */
 
-/** How often the corpus is walked for files this tail has never seen. */
-const DISCOVER_INTERVAL_MS = 15000;
-
-/** How often the recently-touched files are read for appends. Fast enough to feel live. */
-const POLL_INTERVAL_MS = 400;
-
-/** How long after its last write a file stays on the hot set, stat'd on every poll tick. */
-const HOT_WINDOW_MS = 120000;
-
-/** Depth cap for the discovery walk: `<slug>/<sid>/subagents/agent-*.jsonl` is four deep. */
-const MAX_WALK_DEPTH = 6;
-
-/** Ceiling on how much of one file is read per tick, so a burst of output cannot balloon the heap. */
+/** Ceiling on how much of one file is read per pass, so a burst of output cannot balloon the heap. */
 const MAX_READ_BYTES = 4 * 1024 * 1024;
-
-/**
- * Every `*.jsonl` under `root`, whatever depth it sits at.
- *
- * A recursive walk rather than `fs.watch`, for the reason the house already ruled on
- * (`shared/polled-lane.service.ts:1-19`): these files are appended to, but a replaced or recreated
- * one emits no usable event, and the root gains a directory every session.
- *
- * `isFile()` and never `stat()`: a symlink named `*.jsonl` must be judged as a symlink, so a link
- * cannot pull content from outside the corpus (`scripts/episodic_extract.py:69-76`). An unreadable
- * directory is skipped — one that vanished mid-walk is not worth a line in the journal.
- */
-async function walkJsonl(root: string, depth: number, found: string[]): Promise<void> {
-  if (depth > MAX_WALK_DEPTH) return;
-  let entries: fs.Dirent[];
-  try {
-    entries = await fs.promises.readdir(root, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const full = path.join(root, entry.name);
-    if (entry.isDirectory()) await walkJsonl(full, depth + 1, found);
-    else if (entry.isFile() && entry.name.endsWith('.jsonl')) found.push(full);
-  }
-}
 
 /** The complete lines in a freshly read chunk, plus the offset that follows them. */
 function completeLines(chunk: Buffer, offset: number): { lines: string[]; next: number } {
@@ -67,8 +35,10 @@ function completeLines(chunk: Buffer, offset: number): { lines: string[]; next: 
 }
 
 export type TranscriptTailDependencies = {
-  /** The directory walked for `*.jsonl`, at any depth below it. */
+  /** The directory whose `*.jsonl` files are followed, at any depth below it. */
   root: string;
+  /** The transcript feed's door: every add, change and unlink with its size. Returns the unsubscribe. */
+  subscribe: (listener: (event: TranscriptFileEvent) => void) => () => void;
   /** Every complete line read, with the file it came from. Called in file order, once per line. */
   onLine: (file: string, line: string) => void;
   /** The server has no logger; a module that must say something takes a closure. */
@@ -84,23 +54,23 @@ export type TranscriptTail = { start(): void; stop(): void };
 export function createTranscriptTail(dependencies: TranscriptTailDependencies): TranscriptTail {
   /** Bytes consumed of each known file: the start of the first line not yet parsed. */
   const offsets = new Map<string, number>();
-  /** The files worth statting — written to recently, or still growing. Everything else is not looked at. */
-  const hot = new Set<string>();
 
   /**
    * The files whose trouble has already been reported — a read that failed, or a record too long to
-   * fit the window — cleared as soon as one reads cleanly. A poll tick is 400 ms, so without this a
-   * file would write 2.5 identical lines a second for as long as the condition lasted, and a
-   * corpus-wide permission fault would bury the journal in one line per file per tick.
+   * fit the window — cleared as soon as one reads cleanly. A live transcript is written to many times
+   * a second, so without this a file would write one identical line per event for as long as the
+   * condition lasted, and a corpus-wide permission fault would bury the journal.
    */
   const reported = new Set<string>();
 
-  let discoverTimer: NodeJS.Timeout | null = null;
-  let pollTimer: NodeJS.Timeout | null = null;
   let running = false;
-  let seeded = false;
-  let discovering = false;
-  let polling = false;
+  let unsubscribe: (() => void) | null = null;
+
+  /** The files being read right now: one read per file at a time. */
+  const reading = new Set<string>();
+  /** The size each running read goes on to: an event that lands mid-read raises it. */
+  const targets = new Map<string, number>();
+  const rootPrefix = path.resolve(dependencies.root) + path.sep;
 
   /**
    * The first byte after the next line break at or beyond `from`, or the end of the file when there
@@ -140,8 +110,8 @@ export function createTranscriptTail(dependencies: TranscriptTailDependencies): 
         // No line break in a window that did NOT reach the end of the file: one record is longer
         // than the window and no amount of waiting will complete it. A transcript line of 7.9 MB is
         // in the corpus today. Leaving the offset here would re-read and re-allocate the window
-        // every 400 ms and keep the file dark forever, so the record is skipped and the tail
-        // resumes at the next line.
+        // on every event for that file and keep it dark forever, so the record is skipped and the
+        // tail resumes at the next line.
         next = await resync(handle, offset + bytesRead, size);
         sawCompleteLine = false;
         if (!reported.has(file)) {
@@ -178,73 +148,56 @@ export function createTranscriptTail(dependencies: TranscriptTailDependencies): 
   };
 
   /**
-   * The walk for files this tail has never seen.
-   *
-   * A file found on the FIRST walk is seeded to its current size — the tail follows, and history is
-   * not activity. A file found later starts at 0, because a transcript that was not there before is
-   * new activity by definition, and skipping its opening bytes would drop the first edits of the
-   * session that created it.
+   * Reads `file` from its offset toward `size`, window after window, unless a read of it is already
+   * running — then that read is handed `size` as its new target and goes on to it before it ends. A pass
+   * that leaves the offset where it was (a half-flushed line) stops: the event that completes the line
+   * starts the next read.
    */
-  const discover = async (): Promise<void> => {
-    if (discovering) return;
-    discovering = true;
+  const readTo = async (file: string, size: number): Promise<void> => {
+    targets.set(file, size);
+    if (reading.has(file)) return;
+    reading.add(file);
     try {
-      const found: string[] = [];
-      await walkJsonl(dependencies.root, 0, found);
-      const now = Date.now();
-      for (const file of found) {
-        let stat: fs.Stats;
-        try {
-          stat = await fs.promises.stat(file);
-        } catch {
-          continue;
-        }
-        if (!offsets.has(file)) offsets.set(file, seeded ? 0 : stat.size);
-        if (now - stat.mtimeMs <= HOT_WINDOW_MS) hot.add(file);
+      while (running) {
+        const offset = offsets.get(file);
+        const target = targets.get(file);
+        if (offset === undefined || target === undefined || offset >= target) return;
+        const next = await readAppended(file, offset, target);
+        // An event that moved the offset while this pass read (an add, a shrink, an unlink) wins.
+        if (offsets.get(file) !== offset) continue;
+        offsets.set(file, next);
+        if (next === offset && targets.get(file) === target) return;
       }
-      seeded = true;
     } finally {
-      discovering = false;
+      reading.delete(file);
+      targets.delete(file);
     }
   };
 
   /**
-   * One pass over the hot set: stat, read the appends, and drop what has gone cold.
-   *
-   * Only the hot files are stat'd. The corpus is over four thousand files, and touching every one of
-   * them every 400 ms is a core burnt to learn nothing, since a quiet transcript has nothing to say.
-   * A file leaves the set when it has neither grown nor been written to inside the window.
+   * The feed's event, for a `*.jsonl` under root. A change to a file this tail holds no offset for starts
+   * where the feed last knew the file, so a transcript older than the process is read from where its
+   * new writing starts and never from 0. No stat is taken here: the event carries the size.
    */
-  const poll = async (): Promise<void> => {
-    // A tick that overruns its interval must not stack on the one after it.
-    if (polling) return;
-    polling = true;
-    try {
-      const now = Date.now();
-      for (const file of [...hot]) {
-        let stat: fs.Stats;
-        try {
-          stat = await fs.promises.stat(file);
-        } catch {
-          hot.delete(file);
-          offsets.delete(file);
-          continue;
-        }
-        const offset = offsets.get(file) ?? 0;
-        if (stat.size > offset) offsets.set(file, await readAppended(file, offset, stat.size));
-        else if (now - stat.mtimeMs > HOT_WINDOW_MS) hot.delete(file);
-      }
-    } finally {
-      polling = false;
+  const onFeedEvent = (event: TranscriptFileEvent): void => {
+    const file = event.filePath;
+    if (!file.startsWith(rootPrefix) || !file.endsWith('.jsonl')) return;
+    if (event.kind === 'unlink') {
+      offsets.delete(file);
+      targets.delete(file);
+      return;
     }
+    const known = event.kind === 'add' ? 0 : (offsets.get(file) ?? event.previousSize ?? event.size);
+    offsets.set(file, Math.min(known, event.size));
+    guard(readTo(file, event.size));
   };
 
   /**
-   * Runs one pass without letting it outlive this process. Both passes are fire-and-forget by
-   * design — the timers must not stack — but an unobserved rejection is not harmless: this server
-   * runs on Node, whose default is to terminate on one, and the process it would take down is the
-   * one carrying every chat socket. Every path inside the passes is guarded, so this is the floor
-   * under that, not a substitute for it.
+   * Runs one read without letting it outlive this process. Reads are fire-and-forget by design — the
+   * feed calls its listeners inside its own report and must not wait on a file — but an unobserved
+   * rejection is not harmless: this server runs on Node, whose default is to terminate on one, and the
+   * process it would take down is the one carrying every chat socket. Every path inside the read is
+   * guarded, so this is the floor under that, not a substitute for it.
    */
   const guard = (pass: Promise<void>): void => {
     pass.catch((error: unknown) => {
@@ -258,31 +211,16 @@ export function createTranscriptTail(dependencies: TranscriptTailDependencies): 
     start: () => {
       if (running) return;
       running = true;
-      // Not awaited: the first walk seeds every offset to end-of-file, and until it lands the hot
-      // set is empty, so the poll has nothing to read rather than a corpus to replay.
-      guard(discover());
-      discoverTimer = setInterval(() => guard(discover()), DISCOVER_INTERVAL_MS);
-      pollTimer = setInterval(() => guard(poll()), POLL_INTERVAL_MS);
-      // Neither timer is a reason for this process to stay alive: they exist to follow files, and a
-      // server that is otherwise finished has nothing left to follow.
-      discoverTimer.unref();
-      pollTimer.unref();
+      unsubscribe = dependencies.subscribe(onFeedEvent);
     },
 
     stop: () => {
       if (!running) return;
       running = false;
-      if (discoverTimer !== null) {
-        clearInterval(discoverTimer);
-        discoverTimer = null;
-      }
-      if (pollTimer !== null) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-      hot.clear();
+      unsubscribe?.();
+      unsubscribe = null;
       offsets.clear();
-      seeded = false;
+      targets.clear();
     },
   };
 }

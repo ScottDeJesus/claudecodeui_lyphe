@@ -7,7 +7,7 @@ import type { ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/t
 /**
  * The server's words for a degraded reading, in the app's.
  *
- * `pending` is the one that is NOT a fault — a poll is in flight and the numbers are simply
+ * `pending` is the one that is NOT a fault — a read is in flight and the numbers are simply
  * not here yet. An unrecognised word is quoted rather than swallowed: a new server reason
  * should reach the reader intact, not be flattened into "something went wrong".
  */
@@ -91,7 +91,7 @@ export function resetsLine(resetsAt: string | null): string | undefined {
   if (Number.isNaN(at.getTime())) return undefined;
 
   // Rounded to the nearest minute before it is printed. The provider computes `resets_at` as
-  // "now + remaining", so the same boundary arrives as 13:59:59.6 on one poll and 14:00:00.4 on
+  // "now + remaining", so the same boundary arrives as 13:59:59.6 on one reading and 14:00:00.4 on
   // the next; `toLocaleTimeString` TRUNCATES, so the untouched stamp made one reset read
   // "01:59 PM" and "02:00 PM" on alternating reads. The countdown below still measures from the
   // real instant — only the clock face is rounded.
@@ -179,7 +179,7 @@ function renderReading(usage: ClaudeUsage | null, pace: ClaudeUsagePace | null) 
 
   // `Array.isArray`: a reachable body with no `windows` is the same calm silence as an empty list, not a TypeError in render.
   if (!Array.isArray(usage.windows) || usage.windows.length === 0) {
-    // Three different silences: a poll in flight is calm, a reading the meter could not parse
+    // Three different silences: a read in flight is calm, a reading the meter could not parse
     // KNOWS why it is empty, and a degraded read has surrendered.
     if (usage.reason === 'pending') return <UsageNote>A fresh reading is on its way.</UsageNote>;
     if (usage.reason === 'shape') {

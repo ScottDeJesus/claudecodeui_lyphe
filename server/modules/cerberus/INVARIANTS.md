@@ -1154,3 +1154,52 @@ Behaviour of each: MAN-9546. The detail rows keep each edit's measurement: the p
 | Edit step 7 after it ran (its seed, `diagnoses.by`'s DEFAULT, `auto_diagnosis`'s columns) | the live store keeps the old shape and the old seed while every scratch store builds the new | position is the version: a change is a new step appended (INV-7004) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis-plan.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/check-trouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-auto-diagnosis.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/AutoDiagnosisSwitch.tsx
+
+## INV-11975 — probe — a quiet minute inside a restart pause is drawn paused for a check that needs attention; the server draws it failing
+
+a quiet minute inside a restart pause is drawn paused for a check that needs attention; the server draws it failing
+
+```probe
+D=$(mktemp -d) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$(cd "$(dirname "$0")" && pwd)"
+cat > "$D/child.mjs" <<'JS'
+const db = await import("@/modules/database/index.js");
+const D = await import("@/modules/cerberus/definitions.service.js");
+const { ingest } = await import("@/modules/cerberus/ingest.service.js");
+const { wardenLinks } = await import("@/modules/cerberus/warden-links.js");
+const { buildOverview } = await import("@/modules/cerberus/read-model/overview.js");
+const { collectFlips } = await import("@/modules/cerberus/flip-judge.js");
+const { rewindowOverview } = await import("/home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/rewindowCells.ts");
+db.getCerberusConnection();
+db.cerberusNodesDb.insert({ id: "case-node", desc: null, public_key: "k", cert_fingerprint: "f", warden_version: null, machine_id: null, facts: null, enrolled_at: Date.now() - 900000 });
+D.putDefinition("case-node", { services: [{ service: "svc", label: null, probes: [{ key: "svc/health", kind: "health_doc", every: 30, timeout: 5, cadence: 30, url: "http://127.0.0.1:1/h" }] }] });
+wardenLinks.attach({ node: "case-node", send: () => true, close() {}, version: "1", clockOffsetMs: null });
+const w = (at, prevAt, status, doc) => ({ check: "svc/clk", source: "svc/health", at: at, fetchedAt: at, status: status, docStatus: doc, value: status === "ok" ? "fine" : "down", data: null, tookMs: 5, prevAt: prevAt });
+const M = Math.floor(Date.now() / 60000) * 60000 - 180000;
+const stored = [ingest.ingestResults("case-node", 1, [w(M - 20000, null, "ok", "green")]), ingest.ingestResults("case-node", 2, [w(M + 40000, M - 20000, "failing", "red")])];
+db.cerberusUpdatesDb.insert({ id: "probe-upd", batch: "probe-batch", node: "case-node", from_version: "1", to_version: "2", started_at: M + 45000, step: "restarting" });
+const stepped = db.cerberusUpdatesDb.insertStep("probe-upd", M + 50000, "restarting", "probe");
+const inputs = (now, flipsAt) => ({ now: now, links: wardenLinks.states(), gateway: { listen: null, address: null, error: null }, memory: (n, k) => ingest.memory(n, k), flipsAt: flipsAt });
+const svcOf = (o) => { const n = o.nodes.find((x) => x.id === "case-node"); return n ? n.services[0] : null; };
+const cellAt = (s, from) => (s ? (s.cells.find((c) => c.from === from) || null) : null);
+const flips = collectFlips(M + 55000);
+const first = buildOverview(inputs(M + 55000, flips.flipsAt));
+const second = buildOverview(inputs(M + 65000));
+const third = buildOverview(inputs(M + 115000));
+const shown = rewindowOverview(first, M + 60000);
+const f = svcOf(first);
+console.log("CASE " + JSON.stringify({ M: M, stored: stored, stepped: stepped, svcStatus: f ? f.status : null, checks: f ? f.checks.map((c) => c.key + "=" + c.status) : null, earliestFlip: flips.earliest() === null ? null : flips.earliest() - M, serverNext: cellAt(svcOf(second), M + 60000), serverNextAt115: cellAt(svcOf(third), M + 60000), drawnNext: cellAt(svcOf(shown), M + 60000) }));
+process.exit(0);
+JS
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json CERBERUS_DB_PATH="$D/cerberus.db" DATABASE_PATH="$D/auth.db" timeout 60 node --import tsx "$D/child.mjs" 2>&1 | grep '^CASE' | sed 's/^CASE //' | node -e 'let s="";process.stdin.on("data",(d)=>{s+=d}).on("end",()=>{if(!s.trim()){console.log("no CASE line");return;}const o=JSON.parse(s);const d=o.drawnNext||{},v=o.serverNext||{};console.log("quiet minute inside a pause: checks "+o.checks.join(",")+"; drawn "+d.status+" (worst "+d.worst+"), server reads "+v.status+" (worst "+v.worst+")")})'
+EOF
+bash "$D/p.sh"
+# expect: quiet minute inside a pause: checks svc/clk=paused,svc/health=paused; drawn failing (worst svc/clk), server reads failing (worst svc/clk). While the defect stands it prints drawn paused.
+```
+
+measured 2026-11-26 by chain chain-pollers-hooks--client-pushes--cerberus-20261126-150519-e0ab, finding L1, LOW
+probe-key: 8844307768f8d7d2cbc9fbe7c554fdb746418192
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus-broadcast.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/flip-judge.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/check-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/freshness.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/node-links.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/overview.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-enrollment.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetOpening.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCheckDetail.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useEnrollmentStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useMinute.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useUpdateBatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/rewindowCells.ts

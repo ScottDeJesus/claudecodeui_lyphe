@@ -21,3 +21,7 @@ export { readRunDocument } from './run-document.service.js';
 export { readChainRun, readChainsHoldingLaunches, readSoulRun } from './run-reads.service.js';
 export type { ChainRun, ChainRunStage, SoulRun } from './run-reads.service.js';
 export { readSoulTranscript } from './soul-transcript.service.js';
+
+// onSoulLaunchesChanged: used by the providers module's running-sessions lane, which reads again when a launcher soul starts or
+// ends, because a hand-dispatched soul is what lights its chat's subagent dot.
+export { onSoulLaunchesChanged } from './soul-launch-changes.js';

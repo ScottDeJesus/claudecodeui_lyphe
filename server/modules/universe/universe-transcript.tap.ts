@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import { subscribeTranscriptFeed } from '@/modules/providers/index.js';
 import { isClaudeTurnLookalike } from '@/shared/claude-transcript-rows.js';
 import { expandHome } from '@/shared/utils.js';
 import type { UniverseActivityInput } from '@/shared/types.js';
@@ -137,7 +138,7 @@ export function createTranscriptTap(dependencies: TranscriptTapDependencies): Tr
     // subagent, which is the thread that owns it and the name a reader can find it by.
     const session = path.basename(file, '.jsonl');
     // Read time, not the record's own `timestamp`: this tap only ever sees bytes written after it
-    // started, so the clock at read time IS the event time to within one poll interval.
+    // started, so the clock at read time IS the event time to within the feed's settle deadline.
     const at = Date.now();
     for (const block of content) {
       if (typeof block !== 'object' || block === null) continue;
@@ -152,6 +153,7 @@ export function createTranscriptTap(dependencies: TranscriptTapDependencies): Tr
 
   const tail = createTranscriptTail({
     root: TRANSCRIPTS_ROOT,
+    subscribe: subscribeTranscriptFeed,
     onLine: emit,
     logError: dependencies.logError,
   });

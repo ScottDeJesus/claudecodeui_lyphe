@@ -67,7 +67,7 @@ export function FleetOpening({ overview, stale, wardens, onEnroll, onUpdateWarde
   ].filter((part): part is { id: string; words: string } => part !== null);
 
   const muted = overview.muted.flatMap((check) => (check.mute === null ? [] : [{ check, mute: check.mute }]));
-  const events = useMemo(() => overview.activity.map((line) => toTimelineEvent(line, t, overview.now)), [overview.activity, overview.now, t]);
+  const events = useMemo(() => overview.activity.map((line) => toTimelineEvent(line, t, now)), [overview.activity, now, t]);
   const enroll = t('cerberus.header.enroll');
 
   return (

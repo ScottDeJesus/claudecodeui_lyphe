@@ -2,8 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { getConnection, memoryCandidatesDb, sessionsDb } from '@/modules/database/index.js';
+import { broadcastToAll } from '@/modules/websocket/index.js';
+import { createPacedHint } from '@/shared/index.js';
 import type { MemoryCandidateFull, MemoryCandidateLean } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
+
+import { ingestInboxSoon } from './memory-ingest.js';
 
 import {
   MAX_BODY_CHARS,
@@ -15,6 +19,19 @@ import {
   primaryPath,
   projectsRoot,
 } from './memory-assert.js';
+
+/**
+ * At most one `memory_changed` per half second: a spill sweep staging a burst costs each open tab one
+ * re-read of the queue, not one per row.
+ */
+const MEMORY_HINT_GAP_MS = 500;
+
+/** Told after every write that moves the queue: a stage, a review, a refusal recorded on a candidate. */
+const memoryHint = createPacedHint({
+  kind: 'memory_changed',
+  minGapMs: MEMORY_HINT_GAP_MS,
+  send: (frame) => broadcastToAll(frame),
+});
 
 /**
  * The memory-intake lane's verbs: what a session PROPOSES, and what a person reviews.
@@ -221,11 +238,12 @@ function resolveSession(candidate: MemoryCandidateFull): MemoryCandidateFull {
  * `source` is the INGEST PATH's own identity and never the file's claim, so it is a parameter the
  * caller passes rather than a field the door would hand back.
  *
- * No event row, no frame, no bell — this lane is not a board lane. Its own `created_at` is its
- * record.
+ * No event row and no bell — this lane is not a board lane, and its own `created_at` is its record.
+ * The one frame is the paced `memory_changed` hint, told after the insert, so every open tab reads
+ * the queue again.
  */
 export function stageMemoryCandidate(input: MemoryCandidateInput, source = 'spill'): MemoryCandidateFull {
-  return resolveSession(
+  const staged = resolveSession(
     memoryCandidatesDb.insertCandidate({
       name: input.name,
       body: input.body,
@@ -238,6 +256,8 @@ export function stageMemoryCandidate(input: MemoryCandidateInput, source = 'spil
       sessionId: input.sessionId,
     })
   );
+  memoryHint.tell();
+  return staged;
 }
 
 /**
@@ -311,7 +331,9 @@ function review(candidateId: string, approve: boolean): MemoryCandidateFull | nu
     return stored;
   });
 
-  return resolveSession(commit());
+  const reviewed = resolveSession(commit());
+  memoryHint.tell();
+  return reviewed;
 }
 
 /**
@@ -328,10 +350,15 @@ function review(candidateId: string, approve: boolean): MemoryCandidateFull | nu
  */
 export function approveMemoryCandidate(candidateId: string): MemoryCandidateFull | null {
   try {
-    return review(candidateId, true);
+    const approved = review(candidateId, true);
+    // review() returns past its transaction's commit, so the note is on disk: the inbox run can take it now.
+    if (approved !== null) ingestInboxSoon(approved.assertedPath);
+    return approved;
   } catch (error) {
     if (error instanceof MemoryRefusal) {
       memoryCandidatesDb.recordRefusal({ id: candidateId, refusal: error.message });
+      // The refusal is shown on the card, so it is news to every other tab too.
+      memoryHint.tell();
     }
     throw error;
   }

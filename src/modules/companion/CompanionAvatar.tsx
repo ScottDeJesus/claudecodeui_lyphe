@@ -5,6 +5,7 @@ import { hearVoice } from '@/modules/companion/utils/astrolabeEar';
 import { createAstrolabeInstrument } from '@/modules/companion/utils/astrolabeInstrument';
 import { listeningTap } from '@/modules/companion/utils/listeningTap';
 import { presenceWords } from '@/modules/companion/utils/presenceWords';
+import { CANVAS_REST_FRAME_MS } from '@/shared/constants';
 import type {
   AstrolabeFrameInput,
   AstrolabeTier,
@@ -71,8 +72,8 @@ const INSTRUMENT_STATE: Record<CompanionPresence['state'], AstrolabeFrameInput['
   walking: 'thinking',
 };
 
-/** An idle face draws every other frame: its breath is slow enough that 30 frames a second loses nothing. */
-const IDLE_FRAME_STRIDE = 2;
+/** The longest step a frame's motion takes, in s: a tab come back after a while moves on from where it was instead of leaping. */
+const MOST_STEP_S = 0.05;
 
 /** Where a subject (a chat, a file) sits on the dial: a stable bearing hashed from its name, so the pointer returns to the same place for the same thing. */
 function bearingOf(subject: string): number {
@@ -183,22 +184,34 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
     intersectionObserver?.observe(frameBox);
 
     let raf = 0;
+    // At rest or unseen, the next frame is asked of a timer `CANVAS_REST_FRAME_MS` on, so a resting face asks the browser for no frame between.
+    let restTimer: number | null = null;
+    const schedule = (awake: boolean) => {
+      if (awake) {
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+      restTimer = window.setTimeout(() => {
+        restTimer = null;
+        raf = requestAnimationFrame(loop);
+      }, CANVAS_REST_FRAME_MS);
+    };
     let last = performance.now();
-    let frameCount = 0;
     let levelFrame: AstrolabeVoiceFrame | null = null;
     let reported = false;
     const loop = () => {
-      raf = requestAnimationFrame(loop);
       const now = performance.now();
       if (!visible || document.hidden) {
         last = now;
+        schedule(false);
         return;
       }
       const current = latest.current;
       const state = current.form ?? INSTRUMENT_STATE[current.presence.state];
-      frameCount += 1;
-      if (state === 'idle' && frameCount % IDLE_FRAME_STRIDE !== 0) return;
-      const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
+      // A body at rest draws on the clock (`CANVAS_REST_FRAME_MS`): two resting cores drawing every other frame held a phone-profile home 98% busy.
+      const resting = state === 'idle';
+      schedule(!resting);
+      const dt = Math.min(resting ? (CANVAS_REST_FRAME_MS / 1000) * 1.5 : MOST_STEP_S, Math.max(0.001, (now - last) / 1000));
       last = now;
       try {
         // Her voice: the player's tap while she speaks, the ears' microphone while she listens.
@@ -259,6 +272,7 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
     raf = requestAnimationFrame(loop);
     return () => {
       cancelAnimationFrame(raf);
+      if (restTimer !== null) window.clearTimeout(restTimer);
       resizeObserver?.disconnect();
       intersectionObserver?.disconnect();
       instrument.destroy();

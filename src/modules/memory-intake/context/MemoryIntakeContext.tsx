@@ -2,15 +2,8 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState, type Rea
 
 import { api } from '@/shared/api';
 import { createStableContext } from '@/shared/context/stableContext';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
 import type { MemoryPending } from '@/shared/types';
-
-/**
- * How often the pending queue is re-read. Deliberately slow, and the same floor the accounts
- * poller keeps: nothing here moves except when a session proposes a memory or a person reviews
- * one, and the lane answers out of this app's own database — so a slow read costs one skipped
- * reading rather than a queue of them.
- */
-const MEMORY_POLL_MS = 60_000;
 
 /**
  * The pending picture, and the one way to ask for it again.
@@ -19,6 +12,9 @@ const MEMORY_POLL_MS = 60_000;
  * tell apart from `{reachable: false}` ("asked, and there was no picture to be had"): the
  * first is a spinner, the second is words about the memory queue being unreachable.
  */
+/** The server's frame after a candidate is staged or reviewed. */
+const MEMORY_FRAMES = ['memory_changed'] as const;
+
 type MemoryIntakeValue = {
   pending: MemoryPending | null;
   pendingCount: number;
@@ -27,13 +23,13 @@ type MemoryIntakeValue = {
 
 /**
  * `null` on purpose, not a filled-in default: a default object makes the hook's guard below
- * unreachable and lets a consumer mounted outside the provider read a picture nobody polls
- * for (TasksSettingsContext.tsx:37-53 is the shape to avoid).
+ * unreachable and lets a consumer mounted outside the provider read a picture nobody
+ * reads (TasksSettingsContext.tsx:37-53 is the shape to avoid).
  */
 const MemoryIntakeContext = createStableContext<MemoryIntakeValue | null>(import.meta.hot, 'MemoryIntakeContext', null);
 
 /**
- * The app's ONE memory-intake poller, mounted inside the auth gate so it never asks against
+ * The app's ONE memory-intake reader, mounted inside the auth gate so it never asks against
  * the login screen.
  *
  * It holds the READING and nothing else. The Inbox's waiting count, the chat gutter and the
@@ -43,17 +39,17 @@ const MemoryIntakeContext = createStableContext<MemoryIntakeValue | null>(import
  */
 export function MemoryIntakeProvider({ children }: { children: ReactNode }) {
   // The last queue this app answered with. Essential rather than derived: it is the only copy
-  // of the picture between polls, and `null` (nothing asked yet) has to look different on
+  // of the picture between reads, and `null` (nothing asked yet) has to look different on
   // screen from a reachable-false answer.
   const [pending, setPending] = useState<MemoryPending | null>(null);
 
-  // Mount flag: a poll that resolves after this provider is gone must not set state.
+  // Mount flag: a read that resolves after this provider is gone must not set state.
   const mountedRef = useRef(true);
-  // Which read this is. Two can be open at once — the interval's and the one a review asks for
+  // Which read this is. Two can be open at once — the frame's and the one a review asks for
   // — so each takes a token and answers are published in TOKEN order, never arrival order.
   const newestReadRef = useRef(0);
   // The newest token that has ANSWERED. An older answer landing after it is dropped rather than
-  // published: a poll that left BEFORE a review must not land after it and put the reviewed row
+  // published: a read that left BEFORE a review must not land after it and put the reviewed row
   // back on screen for a minute (the hazard useCliVersion.ts:50-53 names).
   const newestAnswerRef = useRef(0);
 
@@ -80,22 +76,21 @@ export function MemoryIntakeProvider({ children }: { children: ReactNode }) {
     store(next);
   }, [store]);
 
+  // A stage or a review is told by `memory_changed`, paced by the server to two a second.
+  useServerFrame(MEMORY_FRAMES, () => {
+    void refresh();
+  });
+
   useEffect(() => {
     mountedRef.current = true;
     void refresh();
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, MEMORY_POLL_MS);
-    // A backgrounded tab's interval is throttled to near-nothing, so coming back to the app is
-    // its own reason to ask: what a person reads on return is a reading of now, not of whenever
-    // the browser last let the timer through.
+    // Coming back to the app is its own reason to ask: what a person reads on return is a reading of now.
     const onVisibility = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       mountedRef.current = false;
-      window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [refresh]);

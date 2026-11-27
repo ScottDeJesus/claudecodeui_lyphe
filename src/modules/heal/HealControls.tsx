@@ -52,10 +52,10 @@ export function HealControls({ switches, ignore }: { switches: HealSwitches; ign
   // The last add's swept count, null until one lands — the confirmation's whole content.
   const [swept, setSwept] = useState<number | null>(null);
   // The field is CONTROLLED off this text, so a cap the server reads back can repaint it — an
-  // uncontrolled input binds once at mount and never shows the value the PUT or the poll returned.
+  // uncontrolled input binds once at mount and never shows the value the PUT or the read returned.
   const [capText, setCapText] = useState(switches.daily_cap === null ? '' : String(switches.daily_cap));
-  // Re-seeded whenever a DIFFERENT cap is read back — the poll's answer or a PUT's — so the box shows
-  // the value the file holds and never the number that was typed at it. A poll landing mid-type is
+  // Re-seeded whenever a DIFFERENT cap is read back — the read's answer or a PUT's — so the box shows
+  // the value the file holds and never the number that was typed at it. A read landing mid-type is
   // left alone: the dependency does not move, and a half-typed amount was never the file's value.
   useEffect(() => {
     setCapText(switches.daily_cap === null ? '' : String(switches.daily_cap));
@@ -78,7 +78,7 @@ export function HealControls({ switches, ignore }: { switches: HealSwitches; ign
   };
   // The schedule as the file last answered. The flag's own door (`GET /api/settings/heal-cycle`) is
   // read on open and every write adopts what it reads back — each answer kept WITH the payload
-  // reading it was taken against, so a later poll that moved the file supersedes it on its own and
+  // reading it was taken against, so a later read that moved the file supersedes it on its own and
   // the row never shows an answer older than the summary.
   const polled = `${switches.cycle.on}:${switches.cycle.hour}`;
   const [answered, setAnswered] = useState<{ value: HealCycleSwitch; against: string } | null>(null);

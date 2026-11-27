@@ -24,8 +24,10 @@ import type { Router } from 'express';
 
 import { readInstalledCliVersion } from '@/modules/cli-version/index.js';
 import { appConfigDb } from '@/modules/database/index.js';
+import { broadcastToAll, chatRunRegistry } from '@/modules/websocket/index.js';
 import type { ClaudeActivity } from '@/shared/claude-activity-types.js';
 import type { ClaudeUpdateJob, ClaudeUpdatesReport } from '@/shared/claude-update-types.js';
+import { createFileLane, createPacedHint } from '@/shared/index.js';
 
 import { createClaudeUpdatesRouter } from './claude-updates.routes.js';
 import { LOADED_SDK_VERSION } from './packages.js';
@@ -34,12 +36,22 @@ import { createAutoInstall } from './update-auto-install.service.js';
 import type { ReportReadings } from './update-check.report.js';
 import { createUpdateCheckService } from './update-check.service.js';
 import type { GitResult } from './update-git.js';
-import { claudeUpdatesDir, readJob, readLogTail, spawnUpdateRunner } from './update-job.js';
+import { JOB_FILE, LOG_FILE, claudeUpdatesDir, readJob, readLogTail, spawnUpdateRunner } from './update-job.js';
 import { createUpdateReconciler } from './update-reconciler.js';
+import { onUpdateFileWritten } from './update-written.js';
 
 /** How many lines of `job.log` a report carries. Enough to see the npm a job ended on, short enough
  *  to ride in every answer. */
 const LOG_TAIL_LINES = 40;
+
+/**
+ * At most one `claude_updates_changed` per quarter second: an install step's write and the npm output
+ * appended beside it come in bursts, and one re-read per tab per gap keeps the log tail live.
+ */
+const UPDATES_HINT_GAP_MS = 250;
+
+/** The runner's two files. Its writes are another process's, so they are heard on the directory. */
+const RUNNER_FILES: ReadonlySet<string> = new Set([JOB_FILE, LOG_FILE]);
 
 export function createClaudeUpdatesModule(dependencies: {
   appRoot: string;
@@ -61,6 +73,7 @@ export function createClaudeUpdatesModule(dependencies: {
 } {
   const dir = claudeUpdatesDir();
   const { appRoot, supervised, isListening, requestReboot, onRebootFailed, readClaudeActivity } = dependencies;
+  startUpdatesHint(dir);
 
   const check = createUpdateCheckService({
     dir,
@@ -168,4 +181,29 @@ export function createClaudeUpdatesModule(dependencies: {
     },
     startReconciler: () => reconciler.start(),
   };
+}
+
+/**
+ * Arms `claude_updates_changed`: this process's own job and check writes announce through
+ * `onUpdateFileWritten`, and the detached runner's (every install step, and the npm output it appends
+ * to `job.log`) are heard on the directory. One paced hint carries both.
+ */
+function startUpdatesHint(dir: string): void {
+  const hint = createPacedHint({
+    kind: 'claude_updates_changed',
+    minGapMs: UPDATES_HINT_GAP_MS,
+    send: (frame) => broadcastToAll(frame),
+  });
+  onUpdateFileWritten(() => hint.tell());
+  // `autoInstall.waiting` is read from Claude activity on every report and moves with no file written:
+  // a run starting or ending is what moves it.
+  chatRunRegistry.onRunChanged((_sessionId, { states }) => {
+    if (states) hint.tell();
+  });
+  createFileLane({
+    dir,
+    names: RUNNER_FILES,
+    tell: () => hint.tell(),
+    logError: (message) => console.error(`[claude-updates] ${message}`),
+  }).start();
 }

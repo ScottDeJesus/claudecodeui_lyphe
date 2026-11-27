@@ -1,11 +1,13 @@
 import os from 'node:os';
 import path from 'node:path';
-import { promises as fsPromises } from 'node:fs';
+import { promises as fsPromises, type Stats } from 'node:fs';
 
 import chokidar, { type FSWatcher } from 'chokidar';
 
 import { sessionSynchronizerService } from '@/modules/providers/services/session-synchronizer.service.js';
 import { broadcastSessionUpsertedBatch } from '@/modules/websocket/index.js';
+import { announceSessionsFlushed } from '@/modules/providers/services/sessions-flushed.service.js';
+import { transcriptFeed } from '@/modules/providers/services/transcript-feed.service.js';
 import type { LLMProvider } from '@/shared/types.js';
 
 type WatcherEventType = 'add' | 'change';
@@ -37,9 +39,9 @@ const IGNORED_DIRECTORY_NAMES = new Set([
   '.git',
   'dist',
   'build',
-  // Claude writes a subagent's transcript and large tool outputs here. The synchronizer already skips
-  // them; ignoring them here keeps the watcher from walking them at all.
-  'subagents',
+  // Claude writes large tool outputs here, never a transcript, so the watcher does not walk them.
+  // Subagent transcripts (under `subagents/`) are watched and reach the transcript feed; the session
+  // index's synchronizer refuses them itself.
   'tool-results',
 ]);
 const IGNORED_FILE_NAMES = new Set(['.DS_Store']);
@@ -177,6 +179,7 @@ async function flushPendingWatcherUpdate(): Promise<void> {
     // session can never clobber unrelated client state, so the frontend needs
     // no "suppress updates while a run is active" protection logic.
     await broadcastSessionUpsertedBatch(queuedUpdate.updatedSessionIds);
+    announceSessionsFlushed([...queuedUpdate.updatedSessionIds]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Session watcher refresh failed while broadcasting session_upserted', { error: message });
@@ -223,6 +226,8 @@ async function onUpdate(
   }
 }
 
+let unsubscribeSessionIndex: (() => void) | null = null;
+
 /**
  * Starts provider filesystem watchers and performs initial DB synchronization.
  */
@@ -234,6 +239,13 @@ export async function initializeSessionsWatcher(): Promise<void> {
     processedByProvider: initialSync.processedByProvider,
     prunedOrphans: initialSync.prunedOrphans,
     failures: initialSync.failures,
+  });
+
+  // The session index is the transcript feed's first subscriber; an unlink is not its business.
+  unsubscribeSessionIndex ??= transcriptFeed.subscribe((event) => {
+    if (event.kind !== 'unlink') {
+      void onUpdate(event.kind, event.filePath, event.provider);
+    }
   });
 
   for (const { provider, rootPath } of PROVIDER_WATCH_PATHS) {
@@ -248,17 +260,37 @@ export async function initializeSessionsWatcher(): Promise<void> {
       const watcher = chokidar.watch(rootPath, {
         ignored: createWatcherIgnoredMatcher(rootPath),
         persistent: true,
-        ignoreInitial: true,
+        ignoreInitial: false,
         followSymlinks: false,
         depth: 6,
       });
 
+      // Adds before 'ready' are the first scan: the feed records their sizes and publishes nothing, so a
+      // boot indexes nothing the initial sync did not.
+      let isReady = false;
       watcher
-        .on('add', (filePath: string) => {
-          void onUpdate('add', filePath, provider);
+        .on('ready', () => {
+          isReady = true;
         })
-        .on('change', (filePath: string) => {
-          void onUpdate('change', filePath, provider);
+        .on('add', (filePath: string, stats?: Stats) => {
+          if (!isWatcherTargetFile(provider, filePath)) {
+            return;
+          }
+          if (isReady) {
+            transcriptFeed.report('add', provider, filePath, stats);
+          } else {
+            transcriptFeed.seen(provider, filePath, stats);
+          }
+        })
+        .on('change', (filePath: string, stats?: Stats) => {
+          if (isWatcherTargetFile(provider, filePath)) {
+            transcriptFeed.report('change', provider, filePath, stats);
+          }
+        })
+        .on('unlink', (filePath: string) => {
+          if (isWatcherTargetFile(provider, filePath)) {
+            transcriptFeed.report('unlink', provider, filePath);
+          }
         })
         .on('error', (error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
@@ -293,8 +325,14 @@ export async function closeSessionsWatcher(): Promise<void> {
     })
   );
   watchers.length = 0;
+  unsubscribeSessionIndex?.();
+  unsubscribeSessionIndex = null;
+  transcriptFeed.close();
   pendingWatcherUpdate = null;
   pendingWatcherUpdateStartedAt = null;
   watcherRefreshInFlight = false;
   watcherRescheduleAfterRefresh = false;
 }
+
+// One flush, one call per subscriber, with the ids just broadcast (see sessions-flushed.service.ts).
+export { onSessionsFlushed } from '@/modules/providers/services/sessions-flushed.service.js';

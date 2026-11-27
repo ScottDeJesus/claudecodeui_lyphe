@@ -25,6 +25,8 @@ type CandidateOpeningProps = {
   onClose: () => void;
   onSpike: () => void;
   onOpenChat: () => void;
+  /** Opens the chat a spike with no chat of its own was launched from. */
+  onOpenLauncher: () => void;
   /** Adopt: Opus places it on the roadmap and its design starts; nothing is asked. */
   onAdopt: () => void;
   /** Opens the Reject question. */
@@ -57,7 +59,7 @@ function evidenceOf(candidate: RndCandidate): { sentence: string; rest: string }
 }
 
 /** The candidate's facts, in the order he needs them: what it is, why, the question, where it is from, then what has happened to it. */
-function factsOf(candidate: RndCandidate, t: TFunction): Array<readonly [string, ReactNode]> {
+function factsOf(candidate: RndCandidate, t: TFunction, onOpenLauncher: () => void): Array<readonly [string, ReactNode]> {
   const source = (
     <a
       className="underline underline-offset-2 finger:inline-block finger:py-3.5"
@@ -77,6 +79,13 @@ function factsOf(candidate: RndCandidate, t: TFunction): Array<readonly [string,
   ];
   // A spike that never answers stays spiking until he presses again: how long it has been out is the one sign of that.
   if (candidate.word === 'spiking' && candidate.spike !== null) facts.push([t('rnd.opening.spikeStarted'), formatRelativeTime(candidate.spike.started_at)]);
+  // A spike started from a chat has no chat of its own: its work ran as a background agent of the chat that launched it.
+  if (candidate.spike !== null && candidate.spike.launched_from !== null) {
+    const name = candidate.spike.launched_from_name;
+    facts.push([t('rnd.opening.launchedFrom'), name === null ? said(t('rnd.opening.launchedFromElsewhere')) : (
+      <Button variant="link" className="finger:h-11" onClick={onOpenLauncher} data-rnd-launcher="">{name}</Button>
+    )]);
+  }
   if (candidate.verdict !== null) {
     const stamp = t('rnd.opening.verdictValue', { word: t('rnd.opening.verdictWord.' + candidate.verdict.word), ago: formatRelativeTime(candidate.verdict.at) });
     // The verdict's own sentence is said here as words, whole; a no's sentence is already said as why it was rejected.
@@ -108,7 +117,8 @@ function factsOf(candidate: RndCandidate, t: TFunction): Array<readonly [string,
  * THE ACTS STAND FIRST, where no length can move them: the store lets what it is and why run to 1200 characters each, and a
  * press under them would leave the plate. They are in the same place on every candidate, so the hand learns it.
  *
- * THE ACTS GO BY ITS WORD, the main one first. Waiting: Spike, Reject. Spiking: Open chat, Spike again, Reject. Proved: Adopt,
+ * THE ACTS GO BY ITS WORD, the main one first. Waiting: Spike, Reject. Spiking: Open chat (only for a spike with a chat of its
+ * own; one launched from a chat says "Launched from <chat>" among its facts instead), Spike again, Reject. Proved: Adopt,
  * Spike again, Reject. Rejected: Bring back. An adopted candidate has none: it is the roadmap's now. Reject is quiet, never red:
  * it is undone with Bring back, and the reason it asks for is what keeps the scout from filing the same thing again.
  *
@@ -116,7 +126,7 @@ function factsOf(candidate: RndCandidate, t: TFunction): Array<readonly [string,
  *
  * Rendered by RndPanel, which hands it the open row's mark, the side the room allows and the question open over it.
  */
-export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal, onClose, onSpike, onOpenChat, onAdopt, onReject, onReopen, children }: CandidateOpeningProps) {
+export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal, onClose, onSpike, onOpenChat, onOpenLauncher, onAdopt, onReject, onReopen, children }: CandidateOpeningProps) {
   const { t } = useTranslation();
   const evidenceId = useId();
 
@@ -150,7 +160,9 @@ export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal
     if (candidate.word === 'spiking') {
       return (
         <>
-          <Button className="finger:h-11" busy={busy} onClick={onOpenChat} data-rnd-act="open-chat">{t('rnd.act.openChat')}</Button>
+          {candidate.spike?.session != null && (
+            <Button className="finger:h-11" busy={busy} onClick={onOpenChat} data-rnd-act="open-chat">{t('rnd.act.openChat')}</Button>
+          )}
           {again}
           {reject}
         </>
@@ -191,7 +203,7 @@ export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal
           <div className="flex flex-wrap items-center gap-2.5" data-rnd-acts={candidate.word}>
             {acts()}
           </div>
-          <KeyValueList items={factsOf(candidate, t)} />
+          <KeyValueList items={factsOf(candidate, t, onOpenLauncher)} />
           {evidence.trim() !== '' && (
             <section aria-labelledby={evidenceId} className="flex flex-col gap-2">
               <Rule id={evidenceId} level={4}>{t('rnd.opening.evidence')}</Rule>

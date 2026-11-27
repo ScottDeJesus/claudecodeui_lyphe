@@ -1,7 +1,7 @@
 export { WS_OPEN_STATE, connectedClients } from './services/websocket-state.service.js';
 // Consumed by the companion module's store (every frame it emits reaches this account's pages and no
 // one else's) and its alert feed (which asks whether any page of the account is there to hear it).
-export { sendToUser, isUserConnected } from './services/websocket-state.service.js';
+export { broadcastToAll, sendToUser, isUserConnected } from './services/websocket-state.service.js';
 // Consumed by the companion module's tools: `stop_session` is the page's own stop and `answer_session`
 // the page's own permission answer, so a stop or an answer from her is the same act as from the chat.
 export { abortChatRun, answerChatPermission } from './services/chat-run-verbs.service.js';
@@ -13,6 +13,8 @@ export { createWebSocketServer } from './services/websocket-server.service.js';
 // half-open one terminated, the same keep-alive the browser gateway's sockets get.
 export { attachWebSocketHeartbeat } from './services/websocket-server.service.js';
 export { chatRunRegistry } from './services/chat-run-registry.service.js';
+// laneWatch: used by a module that tails something only while a socket watches it (the subagent transcript tail).
+export { laneWatch } from './services/lane-watch.service.js';
 // Consumed by the providers module's sessions watcher, which announces the
 // sessions it (re)indexed from disk through the same builder the chat gateway
 // uses, so both paths put the identical delta on the wire.

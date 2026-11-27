@@ -81,7 +81,7 @@ type ClaudeHistoryMessagesResult =
  * whose finish notification was compacted out of the parent transcript would otherwise read
  * as running forever, on every load. Well past any real run; short of a day.
  */
-const IN_FLIGHT_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
+export const IN_FLIGHT_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
 
 export type ClaudeSubagentTranscript = {
   activity: SubagentActivity[];

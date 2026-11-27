@@ -16,6 +16,10 @@ import {
 import type { IsSessionProcessing, LLMProvider, MarkSessionIdle, MarkSessionProcessing, RunningSessionListItem, SessionActivityMap, SyncProcessingSessions } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
+
+/** The frame the server's running-sessions lane sends: the route's whole answer, at the frame's top level. */
+const RUNNING_SESSIONS_STATE_KIND = 'running_sessions_state';
 
 type RunningSessionApiItem = {
   sessionId?: unknown;
@@ -33,7 +37,7 @@ type RunningSessionApiItem = {
 
 type RunningSessionsApiPayload = {
   data?: {
-    sessions?: RunningSessionApiItem[];
+    sessions?: unknown;
     /**
      * Conversations with a subagent still running, whether or not they carry a live run. Beside
      * `sessions` rather than on it, because the chat this is usually about has no run left: its
@@ -79,10 +83,10 @@ const parseSubagentModels = (value: unknown): [string, string[]][] => {
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
 };
 
-/** How long a read of the running list that has not settled blocks the next poll tick: the api's 30 s request ceiling (`REQUEST_TIMEOUT_MS`) and a tick. */
+/** How long a read of the running list that has not settled blocks the next read: the api's 30 s request ceiling (`REQUEST_TIMEOUT_MS`) and five seconds past it. */
 const RUNNING_READ_GUARD_MS = 35_000;
 
-/** Whether two id lists name the same sessions, so the poll can keep the previous array. */
+/** Whether two id lists name the same sessions, so a reading that moved nothing keeps the previous array. */
 const sessionIdListsMatch = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((id, index) => id === right[index]);
 
@@ -97,8 +101,8 @@ const asOptionalString = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value : null;
 
 /**
- * Keeps the previous array when the poll returned the same runs, so a five-second
- * refresh does not re-render every consumer while nothing has changed.
+ * Keeps the previous array when a reading (the route's or a frame's) carries the same runs, so it
+ * does not re-render every consumer while nothing has changed.
  */
 const runningSessionListsMatch = (
   left: readonly RunningSessionListItem[],
@@ -119,11 +123,11 @@ const runningSessionListsMatch = (
 
 /**
  * A set of session ids with a stable identity while membership is unchanged — what every
- * membership-only consumer of the activity map and of the running-sessions poll reads.
+ * membership-only consumer of the activity map and of the running-sessions list reads.
  *
  * Both sources rewrite themselves constantly: every provider `status` frame rewrites an entry's
  * `statusText`, allocating a new activity map several times a second during a run, and the
- * five-second poll rebuilds its running list whether or not anything moved. Consumers that only
+ * running list is rebuilt on every reading, whether or not anything moved. Consumers that only
  * need membership — the sidebar renders a dot per row and a running count — would re-render on all
  * of it. Deriving the set from a membership key, rather than from the collection, keeps its
  * identity stable without reading a ref during render. Session ids never contain a NUL, so it is a
@@ -167,7 +171,7 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
   // holding one has no run left to hang anything on.
   const [subagentSessionIds, setSubagentSessionIds] = useState<readonly string[]>(NO_SESSION_IDS);
   // The models of the agents each of those sessions has running, held as the JSON of its sorted pairs: a string is equal to the
-  // last poll's exactly when nothing changed, so the map built from it below keeps its identity through a poll that moved nothing.
+  // last reading's exactly when nothing changed, so the map built from it below keeps its identity through a reading that moved nothing.
   const [subagentModelsKey, setSubagentModelsKey] = useState('[]');
   // Answered by the server's own approval map rather than read off the runs below, and that is the
   // whole point of it: a question outlives the turn that asked it, so the chat it waits in is
@@ -180,11 +184,81 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
   const { hasQueuedSend } = useWebSocket();
 
   // The read of the running list that is out, if any, and when it began. The server holds this read for as long as 76 s while a successor
-  // waits for its predecessor to drain (`RUNS_READOPTED_WAIT_MS`, server/index.ts), and the five-second poll below would otherwise add a
-  // held read every tick: six of them fill the browser's six connections to this origin, and every other request of the page (her speech,
-  // her picture) waits behind them. One read at a time. A read older than the 30 s ceiling plus a tick no longer blocks the next one:
+  // waits for its predecessor to drain (`RUNS_READOPTED_WAIT_MS`, server/index.ts), and the reads below (a reconnect, a tab shown again) would otherwise
+  // pile held reads up: six of them fill the browser's six connections to this origin, and every other request of the page (her speech,
+  // her picture) waits behind them. One read at a time. A read older than the 30 s ceiling and five seconds past it no longer blocks the next one:
   // the ceiling ends it, and on a browser with no `AbortSignal.timeout` (iOS 15) a read that never settles has no ceiling at all.
   const refreshingRef = useRef<{ startedAt: number } | null>(null);
+
+  // One answer, from the route or from a running_sessions_state frame (the same body, at the frame's top level).
+  const applyRunningSessions = useCallback((payload: RunningSessionsApiPayload) => {
+    const rawSessions = payload.data?.sessions;
+    const sessions: RunningSessionApiItem[] = Array.isArray(rawSessions) ? rawSessions : [];
+
+    // The same payload feeds two consumers: the activity map (membership and
+    // status) and the sidebar's Running list, which needs the project each
+    // run belongs to.
+    setRunningSessions((previous) => {
+      const next = sessions.reduce<RunningSessionListItem[]>((acc, session) => {
+        if (typeof session.sessionId !== 'string' || !session.sessionId) {
+          return acc;
+        }
+
+        acc.push({
+          sessionId: session.sessionId,
+          provider: (typeof session.provider === 'string' ? session.provider : 'claude') as LLMProvider,
+          startedAt: parseStartedAt(session.startedAt),
+          projectId: asOptionalString(session.projectId),
+          projectPath: asOptionalString(session.projectPath),
+          projectDisplayName: asOptionalString(session.projectDisplayName) ?? 'Unknown Project',
+          sessionTitle: asOptionalString(session.sessionTitle) ?? session.sessionId,
+          lastActivity: asOptionalString(session.lastActivity),
+          awaitingInput: session.awaitingInput === true,
+        });
+        return acc;
+      }, []);
+
+      return runningSessionListsMatch(previous, next) ? previous : next;
+    });
+
+    // Sorted before it becomes state: the set below is built from a membership key, and an order
+    // the server is free to change must not read as a change of membership.
+    const subagents = (Array.isArray(payload.data?.subagentSessionIds)
+      ? payload.data.subagentSessionIds
+      : []
+    ).filter((id): id is string => typeof id === 'string' && id.length > 0).sort();
+    setSubagentSessionIds((previous) => (
+      sessionIdListsMatch(previous, subagents) ? previous : subagents
+    ));
+
+    setSubagentModelsKey(JSON.stringify(parseSubagentModels(payload.data?.subagentModels)));
+
+    const awaiting = (Array.isArray(payload.data?.awaitingInputSessionIds)
+      ? payload.data.awaitingInputSessionIds
+      : []
+    ).filter((id): id is string => typeof id === 'string' && id.length > 0).sort();
+    setAwaitingInputSessionIds((previous) => (
+      sessionIdListsMatch(previous, awaiting) ? previous : awaiting
+    ));
+
+    syncProcessingSessions(
+      sessions
+        .map((session) => {
+          if (typeof session.sessionId !== 'string' || !session.sessionId) {
+            return null;
+          }
+
+          return {
+            sessionId: session.sessionId,
+            startedAt: parseStartedAt(session.startedAt),
+            statusText: typeof session.statusText === 'string' ? session.statusText : undefined,
+            canInterrupt: typeof session.canInterrupt === 'boolean' ? session.canInterrupt : undefined,
+          };
+        })
+        .filter((session): session is NonNullable<typeof session> => Boolean(session)),
+      hasQueuedSend,
+    );
+  }, [hasQueuedSend, syncProcessingSessions]);
 
   const refreshRunningSessions = useCallback(async () => {
     const inFlight = refreshingRef.current;
@@ -199,72 +273,7 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
         return;
       }
 
-      const payload = (await response.json()) as RunningSessionsApiPayload;
-      const sessions = Array.isArray(payload.data?.sessions) ? payload.data.sessions : [];
-
-      // The same payload feeds two consumers: the activity map (membership and
-      // status) and the sidebar's Running list, which needs the project each
-      // run belongs to.
-      setRunningSessions((previous) => {
-        const next = sessions.reduce<RunningSessionListItem[]>((acc, session) => {
-          if (typeof session.sessionId !== 'string' || !session.sessionId) {
-            return acc;
-          }
-
-          acc.push({
-            sessionId: session.sessionId,
-            provider: (typeof session.provider === 'string' ? session.provider : 'claude') as LLMProvider,
-            startedAt: parseStartedAt(session.startedAt),
-            projectId: asOptionalString(session.projectId),
-            projectPath: asOptionalString(session.projectPath),
-            projectDisplayName: asOptionalString(session.projectDisplayName) ?? 'Unknown Project',
-            sessionTitle: asOptionalString(session.sessionTitle) ?? session.sessionId,
-            lastActivity: asOptionalString(session.lastActivity),
-            awaitingInput: session.awaitingInput === true,
-          });
-          return acc;
-        }, []);
-
-        return runningSessionListsMatch(previous, next) ? previous : next;
-      });
-
-      // Sorted before it becomes state: the set below is built from a membership key, and an order
-      // the server is free to change must not read as a change of membership.
-      const subagents = (Array.isArray(payload.data?.subagentSessionIds)
-        ? payload.data.subagentSessionIds
-        : []
-      ).filter((id): id is string => typeof id === 'string' && id.length > 0).sort();
-      setSubagentSessionIds((previous) => (
-        sessionIdListsMatch(previous, subagents) ? previous : subagents
-      ));
-
-      setSubagentModelsKey(JSON.stringify(parseSubagentModels(payload.data?.subagentModels)));
-
-      const awaiting = (Array.isArray(payload.data?.awaitingInputSessionIds)
-        ? payload.data.awaitingInputSessionIds
-        : []
-      ).filter((id): id is string => typeof id === 'string' && id.length > 0).sort();
-      setAwaitingInputSessionIds((previous) => (
-        sessionIdListsMatch(previous, awaiting) ? previous : awaiting
-      ));
-
-      syncProcessingSessions(
-        sessions
-          .map((session) => {
-            if (typeof session.sessionId !== 'string' || !session.sessionId) {
-              return null;
-            }
-
-            return {
-              sessionId: session.sessionId,
-              startedAt: parseStartedAt(session.startedAt),
-              statusText: typeof session.statusText === 'string' ? session.statusText : undefined,
-              canInterrupt: typeof session.canInterrupt === 'boolean' ? session.canInterrupt : undefined,
-            };
-          })
-          .filter((session): session is NonNullable<typeof session> => Boolean(session)),
-        hasQueuedSend,
-      );
+      applyRunningSessions((await response.json()) as RunningSessionsApiPayload);
     } catch (error) {
       console.error('[SessionProtection] Failed to sync running sessions:', error);
     } finally {
@@ -273,18 +282,31 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
         refreshingRef.current = null;
       }
     }
-  }, [hasQueuedSend, syncProcessingSessions]);
+  }, [applyRunningSessions]);
 
   useEffect(() => {
     void refreshRunningSessions();
   }, [refreshRunningSessions]);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
+  // The server sends the whole answer whenever it changes; a reconnect means frames were missed, so the route is read once.
+  useServerFrame([RUNNING_SESSIONS_STATE_KIND], (event) => {
+    if (event.kind !== RUNNING_SESSIONS_STATE_KIND) {
       void refreshRunningSessions();
-    }, 5000);
-    // A hidden tab's timers are throttled to about once a minute; refresh the moment it is looked
-    // at again, so a spinner or a waiting-for-you dot is not a minute stale on return.
+      return;
+    }
+    applyRunningSessions({
+      data: {
+        sessions: event.sessions,
+        subagentSessionIds: event.subagentSessionIds,
+        subagentModels: event.subagentModels,
+        awaitingInputSessionIds: event.awaitingInputSessionIds,
+      },
+    });
+  });
+
+  useEffect(() => {
+    // A hidden tab may have slept through frames (a backgrounded phone drops its socket); read the moment it is looked at
+    // again, so a spinner or a waiting-for-you dot is never stale on return.
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         void refreshRunningSessions();
@@ -293,7 +315,6 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
     document.addEventListener('visibilitychange', onVisible);
 
     return () => {
-      window.clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [refreshRunningSessions]);

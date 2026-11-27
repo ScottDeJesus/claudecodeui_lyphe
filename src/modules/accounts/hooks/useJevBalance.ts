@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, readApiJson } from '@/shared/api';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
 import type { JevSummary } from '@/shared/types';
 
-/** The DeepSeek balance's cadence, for its reason: a slow figure a person wants fresh when they open the panel. */
-const BALANCE_POLL_MS = 180_000;
+/** The frame an append to the Jev ledger sends (MAN-453). */
+const JEV_FRAMES = ['jev_changed'] as const;
 
 /**
  * The estimate this surface draws, in its own camelCase: the reader answers snake_case, and this is
@@ -61,13 +62,15 @@ export function useJevBalance() {
     }
   }, []);
 
+  useServerFrame(JEV_FRAMES, () => {
+    void refresh();
+  });
+
   useEffect(() => {
     mountedRef.current = true;
     void refresh();
-    const timer = window.setInterval(() => void refresh(), BALANCE_POLL_MS);
     return () => {
       mountedRef.current = false;
-      window.clearInterval(timer);
     };
   }, [refresh]);
 

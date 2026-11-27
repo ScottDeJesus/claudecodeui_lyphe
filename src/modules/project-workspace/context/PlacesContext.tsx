@@ -211,7 +211,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
   const awaitingInput = useAwaitingInputSessionIdSet();
   const { picture } = useCompanion();
   const claudeUpdate = useClaudeUpdateLine();
-  const appVersion = useVersionCheck('siteboon', 'claudecodeui');
+  const appVersion = useVersionCheck();
   const rndMark = useRndMark();
 
   const chatAsking = lastChatId !== null && awaitingInput.has(lastChatId);

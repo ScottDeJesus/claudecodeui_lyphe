@@ -19,3 +19,7 @@ export type { LaneStream, LaneStreamAnswer, LaneStreamRequest } from './shadow-c
 // The allowlist router the lanes' routes files hand their tables to, and the id checks they share.
 export { LOWERCASE_UUID_RULE, LOWERCASE_UUID_SOURCE, SHA256_RULE, createLaneRouter, patternRule } from './shadow-connector-lane-router.js';
 export type { LaneRoute, LaneRouterDefinition, LaneRule } from './shadow-connector-lane-router.js';
+export { createPacedHint } from './paced-hint.service.js';
+export type { PacedHint, PacedHintDependencies, PacedHintFrame } from './paced-hint.service.js';
+export { createFileLane } from './file-lane.service.js';
+export type { FileLane, FileLaneDependencies } from './file-lane.service.js';

@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
-import { CORE_GAUGE_GAPS, SCREEN_FRAME_PX } from '@/shared/constants';
+import { CANVAS_REST_FRAME_MS, CORE_GAUGE_GAPS, SCREEN_FRAME_PX } from '@/shared/constants';
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
 import { playSound } from '@/shared/sounds';
 import type { AffectedAreasTrouble, ChatAttachment, DispatcherModelWord, Project, ProjectSession, SlashCommand, SoundName } from '@/shared/types';
@@ -914,4 +914,60 @@ function keepsOpeningRegionMembers(region: Element): Element[] {
   const name = region.getAttribute('data-ast-keeps-opening');
   if (!name) return [region];
   return Array.from(region.ownerDocument.querySelectorAll(`[data-ast-keeps-opening="${CSS.escape(name)}"]`));
+}
+
+// ---------------------------
+
+//----------------- A CANVAS LOOP AT REST ------------
+
+/** How long a paced canvas loop keeps drawing every display frame after its painter was last told anything, in ms: a turn, a flick, a stand or a fold has settled inside it. */
+const PAINT_AWAKE_MS = 2500;
+
+/** A canvas loop's pace (`paceCanvasPainter`): `next` asks for the loop's next frame, `cancel` stops it for good. */
+export type CanvasPace = { next: () => void; cancel: () => void };
+
+/**
+ * Paces a canvas painter's frame loop so the page can rest. Every method of `painter` but `frame` and the read-only `queries` (asked
+ * every frame, they tell it nothing) is wrapped in place to wake the pace: a press, a drag, a wheel, a key, new data, a resize, the
+ * theme. Awake, `next` asks for the next display frame. Told nothing for `PAINT_AWAKE_MS`, it asks a timer for one
+ * `CANVAS_REST_FRAME_MS` on, so a loop at rest requests no frame in between: a loop that asks for every frame, even one it then
+ * leaves undrawn, makes the browser run its whole frame for the page at every vsync (measured 2026-11-26 on a phone profile: such
+ * loops held the home 73% busy unthrottled, against 17% without them). A wake while the timer waits asks for a frame at once.
+ * Used by the roadmap module's `RoadmapStack` and the kit's `Hoop`, whose painters animate without stopping (a crawl, a breath, a bead).
+ */
+export function paceCanvasPainter<P extends { frame: (now: number) => unknown }>(painter: P, queries: readonly (keyof P & string)[], loop: FrameRequestCallback): CanvasPace {
+  let wokeAt = performance.now();
+  let frame = 0;
+  let timer: number | null = null;
+  const methods = painter as unknown as Record<string, unknown>;
+  for (const name of Object.keys(methods)) {
+    const method = methods[name];
+    if (name === 'frame' || (queries as readonly string[]).includes(name) || typeof method !== 'function') continue;
+    methods[name] = (...args: unknown[]) => {
+      wokeAt = performance.now();
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+        frame = requestAnimationFrame(loop);
+      }
+      return (method as (...given: unknown[]) => unknown)(...args);
+    };
+  }
+  return {
+    next() {
+      if (performance.now() - wokeAt < PAINT_AWAKE_MS) {
+        frame = requestAnimationFrame(loop);
+        return;
+      }
+      timer = window.setTimeout(() => {
+        timer = null;
+        frame = requestAnimationFrame(loop);
+      }, CANVAS_REST_FRAME_MS);
+    },
+    cancel() {
+      cancelAnimationFrame(frame);
+      if (timer !== null) window.clearTimeout(timer);
+      timer = null;
+    },
+  };
 }

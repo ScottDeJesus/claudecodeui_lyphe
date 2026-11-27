@@ -17,7 +17,8 @@ EnvironmentFile=__REPO__/.env
 Environment=NODE_ENV=production
 Environment=PATH=__REPO__/node_modules/.bin:__HOME__/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Same exposure as :5183 — a login in front of a pty and the filesystem — so the Docker bridges are
-# dropped the same way, by interface. The watchdog re-asserts these rules every minute.
+# dropped the same way, by interface. Cerberus's cloudcli/bridge.dropped check counts them every five
+# minutes and its entry puts back any that went missing.
 ExecStartPre=+/bin/sh -c 'for i in docker0 br-+; do /usr/sbin/iptables -C INPUT -p tcp --dport 5184 -i $i -j DROP 2>/dev/null || /usr/sbin/iptables -I INPUT -p tcp --dport 5184 -i $i -j DROP; done'
 # A first boot with no build yet builds one before serving.
 ExecStartPre=/bin/sh -c 'test -L .prod-client/current || scripts/prod-client-build.sh --force'

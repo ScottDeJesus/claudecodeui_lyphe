@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import type { Router } from 'express';
 
+import { defineSubagentTranscriptWatch } from '@/modules/providers/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
 import type { RelayAnswer, ResumeRunOrder } from '@/shared/relayed-press-types.js';
@@ -9,10 +10,11 @@ import type { SoulLaunchSnapshot, SoulLaunchStateEvent } from '@/shared/types.js
 import { dispatchSoulsStateDir, pacerHomeDir } from '@/shared/utils.js';
 
 import { releaseCpuWait } from './cpu-wait.transport.js';
-import { createDispatchSoulsRouter } from './dispatch-souls.routes.js';
+import { createDispatchSoulsRouter, isLaunchId } from './dispatch-souls.routes.js';
 import { resumeChainOnHisWord } from './run-resume.service.js';
-import { readSoulTranscript } from './soul-transcript.service.js';
+import { readSoulTranscript, soulRecordDirectory } from './soul-transcript.service.js';
 import { snapshotLaunches } from './soul-launch.service.js';
+import { announceSoulLaunchesChanged } from './soul-launch-changes.js';
 
 /**
  * How often the launch root is read. Two seconds: fast enough that a launch appearing or a receipt
@@ -72,12 +74,17 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
   // Where a launch the runner is holding back for CPU keeps its marker: the pacer's own folder, beside the launch root's
   // parent (`pacerHomeDir` follows `PLAN_RUNNER_PACER_HOME`, as the pacer does), so a scratch state root has its own.
   const cpuWaitDir = path.join(pacerHomeDir(path.dirname(stateDir)), 'cpu-wait');
+  // The subagent tail watches a soul's record directory by the rule its transcript route reads it by.
+  defineSubagentTranscriptWatch({
+    soulRecordDirectory: (launchId) => (isLaunchId(launchId) ? soulRecordDirectory(stateDir, launchId) : null),
+  });
 
   const broadcast = (frame: SoulLaunchStateEvent): void => {
     const message = JSON.stringify(frame);
     connectedClients.forEach((client) => {
       if (client.readyState === WS_OPEN_STATE) client.send(message);
     });
+    announceSoulLaunchesChanged();
   };
 
   /**

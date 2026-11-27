@@ -254,7 +254,8 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
         refusal={askingReject ? null : openedRefusal}
         onClose={foldBack}
         onSpike={() => opened !== undefined && onSpike(opened.name)}
-        onOpenChat={() => opened !== undefined && opened.spike !== null && onOpenChat(opened.spike.session)}
+        onOpenChat={() => { const chat = opened?.spike?.session; if (chat) onOpenChat(chat); }}
+        onOpenLauncher={() => { const chat = opened?.spike?.launched_from; if (chat) onOpenChat(chat); }}
         onAdopt={() => opened !== undefined && onAdopt(opened.name)}
         onReject={() => setAsking('reject')}
         onReopen={() => opened !== undefined && onReopen(opened.name)}

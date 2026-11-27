@@ -175,6 +175,9 @@ export type ReleaseInfo = {
   publishedAt: string;
 };
 
+/** GET /api/app-release's body, also carried by the app_release_state frame: GitHub's tag verbatim (`v1.2.3`) and the release; both null when none is published. Read by useVersionCheck. */
+export type AppReleaseReading = { tag: string | null; release: ReleaseInfo | null };
+
 /** How this CloudCLI install was obtained; decides whether the UI offers a self-update action. */
 export type InstallMode = 'git' | 'npm';
 
@@ -267,6 +270,47 @@ export type ServerEvent = {
   seq?: number;
   [key: string]: unknown;
 };
+
+/**
+ * The hint kinds: frames of `{ kind, at }` only, naming nothing, so a hook that hears one reads its
+ * own route again (through `useServerFrame`). None carries `seq` or `sessionId`.
+ */
+export type ServerHintKind =
+  /** The memory-intake queue changed: read the candidates again. */
+  | 'memory_changed'
+  /** The Claude accounts store changed: read the accounts again. */
+  | 'accounts_changed'
+  /** A queued draft moved: hydrate the composer's draft card again. */
+  | 'drafts_changed'
+  /** The Claude update job or check was written: read the update state again. */
+  | 'claude_updates_changed'
+  /** The installed CLI version, or the runs on an older one, moved: read the version report again. */
+  | 'cli_version_changed'
+  /** The heal ledger committed: read the heal summary again. */
+  | 'heal_changed'
+  /** The Jev ledger was appended to: read the Jev summary again. */
+  | 'jev_changed'
+  /** A DeepSeek-counted transcript was written: read the DeepSeek usage again. */
+  | 'deepseek_usage_changed'
+  /** A watched subagent transcript moved; carries `key` and reaches only the sockets watching it. */
+  | 'subagent_transcript_changed';
+
+/**
+ * The state kinds: `{ kind, at }` plus the whole body the named route answers, so a hook sets its
+ * state from the frame instead of reading the route. None carries `seq` or `sessionId`.
+ */
+export type ServerStateKind =
+  /** GET /api/providers/sessions/running's answer. */
+  | 'running_sessions_state'
+  /** The Claude usage window, under `usage`. */
+  | 'accounts_usage_state'
+  /** GET /api/deepseek/balance's answer for one server reading. */
+  | 'deepseek_balance_state'
+  /** GET /api/app-release's answer. */
+  | 'app_release_state';
+
+/** One hint frame as it arrives. `key` is present only on `subagent_transcript_changed`. */
+export type ServerHintFrame = { kind: ServerHintKind; at: number; key?: string };
 
 
 // ---------------------------
@@ -3605,8 +3649,8 @@ export type DispatcherCardStage = { name: string; soul: string | null; launch_id
 export type DispatcherCard = { board: string; card: string; title: string; state: DispatcherCardState; flow: 'bug' | 'change' | 'tweak' | 'cure' | null; part: 'whole' | 'fix' | 'change'; sorted_by: string | null; confidence: number | null; hold: string | null; waits_on: number | null; waited_days: number | null; rides_as: 'high' | 'medium' | 'low' | null; chain_id: string | null; cases: DispatcherCardCase[]; stages: DispatcherCardStage[] };
 /** The two causes a phase's or a plan's `stalled` word carries (`report_stall`): `dispatcher_down` when no daemon holds the home, so nothing can record anything, and `ended_unrecorded` when one does and has not. Both are answered by Resume, which wakes or starts the daemon. */
 export type DispatcherStall = 'dispatcher_down' | 'ended_unrecorded';
-/** The plan's word, in ONE precedence: `gaps`, `complete`, `hidden`, `scheduled`, `paused`, `queued`, `stalled`, `live`, `parked`, else `idle`. `gaps` is a plan whose every phase is done while a gap ticket one of them left is still open (`gaps.shipped` is not yet true): it finished, and the house is healing what it could not close — it reads `complete` once the last such ticket ends. `hidden` is a plan the operator hid (`DispatcherPlan.hidden` says since when): held out of the queue and paused until he Shows it, and it outranks every word below it — an hour armed for it fires into a refusal, so a card reading `scheduled` over it would promise a start nothing makes. `stalled` is a released plan (approved, unpaused) whose only running work has ENDED with nothing to record it — never `live`, because nothing is moving it; `DispatcherPlan.stalled` says why. `scheduled` outranks the pause flag on purpose — a paused plan with an hour set is going to start by itself, and calling it merely `paused` would hide the one fact the operator needs. `paused` and `queued` are told apart by whether a walk ever launched: a paused plan that has run is stopped mid-plan, one that never launched is still waiting at the gate. */
-export type DispatcherPlanStatus = 'idle' | 'parked' | 'queued' | 'scheduled' | 'paused' | 'stalled' | 'live' | 'hidden' | 'complete' | 'gaps';
+/** The plan's word, in ONE precedence: `gap-needs-you`, `gaps`, `complete`, `hidden`, `scheduled`, `paused`, `queued`, `stalled`, `live`, `parked`, else `idle`. `gap-needs-you` is a plan whose every phase is done while a gap ticket its fix rounds could not close is open (`gaps.word`): the builder was sent back twice and the gap still stands, so it needs the operator — the ticket's card asks him — and it reads `complete` once the last such ticket ends. `gaps` is the same for a ticket filed before the fix rounds existed: the house is healing it. `hidden` is a plan the operator hid (`DispatcherPlan.hidden` says since when): held out of the queue and paused until he Shows it, and it outranks every word below it — an hour armed for it fires into a refusal, so a card reading `scheduled` over it would promise a start nothing makes. `stalled` is a released plan (approved, unpaused) whose only running work has ENDED with nothing to record it — never `live`, because nothing is moving it; `DispatcherPlan.stalled` says why. `scheduled` outranks the pause flag on purpose — a paused plan with an hour set is going to start by itself, and calling it merely `paused` would hide the one fact the operator needs. `paused` and `queued` are told apart by whether a walk ever launched: a paused plan that has run is stopped mid-plan, one that never launched is still waiting at the gate. */
+export type DispatcherPlanStatus = 'idle' | 'parked' | 'queued' | 'scheduled' | 'paused' | 'stalled' | 'live' | 'hidden' | 'complete' | 'gaps' | 'gap-needs-you';
 /** Since when the operator has had a plan hidden, and the epic whose press it was (`hooks/dispatcher/store_hidden.py`, `report.hidden_reading`): `at` is the hide's own store stamp — the moment the card's news let-go compares against — and `arc` is the epic's bare name when the press was the epic deck's (its plans then leave and return as one), else `null`. */
 export type DispatcherPlanHidden = { at: string; arc: string | null };
 /** The operator's planning brake on ONE feature or ONE epic (`dispatcher pause-planning <name>`; the dispatcher's own record, `hooks/dispatcher/store_planning.py`): `at` is the press's store stamp (`YYYY-MM-DDTHH:MM:SSZ`) and `by` the door that pressed it — `cli` (his terminal) or `app:card` (this app's card). It is NOT the walk's `paused` flag, which also means the gate's hold, a Hide, park-at-peak and the backoff. `DispatcherPlan.planning_paused` and `DispatcherArc.planning_paused` carry it, each `null` while that subject's OWN brake does not stand; read tolerantly (`planningPausedSince`), and a key that IS there and is neither `null` nor `{at, by}` text is refused by name. */
@@ -3626,7 +3670,7 @@ export type DispatcherDecidedBy = 'builder' | 'rule' | 'designer';
 /** One choice made FOR the operator since the plan's last load (`report.plan_dict.decided`, `store_decided.since_load`), oldest first. `id` is the row's own and `at` its stamp; `task` is the TITLE of the phase it was made in (never its key, INV-76), `null` for a choice of no phase. `what` is what was left open, `choice` what was done, `why` one line, `undo` what reverses it. */
 export type DispatcherDecided = { id: number; at: string; task: string | null; by: DispatcherDecidedBy; what: string; choice: string; why: string; undo: string };
 /** One gap a finished task left open, which the house is healing (`report.plan_dict.open_gaps`, `gaps.open_for`): `task` is the phase's title, `title` the finding's, `ticket` the open ticket's id and `priority` that ticket's own word as its board holds it — a string, because the board's vocabulary is the board's. While one is open the plan reads `gaps`, never `complete`. */
-export type DispatcherGap = { task: string; title: string; ticket: number; priority: string };
+export type DispatcherGap = { task: string; title: string; ticket: number; priority: string; /** Why its fix rounds could not close it, when they could not (`gaps.listed`); null for a ticket filed before them. */ needs_you: string | null };
 /** A phase whose walk waits on its designer (`report.phase_dict.ruling`, `decider.waiting`): `asked` while his ruling is owed. */
 export type DispatcherPhaseRuling = 'asked';
 /** One plan whole: its row, its waits, its armed hour, its books, its phases in position order and its log oldest first. `state` is the STORE's own state word — `designing`, `designed`, `questions`, `loaded`, `parked` — a string rather than a union, because the store's vocabulary belongs to the store. `goal` is null on a plan that has been opened and not yet designed. `session` is the session that opened it, `author` the soul that wrote its design. `schedule` is the armed hour read back out of systemd at this instant (`schedule.armed`), `{ start_at, unit }` with `start_at` the timer's own ISO stamp — so a timer stopped or fired by hand reads null here at once. `cost_usd`, `rounds` and `tokens*` sum this plan's phases — and `cost_usd` is PAID dollars, so a plan that rode the operator's Claude subscription reads `0` there while its tokens count everything it spent. `paid_vendor` names the vendor those dollars were billed by (`DeepSeek`, `Claude API`, or `""` for a mix or a swept record), read tolerantly. `launched` is whether a walk has ever gone out for it — see the field. */

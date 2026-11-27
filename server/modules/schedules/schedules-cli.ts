@@ -119,6 +119,19 @@ function parseTags(raw: string): string[] {
 }
 
 /** The registry read the two editing verbs share: the row they are about to replace or delete. */
+/**
+ * The verb's exit code, after one registry sync when the table it wrote was the live crontab.
+ *
+ * The door's own crontab child carries CRON_DOOR_WRITE, so the house's crontab on PATH starts no sync
+ * of its own; this is that sync, run here inside the lock the verb holds so it reads the table this
+ * verb just wrote. A --tabfile is not the box's table and is not synced. runSync never throws: a sync
+ * that failed is its own recorded report, and the verb's code is unchanged by it.
+ */
+async function endWithLiveSync(tabfile: string | undefined, code: number): Promise<number> {
+  if (tabfile === undefined) await runSync();
+  return code;
+}
+
 function findRow(id: string): CronJob | undefined {
   return cronJobsDb.listJobs().find((job) => job.id === id);
 }
@@ -195,7 +208,7 @@ async function add(argv: string[]): Promise<number> {
         `add drift crontab=${written ? 'written' : 'unchanged'} registry=missing command='${command}' ` +
           `reason='${messageOf(error)}'`
       );
-      return 1;
+      return await endWithLiveSync(tabfile, 1);
     }
 
     say(
@@ -203,7 +216,7 @@ async function add(argv: string[]): Promise<number> {
         `log=${logPath ?? 'none'} tags=${JSON.stringify(tags)} ` +
         `crontab=${written ? 'written' : 'unchanged'} row=${id}`
     );
-    return 0;
+    return await endWithLiveSync(tabfile, 0);
   });
 }
 
@@ -254,14 +267,14 @@ async function remove(argv: string[]): Promise<number> {
         `remove drift crontab=${dropped ? 'removed' : 'unchanged'} registry=not-deleted ` +
           `command='${command}' reason='${messageOf(error)}'`
       );
-      return 1;
+      return await endWithLiveSync(tabfile, 1);
     }
 
     say(
       `remove ok command='${command}' table=${tabfile ?? 'live'} crontab=${dropped ? 'removed' : 'unchanged'} ` +
         `row=${id} registry=${existing === undefined ? 'absent' : 'deleted'}`
     );
-    return 0;
+    return await endWithLiveSync(tabfile, 0);
   });
 }
 

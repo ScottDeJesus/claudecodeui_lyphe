@@ -26,7 +26,7 @@ import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/ty
  * Mirrors `RUNNING_BELIEVED_FOR_MS` in the chat's pinned rows (`PinnedSubagents.tsx`), drawn in the
  * strip above the chat box: a "running" row older than this is not believed.
  *
- * Read by the sidebar's subagent mark too (`runningSubagentModels`, and the candidate window in
+ * Read by the sidebar's subagent mark too (`runningSubagents`, and the candidate window in
  * `session-subagent-runs.service.ts`), so the three answers to "is an agent still out there" are
  * one window rather than three.
  */
@@ -200,21 +200,32 @@ function isRunningContainer(message: NormalizedMessage): boolean {
   return !result.isError && receipt?.isAsync === true;
 }
 
+/** One agent the strip paints as running: its model (`''` until recorded) and its launch instant (`null` when the call carries no readable time). */
+export type RunningSubagent = { model: string; launchedAt: number | null };
+
 /**
- * The model of every subagent this conversation has running RIGHT NOW, one entry for each, in the order the strip pins them:
- * the model the agent's own transcript names (`subagent.model`), or `''` for one whose model is not recorded yet. Empty when it
- * has none running: the question the sidebar's subagent mark asks, and the answer the chat's pinned strip draws its own from.
+ * Every subagent this conversation has running RIGHT NOW, one entry for each, in the order the strip pins them:
+ * the model the agent's own transcript names (`subagent.model`), or `''` for one whose model is not recorded yet, and when it
+ * launched. Empty when it has none running: the question the sidebar's subagent mark asks, and the answer the chat's pinned strip
+ * draws its own from. The launch is what says when the four-hour window stops believing the agent.
  *
  * Asked through `collectSessionAgents` deliberately, rather than by re-walking the messages: the
  * containers it offers and the four-hour launch window it applies to an unfinished one ARE the
  * strip's selection, so a mark can never light on an agent the strip would not pin.
  *
- * Consumed by `session-subagent-runs.service.ts`, for the running-sessions route's `subagentSessionIds` and `subagentModels`.
+ * Consumed by `session-subagent-runs.service.ts`, for the running-sessions route's `subagentSessionIds` and `subagentModels`
+ * and for the instant that answer lapses (`subagentRunsLapseAt`).
  */
-export function runningSubagentModels(messages: NormalizedMessage[], now: number = Date.now()): string[] {
+export function runningSubagents(messages: NormalizedMessage[], now: number = Date.now()): RunningSubagent[] {
   return collectSessionAgents(messages, now)
     .filter(isRunningContainer)
-    .map((message) => (typeof message.subagent?.model === 'string' ? message.subagent.model : ''));
+    .map((message) => {
+      const launchedAt = readTime(message.timestamp);
+      return {
+        model: typeof message.subagent?.model === 'string' ? message.subagent.model : '',
+        launchedAt: Number.isFinite(launchedAt) ? launchedAt : null,
+      };
+    });
 }
 
 /**
@@ -250,10 +261,18 @@ export async function hasFreshSubagentSidechains(
  * and loose `agent-*.jsonl` beside the parent transcript before that. Empty when there are none —
  * a session with no agents pays one failed `readdir` and nothing else.
  */
+/**
+ * Where Claude writes a session's subagent sidechains today: `<projectDir>/<providerSessionId>/subagents/`.
+ * Read by the stamp below and by the subagent transcript tail, which watches this directory.
+ */
+export function subagentsDirectoryOf(transcriptPath: string, providerSessionId: string): string {
+  return path.join(path.dirname(transcriptPath), providerSessionId, 'subagents');
+}
+
 export async function readSubagentStamp(transcriptPath: string, providerSessionId: string): Promise<string> {
   const projectDirectory = path.dirname(transcriptPath);
   const directories = [
-    path.join(projectDirectory, providerSessionId, 'subagents'),
+    subagentsDirectoryOf(transcriptPath, providerSessionId),
     projectDirectory,
   ];
 

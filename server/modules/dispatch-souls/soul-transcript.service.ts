@@ -72,9 +72,14 @@ async function readSessionIdFromChildLog(launchDir: string): Promise<string | nu
  * environment — see `createDispatchSoulsModule`, whose JSDoc says everything under that root takes
  * what it needs as an argument.
  */
+/** A launch's record directory under the launch root: where its receipt and its child's log are written. */
+export function soulRecordDirectory(stateDir: string, launchId: string): string {
+  return path.join(stateDir, launchId);
+}
+
 export async function readSoulTranscript(stateDir: string, launchId: string): Promise<SubagentTranscriptResult> {
   try {
-    const launchDir = path.join(stateDir, launchId);
+    const launchDir = soulRecordDirectory(stateDir, launchId);
     const sessionId = await readSessionIdFromReceipt(launchDir) ?? await readSessionIdFromChildLog(launchDir);
     if (!sessionId) {
       return NOT_FOUND_SOUL_TRANSCRIPT;

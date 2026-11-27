@@ -37,6 +37,8 @@ type UserDependencies = {
     clearQueuedMessage(userId: number, scope: string): QueuedChatMessage | null;
     deleteDraft(userId: number, scope: string): void;
   };
+  /** Told after a queued message is appended or cleared, so every open tab's card follows the server. */
+  tellDraftsChanged(): void;
   readSystemGitConfig(): Promise<GitConfig>;
   applyGlobalGitConfig(gitName: string, gitEmail: string): Promise<void>;
   logInfo(message: string): void;
@@ -252,12 +254,15 @@ export function createUserService(dependencies: UserDependencies) {
           { code: 'QUEUED_MESSAGE_NOT_COMBINABLE', statusCode: 409 },
         );
       }
+      dependencies.tellDraftsChanged();
       return { success: true, queuedMessage: result.queuedMessage, appended: result.appended };
     },
 
     /** Answers the message it removed (null when none was waiting), so the composer can hand all of it back. */
     clearQueuedMessage(userId: number, scopeInput: unknown) {
       const queuedMessage = dependencies.drafts.clearQueuedMessage(userId, readDraftScope(scopeInput));
+      // Nothing removed is nothing written: no tab's card has anything to follow.
+      if (queuedMessage !== null) dependencies.tellDraftsChanged();
       return { success: true, queuedMessage };
     },
 

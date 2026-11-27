@@ -3,6 +3,7 @@ import spawn from 'cross-spawn';
 import { sessionDraftsDb, userDb, userPreferencesDb } from '@/modules/database/index.js';
 
 import { createUserRouter } from './user.routes.js';
+import { tellDraftsChanged } from './drafts-hint.service.js';
 import { createUserService } from './user.service.js';
 
 type GitCommandResult = { stdout: string };
@@ -35,6 +36,7 @@ async function readSystemGitConfig() {
 }
 
 const userService = createUserService({
+  tellDraftsChanged,
   users: {
     getGitConfig: (userId) => userDb.getGitConfig(userId),
     updateGitConfig: (userId, gitName, gitEmail) => userDb.updateGitConfig(

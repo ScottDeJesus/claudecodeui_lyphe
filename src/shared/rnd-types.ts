@@ -91,7 +91,9 @@ export type RndCandidate = {
   filed_by: string | null;
   /** The scout that filed it, or null when filed by hand. */
   scout: number | null;
-  spike: { session: string; started_at: string } | null;
+  /** session: the spike's own chat (made by the R&D place). launched_from: the chat a spike with no chat of its own was
+   * launched from (/spike typed in a chat), with its name, null when the app holds no such chat. */
+  spike: { session: string | null; launched_from: string | null; launched_from_name: string | null; started_at: string } | null;
   verdict: { word: RndVerdictWord; evidence: string | null; dir: string | null; at: string } | null;
   rejected: { why: string; at: string; by: string | null } | null;
   /** The feature it became, the epic it stands under, that feature's own word on the roadmap, and Opus's one line of why

@@ -8,7 +8,7 @@ import { formatShortDate, roadmapFeatureIndex } from '@/shared/utils';
 
 /** The steps the locale has a phrase for, as `roadmap.step.<step>` keys. `waiting` and `shipped` are spelled apart: each needs a value. */
 const PLAIN_STEPS: ReadonlySet<RoadmapFeatureStep> = new Set<RoadmapFeatureStep>([
-  'idea', 'proposed', 'designing', 'questions', 'cutting', 'accept', 'parked', 'building', 'queued', 'paused', 'stalled', 'starting', 'gaps',
+  'idea', 'proposed', 'designing', 'questions', 'cutting', 'accept', 'parked', 'building', 'queued', 'paused', 'stalled', 'starting', 'gaps', 'gap-needs-you',
 ]);
 
 /**

@@ -87,7 +87,7 @@ export function createClaudeUpdatesRouter(routes: ClaudeUpdatesRoutes): express.
   });
 
   // 202, not 200: a job has been started, not finished. The report that comes back is the answer to
-  // "what is happening", which is exactly what the tab polls from here on.
+  // "what is happening", which is exactly what the tab reads again on each `claude_updates_changed` from here on.
   router.post('/apply', async (request, response, next) => {
     try {
       const targets = readTargets(request.body);

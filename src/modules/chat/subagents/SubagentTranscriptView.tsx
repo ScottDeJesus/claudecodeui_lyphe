@@ -59,7 +59,7 @@ export function SubagentTranscriptView({
   // entry would throw away the diff cache between two steps of the same file.
   const createDiff = useMemo(() => createCachedDiffCalculator(), []);
   // How far back the reader has reached, raised by the "show earlier" press below. It is the one
-  // thing on this view that is genuinely the reader's, and it survives the polling reads.
+  // thing on this view that is genuinely the reader's, and it survives the read each frame brings.
   const [shown, setShown] = useState(INITIALLY_DRAWN_STEPS);
 
   // Whether this transcript is still being written, in the words a person reads: the row is

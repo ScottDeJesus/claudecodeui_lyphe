@@ -9,6 +9,9 @@ import { useSharedSessionFollower } from '@/modules/auth/hooks/useSharedSessionF
 import { dropAuthEvents, peekAuthEvents } from '@/shared/authTrace';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
+
+/** The longest delay setTimeout keeps, in ms (a signed 32-bit count); a longer one fires at once. */
+const LONGEST_TIMER_MS = 2_147_483_647;
 /** The signed-in account held by AuthContext - a required `username` plus an optional id and any additional fields the auth API returns - and should be read through `useAuth()` rather than re-derived from raw auth responses. */
 type AuthUser = {
   id?: number | string;
@@ -457,9 +460,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     const refreshDelay = getAuthTokenRefreshDelay(token);
+    // Held inside setTimeout's range: a delay past 2^31 - 1 ms (24.8 days) fires AT ONCE. The server signs for 3650 days, so the
+    // halfway point was ~5 years out and every token was refreshed the moment it arrived; on a slow phone each refresh landed in a
+    // new second, was adopted, and closed and reopened the socket about every second (measured 2026-11-26). A tab open that long
+    // refreshes when the held timer fires, which is early and harmless.
     const refreshTimer = refreshDelay === null
       ? null
-      : window.setTimeout(() => void refreshSession(), refreshDelay);
+      : window.setTimeout(() => void refreshSession(), Math.min(refreshDelay, LONGEST_TIMER_MS));
 
     window.addEventListener('focus', refreshIfNeeded);
     document.addEventListener('visibilitychange', handleVisibilityChange);

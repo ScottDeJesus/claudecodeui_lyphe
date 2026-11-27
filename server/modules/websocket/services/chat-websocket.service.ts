@@ -15,6 +15,7 @@ import {
   markSocketShowing,
   markSocketSubscribed,
 } from '@/modules/websocket/services/chat-session-audience.service.js';
+import { laneWatch } from '@/modules/websocket/services/lane-watch.service.js';
 import { broadcastSessionUpserted } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
 import {
   connectedClients,
@@ -826,6 +827,10 @@ export function handleChatConnection(
         case 'chat.subscribe':
           handleChatSubscribe(ws, data, dependencies);
           return;
+        case 'watch.start':
+        case 'watch.stop':
+          laneWatch.handle(ws, { type: messageType, lane: data.lane, key: data.key });
+          return;
         case 'chat.permission-response':
           handlePermissionResponse(data, dependencies);
           return;
@@ -855,6 +860,7 @@ export function handleChatConnection(
   ws.on('close', () => {
     console.log('[INFO] Chat client disconnected');
     connectedClients.delete(ws);
+    laneWatch.drop(ws);
     clearPresence(ws);
     restartHold.panelGone(ws);
   });

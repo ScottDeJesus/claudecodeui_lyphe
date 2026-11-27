@@ -1,7 +1,7 @@
 // protects: server/modules/dispatcher/dispatcher-plan.reader.ts, server/modules/dispatcher/dispatcher-state.transport.ts, server/shared/types.ts, src/shared/types.ts
 // writes: none
 // The house's status JSON (report.plan_dict, walks-decide-themselves) may say a plan finished with a gap (status gaps), list what was
-// decided for the operator (decided) and the gaps being healed (open_gaps), and mark a phase waiting on the designer (ruling asked).
+// decided for the operator (decided) and the gaps still open, each with why it needs him (open_gaps), and mark a phase waiting on the designer (ruling asked).
 // CloudCLI's dispatcher reader carries all four through, key for key. The plan is one of today's own (live dispatcher status --json,
 // read only) with the four written onto a copy; nothing is written anywhere.
 
@@ -44,7 +44,7 @@ runCase(async (t: { defer: (cleanup: () => unknown) => void }) => {
     { id: 7, at: "2026-11-21T10:00:00Z", task: title, by: "builder", what: "which table holds the rows", choice: "a new table", why: "nothing else holds them", undo: "drop the table" },
     { id: 8, at: "2026-11-21T11:00:00Z", task: null, by: "rule", what: "B1 came back unchanged", choice: "the finding stands", why: "it came back unchanged after your answer", undo: "rule it again" },
   ];
-  const openGaps = [{ task: title, title: "the card does not refresh after a ruling", ticket: 4242, priority: "high" }];
+  const openGaps = [{ task: title, title: "the card does not refresh after a ruling", ticket: 4242, priority: "high", needs_you: "2 fix rounds did not close this gap; the builder's last report says: the refresh needs the board's event" }];
   plan.status = "gaps";
   plan.decided = decided;
   plan.open_gaps = openGaps;

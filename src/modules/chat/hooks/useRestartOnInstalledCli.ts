@@ -47,7 +47,7 @@ const RESUMED_HOLD_MS = 20_000;
  * `pressedAt` is what makes the stop's `complete` THIS restart's rather than an older one's, and
  * every phase carries the moment it began (`since`) because the deadlines below are anchored to
  * that rather than to when their effect last ran: an unrelated conversation's `complete`, or a
- * poll landing, re-runs the effect, and a timer re-armed there would push its own deadline out
+ * report's read landing, re-runs the effect, and a timer re-armed there would push its own deadline out
  * indefinitely — leaving the ending it exists to speak unreachable.
  * `staleVersion` is what the report said this conversation was running when the press was made.
  */
@@ -63,7 +63,7 @@ const IDLE: RestartIntent = { phase: 'idle' };
 type RestartArgs = {
   /** The conversation on screen — the one `submit` will send to. */
   sessionId: string | null;
-  /** A live, interruptible run in that conversation, right now (never the polled report). */
+  /** A live, interruptible run in that conversation, right now (never the shared version report). */
   canAbort: boolean;
   /** Every session producing a response, so a submit can be told from a silent early return. */
   processingSessions: SessionActivityMap | undefined;

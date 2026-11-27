@@ -4,7 +4,7 @@ import { AppError } from '@/shared/utils.js';
 
 import { HUB_NODE_ID } from '../definition-document.js';
 
-import { statusAt } from './freshness.js';
+import { staleFrom, statusAt } from './freshness.js';
 import { layerCurrent, muteActiveAt, pausedSince, toMuteView, type NodeOverlay } from './overlays.js';
 import { staleAfterSecondsOf, type CheckSeries } from './series.js';
 import { shownRow, storedStatusOf } from './status-rules.js';
@@ -85,6 +85,21 @@ function unknownSince(
 }
 
 /**
+ * Tells `flipsAt` each instant after `now` at which this check's own status turns with nothing written: its
+ * fresh row going stale, and a mute over it beginning or running out. The node's silence and pauses are told
+ * by `resolveNodeLink`.
+ */
+function reportCheckFlips(series: CheckSeries, now: number, flipsAt: (at: number) => void): void {
+  const staleAt = staleFrom(series.rows, now, series.staleAfterMs, series.liveLastAt);
+  if (staleAt !== null) flipsAt(staleAt);
+  for (const mute of series.mutes) {
+    if (mute.lifted_at !== null && mute.lifted_at <= now) continue;
+    if (mute.from_at > now) flipsAt(mute.from_at);
+    if (mute.until_at > now) flipsAt(mute.until_at);
+  }
+}
+
+/**
  * Builds one check's view at `inputs.now` from its definition row and its series.
  *
  * `status` is the latest row's word when it is still fresh (`statusAt`), `unknown` when it is not or
@@ -114,6 +129,7 @@ export function buildCheckView(
   const raw = verdict === 'result' && row ? shownRow(row) : 'unknown';
   const status = layerCurrent(raw, now, series.mutes, overlay);
   const mute = muteActiveAt(series.mutes, now);
+  if (inputs.flipsAt) reportCheckFlips(series, now, inputs.flipsAt);
   const { newest, since: statusSince } = inputs.memory(check.node, check.key);
   const heard = newest && (!row || newest.at > row.at) ? newest : row;
 

@@ -52,6 +52,7 @@ export function epochOf(iso: string | null): number | null {
  * is waiting on, and amber over a plan they parked themselves would be the card arguing with them.
  */
 export function planStatusTone(status: DispatcherPlanStatus): Tone {
+  if (status === 'gap-needs-you') return 'danger';     // a gap its fix rounds could not close: it waits on the operator
   if (status === 'stalled' || status === 'gaps') return 'warn';
   return status === 'live' || status === 'complete' ? 'positive' : 'neutral';
 }

@@ -1,31 +1,25 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 
 import { api } from '@/shared/api';
-import type { CliVersionReport } from '@/shared/types';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
+import type { CliVersionReport, ServerEvent } from '@/shared/types';
 
 /**
- * How often the report is re-read. The server caches its own probe for 60 s, so a faster poll
- * would ask the same cached answer twice; a slower one would leave a finished run on screen.
- */
-const POLL_MS = 60_000;
-
-/**
- * The report is held at MODULE scope, behind one poller shared by every consumer.
+ * The report is held at MODULE scope, behind one reader shared by every consumer.
  *
  * Not a per-component `useState`: the sidebar mounts this hook once per session row, and a
- * hook that fetched on its own would put one request per conversation on the wire every minute
- * — the same picture, N times. One store, one interval, N subscribers.
+ * hook that fetched on its own would put one request per conversation on the wire for every
+ * `cli_version_changed` — the same picture, N times. One store, one read per frame, N subscribers.
  *
  * ⚠ Module scope is per DOCUMENT: a reload or a second tab starts with nothing and asks again.
  * That is correct here — the report is a reading of right now, never something to carry over.
  */
 let report: CliVersionReport | null = null;
 /**
- * The last body VERBATIM. A poll that answers the same JSON republishes nothing, so an idle
- * app does not re-render every session row once a minute for a picture that did not move.
+ * The last body VERBATIM. A read that answers the same JSON republishes nothing, so a frame that
+ * moved nothing this page draws does not re-render every session row.
  */
 let lastBody = '';
-let timer: ReturnType<typeof setInterval> | null = null;
 /** The read in flight, so a mount during one joins it instead of opening a second. */
 let inFlight: Promise<boolean> | null = null;
 /** Which read owns the slot above. A forced read takes it, so an older one cannot clear it. */
@@ -43,7 +37,7 @@ const listeners = new Set<() => void>();
  * the last picture is the honest reading of "we could not ask", and a console error would put
  * a transient network blip into a screen's evidence.
  *
- * `force` is what a CALLER waiting on the answer needs. Joining the poll already in flight would
+ * `force` is what a CALLER waiting on the answer needs. Joining the read already in flight would
  * hand it a picture taken before whatever it just did, so `refresh()` opens its own request and
  * its promise resolves on a reading no older than the call.
  *
@@ -79,7 +73,7 @@ function read(force = false): Promise<boolean> {
       // Nothing to say: the picture that is already here is the best one available.
       return false;
     } finally {
-      // Only if this is still the newest read: a forced one starting mid-poll takes the slot, and
+      // Only if this is still the newest read: a forced one starting mid-read takes the slot, and
       // clearing it unconditionally would drop the newer request a later joiner should get.
       if (newestRead === token) inFlight = null;
     }
@@ -87,23 +81,34 @@ function read(force = false): Promise<boolean> {
   return inFlight;
 }
 
-/** Subscribes one consumer, starting the shared poller for the first and stopping it for the last. */
+/**
+ * Subscribes one consumer. The first one reads the report: while nobody is mounted no frame is heard,
+ * so what is held may be old. A later one is handed what is held, which the frames keep current.
+ */
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (timer === null) {
-    void read();
-    timer = setInterval(() => void read(), POLL_MS);
-  }
+  if (listeners.size === 1) void read();
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && timer !== null) {
-      clearInterval(timer);
-      timer = null;
-    }
   };
 }
 
 const getSnapshot = () => report;
+
+/** The frame the server sends when the installed CLI or the runs on an older one move. */
+const CLI_VERSION_FRAME_KINDS: readonly string[] = ['cli_version_changed'];
+/** The frame last answered: every mounted consumer hears the same one, and it is read once. */
+let lastHeardFrame: ServerEvent | null = null;
+
+/**
+ * Reads the report again for a frame (or a reconnect, after which frames may have been missed).
+ * Forced, because a read already out may have begun before the change the frame announces.
+ */
+function readOnFrame(event: ServerEvent): void {
+  if (event === lastHeardFrame) return;
+  lastHeardFrame = event;
+  void read(true);
+}
 
 /**
  * The installed Claude CLI, and which live conversations are running a different one.
@@ -131,6 +136,7 @@ export function useCliVersion(): {
   refresh: () => Promise<boolean>;
 } {
   const current = useSyncExternalStore(subscribe, getSnapshot);
+  useServerFrame(CLI_VERSION_FRAME_KINDS, readOnFrame);
   const installed = current?.installed ?? null;
 
   // THE comparison, made once for the whole app. `installed` unknown (a bare `claude` on PATH,

@@ -44,7 +44,14 @@ import type {
  * its own. A listener that throws is logged and costs no other listener and no browser; a flagged update frame
  * (`hintUpdateMoved`) closes through the same function and counts.
  *
- * Consumers: `definitions.service.ts` (a definition, label or retire write), `ingest.service.ts`
+ * TIME IS HINTED TOO. A check going stale, a mute running out or a node falling silent writes nothing, so no writer
+ * hints it. A tab's read forecasts the earliest such instant and hands it to `armFlipDeadline`: one unref'd timer
+ * keeps the earliest future instant it was handed, and when it fires the judge (`flip-judge.ts`, registered by the
+ * routes) reads whether anything really turned. Only then does a hint go out, naming what turned, so an open check
+ * sheet reads on it as it reads on any frame naming its check. With no browser socket open nothing is re-armed.
+ *
+ * Consumers: `definitions.service.ts` (a definition, label or retire write), `warden-enrollment.ts` (a token
+ * spent, which the Enroll dialog reads on), `ingest.service.ts`
  * (a stored change), `warden-gateway.ts` (link changes, through `wardenLinks.onChange`),
  * `warden-link.ts` (a node's first heartbeat), `mutes.service.ts` (a mute set or lifted),
  * `catalog.service.ts` and `run-frames.ts` (an entry or a run moving; `sendRunOutput` for a stored
@@ -180,4 +187,76 @@ export function sendRunOutput(runId: string, lines: CerberusRunLine[]): void {
  */
 export function sendDiagStep(diagId: string, step: CerberusDiagnosisStep): void {
   sendToBrowsers({ kind: 'cerberus_diag_step', diagId, step });
+}
+
+/** The longest delay Node's timers hold; a later one would fire at once. */
+const MAX_TIMER_MS = 2_147_483_647;
+
+/**
+ * The least wait before a flip is judged: an instant that is always just ahead (a pause still running, whose end
+ * the update announces itself) costs at most one judgement a second, never a spin.
+ */
+const MIN_FLIP_LEAD_MS = 1_000;
+
+/** What the judge answers for an instant: the nodes and checks it turned (none when it turned nothing), and the next instant forecast. */
+export type FlipJudgement = { nodes: string[]; checks: string[]; next: number | null };
+
+let flipJudge: ((at: number) => FlipJudgement) | null = null;
+let flipTimer: NodeJS.Timeout | null = null;
+/** The instant the armed timer is for, so a later instant never displaces an earlier one. */
+let flipDueAt: number | null = null;
+
+/** Registers the one judge of a fired flip deadline. Consumers: `cerberus.routes.ts`. */
+export function judgeFlipsWith(judge: (at: number) => FlipJudgement): void {
+  flipJudge = judge;
+}
+
+/**
+ * Keeps the earliest future instant it is handed on one unref'd timer; `null`, or an instant no earlier than the
+ * one armed, changes nothing. Consumers: `cerberus.routes.ts`, after `GET /overview` and
+ * `GET /checks/:node/:service/:id`, and the fired deadline itself.
+ */
+export function armFlipDeadline(at: number | null): void {
+  if (at === null) return;
+  const now = Date.now();
+  if (at <= now) return;
+  if (flipTimer !== null && flipDueAt !== null && flipDueAt <= at) return;
+  if (flipTimer !== null) clearTimeout(flipTimer);
+  flipDueAt = at;
+  flipTimer = setTimeout(() => fireFlipDeadline(at), Math.min(MAX_TIMER_MS, Math.max(MIN_FLIP_LEAD_MS, at - now)));
+  flipTimer.unref();
+}
+
+function hasOpenBrowser(): boolean {
+  let open = false;
+  connectedClients.forEach((client) => {
+    if (client.readyState === WS_OPEN_STATE) open = true;
+  });
+  return open;
+}
+
+/**
+ * The deadline came: hint what it turned, then arm the next instant the judge forecasts while a browser is there
+ * to read it. A judge that throws is logged and answered with a bare hint, so every tab reads for itself rather
+ * than miss a turn.
+ */
+function fireFlipDeadline(at: number): void {
+  flipTimer = null;
+  flipDueAt = null;
+  if (flipJudge === null) {
+    hintChanged({});
+    return;
+  }
+  let judgement: FlipJudgement;
+  try {
+    judgement = flipJudge(at);
+  } catch (error) {
+    console.error(`[Cerberus] judging the flip due at ${new Date(at).toISOString()} failed: ${error instanceof Error ? error.message : String(error)}`);
+    hintChanged({});
+    return;
+  }
+  if (judgement.nodes.length > 0 || judgement.checks.length > 0) {
+    hintChanged({ nodes: judgement.nodes, checks: judgement.checks });
+  }
+  if (hasOpenBrowser()) armFlipDeadline(judgement.next);
 }

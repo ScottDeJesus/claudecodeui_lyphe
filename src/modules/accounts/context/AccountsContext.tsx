@@ -71,10 +71,10 @@ const AccountsContext = createStableContext<AccountsValue | null>(import.meta.ho
  * balances, the door's acts, the account-change re-read, and the two sign-in windows.
  *
  * Mounted once by `ProjectWorkspaceShell`, above the views rail and the main region, so the rail button's popover and
- * the Accounts gutter widget read the same state: opening the widget starts no second poller, and a switch made in one
- * place is on screen in the other at once. The hooks poll on their own timers (accounts a minute, usage and both
- * balances three) for as long as this is mounted — which is as long as the workspace is — and a place that draws
- * the panel only reads.
+ * the Accounts gutter widget read the same state: opening the widget starts no second reader, and a switch made in one
+ * place is on screen in the other at once. The hooks read once on mount and then on the server's frames
+ * (`accounts_changed`, `accounts_usage_state` while the usage lane is watched, `deepseek_balance_state`, `jev_changed`)
+ * for as long as this is mounted — which is as long as the workspace is — and a place that draws the panel only reads.
  *
  * The sign-in windows live here, not in either home: both draw a Re-login button and a Set up row, and the window must
  * outlive the popover that was open when it was pressed. They draw on `document.body`, so where they are mounted

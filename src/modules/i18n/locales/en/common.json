@@ -653,6 +653,8 @@
       "back": "Back to the candidates",
       "filed": "filed {{ago}}",
       "spikeStarted": "Spike started",
+      "launchedFrom": "Launched from",
+      "launchedFromElsewhere": "a chat outside this app",
       "what": "What it is",
       "why": "Why it might help",
       "question": "The spike’s question",
@@ -1775,6 +1777,7 @@
       "stalled": "stalled — its run ended",
       "starting": "starting",
       "gaps": "finished with gaps — being healed",
+      "gap-needs-you": "built — a gap needs you",
       "shipped": "shipped {{date}}",
       "shippedUndated": "shipped"
     },
@@ -2092,7 +2095,7 @@
       "why": "Why",
       "undo": "To undo",
       "earlier": "Show {{count}} earlier",
-      "gaps": "Gaps being healed",
+      "gaps": "Open gaps",
       "gapsBelow_one": "{{count}} gap below",
       "gapsBelow": "{{count}} gaps below",
       "priority": {
@@ -2127,7 +2130,8 @@
       "idle": "IDLE",
       "hidden": "HIDDEN",
       "complete": "COMPLETE",
-      "gaps": "FINISHED WITH GAPS"
+      "gaps": "FINISHED WITH GAPS",
+      "gap-needs-you": "A GAP NEEDS YOU"
     },
     "phase": {
       "running": "running",

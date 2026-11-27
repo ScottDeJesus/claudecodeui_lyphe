@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
 import type { ClaudeAccounts } from '@/shared/types';
-
-/**
- * How often the account picture is re-read. Deliberately slow: nothing here changes except when a
- * person acts, and the server answers off the door's own files — so a slow read costs one skipped
- * picture, never a queue.
- */
-const ACCOUNTS_POLL_MS = 60_000;
 
 /**
  * What to say when a write did not land.
@@ -34,14 +28,17 @@ async function readBody(response: Response): Promise<unknown> {
   }
 }
 
-/** The event a command made OUTSIDE this hook's own instance fires, so the one instance that polls re-reads the picture at once instead of at its next tick. */
+/** The event a command made OUTSIDE this hook's own instance fires, so the provider's one instance re-reads the picture at once. */
 const ACCOUNTS_CHANGED_EVENT = 'cloudcli:accounts-changed';
+
+/** The server's hint that the door's account files were written (`server/modules/accounts/accounts-lanes.ts`). */
+const ACCOUNTS_FRAME_KINDS = ['accounts_changed'] as const;
 
 /**
  * Tells the account provider the picture moved under it. Fired when the Re-login window closes (the
  * panel's door and Settings' door both) and when the Set up window closes: each ran a command this
- * app cannot see the end of, so the panel re-reads rather than going on showing the old account
- * until its next tick.
+ * app cannot see the end of, so the panel re-reads at once rather than wait for the door's files
+ * to move.
  */
 export function announceAccountsChanged(): void {
   window.dispatchEvent(new Event(ACCOUNTS_CHANGED_EVENT));
@@ -51,7 +48,7 @@ export function announceAccountsChanged(): void {
  * The Claude accounts the door holds, and the three writes that change them.
  *
  * Used by the accounts module's AccountsProvider, which owns the single instance — it is mounted once
- * above the views rail and the main region, so there is exactly one poller in the app however many
+ * above the views rail and the main region, so there is exactly one reader in the app however many
  * places draw the panel.
  *
  * ONE PICTURE, THREE WRITES. `GET /api/accounts` answers the door's own picture, tagged with
@@ -64,7 +61,7 @@ export function announceAccountsChanged(): void {
  */
 export function useClaudeAccounts() {
   // The last picture the route answered with. Held because the rail button and the panel both
-  // read it between polls, and because `null` (nothing asked yet) has to look different from
+  // read it between reads, and because `null` (nothing asked yet) has to look different from
   // `{reachable:false}` (asked, and there was no picture to be had).
   const [data, setData] = useState<ClaudeAccounts | null>(null);
   // True while any write is in flight, so the rows can refuse a second press.
@@ -76,7 +73,7 @@ export function useClaudeAccounts() {
   // end it, every glance until the next write.
   const [error, setError] = useState<string | null>(null);
 
-  // Mount flag: a poll that resolves after the provider unmounted (a sign-out, or the workspace leaving the tree) must not set state.
+  // Mount flag: a read that resolves after the provider unmounted (a sign-out, or the workspace leaving the tree) must not set state.
   const mountedRef = useRef(true);
   // The in-flight guard read synchronously — `busy` is a render value and lands too late to
   // stop a second press in the same tick.
@@ -86,7 +83,7 @@ export function useClaudeAccounts() {
     if (!mountedRef.current) return;
     setData(next);
     // The picture is the fact a refusal was about, and this one is newer than the refusal: a failed write
-    // re-reads nothing, so only a later read — the poll, an announced change, a landed write — ends it.
+    // re-reads nothing, so only a later read — the server's hint, an announced change, a landed write — ends it.
     setError(null);
   }, []);
 
@@ -104,12 +101,8 @@ export function useClaudeAccounts() {
   useEffect(() => {
     mountedRef.current = true;
     void refresh();
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, ACCOUNTS_POLL_MS);
     return () => {
       mountedRef.current = false;
-      window.clearInterval(timer);
     };
   }, [refresh]);
 
@@ -120,13 +113,19 @@ export function useClaudeAccounts() {
     return () => window.removeEventListener(ACCOUNTS_CHANGED_EVENT, readAgain);
   }, [refresh]);
 
+  // The server tells every tab when the door's account files move, whoever moved them: this panel,
+  // another tab, the door's own script or a settle. A reconnect reads too, for what the drop missed.
+  useServerFrame(ACCOUNTS_FRAME_KINDS, () => {
+    void refresh();
+  });
+
   /**
    * One of the door's three writes, and the one place their shared shape lives.
    *
    * The route answers the door's own line on 200 (`USING <slug>`, `AUTO on`, `REMOVED <slug>`) or
    * the door's own refusal sentence on 422 as `{ error }`. A refusal is shown in the panel's warn
    * banner, in the door's words; a landed write re-reads the picture at once, because the row it
-   * moved is drawn from that picture and a minute-old copy would go on showing the account the
+   * moved is drawn from that picture and an older copy would go on showing the account the
    * write just replaced. The single-writer guard makes none of these re-entrant.
    */
   const doorWrite = useCallback(async (send: () => Promise<Response>) => {

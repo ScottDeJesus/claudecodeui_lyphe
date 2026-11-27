@@ -27,3 +27,24 @@ measured 2026-10-01 by chain chain-chat-follow-glide-20261001-140108-5a55, findi
 probe-key: c81704efc5c53c1e47fcf85bdd283e617dc5ae11
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useFollowGlide.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useReplyAnchor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/landAtMessageTop.ts
+
+## INV-11974 — probe — LOW — DeepSeek spend written by a subagent transcript raises no deepseek_usage_changed
+
+LOW — DeepSeek spend written by a subagent transcript raises no deepseek_usage_changed
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'watcher ignores subagents/: '; grep -c "^  'subagents',$" server/modules/providers/services/sessions-watcher.service.ts
+printf 'ledger walks every jsonl recursively: '; grep -c 'under the roots, recursively' ~/.claude/hooks/deepseek_usage/sync.py
+printf 'usage hint sources: '; grep -c 'hint.tell()' server/modules/deepseek/deepseek.module.ts
+EOF
+bash "$D/p.sh"
+# expect: today "1", "1", "1" (the flush is the hint's only source and the flush skips subagents/); cured: the watcher stops ignoring subagents/, or the hint gains a second source (sources 2 or more)
+```
+
+measured 2026-11-26 by chain chain-pollers-hooks--client-pushes--deepseek-20261126-150517-8e93, finding L2, LOW
+probe-key: 00bceab64767a12e164c0b2e7522d6038397f3df
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/deepseek/deepseek.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/deepseek/deepseek.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-flushed.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-watcher.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useDeepseekBalance.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/deepseek-spend/useDeepseekUsage.ts

@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, readApiJson } from '@/shared/api';
+import { useServerFrame } from '@/shared/hooks/useServerFrame';
 import type { JevRange, JevSummary } from '@/shared/types';
-
-/**
- * How often the tab asks the reader again.
- *
- * Ten seconds because each poll spawns one Python process on this host — the reader is a command,
- * not a table the browser can query — and the screen is a ledger of what Jev has already done
- * rather than a live meter. Faster is a process a second for a number nobody acts on that fast.
- */
-export const JEV_POLL_MS = 10_000;
 
 /** How many feed rows the tab asks for. The feed is the newest-first tail, not the whole file. */
 const JEV_FEED = 50;
+
+/** The frame an append to the Jev ledger sends (MAN-453). */
+const JEV_FRAMES = ['jev_changed'] as const;
 
 /** What the panel draws and the one press it owns: the last reading, whether one is out, and the fault. */
 export type JevPanelRead = {
@@ -29,19 +24,20 @@ export type JevPanelRead = {
  * The tag is the whole reason this is one value rather than three: a reading of another window is
  * not this window's numbers, so the moment the range moves the data is absent without anyone having
  * to clear it — no frame draws the last week's ledger under a `30d` label. `data` is likewise the
- * reading kept ACROSS a failed poll, because a fault beside real numbers is a true screen while a
+ * reading kept ACROSS a failed read, because a fault beside real numbers is a true screen while a
  * blank one is not.
  */
 type SettledReading = { range: JevRange; data: JevSummary | null; error: string | null };
 
 /**
- * The Jev view's whole read: `api.jev.summary` on a timer, in the shape of `HealContext.tsx:91-129`.
+ * The Jev view's whole read: `api.jev.summary` on mount, on each `jev_changed` (an append to the
+ * ledger, paced by the server to one frame per ten seconds) and on a reconnect, in the shape of
+ * `HealContext.tsx`.
  *
  * ONE question per window at a time and the newest answer wins, which is what the two tokens are
- * for: a poll issued before a press must not land after the press's own read and put the pre-press
- * numbers back on screen for ten seconds. The interval stands down while the tab is hidden — a
- * backgrounded timer is throttled to near-nothing anyway, and the reader it would wake is a process
- * this host pays for — and `visibilitychange` is what asks the moment the operator comes back.
+ * for: a read issued before a press must not land after the press's own read and put the pre-press
+ * numbers back on screen. A frame heard while the tab is hidden is let pass — the reader it would wake
+ * is a process this host pays for — and `visibilitychange` is what asks the moment the operator comes back.
  */
 export function useJevPanel(range: JevRange): JevPanelRead {
   const [settled, setSettled] = useState<SettledReading | null>(null);
@@ -49,11 +45,11 @@ export function useJevPanel(range: JevRange): JevPanelRead {
   // Mount flag: a read that resolves after this panel is gone must not set state on the run that
   // replaced it.
   const mountedRef = useRef(true);
-  // Which read this is. Two can be open at once — the interval's and the one the refresh press asks
+  // Which read this is. Two can be open at once — a frame's and the one the refresh press asks
   // for — so each takes a token.
   const newestReadRef = useRef(0);
   // The newest token that has ANSWERED. An older answer landing after it is dropped rather than
-  // published: a poll that left BEFORE a press must not land after it and put the pre-press numbers
+  // published: a read that left BEFORE a press must not land after it and put the pre-press numbers
   // back on screen.
   const newestAnswerRef = useRef(0);
 
@@ -84,20 +80,19 @@ export function useJevPanel(range: JevRange): JevPanelRead {
     }));
   }, [range]);
 
+  // An append to the ledger is told by `jev_changed`. A hidden tab lets the frame pass: coming back to
+  // the tab reads anyway (below), so what was heard while hidden is read the moment it is shown.
+  useServerFrame(JEV_FRAMES, () => {
+    if (document.visibilityState === 'visible') void refresh();
+  });
+
   useEffect(() => {
     mountedRef.current = true;
-    // A new window is a new question and it is asked AT ONCE rather than at the next tick: the
-    // press that moved the range is answered in the same breath as the label that moved with it.
+    // A new window is a new question and it is asked AT ONCE: the press that moved the range is
+    // answered in the same breath as the label that moved with it.
     void refresh();
 
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      void refresh();
-    }, JEV_POLL_MS);
-
-    // Coming back to the tab is the one moment the ledger has been written under a screen that would
-    // otherwise never ask again — what a person reads on return is a reading of now, not of whenever
-    // the browser last let the timer through.
+    // Coming back to the tab reads once: the frames heard while it was hidden were let pass (above).
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
@@ -105,7 +100,6 @@ export function useJevPanel(range: JevRange): JevPanelRead {
 
     return () => {
       mountedRef.current = false;
-      window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [refresh]);
