@@ -1983,7 +1983,7 @@ The trigger that applies `planAutoDiagnosis` (MAN-9542) to the store as it stand
 | `SETTLE_MS` (60 s) after arming | `settled` turns true; the first plan is requested |
 | a hint sent, before settle | nothing |
 | a hint sent, after settle | one plan on the next turn of the event loop: `setImmediate`, at most one pending however many hints arrive; never inside a writer's call or the window's timer |
-| the deadline | each plan arms one unref'd `setTimeout` at `plan.nextAt`, replacing the last; the delay is clamped to `LONGEST_TIMER_MS` (2^31−1); when it fires it requests a plan |
+| the deadline | each plan arms the one unref'd deadline timer (`shared/deadline-timer.ts`) at `plan.nextAt`, replacing the last; an instant past 2^31−1 ms is waited out in steps, never fired early; when it comes it requests a plan |
 | a plan threw | a retry, see "A plan that throws" |
 
 Every Cerberus writer hints after its write commits (a stored status move, a link up or down, a mute, a diagnosis starting or ending, an update moving, the switch), so one subscription hears all of them and every one added later. The plan's own start hints and finds the node busy: it starts nothing.

@@ -6,6 +6,7 @@ import type {
   CerberusRunLine,
   CerberusRunOutputEvent,
 } from '@/shared/cerberus-types.js';
+import { createDeadlineTimer } from '@/shared/deadline-timer.js';
 
 /**
  * The three frames Cerberus puts on the browser's gateway socket: the hint `cerberus_changed`, a
@@ -189,9 +190,6 @@ export function sendDiagStep(diagId: string, step: CerberusDiagnosisStep): void 
   sendToBrowsers({ kind: 'cerberus_diag_step', diagId, step });
 }
 
-/** The longest delay Node's timers hold; a later one would fire at once. */
-const MAX_TIMER_MS = 2_147_483_647;
-
 /**
  * The least wait before a flip is judged: an instant that is always just ahead (a pause still running, whose end
  * the update announces itself) costs at most one judgement a second, never a spin.
@@ -202,9 +200,12 @@ const MIN_FLIP_LEAD_MS = 1_000;
 export type FlipJudgement = { nodes: string[]; checks: string[]; next: number | null };
 
 let flipJudge: ((at: number) => FlipJudgement) | null = null;
-let flipTimer: NodeJS.Timeout | null = null;
-/** The instant the armed timer is for, so a later instant never displaces an earlier one. */
+/** The instant the armed deadline judges, so a later instant never displaces an earlier one; null when none is armed. */
 let flipDueAt: number | null = null;
+/** Wakes at the flip instant, or a second on when that is nearer; an instant past Node's longest timer is waited out, never judged early. */
+const flipTimer = createDeadlineTimer(() => {
+  if (flipDueAt !== null) fireFlipDeadline(flipDueAt);
+});
 
 /** Registers the one judge of a fired flip deadline. Consumers: `cerberus.routes.ts`. */
 export function judgeFlipsWith(judge: (at: number) => FlipJudgement): void {
@@ -217,14 +218,12 @@ export function judgeFlipsWith(judge: (at: number) => FlipJudgement): void {
  * `GET /checks/:node/:service/:id`, and the fired deadline itself.
  */
 export function armFlipDeadline(at: number | null): void {
-  if (at === null) return;
+  if (at === null || !Number.isFinite(at)) return;
   const now = Date.now();
   if (at <= now) return;
-  if (flipTimer !== null && flipDueAt !== null && flipDueAt <= at) return;
-  if (flipTimer !== null) clearTimeout(flipTimer);
+  if (flipDueAt !== null && flipDueAt <= at) return;
   flipDueAt = at;
-  flipTimer = setTimeout(() => fireFlipDeadline(at), Math.min(MAX_TIMER_MS, Math.max(MIN_FLIP_LEAD_MS, at - now)));
-  flipTimer.unref();
+  flipTimer.arm(Math.max(now + MIN_FLIP_LEAD_MS, at));
 }
 
 function hasOpenBrowser(): boolean {
@@ -241,7 +240,6 @@ function hasOpenBrowser(): boolean {
  * than miss a turn.
  */
 function fireFlipDeadline(at: number): void {
-  flipTimer = null;
   flipDueAt = null;
   if (flipJudge === null) {
     hintChanged({});

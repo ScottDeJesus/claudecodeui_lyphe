@@ -11,6 +11,7 @@
  * arms again reads as armed for its new instant.
  *
  * Consumers: `modules/cerberus/red-watch.service.ts` (the next plan), `modules/cerberus/warden-links.ts` (each node's silence),
+ * `modules/cerberus/auto-diagnosis.service.ts` (the plan's `nextAt`), `modules/cerberus/cerberus-broadcast.ts` (the next flip),
  * `modules/scheduled-messages/services/scheduled-message-clock.service.ts` (the next due scheduled message, and the
  * earliest end of a queued message's hold).
  */
