@@ -1715,8 +1715,9 @@ Install mode:
 
 ## The reconciler — `update-reconciler.ts` (when), `update-reconciler.states.ts` (what)
 
-- `start()` is the last line of `soleServerDuties` in `server/index.ts`. It registers the reboot-failed listener and arms a 1 s tick only for a non-terminal job. `kick()` re-arms after an action; a pass that sees a terminal job disarms.
-- Each tick is a no-op until `isListening()`, is skipped while a previous pass runs (`busy`), reads `job.json`, and acts once per state.
+- `start()` is the last line of `soleServerDuties` in `server/index.ts`. It registers the reboot-failed listener and, for a non-terminal job only, arms and passes at once. `kick()` does the same after an action, and after the exit of a runner this process spawned (`spawnUpdateRunner`'s `onExit`). A pass that sees no job or a terminal one disarms.
+- Armed means no clock: a `watchDirectory` on `<dir>` hears every write of `job.json` and starts a pass, and each settled pass leaves at most one timer from `nextWakeMs` (`update-reconciler.wake.ts`). That timer is one of: `PASS_RETRY_MS` (5 s) after a pass that threw; `RUNNER_LIVENESS_MS` (5 s) for a runner whose exit this process does not hold; or the end of this process's own reboot-answer window. Depth: MAN-7403.
+- A pass is a no-op until `isListening()`. An event during a pass (`busy`) makes one more pass when it ends. A pass reads `job.json` and acts once per state.
 
 | state | walk |
 | --- | --- |
@@ -3012,9 +3013,22 @@ what a launch MEANS.
 **RULE: these are a contract the launcher does not know it has.** The receipt's wording, `result.json`'s
 `provider`, `status` and `model`, `spec.json`'s `provider` and `model`, the CLI's own `system`/`init` event at the front
 of `child.log` (the `model` a running soul is named by), and the directory layout are all read from here,
-by a program in another repository, on a two-second poll. Reword the receipt line and every soul
+by a program in another repository, the moment a watch reports the write (`launch-watch.service.ts`, MAN-534). Reword the receipt line and every soul
 unpins; rename a field and the pin paints the wrong vendor. The estate carries the same rule from
 its own side: INV-36, surfaced in MAN-838.
+
+**WHAT MAKES THE LANE READ** (`launch-watch.service.ts`, `launch-clock.service.ts`, wired in `dispatch-souls.module.ts`): a
+`watchDirectory` on the launch root and on the chains root, armed BEFORE each root is listed, then one on EVERY directory in each
+(not only the six-hour window's), and one on the pacer's `cpu-wait/`. It counts a child made or removed in a root; `spec.json`,
+`result.json`, `launcher.pid` and `child.pid` in a launch directory; `child.log` only until the lane holds the launch's served
+model or the log passes the 64 KiB head the model is read from (the write past it is the last that counts); `chain.json` in a chain
+directory; and a `<launch id>.json` marker in `cpu-wait/`. A lost watch lists its root again. A burst is gathered for 300 ms
+(`server/shared/settled-call.service.ts`) and pokes the lane once. The file names are exported by the transports that read them
+(`SPEC_FILE` … `CHILD_LOG_HEAD_BYTES`, `CHAIN_RECORD_FILE`); the watch spells none. Two changes write nothing, and the lane's
+backstop, a function of its picture (`nextLaunchReadMs`), is the one timer for them: a launch leaving the six-hour window (one second
+past the first carried launch's `(ended_at ?? started_at) + 6 h`), and a launcher or child killed with no receipt (`LIVENESS_MS`,
+30 s, and only while some launch is running: a stranger's process exit offers this server no event). With no launch carried the lane
+reads only when something is written.
 
 **Every timestamp in a launch directory is epoch SECONDS**, because the launcher's Python wrote them
 with `time.time()`. Only the frame's own `at` is milliseconds. Read one as the other and every launch
@@ -3082,12 +3096,12 @@ then the id the child itself announced on the `system`/`init` event at the front
 (`readServedModel`, the head of the file only, never the whole log), then `spec.json`'s word, then
 nothing. The init event is what names a soul while it is out: `spec.json` holds only the word the
 launcher was asked for (`opus`) and `''` for a soul that took the default model, and the receipt
-lands at the very end. The event is there seconds after the launch (the 2 s poll plus the CLI's
-start-up hooks). Measured 2026-11-06 over the newest 400 launches on disk: it ended by byte 12,422 and every one
+lands at the very end. The event is there seconds after the launch (the CLI's
+start-up hooks; the lane reads when the watch reports the write, MAN-534). Measured 2026-11-06 over the newest 400 launches on disk: it ended by byte 12,422 and every one
 carried it, and wherever the receipt exists too the two agree (0 of 398 differ). A launch's model never
 changes once found, so the lane keeps it per launch id (`servedModelByLaunchId`, owned by the
-composition root and emptied of the ids the lane stops carrying) and a log is read until it names one, not every
-poll — an ended launch's log is final, so even an empty answer is kept for it. The launch table
+composition root and emptied of the ids the lane stops carrying) and a log is read until it names one, not at every
+read — an ended launch's log is final, so even an empty answer is kept for it. The launch table
 (`charters/launch.toml`) is never asked: it says what a soul would be given, not what it was.
 
 `blocked` — the row's `DeepSeek refused this soul — it finished on Claude` note — takes EITHER
@@ -3182,15 +3196,18 @@ reading's own time beside the frame's arrival one. Why those two lanes are not o
 a picture as sent only AFTER the send returns, and why a failing tick never takes the lane down
 with it are documented once, there.
 
-What makes a lane read is one of two clocks, a type that admits no third (`PolledLaneClock`): `pollMs`, a fixed interval, which
-`dispatch-souls` keeps at two seconds over a few dozen small files; or `backstopMs`, NO interval — the lane reads at `start()`, on
+What makes a lane read is one of two clocks, a type that admits no third (`PolledLaneClock`): `pollMs`, a fixed interval; or `backstopMs`, NO interval — the lane reads at `start()`, on
 every `poke()`, and once `backstopMs` after its last reading settled (the timer is re-armed by each settling, so a lane that is
 poked often never fires it; `null` is no backstop at all). The dispatcher and roadmap lanes are on `backstopMs` (60 s), poked by
-`server/shared/dispatcher-store-watch.service.ts` (MAN-9543).
+`server/shared/dispatcher-store-watch.service.ts` (MAN-9543). `backstopMs` may also be a FUNCTION of the picture the lane holds
+when a reading settles, answering the wait or `null` for none: the lane whose next unwritten change is a fact of its own picture
+names it there. The souls lane is the one that does (`dispatch-souls/launch-clock.service.ts`, MAN-528): poked by its launch watch
+through a 300 ms settle (`server/shared/settled-call.service.ts`), and read with nothing written only one second past the first
+carried launch's keep edge (never further off than the six hours themselves), or every 30 s while a launch is running — never while none is. After a FAILED reading a function backstop arms nothing: the picture it would be asked about is one that reading could not refresh, and the next poke reads.
 
 `poke()` runs one tick now while the lane is started, a no-op otherwise: the roadmap routes call it after every `ok` write, and on a `backstopMs` lane the store watch calls it. It is an ordinary tick, and a poke that arrives while a reading is out is REMEMBERED (a flag, never a queue: one reading at a time) and one more tick runs the moment that reading lands, because that reading began before the write and may have taken the old picture. A press is therefore never more than one read late.
 
-What is THIS lane's and not the mechanism's: the launch root, the two-second cadence, the six-hour
+What is THIS lane's and not the mechanism's: the launch root, its watch and its picture backstop, the six-hour
 window, and the frame. The root is `dispatchSoulsStateDir()` in `server/shared/utils.ts`
 (`DISPATCH_SOULS_STATE_DIR`, defaulting to `~/.claude/state/dispatch-souls`), the one answer for this
 lane, the providers module's stamp scan (`session-soul-launches.service.ts`) and the purple dot's
@@ -4974,11 +4991,24 @@ section: hosting/001 What runs
 | `cloudcli-server-dev.service` | `/usr/bin/node deploy/dev-supervisor/supervisor.mjs` — the handover supervisor: it boots each edited server beside the running one and retires the old one only when the new one reports READY, and a builder's save waits until the running server says it is quiet (MAN-9553; his **Restart server** press, a reboot request and `systemctl restart` are never held); the API process — the HTTP API, the browser's WebSocket gateway and the warden gateway — is its child | `127.0.0.1:3011` (the API, loopback only) and `100.103.222.79:3012` (`CERBERUS_LISTEN`, tailnet-bound: the warden gateway — see below) |
 | `cloudcli-client-dev.service` | `node_modules/.bin/vite --host 0.0.0.0 --port 5183 --strictPort` — the client with HMR, its responses compressed by `vite-plugins/compressResponses.js` (see Rules) | `0.0.0.0:5183`, minus the Docker bridges (see below) |
 | `cloudcli-client-prod.service` | `vite preview --host 0.0.0.0 --port 5184 --strictPort --outDir .prod-client/current` — the BUILT client: ~50 requests on a fresh load instead of ~700 unbundled modules, Brotli-precompressed at build time (the page document included), every `/assets/*` file cached for a year and everything else revalidated by ETag, by `vite-plugins/precompressedAssets.js`. Same `.env`, so it proxies `/api`, `/ws`, `/shell` and `/plugin-ws` to :3011 exactly as :5183 does. No HMR: an edit reaches it through the rebuild below | `0.0.0.0:5184`, minus the Docker bridges |
-| `cloudcli-client-prod-build.timer` → `.service` | every 2 min, `scripts/prod-client-build.sh`: builds only when a build input (`src`, `public`, `shared`, `index.html`, `vite.config.js`, `vite-plugins`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, `.env`, `package.json`, `package-lock.json`) changed since the last build's START (~30 s, `Nice=10`; one build at a time under `flock`, a failed build leaves nothing behind), into `.prod-client/builds/<id>`, then re-points the `.prod-client/current` symlink in one rename. The previous build's hashed assets are carried forward for two days, so a tab opened before a swap can still load its lazy chunks. `--force` builds regardless | — |
+| `cloudcli-client-prod-build-watch.service` | `/usr/bin/node deploy/prod-client-watch/watch-build.mjs` — the build watcher: it reads the build inputs from `scripts/prod-client-build.sh --inputs` (`src`, `public`, `shared`, `index.html`, `vite.config.js`, `vite-plugins`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, `.env`, `package.json`, `package-lock.json`), watches each directory input as a tree (`deploy/tree-watch/tree-watch.mjs`: one inotify watch per directory) and the repo root for every input's name, and runs the script once at its own start and then once per burst of saves: 20 s (`QUIET_MS`) after the burst's last event, never later than 2 min (`MAX_WAIT_MS`) after its first. One build at a time; a burst that settles during a build runs the script once more when it ends. The script builds only when an input changed since the last build's START (~30 s, `Nice=10`; one build at a time under `flock`: a manual run skips while one builds, the watcher's `--wait-lock` run waits for it; a failed build leaves nothing behind), into `.prod-client/builds/<id>`, re-points the `.prod-client/current` symlink in one rename and prints `prod client built: <id>`. The previous build's hashed assets are carried forward for two days, so a tab opened before a swap can still load its lazy chunks. `--force` builds regardless. `Restart=always`; a stop (`KillMode=mixed`, `TimeoutStopSec=600`) waits for a running build to end | — |
 | Cerberus's keepers on eis1 | four checks (`cloudcli/dev-client.compiles`, `cloudcli/prod-client.ok`, `cloudcli/bridge.dropped`, `eis-app/dev.compiles`) whose auto-run entries run `deploy/heal/dev-unit.sh` to restart a client whose fresh module stops compiling — Vite's transform can wedge while systemd still reads `active` — and `deploy/heal/bridge-drop.sh` to put missing bridge drops back (MAN-10290); the API is kept by its supervisor (`deploy/dev-supervisor/README.md`) | — |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/precompressedAssets.js, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service
+
+## MAN-10316 — What runs — `cloudcli-sessions-tmux.service`
+section: hosting/001 What runs/001 `cloudcli-sessions-tmux.service`
+
+| Unit | What it is | Bind |
+|---|---|---|
 | `cloudcli-sessions-tmux.service` | `/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity` — a do-nothing session holding the tmux server that the chat CLI of every project running on no node is spawned into, in a cgroup of its own so the API's restart cannot reach them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cloudcli/sessions` (mode 0700; `CLOUDCLI_SESSIONS_DIR` moves the directory). `sudo systemctl stop cloudcli-sessions-tmux` is the deliberate "end every live chat session of a project on no node" switch, and `CLOUDCLI_SESSION_KEEPALIVE=0` (or `off`/`false`) in the API's `.env` — unset here, so the feature is on — puts new turns of a project on no node back inside the API process; a turn of a project assigned to a node is refused instead (MAN-689) | — (unix sockets under `~/.cloudcli/sessions`) |
 | `cerberus-warden-sessions.service` | `/usr/bin/tmux -L cerberus-warden -f /dev/null new-session -d -s _keepalive sleep infinity` as `User=` the warden's account — the node-side twin of `cloudcli-sessions-tmux.service`, on its own tmux socket and directory: a do-nothing session holding the tmux server that the Cerberus warden spawns the chat CLIs of a project assigned to its node into, in a cgroup apart from `cerberus-warden.service`'s, so a warden restart or `--refresh` never reaches them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cerberus-warden/sessions` (mode 0700). On this machine (eis1) both session units run: a turn's CLI is in `tmux -L cerberus-warden` when its project is assigned to eis1, else in `tmux -L cloudcli-sessions`. Rendered and `enable --now`ed by `warden/enroll.sh` beside the warden's own unit, never restarted by `--refresh`; `sudo systemctl stop cerberus-warden-sessions` is the deliberate "end every live session on this node" switch (`ExecStop=-… kill-server`). The unit: MAN-7897 | — (unix sockets under `~/.cerberus-warden/sessions`) |
 | `cerberus-warden.service` | `/usr/bin/node /home/lyphe/.cerberus-warden/launcher.mjs` as `User=lyphe`, the operator's account and never root — the launcher, a copy `enroll.sh` makes outside every release: it runs whatever `current` names (`warden/src/main.mjs run`, the Cerberus warden) and takes a release that does not say hello within 60 s back to the one it replaced. The warden runs the probes center pushes down its link and sends their results back, and relays the Claude sessions center places on its node (MAN-7897). `Restart=always`, `RestartSec=5`, starts at boot. Neither `deploy/systemd/install.sh` nor a hand copy installs it: `warden/enroll.sh` renders every `warden/systemd/*.service` (this unit and `cerberus-warden-sessions.service`) into `/etc/systemd/system/`. Installed once with the command Cerberus prints for a new node (`POST /api/cerberus/enrollments`): `curl -fsSL http://100.103.222.79:3012/cerberus/enroll.sh \| sudo sh -s -- --name <node> --token <token>`. Each newer release (`npm run build:warden`, after a minor bump of `warden/package.json`) reaches it with the same URL and `sudo sh -s -- --refresh`: the script swaps `current`, copies the release's `launcher.mjs` out to the warden's home and restarts this unit, never the sessions unit. The unit: MAN-7837; the install: MAN-7826 | none — it listens on no TCP port and dials the warden gateway at `100.103.222.79:3012` (`CERBERUS_LISTEN`, above) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/precompressedAssets.js, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service
+
+## MAN-10317 — What runs — The API and both client units read `.env` (`SERVER_PORT=3011`, `VITE_PORT=5183`, `HOST=127.0.0.1`,
+section: hosting/001 What runs/002 The API and both client units read `.env` (`SERVER_PORT=3011`, `VITE_PORT=5183`, `HOST=127.0.0.1`,
 
 The API and both client units read `.env` (`SERVER_PORT=3011`, `VITE_PORT=5183`, `HOST=127.0.0.1`,
 `CLAUDE_CLI_PATH`, …), run as the host's own user with `NODE_ENV=development` (the production client: `production`), the interactive shell's full
@@ -4987,7 +5017,7 @@ a chat CLI sits in the keepalive's cgroup but is handed that same environment wh
 `Restart=always`, `StartLimitBurst=5` in a 120 s window (a crash loop latches `failed` instead of
 restarting unseen forever; Cerberus's restart entry runs `systemctl reset-failed` before it restarts), and start at boot. The API unit differs: `StartLimitIntervalSec=0` (never latches `failed`), `RestartSec=5` with `RestartSteps=4` and `RestartMaxDelaySec=60` backing off to 60 s, because the supervisor heals its own child (`deploy/dev-supervisor/README.md`). The dev client's unit lives in `/etc/systemd/system/` only — no copy of it is kept in this
 repo. Two
-more units this repo ships (the three production-client units are covered above), each installed
+more units this repo ships (the two production-client units are covered above), each installed
 with [`deploy/systemd/install.sh`](../deploy/systemd/install.sh) and each carrying its own exact
 commands in its header comment:
 [`deploy/systemd/cloudcli-server-dev.service`](../deploy/systemd/cloudcli-server-dev.service) —
@@ -4996,9 +5026,9 @@ rather than `enable --now` — and
 [`deploy/systemd/cloudcli-sessions-tmux.service`](../deploy/systemd/cloudcli-sessions-tmux.service),
 which is new to systemd and therefore `enable --now`. Both commands are in the Runbook below.
 
-The three `cloudcli-client-prod*` units ship in `deploy/systemd/`, installed with `install.sh` and
-the commands in the service's header. The dev client (:5183) is for watching an edit land live; the production
-client (:5184) is the fast one for everyday use, at most one rebuild (≈2.5 min) behind the source.
+The two `cloudcli-client-prod*` units ship in `deploy/systemd/`, installed with `install.sh` and
+the commands in each unit's header. The dev client (:5183) is for watching an edit land live; the production
+client (:5184) is the fast one for everyday use, one build behind a save: about 20 s of quiet plus a ~30 s build.
 
 The clients are the only ports the LAN needs: `vite.config.js` proxies `/api`, `/ws`, `/shell` and
 `/plugin-ws` to the API on loopback, so the API never faces the LAN. The API process owns one more port, the warden gateway on `CERBERUS_LISTEN` (`100.103.222.79:3012` in `.env`, the `tailscale0` address — never `0.0.0.0`): it carries only the warden websocket `/cerberus/ws` and the public install files (`/cerberus/enroll.sh` and `/cerberus/warden/…`, served by `warden-files.ts`; every other GET answers 404), no API route and no login, and under the supervisor it binds with `reusePort` so a handover's successor listens beside the retiring process: its `start()` binds the gateway before the process signals READY, and the supervisor retires the old process on READY (MAN-7804). Its design: MAN-7803. The app is reachable at
@@ -5185,8 +5215,10 @@ section: hosting/003 Runbook
 systemctl status cloudcli-server-dev cloudcli-client-dev cloudcli-sessions-tmux
 sudo iptables -S INPUT | grep -E '518[34]'   # the bridge drops (docker0, br-+) on both client ports
 deploy/heal/bridge-drop.sh check 5183 5184      # the same rules counted: "4 of 4 bridge drops in place"
-systemctl status cloudcli-client-prod cloudcli-client-prod-build.timer
-scripts/prod-client-build.sh --force            # rebuild :5184 now instead of waiting for the timer
+systemctl status cloudcli-client-prod cloudcli-client-prod-build-watch
+sudo journalctl -u cloudcli-client-prod-build-watch -f  # `[prod-build-watch] building (change: src/…)` → `prod client built: <id>`, 20 s after a burst of saves
+scripts/prod-client-build.sh --force            # the manual door: rebuild :5184 now, whatever changed
+scripts/prod-client-build.sh --inputs           # what the watcher watches, one per line
 readlink .prod-client/current                   # the build :5184 is serving
 tmux -L cloudcli-sessions ls                 # the truthful liveness probe (see "A dead tmux keepalive…"); `_keepalive` alone = no chat CLI running
                                              # one `<app session id>-<base36>` per live CONVERSATION (every message joins it; it closes two hours after the last one, never mid-task); a restart re-adopts or retires the rest, so a lingering one means the gate is off (see "A server heal…")
@@ -5211,6 +5243,10 @@ sudo systemctl stop cerberus-warden-sessions    # deliberate: end every live ses
 deploy/systemd/install.sh cloudcli-sessions-tmux.service
 sudo systemctl enable --now cloudcli-sessions-tmux
 tmux -L cloudcli-sessions ls                    # proves the install: `_keepalive` is there
+# installing the production client's build watcher (new to systemd, so enable --now):
+deploy/systemd/install.sh cloudcli-client-prod-build-watch.service
+sudo systemctl enable --now cloudcli-client-prod-build-watch
+systemctl list-timers --all | grep prod-build   # nothing: no timer builds the client
 # redeploying the API unit (already enabled, so restart — never enable):
 deploy/systemd/install.sh cloudcli-server-dev.service
 sudo systemctl restart cloudcli-server-dev

@@ -113,3 +113,17 @@ export function judge(spec, outcome) {
   if (!warn) return unreadable('warn', spec.warn);
   return { status: evaluate(warn, metrics) ? 'warn' : 'ok', value: sentence };
 }
+
+/**
+ * The numbers `spec`'s pass and warn compare `metric` to, in the metric's base unit (`age < 26h` →
+ * 93 600), read through `parseExpr` so a bound has one home: the definition. [] when neither names
+ * it. Consumer: `watched-probe.mjs`'s `flipAt`, the instant an aged reading crosses one.
+ */
+export function boundsOf(spec, metric) {
+  const passText = isBlank(spec.pass) ? (DEFAULT_PASS[spec.kind] ?? '') : spec.pass;
+  return [passText, spec.warn]
+    .filter((text) => !isBlank(text))
+    .map((text) => readForKind(spec.kind, text))
+    .filter((expr) => expr !== null && expr.metric === metric)
+    .map((expr) => expr.value);
+}

@@ -1,5 +1,6 @@
 import { cerberusNodesDb } from '@/modules/database/index.js';
 import type { CerberusEnvelope, CerberusHelloBody, CerberusLinkState } from '@/shared/cerberus-types.js';
+import { createDeadlineTimer, type DeadlineTimer } from '@/shared/deadline-timer.js';
 
 /**
  * The registry every warden's link joins: who is connected, when each node was last heard, and the
@@ -10,7 +11,8 @@ import type { CerberusEnvelope, CerberusHelloBody, CerberusLinkState } from '@/s
  * both. A node is SILENT once `now − lastHeardAt > 90 000`, whether or not its socket is still
  * open — a half-open connection that carries nothing is silent — and `silentSince` is
  * `lastHeardAt + 90 000`, the moment the 90 seconds ran out rather than the moment anyone noticed.
- * Any frame counts as hearing the node, a heartbeat or a result alike.
+ * Any frame counts as hearing the node, a heartbeat or a result alike. Entering silence is told at that
+ * moment: each node holds one timer armed at `lastHeardAt + 90 001` (`armSilence`), re-armed by each hearing.
  *
  * BOOT. `seedFromStore()` reads every enrolled node's stored `last_heartbeat_at` as its
  * `lastHeardAt`. A node unheard since before this boot therefore reads silent at once, and the
@@ -35,9 +37,6 @@ import type { CerberusEnvelope, CerberusHelloBody, CerberusLinkState } from '@/s
 
 /** The silence threshold: a node unheard for longer than this is silent. */
 const SILENCE_AFTER_MS = 90_000;
-
-/** How often the registry looks for a node that has just run out its 90 seconds. */
-const SILENCE_CHECK_INTERVAL_MS = 5000;
 
 /** The close code `attach` gives an older link of the same node: a newer one has taken its place. */
 const REPLACED_LINK_CLOSE_CODE = 4000;
@@ -102,13 +101,14 @@ type NodeRecord = {
   lastClockOffsetMs: number | null;
   /** Whether the last look found the node silent — what makes entering and leaving silence an event. */
   wasSilent: boolean;
+  /** Fires the moment the node's 90 seconds run out (`armSilence`). */
+  silence: DeadlineTimer;
 };
 
 const records = new Map<string, NodeRecord>();
 const handlers = new Map<string, CerberusFrameHandler>();
 const listeners = new Set<LinkChangeListener>();
 const helloListeners = new Set<HelloListener>();
-let silenceTimer: NodeJS.Timeout | null = null;
 
 /** A node never heard is silent; so is one unheard for more than 90 seconds. */
 function isSilent(record: NodeRecord, now: number): boolean {
@@ -119,7 +119,9 @@ function recordFor(node: string): NodeRecord {
   let record = records.get(node);
   if (!record) {
     // A node nobody has heard is silent: its first frame is the event that leaves silence.
-    record = { link: null, lastHeardAt: null, lastVersion: null, lastClockOffsetMs: null, wasSilent: true };
+    const created: NodeRecord = { link: null, lastHeardAt: null, lastVersion: null, lastClockOffsetMs: null, wasSilent: true,
+      silence: createDeadlineTimer(() => { refreshSilence(node, created, Date.now()); armSilence(created); }) };
+    record = created;
     records.set(node, record);
   }
   return record;
@@ -155,15 +157,10 @@ function refreshSilence(node: string, record: NodeRecord, now: number): void {
   notifyChanged(node, record);
 }
 
-// The timer is started by the first thing that gives it work and unref'd: it is a convenience of a
-// running server, never a reason for a process to stay up.
-function ensureSilenceTimer(): void {
-  if (silenceTimer) return;
-  silenceTimer = setInterval(() => {
-    const now = Date.now();
-    for (const [node, record] of records) refreshSilence(node, record, now);
-  }, SILENCE_CHECK_INTERVAL_MS);
-  silenceTimer.unref();
+/** Arms the node's timer one millisecond past the moment its 90 seconds run out; clears it when no hearing can run out. */
+function armSilence(record: NodeRecord): void {
+  if (record.lastHeardAt === null || isSilent(record, Date.now())) record.silence.clear();
+  else record.silence.arm(record.lastHeardAt + SILENCE_AFTER_MS + 1);
 }
 
 export const wardenLinks = {
@@ -263,7 +260,6 @@ export const wardenLinks = {
    * already in place and the listeners are told either way.
    */
   attach(link: CerberusWardenLink): void {
-    ensureSilenceTimer();
     const record = recordFor(link.node);
     const older = record.link;
     record.link = link;
@@ -293,13 +289,13 @@ export const wardenLinks = {
 
   /**
    * Notes that a frame of any kind arrived from the node at `at` (epoch ms). The stamp only moves
-   * forward. When this ends the node's silence the listeners hear of it now, not at the next tick.
+   * forward. When this ends the node's silence the listeners hear of it now, and the node's timer is armed again.
    */
   heard(node: string, at: number): void {
-    ensureSilenceTimer();
     const record = recordFor(node);
     if (record.lastHeardAt === null || at > record.lastHeardAt) record.lastHeardAt = at;
     refreshSilence(node, record, Date.now());
+    armSilence(record);
   },
 
   /**
@@ -307,7 +303,6 @@ export const wardenLinks = {
    * Idempotent: a node already heard since (or linked) keeps the later of the two stamps.
    */
   seedFromStore(): void {
-    ensureSilenceTimer();
     const now = Date.now();
     for (const row of cerberusNodesDb.list()) {
       const record = recordFor(row.id);
@@ -316,6 +311,7 @@ export const wardenLinks = {
       }
       // Seeding is a start of knowledge, not an event: nothing is told that a node "became" silent.
       record.wasSilent = isSilent(record, now);
+      armSilence(record);
     }
   },
 };

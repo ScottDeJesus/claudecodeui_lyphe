@@ -120,7 +120,7 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
   function armSoleDuties(): void {
     if (!startFinished || !dutiesAsked || stopped) return;
     startSelfChecks(() => gatewayState);
-    // Its first tick is one interval away (`startRedWatch`), after the server has finished starting.
+    // Its first plan is a minute away (`startRedWatch`), after the server has finished starting.
     startRedWatch(overview);
     // Hears the module's own hints; its first plan is one settle minute away (`auto-diagnosis.service.ts`).
     startAutoDiagnosis({ overview, readInputs });

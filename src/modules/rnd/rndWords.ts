@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 
-import type { RndCandidate, RndPicture, RndWord, RndScoutOut } from '@/shared/rnd-types';
+import type { RndCandidate, RndPicture, RndSchedule, RndWord, RndScoutOut } from '@/shared/rnd-types';
 import { formatRelativeTime } from '@/shared/utils';
 
 /** The place's four views. Verdicts holds two words: what a spike proved, then what was adopted from it. */
@@ -69,34 +69,36 @@ export type ScoutLine = {
   trouble: string | null;
   /** The run's source scouts and its ranker, each with its state (an ended one with its outcome); null before a run of them. */
   scouts: string | null;
-  weekly: string;
+  /** When it next goes out by itself, or that it goes out only when pressed. */
+  schedule: string;
 };
 
 /**
  * THE SCOUT'S LINE, the first that holds: a run is out (how many of its sources are read); there is nothing for one to read;
  * none has gone out; the last one ended without an answer; the last one filed something; the last one found nothing new.
- * Beside it, the run's source scouts and its ranker. weeklyWords says a cron expression as a day and a time.
+ * Beside it, the run's source scouts and its ranker. scheduleWords says the schedule as a day and a time.
  */
-export function scoutLine(picture: RndPicture, t: TFunction, weeklyWords: (expression: string) => string): ScoutLine {
+export function scoutLine(picture: RndPicture, t: TFunction, scheduleWords: (schedule: RndSchedule) => string): ScoutLine {
   const { out, last } = picture.scout;
-  const weekly = picture.settings.weekly === null
-    ? t('rnd.scout.noWeekly')
-    : t('rnd.scout.weekly', { when: weeklyWords(picture.settings.weekly) });
+  const setting = picture.settings.schedule;
+  const schedule = setting.frequency === 'off'
+    ? t('rnd.scout.noSchedule')
+    : t('rnd.scout.scheduled', { when: scheduleWords(setting) });
   const run = out ?? last;
   const scouts = run === null || run.scouts.length === 0 ? null : runWords(run, t);
   if (out !== null) {
     const read = out.scouts.filter((one) => one.state === 'ended').length;
     const line = t('rnd.scout.outRun', { ago: formatRelativeTime(out.started_at), read, total: out.scouts.length });
-    return { out: true, line, trouble: null, scouts, weekly };
+    return { out: true, line, trouble: null, scouts, schedule };
   }
-  if (picture.settings.sources.length === 0) return { out: false, line: t('rnd.scout.noSources'), trouble: null, scouts, weekly };
-  if (last === null) return { out: false, line: t('rnd.scout.never'), trouble: null, scouts, weekly };
+  if (picture.settings.sources.length === 0) return { out: false, line: t('rnd.scout.noSources'), trouble: null, scouts, schedule };
+  if (last === null) return { out: false, line: t('rnd.scout.never'), trouble: null, scouts, schedule };
   const ago = formatRelativeTime(last.ended_at ?? last.started_at);
   if (last.outcome === 'failed' || last.outcome === 'lost') {
-    return { out: false, line: t('rnd.scout.lastTrouble', { ago }), trouble: t('rnd.scout.outcome.' + last.outcome), scouts, weekly };
+    return { out: false, line: t('rnd.scout.lastTrouble', { ago }), trouble: t('rnd.scout.outcome.' + last.outcome), scouts, schedule };
   }
   const line = last.filed > 0 ? t('rnd.scout.lastFiled', { ago, filed: last.filed }) : t('rnd.scout.lastNothing', { ago });
-  return { out: false, line, trouble: null, scouts, weekly };
+  return { out: false, line, trouble: null, scouts, schedule };
 }
 
 /** Each source scout of a run with its state (an ended one with its outcome), then its ranker's, as one line. */

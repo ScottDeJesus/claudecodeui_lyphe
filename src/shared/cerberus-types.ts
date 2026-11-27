@@ -58,6 +58,9 @@ export type CerberusDocStatus = 'green' | 'yellow' | 'red' | 'muted';
  */
 export type CerberusProbeKind = 'health_doc' | 'http' | 'tcp' | 'exec' | 'file_age' | 'sql';
 
+/** The unit an `exec` probe's `ages` names: what its leading number counts time in. */
+export type CerberusAgeUnit = 's' | 'm' | 'h' | 'd';
+
 /**
  * The six words a warden reports an update's progress in, in the order a healthy update says them:
  * `waiting` (a fix or diagnosis is running and the restart will not interrupt it — said before the
@@ -754,6 +757,8 @@ export type CerberusProbeSpec = {
   host?: string;
   port?: number;
   cmd?: string;
+  watch?: string;
+  ages?: CerberusAgeUnit;
   path?: string;
   dsn?: string;
   query?: string;

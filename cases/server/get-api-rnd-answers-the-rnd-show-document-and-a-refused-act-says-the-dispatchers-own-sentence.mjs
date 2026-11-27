@@ -25,7 +25,7 @@ function picture(d) {
     standing: d.standing,
     rows: (d.candidates || []).map((c) => c.name + "=" + c.word),
     web: s.web_search,
-    weekly: s.weekly,
+    schedule: s.schedule,
     sources: (s.sources || []).map((x) => x.url),
     out: scout.out ? scout.out.id : null,
     last: scout.last ? scout.last.id + "/" + scout.last.outcome + "/" + scout.last.filed : null,

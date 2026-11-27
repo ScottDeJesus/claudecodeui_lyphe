@@ -1,4 +1,5 @@
 import type {
+  CerberusAgeUnit,
   CerberusProbeDefinition,
   CerberusProbeKind,
   CerberusServiceDefinition,
@@ -74,6 +75,23 @@ export const KIND_FIELDS: Record<CerberusProbeKind, readonly string[]> = {
   sql: ['dsn', 'query'],
 };
 
+/**
+ * The fields a kind MAY carry beside its own, stored with them in the `spec` column: an `exec`
+ * probe's `watch` and `ages`, which come together or not at all (`parseWatch`). Consumers: this
+ * file's parser, and `definition-rows.ts`, which moves them with the kind's own fields.
+ */
+export const KIND_OPTIONAL_FIELDS: Record<CerberusProbeKind, readonly string[]> = {
+  health_doc: [],
+  http: [],
+  tcp: [],
+  exec: ['watch', 'ages'],
+  file_age: [],
+  sql: [],
+};
+
+/** The units an `exec` probe's `ages` may name. */
+export const AGE_UNITS: readonly CerberusAgeUnit[] = ['s', 'm', 'h', 'd'];
+
 /** What `parseDefinition` answers: the normalised services, or the path of the first thing wrong. Consumer: `definitions.service.ts`. */
 export type ParsedDefinition =
   | { ok: true; services: CerberusServiceDefinition[] }
@@ -146,6 +164,29 @@ function parseKindField(field: string, value: unknown, path: string): string | n
   return text;
 }
 
+function isAgeUnit(value: unknown): value is CerberusAgeUnit {
+  return typeof value === 'string' && (AGE_UNITS as readonly string[]).includes(value);
+}
+
+/**
+ * An exec probe's `watch` and `ages`, both or neither: the warden reads a watched exec when its file
+ * changes and ages its value in between, which means nothing without the unit the value counts, and
+ * a unit with no file to watch has nothing to read on.
+ */
+function parseWatch(record: Record<string, unknown>, path: string): { watch?: string; ages?: CerberusAgeUnit } {
+  if (record.watch === undefined && record.ages === undefined) return {};
+  if (record.watch === undefined) {
+    throw new Refusal(`${path}.watch`, 'an exec probe that carries ages needs watch, the file its command reads');
+  }
+  if (record.ages === undefined) {
+    throw new Refusal(`${path}.ages`, `an exec probe that carries watch needs ages, the unit its value counts (${AGE_UNITS.join(', ')})`);
+  }
+  const watch = asText(record.watch, `${path}.watch`);
+  if (!watch.startsWith('/') || watch.includes('\0')) throw new Refusal(`${path}.watch`, 'must be an absolute path');
+  if (!isAgeUnit(record.ages)) throw new Refusal(`${path}.ages`, `must be one of ${AGE_UNITS.join(', ')}`);
+  return { watch, ages: record.ages };
+}
+
 function parseProbe(raw: unknown, path: string, service: string): CerberusProbeDefinition {
   const record = asRecord(raw, path);
 
@@ -157,7 +198,8 @@ function parseProbe(raw: unknown, path: string, service: string): CerberusProbeD
   // `cadence` is how often a health document republishes, so it is a health_doc's field alone;
   // that keeps "three times the cadence, else three times every" one rule for every kind.
   const cadenceFields = probeKind === 'health_doc' ? ['cadence'] : [];
-  refuseUnknownFields(record, [...COMMON_PROBE_FIELDS, ...KIND_FIELDS[probeKind], ...cadenceFields], path, probeKind);
+  const kindFields = [...KIND_FIELDS[probeKind], ...KIND_OPTIONAL_FIELDS[probeKind]];
+  refuseUnknownFields(record, [...COMMON_PROBE_FIELDS, ...kindFields, ...cadenceFields], path, probeKind);
 
   // The key is `<service>/<id>`; a probe's `service` field, when written, must agree with the
   // service it sits under — one document cannot file a probe under two services.
@@ -183,6 +225,7 @@ function parseProbe(raw: unknown, path: string, service: string): CerberusProbeD
   for (const field of KIND_FIELDS[probeKind]) {
     probe[field] = parseKindField(field, record[field], `${path}.${field}`);
   }
+  if (probeKind === 'exec') Object.assign(probe, parseWatch(record, path));
 
   if (record.pass !== undefined) probe.pass = asText(record.pass, `${path}.pass`);
   if (probeKind === 'file_age' && probe.pass === undefined) {

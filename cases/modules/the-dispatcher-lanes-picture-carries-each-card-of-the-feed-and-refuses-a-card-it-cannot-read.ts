@@ -4,13 +4,13 @@
 // `DispatcherPicture.cards`, the list the `dispatcher_state` frame carries to the board, and refuses a card whose field
 // does not read, naming the field — as it refuses a malformed plan or outing.
 //
-// The document is printed by a stand-in for the dispatcher in this case's scratch folder; nothing is read from the
+// The document is kept by a stand-in for the keeper (a scratch home's status/index.json, what the lane reads); nothing is read from the
 // real store.
 //
-// protects: server/modules/dispatcher/dispatcher-card.reader.ts, server/modules/dispatcher/dispatcher-state.service.ts, server/modules/dispatcher/dispatcher-state.transport.ts, server/shared/types.ts
+// protects: server/modules/dispatcher/dispatcher-card.reader.ts, server/modules/dispatcher/dispatcher-kept.reader.ts, server/modules/dispatcher/dispatcher-state.service.ts, server/modules/dispatcher/dispatcher-state.transport.ts, server/shared/types.ts
 // writes: none
 
-import { chmod, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { broken, held, runCase } from "../lib/case.mjs";
@@ -43,15 +43,15 @@ runCase(async (t: { defer: (cleanup: () => unknown) => void }) => {
   await initializeDatabase();
   const state: any = await import("../../server/modules/dispatcher/dispatcher-state.service.ts");
 
-  const standIn = async (name: string, document: unknown): Promise<string> => {
-    const file = path.join(folder, `${name}.json`);
-    await writeFile(file, JSON.stringify(document));
-    const bin = path.join(folder, name);
-    await writeFile(bin, `#!/bin/sh\ncat '${file}'\n`);
-    await chmod(bin, 0o755);
-    return bin;
+  // A stand-in for the keeper: a scratch home whose status/index.json carries the document's head and no plan files.
+  const standIn = async (name: string, document: Record<string, unknown>): Promise<string> => {
+    const home = path.join(folder, name);
+    await mkdir(path.join(home, "status", "plans"), { recursive: true });
+    const { plans: _plans, ...head } = document;
+    await writeFile(path.join(home, "status", "index.json"), JSON.stringify({ shape: 1, version: 1, generated_at: head.generated_at, good_until: null, document: head, plans: [] }));
+    return home;
   };
-  const read = async (bin: string) => state.lanePictureOf(await state.readDispatcherStore({ bin, timeoutMs: 20000, env: { ...process.env } }));
+  const read = async (home: string) => state.lanePictureOf(await state.readDispatcherStore({ bin: path.join(folder, "no-dispatcher"), timeoutMs: 20000, env: { ...process.env, DISPATCHER_HOME: home } }));
 
   const wrong: string[] = [];
   let picture: any;

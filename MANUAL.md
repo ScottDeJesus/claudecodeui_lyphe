@@ -102,7 +102,7 @@ requested the update. Three files, one question each:
 
 | file | owns |
 |---|---|
-| `update-job.ts` | `job.json`/`job.log` under `claudeUpdatesDir()`; `createJob`/`readJob`/`writeJob` (temp-file + rename, never a half-written read); `spawnUpdateRunner(appRoot, dir, mode)`; `isRunnerAlive(pid)` |
+| `update-job.ts` | `job.json`/`job.log` under `claudeUpdatesDir()`; `createJob`/`readJob`/`writeJob` (temp-file + rename, never a half-written read); `spawnUpdateRunner(appRoot, dir, mode, onExit?)` (`onExit` runs on the child's exit; the child stays detached and unref'd); `isRunnerAlive(pid)` |
 | `update-runner.ts` | the state machine run BY the spawned process: `runInstall` / `runRollback`, one command per step |
 | `runner-command.ts` | one command's mechanics: argv spawn (no shell), framing into `job.log`, the 10-minute ceiling, the detail rule — used by `update-runner.ts` and by nothing else |
 
@@ -187,14 +187,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/ru
 
 The serving half of the install/restart pipeline (the detached runner process is MAN-7402; the
 version check is MAN-7401): once a job exists, everything that starts it, watches it, restarts
-onto it and commits it belongs to whichever API process holds the port. Six files, one question
+onto it and commits it belongs to whichever API process holds the port. Seven files, one question
 each:
 
 | file | owns |
 |---|---|
 | `claude-updates.routes.ts` | `POST /apply` and `POST /restart` (`GET /` and `POST /check` are MAN-7401's) |
 | `update-actions.service.ts` | `applyUpdate` / `restartServer`: the ordered refusal checks, the burst guard |
-| `update-reconciler.ts` | the tick: when a pass runs, one at a time, and dispatch by `job.state` |
+| `update-reconciler.ts` | the wakes: what starts a pass, one at a time, and dispatch by `job.state` |
+| `update-reconciler.wake.ts` | `nextWakeMs`: the one deadline a settled pass leaves behind, or none; `isTerminal` |
 | `update-reconciler.states.ts` | what `installed` and `restarting` DO: CLI verification, the reboot, the 4 ordered rules |
 | `update-commit.ts` | the commit step's 4 guards, INV-100's pathspec rule, never pushed |
 | `update-git.ts` | `GitResult`/`RunGit` — two type aliases only; the one `execFile` implementation lives in `claude-updates.module.ts` |
@@ -231,13 +232,30 @@ requestedBy: process.pid }` the same way the reconciler's own request is recorde
 call triggers still rolls back on failure. `requestReboot()` answering false (the supervisor
 channel closed between the check and the send) is 409 `not-supervised` too.
 
-**The tick** (`update-reconciler.ts`, `TICK_INTERVAL_MS` = 1s): `start()` reads `job.json` once
-and arms only for a non-terminal job; `kick()` arms it and no-ops before `start()`; a pass disarms
-on a terminal job and, when the RUNNER was the one that ended it (`failed`/`rolled-back` reach a
-terminal state without a pass of this file's), fires `runCheck()` once — the one memory the tick
-keeps, so the panel does not wait out the cadence to see a version the runner already moved
-(`TERMINAL_STATES`: `done`, `failed`, `rolled-back`, `interrupted`). One pass at a time (`busy`);
-nothing runs before `isListening()`. `installing`/`rolling-back` with a dead runner
+**What wakes a pass** (`update-reconciler.ts`; the deadlines are `update-reconciler.wake.ts`). No
+clock. While a job is unfinished the reconciler is ARMED: one `watchDirectory` on this directory
+classifying `JOB_FILE`, so every write of `job.json` starts a pass (the runner's step changes, an
+action's new job, another process's write; a re-armed watch passes too, because the directory
+changed while nobody was watching), plus at most one timer. A runner THIS process spawned announces
+its own exit: `spawnUpdateRunner`'s `onExit` drops the pid from the module's set and calls
+`kick()`. A pass that settles with the reconciler still armed sets the timer from
+`nextWakeMs(readJob(dir), …)`:
+- `PASS_RETRY_MS` (5s) after a pass that threw.
+- `RUNNER_LIVENESS_MS` (5s) in `installing`/`rolling-back` when `holdsRunnerExit(runnerPid)` is
+  false. This covers a runner inherited across a handover, whose exit reaches nobody. It is the one
+  poll left, and it runs only in that case.
+- The time left to `requestedAt + REBOOT_ANSWER_TIMEOUT_MS`, plus 1 ms because the rule is strictly
+  past, in `restarting` on this process's own unanswered request.
+- Otherwise none.
+
+`start()` and `kick()` arm and pass at once, for an unfinished job only; `kick()` does nothing
+before `start()`. A pass that finds no job or a terminal one disarms: it closes the watch and clears
+the timer. When the RUNNER was the one that ended the job (`failed`/`rolled-back` reach a terminal
+state without a pass of this file's), that pass also fires `runCheck()` once, so the panel sees a
+version the runner already moved without waiting for the next check (`TERMINAL_STATES`: `done`,
+`failed`, `rolled-back`, `interrupted`). One pass runs at a time (`busy`). An event or a wake
+that arrives during a pass makes one more pass when it ends. Nothing runs before `isListening()`.
+A repository with no update in it holds no watch and no timer. `installing`/`rolling-back` with a dead runner
 (`isRunnerAlive` false) → `interrupted`, the running step marked `failed` — a spinner over a dead
 runner is a lie a person waits on. `installed`/`restarting` are handed to
 `update-reconciler.states.ts`.
@@ -289,7 +307,7 @@ on `/apply` or `/restart` answered 500 `INTERNAL_ERROR` (measured 2026-09-28). A
 wanting the `/api/claude-updates` refusal shape has to join that path's own prefix branch; every
 other route keeps the envelope.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/claude-updates.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/claude-updates.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-actions.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-commit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-git.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-reconciler.states.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-reconciler.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/claude-updates.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/claude-updates.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-actions.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-commit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-git.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-reconciler.states.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-reconciler.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-reconciler.wake.ts
 
 ## MAN-7404 — The Claude update client
 
@@ -7702,10 +7720,24 @@ A refusal stores nothing.
 ## Clear — `sessionDraftsDb.clearQueuedMessage(userId, scope)`
 - Nulls `queued_message`, returns the removed `QueuedChatMessage | null`, deletes the row if empty (`deleteEmptyDraft`).
 
-## Dispatch (`scheduled-message-dispatcher.service.ts`, `POLL_INTERVAL_MS = 30_000`)
-1. `listQueuedMessages` → per session idle: `claimQueuedMessage` (compare-and-null on the exact stored string; a row the claim leaves empty is deleted).
+## Dispatch (`scheduled-message-dispatcher.service.ts`; its two timers in `scheduled-message-clock.service.ts`)
+The queued pass runs when it is told, never on a clock:
+- a run completes un-aborted (on the next turn of the event loop: completion is recorded inside the run's own event handling);
+- `appendQueuedMessage` saved a queued message: `user.service.ts` calls `requestQueuedPass()` (wired in `user.module.ts`);
+- a session's hold ends: the clock's second timer is armed at the earliest hold;
+- boot: `initializeScheduledMessageDispatcher` runs one catch-up pass.
+
+Holds — `holdQueued(sessionId, until)` / `mayStartQueued(sessionId, now)`, one not-before instant per session, kept in memory (a restart drops them; the boot pass then sends):
+| Cause | Hold | Why |
+|---|---|---|
+| the run was aborted (Stop) | `STOP_GRACE_MS` 15 s | sending it the instant Stop lands reads as Stop not working and takes away the moment to cancel it |
+| the queued turn did not start | `QUEUED_RETRY_MS` 30 s | a provider unavailable for now announces nothing when it returns: the one bounded wait |
+
+1. `listQueuedMessages` → per session that is idle, has no scheduled message claimed but not started, and is not held: `claimQueuedMessage` (compare-and-null on the exact stored string; a row the claim leaves empty is deleted).
 2. Send through `runDetachedChatTurn`, with `echoUserMessage` when the message holds no attachments, so every open tab shows the words as the run starts (MAN-311).
-3. Turn did not start → `restoreQueuedMessage`: puts the claimed message back IN FRONT of anything queued since (merged); the row is upserted, since the claim may have deleted it.
+3. Turn did not start → `restoreQueuedMessage`: puts the claimed message back IN FRONT of anything queued since (merged); the row is upserted, since the claim may have deleted it. The session is held `QUEUED_RETRY_MS`.
+
+Scheduled messages share the dispatcher: one timer armed at `scheduledMessagesDb.nextPendingAt()` (`MIN(scheduled_for)` over `status = 'pending'`), re-armed by `scheduledMessagesService.onChanged` (told after schedule and cancel land) and in every pass's `finally`; a pass that threw re-arms no sooner than `FAILED_PASS_RETRY_MS` (30 s), so it never spins. An earliest pending time that will not parse arms a pass at once (the claim compares strings, so a row sorting before now is taken and its send fails it), and the same unreadable time seen again waits `FAILED_PASS_RETRY_MS`: one bad row never strands the messages behind it. The server log says each change once: `[ScheduledMessages] next due armed for <iso>` or `[ScheduledMessages] nothing pending`. `closeScheduledMessageDispatcher` (called on shutdown by `server/index.ts`) clears both timers and both subscriptions.
 
 ## Text save — `sessionDraftsDb.saveDraft(userId, scope, text)`
 - `PUT /drafts` writes `draft_text` and nothing else; it never touches `queued_message`. A body that still carries `queuedMessage` (a page loaded before the append route) has that field ignored, and its text is saved. why not a 4xx: that page sends its text in the same body, and a refusal would lose it.
@@ -7734,7 +7766,7 @@ A refusal stores nothing.
 - Those two error lines are English literals; only `input.queue.*` keys are translated (en, es, ko, zh-CN).
 - The files waiting in the composer (the intake, the sentence naming a file it did not take, the upload at send) are `useAttachmentIntake`'s and `uploadAttachmentFiles`', in `src/shared` (MAN-9406); this hook hands the intake its `setAttachedFiles`, empties the sentence in a layout effect when `draftScope` changes, and again when a send goes ahead.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-drafts.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduled-messages/services/scheduled-message-dispatcher.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/user/user.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/user/user.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/user/user.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/QueuedMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-drafts.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduled-messages/services/scheduled-message-clock.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduled-messages/services/scheduled-message-dispatcher.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/user/user.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/user/user.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/user/user.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/QueuedMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts
 
 ## MAN-9124 — src/modules/companion CompanionAvatar — Kaylee's face: props, the layers, the marks, ring numbers, accessible name, fixture
 
@@ -17010,21 +17042,21 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/analytics/AnalyticsP
 
 ## MAN-10115 — The R&D place — the panel, its views, dialogs and settings sheet: where each piece lives, the contracts the fill feeds
 
-The R&D place: a panel of candidates (things the scout found) in four views, an Opening for the open one, one dialog (Reject) and a settings sheet. Composed from the kit (`src/shared/ui`) and `AgentLaunchChoice` (MAN-7420); no component kind of its own. Shape types: `src/shared/rnd-types.ts` (`RndPicture`, `RndCandidate`, `RndWord`, `RndSettings`, `RndSource`, `RndScoutsRun`, `RndSourceScout`, `RndRanker`, `RndScoutOut`, `RndScoutLast`, `RndStanding`).
+The R&D place: a panel of candidates (things the scout found) in four views, an Opening for the open one, one dialog (Reject) and a settings sheet. Composed from the kit (`src/shared/ui`) and `AgentLaunchChoice` (MAN-7420); no component kind of its own. Shape types: `src/shared/rnd-types.ts` (`RndPicture`, `RndCandidate`, `RndWord`, `RndSettings`, `RndSource`, `RndScoutsRun`, `RndSourceScout`, `RndRanker`, `RndScoutOut`, `RndScoutLast`, `RndStanding`, `RndSchedule`, `RndFrequency`, `RndWeekday`, `RndScheduleChange`).
 
 ## where each piece lives — `src/modules/rnd/`
 | file | role |
 |---|---|
 | `RndPanel.tsx` | the wired root, `RndPanel({ projectPath })`: reads `useRnd`, `useRndWrites`, `useRndLaunch`; Open chat, the Launched-from link and the spike's landing are `useStationDoors().openChatInWorkspace` (the wheel's goChat); stamps `rnd.lastSeenAt` at each new picture while shown |
-| `CandidateRow.tsx`, `CandidateOpening.tsx`, `RejectDialog.tsx`, `RndSettingsSheet.tsx` | pure views: props in, no hooks of their own to the server |
-| `rndWords.ts` | `RND_VIEWS`, `RndView`, `WORD_TONE`, `statusOf` (a proved candidate Opus is placing wears `placing`, info tone; else its word), `rowsOf`, `countOf`, `scoutLine` (the line, its trouble word, the run's source scouts and ranker as `scouts`, the weekly words), `hostOf`, `OPENING_WIDTH_PX` (440), `OPENING_BESIDE_PX` |
+| `CandidateRow.tsx`, `CandidateOpening.tsx`, `RejectDialog.tsx`, `RndSettingsSheet.tsx`, `RndScheduleSection.tsx` | pure views: props in, no hooks of their own to the server |
+| `rndWords.ts` | `RND_VIEWS`, `RndView`, `WORD_TONE`, `statusOf` (a proved candidate Opus is placing wears `placing`, info tone; else its word), `rowsOf`, `countOf`, `scoutLine` (the line, its trouble word, the run's source scouts and ranker as `scouts`, the schedule in words: `rnd.scout.noSchedule` when the frequency is off, else `rnd.scout.scheduled` with the caller's `scheduleWords`), `hostOf`, `OPENING_WIDTH_PX` (440), `OPENING_BESIDE_PX` |
 | `RndFeed.tsx` | the lane's feed, mounted once in `App.tsx` inside `RoadmapFeed`: seeds from `GET /api/rnd`, takes `rnd_state` frames, re-seeds on `websocket_reconnected` (RoadmapFeed's rule), publishes `rnd:all` (`RND_ALL_TOPIC`, live-bus topics.ts); a failed read is said through `useRnd`'s failure, and the next frame or read takes it back |
 | `hooks/useRnd.ts` | the picture off the bus, the feed's failure sentence, Try again (the feed's own read) |
 | `hooks/useRndWrites.ts` | every press, one `api.rnd` call each (src/shared/api.ts); `busy` and `refusal {where, sentence}`; a landed write's dispatcher line is a toast; nothing optimistic, the frame redraws |
 | `startSpikeChat.ts` | posts the spike route, sends `chat.send` {provider claude, the answered model, bypassPermissions, skipPermissions true} and `chat.subscribe` (git-delegation/startRun.ts's two frames), then goChat; a refusal is `SpikeRefusal` with the server's sentence; no open project is refused before the call |
 | `hooks/useRndLaunch.ts` | the census rows `rnd.scout`, `rnd.spike`, `rnd.adopt` (kind `rnd` in `AgentLaunchRow`) as the sheet's slots, read from `GET /api/agent-launch` and replaced by the census a save answers; saves through `api.agentLaunch.saveRow`. Agent Chains lists kind `soul` only, so the rows are the sheet's alone |
 | `hooks/useRndSeen.ts` | `rnd.lastSeenAt` (localStorage) and `useRndMark`: the wheel's mark, lit (owed) while a candidate is proved or one was filed after the stamp |
-| `weeklyWords.ts`, `rndWire.ts`, `lazyRndTab.ts`, `index.ts` | the cron line in words (`sayWeekly`: "Mondays at 06:30"); the answer readers (`readBody`, `sentenceOf`); the lazy pane; the barrel (`RndFeed`, `RndTab`, `useRndMark`) |
+| `scheduleWords.ts`, `rndWire.ts`, `lazyRndTab.ts`, `index.ts` | the schedule in words (`saySchedule`: "Mondays at 06:30", daily, monthly, off), `RND_WEEKDAYS`, `weekdayName`; the answer readers (`readBody`, `sentenceOf`); the lazy pane; the barrel (`RndFeed`, `RndTab`, `useRndMark`) |
 | `en/common.json` | the `rnd` block and `tabs.rnd`; English only, other languages fall back |
 
 ## on the wheel
@@ -17038,7 +17070,8 @@ The R&D place: a panel of candidates (things the scout found) in four views, an 
 - `RndLaunch` (`RndSettingsSheet.tsx`) = `Record<'scout'|'spike'|'adopt', {model, effort}>`, each an `RndLaunchSlot` `{choices, current, pinned, defaultWord}`.
 - Settings sheet "Scouts run": a `SegmentedControl<RndScoutsRun>` (`one_at_a_time` "One at a time", `all_at_once` "All at once") between the launch slots and Web search; its section carries `data-rnd-scouts-run`. A press while `busy`, or on the value already set, is ignored; the control is never shown disabled. `useRndWrites.scoutsRun(next)` is a `'settings'` press, `api.rnd.settings({ scoutsRun })`.
 - A run is `RndScoutOut`: `scouts` (`RndSourceScout[]`, one per source: `waiting`/`out`/`ended`, `suggested`, `read`) and `ranker` (`RndRanker`: `waiting`/`out`/`ended`/`skipped`, `suggestions`, `filed`, `declined`). While one is out the scout line reads `rnd.scout.outRun`: source scouts ended of the total.
-- Ages: `formatRelativeTime`; the weekly time in words is `sayWeekly` (`weeklyWords.ts`).
+- Settings sheet "How often" (`RndScheduleSection`, `data-rnd-frequency`): a `SegmentedControl<RndFrequency>` (Off / Daily / Weekly / Monthly), a weekday `SegmentedControl` for weekly, a 1-28 number field for monthly, a time field for daily, weekly and monthly. A frequency or weekday press saves at once; a typed day or time saves on blur or Enter, and its draft is put back to the stored value when a refused save ends. A press made while a save is out is held (merged with later ones) and sent when the save ends, never dropped. `useRndWrites.schedule(change: RndScheduleChange)` is a `'settings'` press, `api.rnd.settings(change)`; the dispatcher's refusal sentence is the `refusal`.
+- Ages: `formatRelativeTime`; the schedule in words is `saySchedule` (`scheduleWords.ts`).
 
 ## rules that bite
 | rule | why |
@@ -17050,7 +17083,7 @@ The R&D place: a panel of candidates (things the scout found) in four views, an 
 | Acts stand before the evidence; Spike started is shown on a spiking candidate; Open chat only when `spike.session` is set (the spike's own chat); a spike with `spike.launched_from` and no `session` shows "Launched from <`launched_from_name`>" (a `data-rnd-launcher` link to that chat via `onOpenLauncher`, or "a chat outside this app" when the name is null) | the only sign of a spike that never answered |
 | Settings sheet focus: Remove → Undo takes focus; Undo → that source's Remove (found by `data-rnd-source`); line closed → the Add field (`data-rnd-add-source`); a refused removal moves nothing | focus never falls to the page |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/PlacesContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/places/PlacesWheel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/CandidateOpening.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/CandidateRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndSeen.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRnd.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/lazyRndTab.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RejectDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndSettingsSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/rndWire.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/rndWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/startSpikeChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/weeklyWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/rnd-types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/PlacesContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/places/PlacesWheel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/CandidateOpening.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/CandidateRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndSeen.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRnd.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/hooks/useRndWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/lazyRndTab.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RejectDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndScheduleSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/RndSettingsSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/rndWire.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/rndWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/scheduleWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/rnd/startSpikeChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/rnd-types.ts
 
 ## MAN-10134 — src/modules/analytics/sections/repeats/ — the Repeats section scaffold: files, FILL markers, what the fill adds
 
@@ -17292,3 +17325,61 @@ The app's update notice reads the newest release from the server, never from the
 3. A `cli_version_changed`-style hint is not used here: the frame carries the reading itself.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/app-release/app-release.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/app-release/app-release.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/app-release/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVersionCheck.ts
+
+## MAN-10318 — deadline-timer — one timer at one computed instant
+
+Module `server/shared/deadline-timer.ts`: one unref'd timer at one computed instant.
+
+| Name | Does |
+|---|---|
+| `createDeadlineTimer(onDue)` | returns `{ arm, armedAt, clear }` |
+| `arm(at)` | replaces whatever was armed; `at` is epoch ms on this process's clock |
+| `arm(null)` / `arm(NaN)` | clears; a non-finite `at` never fires |
+| `armedAt()` | instant armed, null when none; already null inside `onDue` |
+| `clear()` | nothing fires until the next `arm` |
+
+- An instant already passed fires on the next turn of the timers.
+- A delay over 2,147,483,647 ms (Node's longest timer) is waited out in steps of that size.
+- The timer is unref'd: a deadline never keeps a process up.
+
+Consumers: red watch next plan (MAN-9205), each warden node's silence (MAN-7814), the scheduled-message clock (`scheduled-message-clock.service.ts`: the next due scheduled message and the earliest end of a queued message's hold, MAN-9123).
+Not on it: auto-diagnosis, the compaction trigger, the runtime signals keep hand-written copies (bug ticket 543).
+Arm from the module's own computed instant, never a fixed interval (INV-10187).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduled-messages/services/scheduled-message-clock.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/deadline-timer.ts
+
+## MAN-10321 — settled-call and spool-watch — one call per burst, one sweep per spool drop
+
+Modules `server/shared/settled-call.service.ts` and `server/shared/spool-watch.service.ts`: event-driven settle and spool-sweep triggers. Both are listed in `.oxlintrc.json` `backend-shared-utils` (INV-6548).
+
+## settled-call.service.ts
+
+| Name | Does |
+|---|---|
+| `SETTLE_MS` | 300; the settle every chat-server watch uses, equal to `dispatcher-store-watch.service.ts`'s store-burst settle |
+| `createSettledCall({ run, settleMs })` | returns `{ request(), cancel() }` |
+| `request()` | first call arms one timer; requests while pending are absorbed; `run` called once at fire |
+| `cancel()` | drops a pending call |
+
+- Window is measured from the FIRST request, never pushed back: a writer that never pauses is still read every `settleMs`.
+- Timer is cleared before `run` is called: a request from inside `run` opens a new window.
+- Timer is unref'd: a pending call never holds the process at shutdown.
+- `run` reports its own failure; this file does not catch it.
+- importers: `dispatch-souls.module.ts`, `universe.module.ts`, `spool-watch.service.ts`.
+
+## spool-watch.service.ts
+
+`watchSpool({ dir, isQueued, sweep, logError })` returns `{ close() }`. The trigger the lesson and memory queues share; importers: `kanban-spill.service.ts`, `memory-spill.service.ts`. What a file means (door, stage verb, refusal target) stays in those modules.
+
+| Dependency | Meaning |
+|---|---|
+| `dir` | the queue directory; made (`mkdir -p`) first, then watched, then swept once |
+| `isQueued(name)` | the queue's own test for a finished name; also the `watchDirectory` classifier |
+| `sweep()` | one pass; a throw is logged (`sweep error (continuing)`) and the watch stands |
+| `logError(message)` | error sink |
+
+- Every name the watch hears is settled (`SETTLE_MS`) into one pass.
+- `SPILL_RETRY_MS` = 15000: when a pass leaves a finished file behind (store deferred it: peer write lock, boot race), one retry pass is armed; an empty queue arms nothing. Deadline set by a pass, not a tick.
+- `close()` stops the watch, cancels the settled call and clears the retry.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/settled-call.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/spool-watch.service.ts

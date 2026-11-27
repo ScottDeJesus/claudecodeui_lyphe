@@ -82,6 +82,22 @@ export function toScheduledMessage(row: ScheduledMessageRow): ScheduledMessage {
   };
 }
 
+/** Told after every schedule and cancel landed: the dispatcher re-arms its next-due timer from here. */
+const scheduleChangeListeners = new Set<() => void>();
+
+function tellScheduleChanged(): void {
+  for (const listener of scheduleChangeListeners) {
+    try {
+      listener();
+    } catch (error) {
+      // The write already landed and was answered; a listener that failed must not turn it into a 500.
+      console.error('[ScheduledMessages] A schedule-change listener failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
 export const scheduledMessagesService = {
   /**
    * Records a message to send to a session later.
@@ -140,6 +156,7 @@ export const scheduledMessagesService = {
       scheduledFor,
     }));
     announceScheduledMessagesChanged(scheduled.sessionId);
+    tellScheduleChanged();
     return scheduled;
   },
 
@@ -161,5 +178,14 @@ export const scheduledMessagesService = {
       });
     }
     announceScheduledMessagesChanged(sessionId);
+    tellScheduleChanged();
+  },
+
+  /** Subscribes to schedule and cancel, each told after its write; answers the unsubscribe. */
+  onChanged(listener: () => void): () => void {
+    scheduleChangeListeners.add(listener);
+    return () => {
+      scheduleChangeListeners.delete(listener);
+    };
   },
 };

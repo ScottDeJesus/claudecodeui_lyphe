@@ -20,7 +20,7 @@ const require = createRequire(path.join(REPO, "package.json"));
 
 const KEYS = [
   ["", ["generated_at", "settings", "scout", "standing", "candidates"]],
-  ["settings", ["web_search", "weekly", "sources"]],
+  ["settings", ["web_search", "schedule", "sources"]],
   ["settings.sources", ["url", "label", "added_at"]],
   ["scout", ["out", "last"]],
   ["scout.out", ["id", "launch", "trigger", "started_at"]],

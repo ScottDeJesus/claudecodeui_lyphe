@@ -7,7 +7,7 @@ import type {
   CerberusServiceDefinition,
 } from '@/shared/cerberus-types.js';
 
-import { KIND_FIELDS, PROBE_KINDS } from './definition-document.js';
+import { KIND_FIELDS, KIND_OPTIONAL_FIELDS, PROBE_KINDS } from './definition-document.js';
 
 /**
  * Moves a probe between its two forms: the document a person writes and the rows the store keeps.
@@ -35,6 +35,8 @@ const SPEC_SIGNATURE_FIELDS = [
   'host',
   'port',
   'cmd',
+  'watch',
+  'ages',
   'path',
   'dsn',
   'query',
@@ -58,7 +60,7 @@ function kindFieldsOf(row: CerberusProbeRow, kind: CerberusProbeKind): Record<st
     console.error(`[Cerberus] the spec of probe ${row.node}/${row.key} is not JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
   const fields: Record<string, unknown> = {};
-  for (const field of KIND_FIELDS[kind]) {
+  for (const field of [...KIND_FIELDS[kind], ...KIND_OPTIONAL_FIELDS[kind]]) {
     if (stored[field] !== undefined) fields[field] = stored[field];
   }
   return fields;
@@ -116,7 +118,10 @@ export function specSetSignature(specs: CerberusProbeSpec[]): string {
 /** The `probes` row a probe of a document is stored as, written at checks-set `version`. */
 export function probeRowOf(node: string, probe: CerberusProbeDefinition, version: number): CerberusProbeRow {
   const fields: Record<string, unknown> = {};
-  for (const field of KIND_FIELDS[probe.kind]) fields[field] = (probe as Record<string, unknown>)[field];
+  for (const field of [...KIND_FIELDS[probe.kind], ...KIND_OPTIONAL_FIELDS[probe.kind]]) {
+    const value = (probe as Record<string, unknown>)[field];
+    if (value !== undefined) fields[field] = value;
+  }
   return {
     node,
     key: probe.key,

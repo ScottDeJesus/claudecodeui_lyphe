@@ -2,11 +2,12 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AgentLaunchChoice } from '@/modules/agent-launch';
+import { RndScheduleSection } from '@/modules/rnd/RndScheduleSection';
 import { hostOf } from '@/modules/rnd/rndWords';
-import type { RndScoutsRun, RndSettings, RndSource } from '@/shared/rnd-types';
+import type { RndScheduleChange, RndScoutsRun, RndSettings, RndSource } from '@/shared/rnd-types';
 import { Banner, Button, EmptyState, Field, Input, Rule, SegmentedControl, Sheet, Spinner, Switch } from '@/shared/ui';
 
-/** The three launches the place owns: the weekly scout, the chat that spikes one candidate, and Adopt's placer. */
+/** The three launches the place owns: the scheduled scout, the chat that spikes one candidate, and Adopt's placer. */
 export type RndLaunchKind = 'scout' | 'spike' | 'adopt';
 
 /** One slot of a launch row, as AgentLaunchChoice reads it: the table's words, the one in force, whether the row pins it, and what clearing the pin falls back to. */
@@ -34,6 +35,8 @@ type RndSettingsSheetProps = {
   onWebSearch: (next: boolean) => void;
   /** One at a time (the default) or all at once: how a run's source scouts go out. */
   onScoutsRun: (next: RndScoutsRun) => void;
+  /** Any of the schedule's three words: how often the scout goes out by itself. */
+  onSchedule: (change: RndScheduleChange) => void;
   /** A word pins the slot; null clears the pin. */
   onLaunch: (kind: RndLaunchKind, slot: 'model' | 'effort', next: string | null) => void;
 };
@@ -98,7 +101,7 @@ function AddSource({ busy, onAdd }: { busy: boolean; onAdd: (url: string) => voi
  *
  * Rendered by RndPanel.
  */
-export function RndSettingsSheet({ open, onClose, settings, launch, launchFailure, busy, refusal, onDismissRefusal, onAddSource, onRemoveSource, onWebSearch, onScoutsRun, onLaunch }: RndSettingsSheetProps) {
+export function RndSettingsSheet({ open, onClose, settings, launch, launchFailure, busy, refusal, onDismissRefusal, onAddSource, onRemoveSource, onWebSearch, onScoutsRun, onSchedule, onLaunch }: RndSettingsSheetProps) {
   const { t } = useTranslation();
   const sourcesId = useId();
   const launchId = useId();
@@ -225,6 +228,8 @@ export function RndSettingsSheet({ open, onClose, settings, launch, launchFailur
             </div>
           </section>
         ))}
+
+        <RndScheduleSection schedule={settings.schedule} busy={busy} onSchedule={onSchedule} />
 
         <section aria-labelledby={scoutsRunId} className="flex flex-col gap-3" data-rnd-scouts-run={settings.scouts_run}>
           <Rule id={scoutsRunId}>{t('rnd.settings.scoutsRun')}</Rule>

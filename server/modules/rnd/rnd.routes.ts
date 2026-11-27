@@ -30,6 +30,14 @@ const NAME_NOT_ARG = 'the candidate name must be text that does not begin with a
 const FREE_TEXT_MAX = 4000;
 /** The settings' scoutsRun word (the store's own) and the dispatcher flag value that sets it. */
 const SCOUTS_RUN_FLAGS = new Map<string, string>([['one_at_a_time', 'one-at-a-time'], ['all_at_once', 'all-at-once']]);
+/** The scout's frequency words, the store's own, which the dispatcher's --frequency takes as they are. */
+const FREQUENCIES = new Set(['off', 'daily', 'weekly', 'monthly']);
+/** The weekday words --day takes for a weekly scout. */
+const WEEKDAY_FLAGS = new Set(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']);
+/** The last day of the month --day takes for a monthly scout: every month has a 28th, so none is skipped. */
+const MONTH_DAY_LAST = 28;
+/** HH:MM on a 24-hour clock, the shape --time takes. */
+const CLOCK_TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 /** Not a picture, so no client draws an empty R&D place from it; the first landing's frame fills the screen. */
 const NOT_READ_YET = { error: 'the R&D picture has not been read yet' } as const;
 
@@ -77,15 +85,27 @@ export function createRndRouter(dependencies: RndRouterDependencies): express.Ro
 
   // The dispatcher prints the settings after the write, so the answer is the settings as they now stand.
   router.put('/settings', relayWrite(relayJson, (body) => {
-    const { webSearch, scoutsRun } = body;
-    if (webSearch === undefined && scoutsRun === undefined) return { error: 'the body sets webSearch, scoutsRun or both' };
+    const { webSearch, scoutsRun, frequency, day, time } = body;
+    if ([webSearch, scoutsRun, frequency, day, time].every((field) => field === undefined)) {
+      return { error: 'the body sets at least one of webSearch, scoutsRun, frequency, day or time' };
+    }
     if (webSearch !== undefined && typeof webSearch !== 'boolean') return { error: 'webSearch must be true or false' };
     const scoutsRunFlag = typeof scoutsRun === 'string' ? SCOUTS_RUN_FLAGS.get(scoutsRun) : undefined;
     if (scoutsRun !== undefined && scoutsRunFlag === undefined) return { error: 'scoutsRun must be one_at_a_time or all_at_once' };
+    const frequencyFlag = typeof frequency === 'string' && FREQUENCIES.has(frequency) ? frequency : undefined;
+    if (frequency !== undefined && frequencyFlag === undefined) return { error: 'frequency must be off, daily, weekly or monthly' };
+    const dayFlag = dayFlagOf(day);
+    if (day !== undefined && dayFlag === undefined) return { error: 'day must be a weekday (mon to sun) or a day of the month from 1 to 28' };
+    const timeFlag = typeof time === 'string' && CLOCK_TIME.test(time) ? time : undefined;
+    if (time !== undefined && timeFlag === undefined) return { error: 'time must be HH:MM on a 24-hour clock' };
     return [
       'rnd', 'config',
       ...(webSearch === undefined ? [] : ['--web-search', webSearch ? 'on' : 'off']),
       ...(scoutsRunFlag === undefined ? [] : ['--scouts-run', scoutsRunFlag]),
+      // The verb checks the day against the frequency it will be read under, and refuses in its own sentence.
+      ...(frequencyFlag === undefined ? [] : ['--frequency', frequencyFlag]),
+      ...(dayFlag === undefined ? [] : ['--day', dayFlag]),
+      ...(timeFlag === undefined ? [] : ['--time', timeFlag]),
       '--json',
     ];
   }));
@@ -150,4 +170,11 @@ function isFreeText(value: unknown): value is string {
 
 function isLine(value: unknown): value is string {
   return isFreeText(value) && !/[\r\n]/.test(value);
+}
+
+/** A weekday word, or a day of the month from 1 to MONTH_DAY_LAST, as the verb's --day takes it; undefined for anything else. */
+function dayFlagOf(day: unknown): string | undefined {
+  if (typeof day === 'string' && WEEKDAY_FLAGS.has(day)) return day;
+  if (typeof day === 'number' && Number.isInteger(day) && day >= 1 && day <= MONTH_DAY_LAST) return String(day);
+  return undefined;
 }

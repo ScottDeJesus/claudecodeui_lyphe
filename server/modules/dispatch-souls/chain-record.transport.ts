@@ -35,6 +35,9 @@ type ChainRecord = {
 /** The argv entry that makes a pid the walker (`solo/chain_state.py:walker_alive` asks the same). */
 const WALKER_ARGV = 'chain-run';
 
+/** The record the walker rewrites at every stage boundary: read here, and watched by name in `launch-watch.service.ts`. */
+export const CHAIN_RECORD_FILE = 'chain.json';
+
 /**
  * The launcher's own fence for a launch or chain id (`state_lock.SAFE_ID_RE`, `^[A-Za-z0-9_-]+$`),
  * restated exactly — no length cap, because the launcher sets none and a chain id carries its
@@ -94,7 +97,7 @@ function isWalkerAlive(dir: string, chainId: string): boolean {
 export function readChainRecord(root: string, chainId: string): ChainRecord | null {
   if (!isSafeRecordId(chainId)) return null;
   const dir = path.join(root, chainId);
-  const record = readJson(path.join(dir, 'chain.json')) as { status?: unknown; stages?: unknown; until_pass?: unknown } | null;
+  const record = readJson(path.join(dir, CHAIN_RECORD_FILE)) as { status?: unknown; stages?: unknown; until_pass?: unknown } | null;
   if (record === null || typeof record.status !== 'string') return null;
 
   const launchIds: string[] = [];

@@ -274,7 +274,7 @@ export function classifyLaunch(
  * window opened, and the classification drops what ended before it.
  *
  * `servedModelByLaunchId` is the lane's memory of the model each child's log announced, owned by the
- * composition root: a log is read once per launch, not every poll, and the walk drops the ids the lane
+ * composition root: a log is read once per launch, not at every reading, and the walk drops the ids the lane
  * no longer carries. Omitted, no child's log is read.
  *
  * `cpuWaitDir` is the pacer's `cpu-wait/` folder, where a launch that is waiting for the box's CPU keeps its marker

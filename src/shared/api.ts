@@ -4,7 +4,7 @@ import {
   storeAuthToken,
 } from '@/shared/authToken';
 import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SaveOrder, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, VocabularyEntry, VoiceProvider, VoiceSettingsPatch, WriteAttempt } from '@/shared/types';
-import type { RndScoutsRun } from '@/shared/rnd-types';
+import type { RndScheduleChange, RndScoutsRun } from '@/shared/rnd-types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
@@ -1476,7 +1476,7 @@ export const api = {
   // rnd_state frame a landed write pokes.
   rnd: {
     picture: () => get('/api/rnd'),
-    settings: (body: { webSearch?: boolean; scoutsRun?: RndScoutsRun }) => put('/api/rnd/settings', body),
+    settings: (body: { webSearch?: boolean; scoutsRun?: RndScoutsRun } & RndScheduleChange) => put('/api/rnd/settings', body),
     addSource: (body: { url: string; label?: string }) => post('/api/rnd/sources', body),
     removeSource: (body: { url: string }) => del('/api/rnd/sources', body),
     scout: () => post('/api/rnd/scout', {}),

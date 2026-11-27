@@ -19,12 +19,24 @@ export type RndVerdictWord = 'yes' | 'no' | 'unsettled';
 /** A page the scout reads. */
 export type RndSource = { url: string; label: string | null; added_at: string };
 
+/** How often the scout goes out by itself. */
+export type RndFrequency = 'off' | 'daily' | 'weekly' | 'monthly';
+export type RndWeekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+/** The scout's schedule: a day only where one applies (1-28 for monthly), the time on the box's clock, and the crontab line's expression derived from it (null when off). */
+export type RndSchedule =
+  | { frequency: 'off'; day: null; time: string; cron: null }
+  | { frequency: 'daily'; day: null; time: string; cron: string }
+  | { frequency: 'weekly'; day: RndWeekday; time: string; cron: string }
+  | { frequency: 'monthly'; day: number; time: string; cron: string };
+/** A change to the schedule from the settings sheet: any of its three words; the rest stay as stored. */
+export type RndScheduleChange = { frequency?: RndFrequency; day?: RndWeekday | number; time?: string };
+
 export type RndSettings = {
   web_search: boolean;
   /** Whether a run's source scouts go out one after another (the default) or all together. */
   scouts_run: RndScoutsRun;
-  /** The cron expression of the weekly scout, or null when none is installed. */
-  weekly: string | null;
+  /** How often the scout goes out by itself. */
+  schedule: RndSchedule;
   sources: RndSource[];
 };
 

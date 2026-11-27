@@ -36,6 +36,16 @@ export function deadlineMs(spec) {
   return Math.min(spec.timeout * 1000, MAX_TIMER_MS);
 }
 
+/**
+ * Waits `ms` in steps `setTimeout` can store, then calls `then`. `holder.timer` is always the live
+ * step, so one `clearTimeout(holder.timer)` cancels the whole wait. Every wait the scheduler holds
+ * (a probe's turn, a watched probe's read after a change and at its flip) goes through here.
+ */
+export function waitFor(holder, ms, then) {
+  const step = Math.min(ms, MAX_TIMER_MS);
+  holder.timer = setTimeout(() => (ms > step ? waitFor(holder, ms - step, then) : then()), step);
+}
+
 /** Cuts `text` to at most `maxChars` UTF-16 units without leaving half of a surrogate pair at the end. */
 export function clip(text, maxChars) {
   if (text.length <= maxChars) return text;

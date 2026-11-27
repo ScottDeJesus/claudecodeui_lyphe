@@ -5,23 +5,20 @@ import type { Router } from 'express';
 import { defineSubagentTranscriptWatch } from '@/modules/providers/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
+import { createSettledCall, SETTLE_MS } from '@/shared/settled-call.service.js';
 import type { RelayAnswer, ResumeRunOrder } from '@/shared/relayed-press-types.js';
 import type { SoulLaunchSnapshot, SoulLaunchStateEvent } from '@/shared/types.js';
 import { dispatchSoulsStateDir, pacerHomeDir } from '@/shared/utils.js';
 
+import { chainsRootBeside } from './chain-record.transport.js';
 import { releaseCpuWait } from './cpu-wait.transport.js';
 import { createDispatchSoulsRouter, isLaunchId } from './dispatch-souls.routes.js';
+import { nextLaunchReadMs } from './launch-clock.service.js';
+import { createLaunchWatch } from './launch-watch.service.js';
 import { resumeChainOnHisWord } from './run-resume.service.js';
 import { readSoulTranscript, soulRecordDirectory } from './soul-transcript.service.js';
 import { snapshotLaunches } from './soul-launch.service.js';
 import { announceSoulLaunchesChanged } from './soul-launch-changes.js';
-
-/**
- * How often the launch root is read. Two seconds: fast enough that a launch appearing or a receipt
- * landing reaches the pin while the reader is still looking at the chat, slow enough over a
- * directory of a few dozen launches to be free.
- */
-const POLL_MS = 2000;
 
 /**
  * How long an ended launch stays on the lane after its receipt.
@@ -40,7 +37,7 @@ const LAUNCH_KEEP_S = 6 * 60 * 60;
 const FIRST_READ_WAIT_MS = 5000;
 
 /**
- * What `createDispatchSoulsModule` hands the server entrypoint: the router to mount, the poll's `start` and `stop`, and
+ * What `createDispatchSoulsModule` hands the server entrypoint: the router to mount, the lane's and its watch's `start` and `stop`, and
  * `launches()`, the lane's picture behind `whenLanded` — the souls and chains sessions launched by hand. The lane's
  * reading is synchronous and seeded when it is built, so this answers at once; `null` is the shared lane's type, never
  * a case this lane meets. The entrypoint passes `launches` on to the companion's house
@@ -57,7 +54,7 @@ export type DispatchSoulsModule = {
 };
 
 /**
- * Builds the launcher-souls lane for the server entrypoint: the poll, the frame, and the seed and
+ * Builds the launcher-souls lane for the server entrypoint: the watch that pokes it, the frame, and the seed and
  * transcript routes behind it.
  *
  * The composition root is the only place here that reads the environment, names a path or touches
@@ -89,7 +86,7 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
 
   /**
    * The lane's one door to the journal, and the one thing that bounds its volume. Everything under
-   * this root polls every two seconds, so a fault that persists is a fault that repeats — a broken
+   * this root reads again at every write the watch reports, so a fault that persists repeats — a broken
    * launch root would otherwise write thousands of identical lines and bury everything else in the
    * journal. Said once per distinct message, for the life of the process.
    */
@@ -103,7 +100,7 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
   /**
    * What the lane has learned of each launch's served model (launch id → the id its child's log
    * announced, `readServedModel`). It lives as long as the lane, so a log is read once per launch and
-   * not every two seconds; the walk empties it of the launches the lane has stopped carrying.
+   * not at every reading; the walk empties it of the launches the lane has stopped carrying.
    */
   const servedModelByLaunchId = new Map<string, string>();
 
@@ -122,7 +119,18 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
       ),
     frame: (launches) => ({ kind: 'soul_launch_state', launches, at: Date.now() }),
     broadcast,
-    pollMs: POLL_MS,
+    // No interval: the watch below pokes the lane, and the picture names the one change that will come unwritten.
+    backstopMs: (launches) => nextLaunchReadMs(launches, Date.now() / 1000, LAUNCH_KEEP_S),
+    logError: (message) => logErrorOnce(`[DispatchSouls] ${message}`),
+  });
+
+  const settle = createSettledCall({ run: () => lane.poke(), settleMs: SETTLE_MS });
+  const watch = createLaunchWatch({
+    soulsRoot: stateDir,
+    chainsRoot: chainsRootBeside(stateDir),
+    cpuWaitDir,
+    modelKnown: (launchId) => servedModelByLaunchId.has(launchId),
+    onMove: () => settle.request(),
     logError: (message) => logErrorOnce(`[DispatchSouls] ${message}`),
   });
 
@@ -132,8 +140,15 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
       transcript: (launchId) => readSoulTranscript(stateDir, launchId),
       cpuRelease: (launchId) => releaseCpuWait(launchId),
     }),
-    start: () => lane.start(),
-    stop: () => lane.stop(),
+    start: () => {
+      lane.start();
+      watch.start();
+    },
+    stop: () => {
+      watch.stop();
+      settle.cancel();
+      lane.stop();
+    },
     launches: () => lane.whenLanded(FIRST_READ_WAIT_MS),
     resumeRun: (order) => resumeChainOnHisWord(order, (line) => console.log(line)),
   };

@@ -106,7 +106,19 @@ export function createClaudeUpdatesModule(dependencies: {
     });
   }
 
-  const spawnRunner = (mode: 'install' | 'rollback'): number => spawnUpdateRunner(appRoot, dir, mode);
+  /** The runners THIS process spawned. Their exits are heard, so the reconciler keeps no clock for them;
+   *  a runner inherited across a handover is never in here. */
+  const spawnedRunnerPids = new Set<number>();
+  const spawnRunner = (mode: 'install' | 'rollback'): number => {
+    const pid = spawnUpdateRunner(appRoot, dir, mode, () => {
+      spawnedRunnerPids.delete(pid);
+      reconciler.kick();
+    });
+    spawnedRunnerPids.add(pid);
+    return pid;
+  };
+  const holdsRunnerExit = (runnerPid: number | null): boolean =>
+    runnerPid !== null && spawnedRunnerPids.has(runnerPid);
   /** What the reconciler asks for when it ends a job: the check's own entry, which never rejects. */
   const runCheck = (): void => void check.checkNow();
 
@@ -122,6 +134,7 @@ export function createClaudeUpdatesModule(dependencies: {
     spawnRunner,
     runCheck,
     runGit,
+    holdsRunnerExit,
   });
 
   const actions = createUpdateActions({

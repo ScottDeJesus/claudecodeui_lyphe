@@ -269,11 +269,12 @@ shutdown does not).
 
 The overlap is possible because both children bind with `reusePort: true`, so the kernel lets two
 sockets share `:3011` and load-balances new connections across them. **Linux-only** — as are the
-inotify semantics `watch.mjs` assumes. This whole package targets this host's systemd unit.
+inotify semantics `deploy/tree-watch/tree-watch.mjs` assumes. This whole package targets this host's systemd unit.
 
 ## The watcher is per directory, not `recursive: true`
 
-`watch.mjs` keeps one plain `fs.watch` per directory under `server/` and adds one for each
+`watch.mjs` calls `watchTree` (`deploy/tree-watch/tree-watch.mjs`, shared with the prod client's
+build watcher), which keeps one plain `fs.watch` per directory under `server/` and adds one for each
 directory that appears. It does not use Node's `recursive: true`: on Linux that is Node's own
 walker with one watch per file, and an editor's atomic save (temp name, rename over the file)
 replaces the inode and races that watch away — after which every in-place save of that file is

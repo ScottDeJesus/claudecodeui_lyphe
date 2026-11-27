@@ -72,9 +72,10 @@ export const scheduledMessagesDb = {
    * statement that selects them.
    *
    * Claiming is what makes a missed schedule work: the server can be down at
-   * the moment a message was due, and the next poll after it starts picks the
-   * message up instead of skipping it. Doing it in one transaction is what
-   * stops two overlapping polls from sending the same message twice.
+   * the moment a message was due, and the dispatcher's catch-up pass at boot
+   * picks the message up instead of skipping it; after that its next-due timer
+   * claims each one at its time. Doing it in one transaction is what keeps two
+   * passes from sending the same message twice.
    */
   claimDue(now: Date): ScheduledMessageRow[] {
     const db = getConnection();
@@ -97,6 +98,14 @@ export const scheduledMessagesDb = {
 
       return due;
     })();
+  },
+
+  /** The earliest pending message's time, or null when nothing is pending: the instant the dispatcher's timer is armed at. */
+  nextPendingAt(): string | null {
+    const row = getConnection()
+      .prepare(`SELECT MIN(scheduled_for) AS next FROM scheduled_messages WHERE status = 'pending'`)
+      .get() as { next: string | null } | undefined;
+    return row?.next ?? null;
   },
 
   markFailed(id: string, reason: string): void {

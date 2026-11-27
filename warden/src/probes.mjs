@@ -13,6 +13,13 @@
 //   RUN NOW   `probe.run { probe }` (center's recheck after a fix) runs that probe once, now, and sends its
 //             result at once; one already running finishes, then runs once more, so the answer is never the
 //             read that began before the fix. The cadence of its timer is not touched.
+//   WATCHED   a file_age probe, or an exec probe with `watch` and `ages`, also holds a watch on its
+//             file (`watched-probe.mjs`): it reads at start, on a change (2 s after the last change
+//             heard, 30 s after its previous read ended), and at the instant its kept reading, aged,
+//             would cross a bound of its pass or warn, sending that one at once. Its every-seconds turn
+//             reads nothing: it re-sends the kept reading aged to now, through the batch like a read.
+//             While its watch is not open, or it keeps no reading (its last read did not complete),
+//             the turn reads as an unwatched probe's does and the watch is tried again.
 //   RESULTS   a simple kind yields one result keyed by the probe; a health_doc yields its own check
 //             plus one result per component. They wait in a batch that goes out as reliable `result`
 //             frames after a second, or at once at 500. A frame holds at most 500 results and
@@ -27,13 +34,14 @@
 //
 // What a probe says is the kind's affair (`probe-kinds/*`); this file only schedules, wraps and sends.
 import { log } from './log.mjs';
-import { killLiveProcesses, MAX_TIMER_MS } from './probe-support.mjs';
+import { killLiveProcesses, waitFor } from './probe-support.mjs';
 import { run as runExec } from './probe-kinds/exec.mjs';
 import { run as runFileAge } from './probe-kinds/file-age.mjs';
 import { run as runHealthDoc } from './probe-kinds/health-doc.mjs';
 import { run as runHttp } from './probe-kinds/http.mjs';
 import { run as runSql } from './probe-kinds/sql.mjs';
 import { run as runTcp } from './probe-kinds/tcp.mjs';
+import { agedOutcome, createWatch, watchTarget } from './watched-probe.mjs';
 
 // A Map, so a kind named "constructor" cannot find itself on a prototype.
 const KIND_RUNNERS = new Map([
@@ -96,12 +104,6 @@ function measured(result) {
   return { result: refused, bytes: Buffer.byteLength(JSON.stringify(refused)) };
 }
 
-/** Waits `ms` in steps `setTimeout` can store, then calls `then`; `entry.timer` is always the live step, so one `clearTimeout` cancels the wait. */
-function waitFor(entry, ms, then) {
-  const step = Math.min(ms, MAX_TIMER_MS);
-  entry.timer = setTimeout(() => (ms > step ? waitFor(entry, ms - step, then) : then()), step);
-}
-
 /**
  * @param {{ link: {
  *   on(type: string, handler: (body: object) => void): unknown,
@@ -111,7 +113,7 @@ function waitFor(entry, ms, then) {
  *   `previousAt` (check key → the `at` of its last result) is the chain the daemon keeps across restarts; absent, a fresh one.
  */
 export function createProbes({ link, previousAt = new Map() }) {
-  const schedule = new Map(); // probe key → { spec, fingerprint, timer }
+  const schedule = new Map(); // probe key → { spec, fingerprint, timer, watch }
   const memories = new Map(); // probe key → the object the kind keeps between runs
   const running = new Set(); // probe keys whose run is in flight
   const runAgain = new Set(); // probe keys asked to run now while their run was in flight
@@ -195,6 +197,7 @@ export function createProbes({ link, previousAt = new Map() }) {
     const { spec } = entry;
     if (running.has(spec.key)) return; // still going: this turn is skipped
     running.add(spec.key);
+    entry.watch?.readStarted();
     try {
       const runner = KIND_RUNNERS.get(spec.kind);
       let outcome;
@@ -215,6 +218,7 @@ export function createProbes({ link, previousAt = new Map() }) {
       if (sendNow) flush();
     } finally {
       running.delete(spec.key);
+      entry.watch?.readEnded(memories.get(spec.key)?.kept, Date.now());
       const current = runAgain.delete(spec.key) && !stopped ? schedule.get(spec.key) : null;
       if (current) turn(current, { sendNow: true });
     }
@@ -233,9 +237,45 @@ export function createProbes({ link, previousAt = new Map() }) {
   function startTimer(entry) {
     const begin = () => {
       waitFor(entry, entry.spec.every * 1000, begin);
-      turn(entry);
+      if (!resendKept(entry)) turn(entry);
     };
     waitFor(entry, Math.random() * entry.spec.every * 1000, begin);
+    if (entry.watch) {
+      entry.watch.open();
+      readWatched(entry, 'at start');
+    }
+  }
+
+  // A watched probe's reading moves only with its file and the clock, and the watch and the flip
+  // timer read at those moments, so its turn re-sends the kept reading aged to now instead of reading.
+  // False (the turn reads) while the watch is not open — `open()` tries it again — or nothing is
+  // kept, which is how a kind says its last read did not complete, or the watch opened (at last, or
+  // again after a loss) since its last read began: what was written before it opened was never heard.
+  function resendKept(entry) {
+    if (entry.watch?.open() !== true || entry.watch.openedSinceRead()) return false;
+    const now = Date.now();
+    const outcome = agedOutcome(entry.spec, memories.get(entry.spec.key)?.kept, now);
+    if (!outcome) return false;
+    enqueue(resultsOf(entry.spec, outcome, now));
+    return true;
+  }
+
+  // A probe whose reading moves only with a file and the clock also reads when the file changes and
+  // when its aged reading would cross a bound (`watched-probe.mjs`).
+  function attachWatch(entry) {
+    if (!watchTarget(entry.spec)) return;
+    entry.watch = createWatch(entry.spec, {
+      read: () => readWatched(entry, 'on a change'),
+      readAndSend: () => readWatched(entry, 'at its flip', { sendNow: true }),
+    });
+  }
+
+  // A run of the probe still going (a redefined probe's old run) is followed by one more, as `runNow`'s.
+  function readWatched(entry, why, options) {
+    if (stopped || schedule.get(entry.spec.key) !== entry) return;
+    log(`probe ${entry.spec.key}: read ${why}`);
+    if (running.has(entry.spec.key)) runAgain.add(entry.spec.key);
+    else turn(entry, options);
   }
 
   function usable(spec) {
@@ -258,14 +298,17 @@ export function createProbes({ link, previousAt = new Map() }) {
       const spec = wanted.get(key);
       if (spec && entry.fingerprint === specFingerprint(spec)) continue; // unchanged: keeps running as it was
       clearTimeout(entry.timer); // always the live step of its wait (`waitFor`)
+      entry.watch?.close();
       schedule.delete(key);
       if (!spec) memories.delete(key);
+      else delete memories.get(key)?.kept; // a reading kept under the old definition says nothing of the new
     }
     for (const [key, spec] of wanted) {
       if (schedule.has(key)) continue;
-      const entry = { spec, fingerprint: specFingerprint(spec), timer: null };
+      const entry = { spec, fingerprint: specFingerprint(spec), timer: null, watch: null };
       schedule.set(key, entry);
       if (!memories.has(key)) memories.set(key, {});
+      attachWatch(entry);
       startTimer(entry);
     }
 
@@ -305,7 +348,10 @@ export function createProbes({ link, previousAt = new Map() }) {
     runNow,
     stop() {
       stopped = true;
-      for (const entry of schedule.values()) clearTimeout(entry.timer);
+      for (const entry of schedule.values()) {
+        clearTimeout(entry.timer);
+        entry.watch?.close();
+      }
       schedule.clear();
       runAgain.clear();
       killLiveProcesses();

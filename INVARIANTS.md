@@ -25180,3 +25180,19 @@ measured 2026-11-26 by chain chain-pollers-hooks--write-triggers--registry-20261
 probe-key: e04355068638d230809e603ca4820100eb3fe0cb
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-cli.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-crontab.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-sync.service.ts, /home/lyphe/.claude/scripts/crontab, /home/lyphe/.claude/state/cron-registry.log
+
+## INV-11991 — probe — LOW — a command doc still states a 15 s sweep
+
+LOW — a command doc still states a 15 s sweep
+
+```probe
+D=$(mktemp -d) || exit 1; cat > "$D/p.sh" <<'EOF'
+grep -n -i '15 s\b\|15 seconds\|every 15\|15s' ~/.claude/commands/learn.md ~/.claude/commands/remember.md ~/.claude/hooks/INVARIANTS.md 2>/dev/null | grep -i 'sweep\|pending\|pass\|queue' | wc -l | sed 's/^/command-doc lines stating a 15 s sweep: /'
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-27 by chain chain-pollers-hooks--file-watches--spools-heads-20261127-074424-8140, finding L2, LOW
+probe-key: 69680be9d0f05e8f8b6b0191ca0e18fe5e5636d2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-spill.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-spill.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe-heads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe-heads.watch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/spool-watch.service.ts

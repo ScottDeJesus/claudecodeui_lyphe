@@ -15,7 +15,7 @@
  * that matches neither is stale rather than accepted.
  *
  * Both actions end by kicking the reconciler: the job is on disk, and what happens to it next belongs
- * to the tick.
+ * to the reconciler.
  */
 
 import type {
@@ -64,7 +64,7 @@ type UpdateActionsDependencies = {
   dir: string;
   /** The check service, for the current report. */
   check: { report: (job: ClaudeUpdatesReport['job'], supervised: boolean) => Promise<ReportReadings> };
-  /** The tick to wake once a job is on disk. */
+  /** The reconciler to wake once a job is on disk. */
   reconciler: { kick: () => void };
   /** Starts the detached runner. */
   spawnRunner: (mode: 'install' | 'rollback') => number;
