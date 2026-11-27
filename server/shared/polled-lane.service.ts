@@ -299,17 +299,11 @@ export function createPolledLane<TPicture, TFrame>(
    */
   const seedPicture = (): TPicture | null => {
     const first = dependencies.snapshot();
-    if (!isThenable(first)) {
-      seedUnsent = true;
-      return first;
-    }
+    if (!isThenable(first)) return first;
     inFlight = first;
     void first.then(land, fail).then(replayPoke);
     return null;
   };
-
-  /** A synchronous seed no frame has carried yet: `start` sends it rather than reading the same state a second time. */
-  let seedUnsent = false;
 
   // The picture the last reading took, or `null` while a promise-returning lane's first reading is
   // still out. Seeded with a reading rather than left undefined so `current()` answers with something
@@ -319,7 +313,6 @@ export function createPolledLane<TPicture, TFrame>(
   const tick = (): void => {
     // A reading still out is the whole of "no overlap": this tick is skipped, never queued.
     if (inFlight !== null) return;
-    seedUnsent = false;
     let next: TPicture | Promise<TPicture>;
     try {
       next = dependencies.snapshot();
@@ -352,15 +345,9 @@ export function createPolledLane<TPicture, TFrame>(
         // The poll is never a reason for the process to stay alive at shutdown.
         timer.unref();
       }
-      // The first frame at once, so the first GET after boot answers with the real picture rather than an empty list for the
-      // length of one interval: the synchronous seed when no frame has carried it yet (it IS the start's reading), else one reading.
-      if (seedUnsent && picture !== null) {
-        seedUnsent = false;
-        land(picture);
-        armBackstop();
-      } else {
-        tick();
-      }
+      // One reading immediately, so the first GET after boot answers with the real picture rather
+      // than an empty list for the length of one interval.
+      tick();
     },
 
     poke(): void {
