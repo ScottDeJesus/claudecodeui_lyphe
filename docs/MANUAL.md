@@ -6097,8 +6097,7 @@ governs: /home/lyphe/.claude/hooks/enforce_memory_limits.py
 section: memory-intake/005 The two verbs
 
 **file it** writes the memory to disk. **discard** writes nothing. A `memory` or `topic` note does not
-stay there: within a minute the house's docstore inbox (`~/.claude/docstore/ingest/inbox.py`, run by
-a minute cron and by a PostToolUse hook; `docstore get MAN-92`) takes it in as one store row (a note whose body opens `corrects: <token>` instead edits the row that token names, in place — `docstore get INV-193`), deletes
+stay there: at once the house's docstore inbox (`~/.claude/docstore/ingest/inbox.py`, started by the approval itself once it commits (`server/modules/memory-intake/memory-ingest.ts`), by a PostToolUse hook, and by a nightly backstop cron; `docstore get MAN-92`) takes it in as one store row (a note whose body opens `corrects: <token>` instead edits the row that token names, in place — `docstore get INV-193`), deletes
 the file and re-exports the project's `MEMORY.md` from the rows. This lane's write is the whole of
 its part and never waits on that. Both verbs are on every row, both are
 disabled while any write is in flight, and each raises one toast:
