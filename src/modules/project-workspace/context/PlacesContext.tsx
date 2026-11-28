@@ -1,4 +1,4 @@
-import { FolderPlus, House, MessageSquare, Settings, UserRound } from 'lucide-react';
+import { FolderPlus, House, MessageSquare, PanelLeft, Settings, UserRound } from 'lucide-react';
 import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -17,6 +17,7 @@ import { ProjectCreationWizard } from '@/modules/project-creation-wizard';
 import { useProjectEffectsState, useProjectMainState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import { PlaceTrail } from '@/modules/project-workspace/places/PlaceTrail';
+import { PlacesRail } from '@/modules/project-workspace/places/PlacesRail';
 import { PlacesWheel } from '@/modules/project-workspace/places/PlacesWheel';
 import { StationGlyph } from '@/modules/project-workspace/places/StationGlyph';
 import { useRndMark } from '@/modules/rnd';
@@ -24,6 +25,8 @@ import { openHome, openStation } from '@/shared/cloudcliDoors';
 import { useAwaitingInputSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { createStableContext } from '@/shared/context/stableContext';
 import { useHomeShowing, useStationDoors, useStationShowing } from '@/shared/context/StationLayerContext';
+import { useSetUiPreference, useUiPreferences } from '@/shared/context/UiPreferencesContext';
+import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import type { AppTab, ChatDoor, Place, PlaceId, PlaceMark, PlaceTrailStep, SettingsMainTab } from '@/shared/types';
 import { getSessionTitle } from '@/shared/utils';
@@ -111,6 +114,11 @@ type PlacesValue = {
   openWheel: (opener: HTMLElement | null, heldPointer: number | null) => void;
   /** Opens the new-project wizard, which makes a folder a project: the door the old sidebar's plus was. */
   newProject: () => void;
+  /**
+   * Whether the navigation stands as the rail down the left edge of every page (`PlacesRail`): the reader's choice (`placesRail`), at a
+   * desk only. While it does, the menu in each head's corner (`PlacesMenu`) draws nothing: the rail is the way to every place.
+   */
+  rail: boolean;
 };
 
 const PlacesContext = createStableContext<PlacesValue | null>(import.meta.hot, 'PlacesContext', null);
@@ -168,6 +176,12 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
   const covered = useCurrentApplication() !== null;
   const backToWorkspace = useBackToWorkspace();
   const switcherActs = useSwitcherActions(NO_CHAT_DOOR);
+  // The rail or the wheel: the reader's choice, and a desk's only (a phone has no width to give a rail).
+  const { placesRail } = useUiPreferences();
+  const setPreference = useSetUiPreference();
+  const { isMobile } = useDeviceSettings({ trackPWA: false });
+  const rail = placesRail && !isMobile;
+  const foldRail = useCallback(() => setPreference('placesRail', false), [setPreference]);
 
   const homeName = t('home.title', { defaultValue: 'Home' });
   const stationName = t('station.title', { defaultValue: 'Kaylee Station' });
@@ -357,10 +371,16 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
 
   // The acts under the wheel: the applications' (the list of applications always, and what can be done to the one in front while one
   // is up), then New project. None at the station, which covers the workspace an application stands over.
-  const acts = useMemo(() => (stationShowing ? [] : [
-    ...switcherActs.filter((act) => act.key !== 'chat' && !act.disabled),
-    { key: 'new-project', label: t('places.newProject', { defaultValue: 'New project' }), icon: FolderPlus, run: newProject },
-  ]), [stationShowing, switcherActs, t, newProject]);
+  // Last, at a desk and on every page, the station included: the wheel unfolded into the rail (`placesRail`).
+  const acts = useMemo(() => [
+    ...(stationShowing ? [] : [
+      ...switcherActs.filter((act) => act.key !== 'chat' && !act.disabled),
+      { key: 'new-project', label: t('places.newProject', { defaultValue: 'New project' }), icon: FolderPlus, run: newProject },
+    ]),
+    ...(isMobile ? [] : [
+      { key: 'rail', label: t('places.rail.unfold', { defaultValue: 'Show as a rail' }), icon: PanelLeft, run: () => setPreference('placesRail', true) },
+    ]),
+  ], [stationShowing, switcherActs, t, newProject, isMobile, setPreference]);
 
   // THE WHEEL: up, folding away, or not drawn.
   const [wheel, setWheel] = useState<WheelState | null>(null);
@@ -510,13 +530,14 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
   }, [trailFrom]);
 
   const value = useMemo<PlacesValue>(
-    () => ({ places, waiting, menuMark, openWheel, newProject }),
-    [places, waiting, menuMark, openWheel, newProject],
+    () => ({ places, waiting, menuMark, openWheel, newProject, rail }),
+    [places, waiting, menuMark, openWheel, newProject, rail],
   );
 
   return (
     <PlacesContext.Provider value={value}>
       {children}
+      {rail && <PlacesRail places={places} waiting={waiting} corePlaced={!stationShowing && !homeShowing} onFold={foldRail} />}
       {wheel !== null && (
         <PlacesWheel places={places} acts={acts} from={wheel.from} held={wheel.held} leaving={wheel.leaving} onClose={closeWheel} />
       )}

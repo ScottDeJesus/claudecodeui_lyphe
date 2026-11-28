@@ -51,6 +51,12 @@ export type UiPreferences = {
    * there; the checklist button in the chat's head turns it. A phone opens them as a window instead and keeps no such state.
    */
   showChatFollowups: boolean;
+  /**
+   * Draws the navigation as a rail down the left edge of every page at a desk (`PlacesRail`) in place of the wheel's menu in each head's
+   * corner. Default OFF: the wheel, as it has stood. The dial at the rail's head turns it off, an act under the wheel turns it on, and
+   * Settings has its switch. A phone keeps the wheel whatever this says: it has no width to give a rail.
+   */
+  placesRail: boolean;
 };
 
 export type UiPreferenceKey = keyof UiPreferences;
@@ -73,6 +79,7 @@ const DEFAULTS: UiPreferences = {
   hideGitTab: false,
   hideBrowserTab: false,
   showChatFollowups: true,
+  placesRail: false,
 };
 
 const PREFERENCE_KEYS = Object.keys(DEFAULTS) as UiPreferenceKey[];

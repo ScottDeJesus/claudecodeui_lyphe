@@ -22,13 +22,17 @@ import { cn } from '@/shared/utils';
  * place owes a word, else `done`. A reader of the screen hears the places and their words as the press's description; its name stays
  * "Menu".
  *
+ * WHILE THE RAIL STANDS (`rail`, the reader's `placesRail` at a desk) it draws nothing: `PlacesRail` is on every page in its place.
+ *
  * Used by `ScreenHead` (the end of every screen's head), `ChatHead` (the end of the chat's head), `WorkspaceMain` (handed to the Bugs
  * view, the end of its head), `PlacesCorner` (the station's corner) and `home/WorkspaceHome` (the home's head).
  */
 export function PlacesMenu() {
   const { t } = useTranslation();
-  const { places, waiting, menuMark, openWheel } = usePlaces();
+  const { places, waiting, menuMark, openWheel, rail } = usePlaces();
   const markId = useId();
+  // While the rail stands it is the way to every place, and no head draws a second one.
+  if (rail) return null;
 
   return (
     <button

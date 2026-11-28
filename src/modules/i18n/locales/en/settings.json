@@ -39,6 +39,10 @@
   "appearance": {
     "title": "Appearance",
     "theme": "Theme",
+    "placesRail": {
+      "label": "Navigation rail",
+      "description": "Shows the places as a rail down the left edge of every page, in place of the wheel menu. On a phone the wheel stays."
+    },
     "workspaceTabs": {
       "title": "Tabs in the workspace",
       "hideFiles": {

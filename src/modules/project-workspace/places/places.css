@@ -204,3 +204,77 @@
   .places-dial, .places-menu { transition: none !important; }
   [data-holds-trail][data-holding], [data-holds-places][data-holding] { animation: none; box-shadow: 0 0 0 3px var(--accent); }
 }
+
+/*
+ * THE RAIL (PlacesRail): the wheel unrolled down the left edge of every page, while the reader's `placesRail` is on at a desk. One
+ * spine down its middle, from the dial at its head to Kaylee's core at its foot; each place a glyph on the spine, on a plate of the
+ * canvas so the spine is seen to pass behind it. The place on screen is the ink, and the spine thickens over and under it; a place
+ * pointed at shows the same in a hairline. What waits is a bead on the spine over its place, the dial's own marks.
+ *
+ * IT MAKES ITS OWN ROOM: while it is mounted the document carries `data-places-rail`, and every page's box (`pwa-status-clear`: the
+ * workspace frame, the sessions home, the station) starts at its far edge. `body` in the selector outranks the home-screen app's own
+ * rule for that box (`index.css`), whose inset it keeps.
+ */
+html[data-places-rail] { --places-rail-width: 72px; }
+html[data-places-rail] body .pwa-status-clear { left: calc(var(--safe-area-inset-left, 0px) + var(--places-rail-width)); }
+
+.places-rail {
+  position: fixed; top: 0; bottom: var(--keyboard-height, 0px); left: var(--safe-area-inset-left, 0px); z-index: 30; box-sizing: border-box;
+  width: var(--places-rail-width, 72px); display: flex; flex-direction: column; align-items: center; padding: 12px 0; background: var(--canvas);
+  color: var(--ink); animation: places-fade var(--duration-fade) ease both;
+}
+/* The spine, behind every mark, from under the dial to the core; on a page that draws her core itself, to the last mark. */
+.places-rail::before {
+  content: ''; position: absolute; left: 50%; top: 56px; bottom: 92px; width: 1px; translate: -50% 0; background: var(--hairline); pointer-events: none;
+}
+.places-rail[data-core]::before { bottom: 40px; }
+.places-rail-fold { position: relative; width: 40px; height: 40px; flex: none; margin-bottom: 12px; background: var(--canvas); }
+.places-rail-fold:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+
+.places-rail-run {
+  position: relative; display: flex; flex: 1; min-height: 0; width: 100%; flex-direction: column; align-items: center; overflow-y: auto;
+  overscroll-behavior: contain; scrollbar-width: none;
+}
+.places-rail-run::-webkit-scrollbar { display: none; }
+.places-rail-gap { flex: none; height: 14px; }
+.places-rail-foot { position: relative; display: flex; flex: none; width: 100%; flex-direction: column; align-items: center; }
+.places-rail-core { position: relative; display: grid; flex: none; place-items: center; margin-top: 8px; border-radius: 50%; background: var(--canvas); }
+
+.places-rail-place {
+  position: relative; display: grid; flex: none; place-items: center; width: 100%; height: 44px; margin: 0; padding: 0; border: 0; background: none;
+  color: var(--ink-muted); cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; transition: color var(--duration-fade) ease;
+}
+.places-rail-place:hover, .places-rail-place:focus-visible { color: var(--ink); }
+.places-rail-place[data-here] { color: var(--ink); }
+.places-rail-glyph {
+  position: relative; display: grid; place-items: center; width: 28px; height: 28px; background: var(--canvas);
+  transition: transform 140ms var(--ease-lock);
+}
+.places-rail-place:active .places-rail-glyph { transform: scale(0.9); }
+.places-rail-place:focus-visible .places-rail-glyph { box-shadow: 0 0 0 1px var(--focus); border-radius: var(--radius-control, 2px); }
+/* The spine over and under a place: a hairline of the ink while it is pointed at, thick while it is the place on screen. */
+.places-rail-glyph::before, .places-rail-glyph::after {
+  content: ''; position: absolute; left: 50%; width: 1px; height: 6px; translate: -50% 0; background: var(--ink); opacity: 0;
+  transition: opacity var(--duration-fade) ease;
+}
+.places-rail-glyph::before { bottom: 100%; }
+.places-rail-glyph::after { top: 100%; }
+.places-rail-place:hover .places-rail-glyph::before, .places-rail-place:hover .places-rail-glyph::after,
+.places-rail-place:focus-visible .places-rail-glyph::before, .places-rail-place:focus-visible .places-rail-glyph::after { opacity: 1; }
+.places-rail-place[data-here] .places-rail-glyph::before, .places-rail-place[data-here] .places-rail-glyph::after { width: 2px; opacity: 1; }
+
+/* What waits, on the spine over its place: the dial's marks. */
+.places-rail-bead {
+  position: absolute; left: 50%; top: -9px; width: 6px; height: 6px; translate: -50% 0; border-radius: 50%; box-shadow: 0 0 0 2px var(--canvas);
+  pointer-events: none; animation: places-mark-in var(--duration-lock) var(--ease-lock) both;
+}
+.places-rail-bead[data-mark='owed'] {
+  background: var(--accent);
+  animation: places-mark-in var(--duration-lock) var(--ease-lock) both, places-dial-breathe 2.6s ease-in-out 600ms infinite;
+}
+.places-rail-bead[data-mark='done'] { background: var(--pos-dot); }
+
+@media (prefers-reduced-motion: reduce) {
+  .places-rail, .places-rail-bead { animation: none !important; }
+  .places-rail-place, .places-rail-glyph, .places-rail-glyph::before, .places-rail-glyph::after { transition: none !important; }
+}

@@ -50,6 +50,10 @@
     "lastChat": "last chat",
     "here": "here",
     "newProject": "New project",
+    "rail": {
+      "unfold": "Show as a rail",
+      "fold": "Fold into the wheel"
+    },
     "mark": {
       "asking": "Waiting on your answer",
       "finished": "All finished"

@@ -27,7 +27,7 @@ export default function AppearanceSettingsTab({
   // The sun-follow switch reads the same theme context the Dark Mode switch beside it writes,
   // so the two can never disagree about who is in charge of the colour.
   const { followsSun, setFollowsSun } = useTheme();
-  const { hideShellTab, hideFilesTab, hideGitTab, hideBrowserTab, showRawParameters, showThinking, showWork, showCompactSummary, sendByCtrlEnter, keepProjectsExpanded } = useUiPreferences();
+  const { hideShellTab, hideFilesTab, hideGitTab, hideBrowserTab, showRawParameters, showThinking, showWork, showCompactSummary, sendByCtrlEnter, keepProjectsExpanded, placesRail } = useUiPreferences();
   // The transcript's reading size, read and written through the one hook the chat pane reads —
   // so the stepper and the messages can never disagree about how big the text is.
   const chatFontSize = useChatFontSize();
@@ -172,6 +172,18 @@ export default function AppearanceSettingsTab({
 
       <SettingsSection title={t('appearance.workspaceTabs.title')}>
         <SettingsCard divided>
+          {/* The navigation's two faces: the wheel's menu in each head's corner, or the rail down the left edge of every page. */}
+          <SettingRow
+            label={t('appearance.placesRail.label', { defaultValue: 'Navigation rail' })}
+            description={t('appearance.placesRail.description', { defaultValue: 'Shows the places as a rail down the left edge of every page, in place of the wheel menu. On a phone the wheel stays.' })}
+          >
+            <SettingsToggle
+              checked={placesRail}
+              onChange={(value) => setPreference('placesRail', value)}
+              ariaLabel={t('appearance.placesRail.label', { defaultValue: 'Navigation rail' })}
+            />
+          </SettingRow>
+
           {/* Files, Git and Browser hide their LINK only (the rail and the phone's drawer); the Shell and Tasks
               switches below remove the tab. Listed in the rail's own order. */}
           <SettingRow
