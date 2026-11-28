@@ -6,7 +6,7 @@ import type { TFunction } from 'i18next';
 import { askHeadline, askIdentity } from '@/modules/dispatcher/askState';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { KindTag } from '@/modules/dispatcher/LaneCardHead';
-import { INBOX_MEASURE, SCREEN_FRAME } from '@/shared/constants';
+import { INBOX_SPREAD, SCREEN_FRAME } from '@/shared/constants';
 import { useRevealCard } from '@/shared/hooks/useRevealCard';
 import type { DispatcherAsk, DispatcherPlan, Kind } from '@/shared/types';
 import { Badge, Button, Card, EmptyState, ScrollArea } from '@/shared/ui';
@@ -138,14 +138,14 @@ function WaitingAsksList({ groups, onAnswer }: { groups: AskGroup[]; onAnswer: (
       </header>
 
       <ScrollArea className="min-h-0 flex-1">
-        {/* The Memory section's column, at the start of the page's frame: the rows, or the empty state in their place. */}
+        {/* The rows across the page's frame, two abreast at a desk (`INBOX_SPREAD`), or the empty state in the frame's middle. */}
         <div className={SCREEN_FRAME}>
           {groups.length === 0 ? (
-            <div className={cn(INBOX_MEASURE, 'flex items-center justify-center py-10')}>
+            <div className="flex items-center justify-center py-10">
               <EmptyState icon={Route} title={t('inbox.asks.empty')} message={t('inbox.asks.emptyMessage')} />
             </div>
           ) : (
-            <ul className={cn(INBOX_MEASURE, 'flex flex-col gap-3 py-5')}>
+            <ul className={cn(INBOX_SPREAD, 'gap-y-3 py-5')}>
               {groups.map((group) => (
                 <AskRow key={askIdentity(group.ask)} group={group} onAnswer={onAnswer} />
               ))}

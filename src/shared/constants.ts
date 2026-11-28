@@ -927,6 +927,13 @@ export const SCREEN_FRAME_PX = 1280;
  */
 export const INBOX_MEASURE = 'w-full max-w-2xl';
 
+/**
+ * THE INBOX AT A DESK: two columns across the page's frame (`SCREEN_FRAME`) from 1,280 px, so a section fills the frame instead of
+ * standing as one narrow stack beside empty room; one column below that. Used by the memory-intake module's `MemoryIntakePanel` (the
+ * queue beside the lessons) and the dispatcher module's `WaitingAsks` (its asks two abreast).
+ */
+export const INBOX_SPREAD = 'grid grid-cols-1 items-start gap-x-12 xl:grid-cols-2';
+
 // ---------------------------
 
 //----------------- A HELPER'S DOT ------------

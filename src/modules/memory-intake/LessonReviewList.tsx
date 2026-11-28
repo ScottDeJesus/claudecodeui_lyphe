@@ -46,7 +46,7 @@ export function LessonReviewList() {
     // The memory queue's own column (`INBOX_MEASURE`), in the frame its panel holds it in, so the two
     // sections share one left edge. The rule above the heading is the whole separation between them.
     <section aria-labelledby={headingId} className={cn(INBOX_MEASURE, 'pb-6')} data-lesson-review>
-      <div className="flex items-center gap-2 border-t border-border pt-5">
+      <div className="flex items-center gap-2 border-t border-border pt-5 xl:border-t-0">
         <LightbulbIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <h3 id={headingId} className="text-sm font-medium">
           {t('memory.lessons.title', { defaultValue: 'Lessons' })}

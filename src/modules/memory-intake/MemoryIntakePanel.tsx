@@ -6,7 +6,7 @@ import { useMemoryIntake } from '@/modules/memory-intake/context/MemoryIntakeCon
 import { useMemoryReview } from '@/modules/memory-intake/hooks/useMemoryReview';
 import { LessonReviewList } from '@/modules/memory-intake/LessonReviewList';
 import { MemoryCandidateRow } from '@/modules/memory-intake/MemoryCandidateRow';
-import { INBOX_MEASURE, SCREEN_FRAME } from '@/shared/constants';
+import { INBOX_MEASURE, INBOX_SPREAD, SCREEN_FRAME } from '@/shared/constants';
 import { useToast } from '@/shared/context/ToastContext';
 import type { MemoryReviewOutcome, ToastRequest } from '@/shared/types';
 import { Badge, EmptyState, ScrollArea, Spinner } from '@/shared/ui';
@@ -77,13 +77,15 @@ export function MemoryIntakePanel() {
       </div>
 
       {/* ONE scroll for the whole tab, two sections inside it: the memory queue, then the lessons
-          under their own heading, both in one measured column at the start of the page's frame
-          (`SCREEN_FRAME`, `INBOX_MEASURE`), under the section's name. The queue's three non-list
+          under their own heading. At a desk they stand side by side, a half of the page's frame each
+          (`INBOX_SPREAD`), the queue under the section's name and the lessons beside it; in a narrower
+          window the lessons follow the queue in one measured column (`INBOX_MEASURE`). The queue's three non-list
           states are blocks of their own height rather than the pane's — a state that filled the
           pane would push the lessons below the fold on the very visit where the queue has nothing
           to show and they are all there is — and they stand in the column, over the lessons. */}
       <ScrollArea className="flex-1">
-        <div className={SCREEN_FRAME}>
+        <div className={cn(SCREEN_FRAME, INBOX_SPREAD)} data-memory-spread="">
+          <div className="min-w-0" data-memory-queue="">
           {pending === null ? (
             // Not asked yet — a different fact from an empty queue, and never "All filed".
             <div className={cn(INBOX_MEASURE, 'flex items-center justify-center py-10')}>
@@ -118,6 +120,8 @@ export function MemoryIntakePanel() {
               ))}
             </ul>
           )}
+
+          </div>
 
           {/* The second section of the same review habit — not a tab, and not a provider: it reads
               and writes through its own hook and shares nothing with the queue above but the pane. */}
