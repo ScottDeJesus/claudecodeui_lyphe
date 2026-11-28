@@ -35,7 +35,7 @@ export function PlanStatusBadge({ plan }: { plan: DispatcherPlan }) {
 function walkingSince(plan: DispatcherPlan): number | null {
   for (let index = plan.events.length - 1; index >= 0; index -= 1) {
     const event = plan.events[index];
-    if (event.kind === 'launched' || event.kind === 'relaunched') return epochOf(event.at);
+    if (event.kind === 'launched' || event.kind === 'relaunched' || event.kind === 'gap-round') return epochOf(event.at);
   }
   return null;
 }

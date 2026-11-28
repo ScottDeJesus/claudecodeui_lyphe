@@ -137,8 +137,8 @@ const NO_RUN_KIND = 'no-run';
  * walk stops needing a hand — the pause verb, a halt on an API error, the storm guard — and it is a
  * stop-and-look rather than a fault; a pause for a USAGE LIMIT is the same event told apart by its
  * lift-time tail (`limitPause`) and earns its own code, one push per wall. `relaunched` is the only
- * one of those three that reads as a warning: a phase the walk had left standing was taken up again, usually because
- * its build came back and said the work could continue, and that is news the operator wants whether
+ * one of those three that reads as a warning: a phase the walk had left standing was taken up again, because
+ * it ended without finishing (its walker died, an API-error retry, a usage-limit lift) or a designer's ruling sent it back, and that is news the operator wants whether
  * or not he asked for it. `no-run` is the fourth, and the one the house writes only after it has tried to mend
  * (`hooks/dispatcher/store_alerts.py`): a claim with no run behind it that it could not heal, or a launch refused outright, its `detail` the
  * sentence that says what it tried and why. It is a warning too, and it SPEAKS EVERY TIME — the wave rule below does not reach it: an hour of
@@ -147,6 +147,8 @@ const NO_RUN_KIND = 'no-run';
  *
  * `planner` is not here, and that is what its kind is for: the house's heals — its one relaunch of a designer, a cut or a judgment — are
  * logged as `planner` events, so a claim the house mended pushes nothing, and nothing maps one to `dispatcher.relaunched`, which is a task's.
+ * `gap-round` is absent for the same reason: a walk that finished with gaps sent back to its own builder (`hooks/dispatcher/gap_rounds.py`) is
+ * logged as that kind alone, never `relaunched`, because it is ordinary work and nobody's trouble.
  *
  * A plan in no epic pushes each of them as it happens. A FEATURE OF AN EPIC (`plan.arc` set) is read
  * as one piece of work with its siblings, and tells the operator less, and tells him once:
