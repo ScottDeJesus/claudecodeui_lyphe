@@ -24,6 +24,9 @@ const RESUME_PLACEHOLDER_TEXT = 'No response requested.';
  *
  * Takes `unknown` because the universe's tap parses lines it has not typed. A live SDK frame is
  * typed `user` or `assistant` as the transcript rows are, so it is never one of these.
+ *
+ * Twin: `is_claude_turn_lookalike` in `rust/transcript-engine/src/search/claude_row.rs`, which
+ * transcript search reads with; the two change together.
  */
 export function isClaudeTurnLookalike(record: unknown): boolean {
   if (typeof record !== 'object' || record === null) {
@@ -42,6 +45,9 @@ export function isClaudeTurnLookalike(record: unknown): boolean {
  *
  * The other `<synthetic>` rows are NOT this: a rate-limit refusal, an expired login or an API error
  * says something the reader needs, and carries `isApiErrorMessage: true`.
+ *
+ * Twin: `is_resume_placeholder_row` in `rust/transcript-engine/src/search/claude_row.rs`, which
+ * transcript search reads with; the two change together.
  */
 export function isResumePlaceholderRow(row: AnyRecord): boolean {
   if (row.type !== 'assistant' || row.message?.model !== '<synthetic>') {

@@ -1,8 +1,8 @@
 import os from 'node:os';
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
 
 import { sessionsDb } from '@/modules/database/index.js';
+import { readTitleRows } from '@/modules/transcript-engine/index.js';
 import {
   buildLookupMap,
   extractFirstValidJsonlData,
@@ -12,11 +12,20 @@ import {
   readLastTranscriptTimestamp,
 } from '@/shared/utils.js';
 import type { IProviderSessionSynchronizer } from '@/shared/interfaces.js';
+import type { AnyRecord } from '@/shared/types.js';
 
 type ParsedSession = {
   sessionId: string;
   projectPath: string;
   sessionName?: string;
+};
+
+/** What the head of one transcript says, before its title is read. */
+type SessionHead = {
+  sessionId: string;
+  projectPath: string;
+  /** The name the database already holds; it wins over any title the transcript carries. */
+  storedName?: string;
 };
 
 /**
@@ -25,6 +34,8 @@ type ParsedSession = {
  * when the database holds no transcript path for it. Nothing else may spell the layout out.
  */
 export const CLAUDE_PROJECTS_ROOT = path.join(os.homedir(), '.claude', 'projects');
+
+const UNTITLED_SESSION_NAME = 'Untitled Claude Session';
 
 /**
  * Session indexer for Claude transcript artifacts.
@@ -52,6 +63,9 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
 
   /**
    * Scans ~/.claude/projects and upserts discovered sessions into DB.
+   *
+   * Every head is read first, so the titles of all the files that need one come from one engine
+   * run; the sessions are then named and upserted in the scan's own order.
    */
   async synchronize(since?: Date): Promise<number> {
     const nameMap = await buildLookupMap(path.join(this.claudeHome, 'history.jsonl'), 'sessionId', 'display');
@@ -61,17 +75,23 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       since ?? null
     );
 
-    let processed = 0;
+    const sessionFiles: Array<{ filePath: string; head: SessionHead }> = [];
     for (const filePath of files) {
       if (this.isSubagentTranscript(filePath)) {
         continue;
       }
-
-      const parsed = await this.processSessionFile(filePath, nameMap);
-      if (!parsed) {
-        continue;
+      const head = await this.readSessionHead(filePath);
+      if (head) {
+        sessionFiles.push({ filePath, head });
       }
+    }
 
+    const titlesByPath = await this.readTitlesOf(
+      sessionFiles.filter(({ head }) => head.storedName === undefined)
+    );
+
+    for (const { filePath, head } of sessionFiles) {
+      const parsed = this.nameSession(head, titlesByPath.get(filePath), nameMap);
       const timestamps = await this.readSessionTimestamps(filePath);
       sessionsDb.createSession(
         parsed.sessionId,
@@ -82,10 +102,9 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
         timestamps.updatedAt,
         filePath
       );
-      processed += 1;
     }
 
-    return processed;
+    return sessionFiles.length;
   }
 
   /**
@@ -100,10 +119,12 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
     }
 
     const nameMap = await buildLookupMap(path.join(this.claudeHome, 'history.jsonl'), 'sessionId', 'display');
-    const parsed = await this.processSessionFile(filePath, nameMap);
-    if (!parsed) {
+    const head = await this.readSessionHead(filePath);
+    if (!head) {
       return null;
     }
+    const titlesByPath = await this.readTitlesOf(head.storedName === undefined ? [{ filePath, head }] : []);
+    const parsed = this.nameSession(head, titlesByPath.get(filePath), nameMap);
 
     const timestamps = await this.readSessionTimestamps(filePath);
     return sessionsDb.createSession(
@@ -141,12 +162,10 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
   }
 
   /**
-   * Extracts session metadata from one Claude JSONL session file.
+   * Reads what the head of one Claude JSONL session file says: its session id, its project path
+   * and the name the database already holds. Null for a file that is not a sidebar chat.
    */
-  private async processSessionFile(
-    filePath: string,
-    nameMap: Map<string, string>
-  ): Promise<ParsedSession | null> {
+  private async readSessionHead(filePath: string): Promise<SessionHead | null> {
     const parsed = await extractFirstValidJsonlData(filePath, (rawData) => {
       const data = rawData as Record<string, unknown>;
       const sessionId = typeof data.sessionId === 'string' ? data.sessionId : undefined;
@@ -179,93 +198,93 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
     const existingSession = sessionsDb.getSessionByProviderSessionId(parsed.sessionId)
       ?? sessionsDb.getSessionById(parsed.sessionId);
     const existingSessionName = existingSession?.custom_name;
-    if (existingSessionName && existingSessionName !== 'Untitled Claude Session') {
-      return {
-        ...parsed,
-        sessionName: normalizeSessionName(existingSessionName, 'Untitled Claude Session'),
-      };
+    if (existingSessionName && existingSessionName !== UNTITLED_SESSION_NAME) {
+      return { ...parsed, storedName: existingSessionName };
+    }
+    return parsed;
+  }
+
+  /**
+   * The title each file gives its head's session, from one run of the engine's titles verb. Only
+   * the picked title is kept: a full scan's rows run to hundreds of thousands of last-prompt rows,
+   * and holding them until the upserts end costs ~100 MB of heap. A record carrying `error` has no
+   * title; a rejected read is left to rise, so the sync fails instead of naming every session from
+   * history.jsonl.
+   */
+  private async readTitlesOf(
+    sessionFiles: Array<{ filePath: string; head: SessionHead }>
+  ): Promise<Map<string, string | undefined>> {
+    const results = await readTitleRows(sessionFiles.map(({ filePath }) => filePath));
+    const titlesByPath = new Map<string, string | undefined>();
+    sessionFiles.forEach(({ filePath, head }, index) => {
+      const result = results[index];
+      if (result && 'rows' in result) {
+        titlesByPath.set(filePath, pickSessionTitle(result.rows, head.sessionId));
+      }
+    });
+    return titlesByPath;
+  }
+
+  /**
+   * Names one session: the name already stored, else the transcript's own title, else
+   * history.jsonl's `display`. A file the engine could not read has no title, as an unreadable
+   * file always had.
+   */
+  private nameSession(
+    head: SessionHead,
+    title: string | undefined,
+    nameMap: Map<string, string>
+  ): ParsedSession {
+    const { sessionId, projectPath, storedName } = head;
+    if (storedName !== undefined) {
+      return { sessionId, projectPath, sessionName: normalizeSessionName(storedName, UNTITLED_SESSION_NAME) };
     }
 
     // The transcript's own titles come first: a `/rename` (custom-title) or the CLI's generated title
     // (ai-title) says more than history.jsonl's `display`, which is only the prompt that was typed.
-    let sessionName = await this.extractSessionTitle(filePath, parsed.sessionId);
-    if (!sessionName) {
-      sessionName = nameMap.get(parsed.sessionId);
-    }
-
     return {
-      ...parsed,
-      sessionName: normalizeSessionName(sessionName, 'Untitled Claude Session'),
+      sessionId,
+      projectPath,
+      sessionName: normalizeSessionName(title || nameMap.get(sessionId), UNTITLED_SESSION_NAME),
     };
   }
+}
 
-  /**
-   * Returns the best available title for one session from its transcript.
-   *
-   * Scans forward keeping the last match of each event type, then prefers
-   * `custom-title` (a manual `/rename`) over `ai-title` over `last-prompt`.
-   * Claude writes `custom-title` immediately before `ai-title`, so a reverse
-   * scan that returns its first hit would always lose the manual rename, and
-   * the trailing `last-prompt` would shadow both.
-   *
-   * Returns undefined on a missing or unreadable file so sync can continue.
-   */
-  private async extractSessionTitle(
-    filePath: string,
-    sessionId: string
-  ): Promise<string | undefined> {
-    try {
-      const content = await readFile(filePath, 'utf8');
-      const lines = content.split(/\r?\n/);
+/**
+ * The title a transcript's rows give one session: its LAST non-blank `custom-title` (`/rename`),
+ * else its last `ai-title`, else its last `last-prompt`, counting only rows of this session id.
+ * why: the CLI writes `custom-title` just before `ai-title` and `last-prompt` last, so a reverse
+ * scan returning its first hit lost the rename. The rows are the engine's `titles` record of the file.
+ */
+export function pickSessionTitle(rows: AnyRecord[], sessionId: string): string | undefined {
+  let foundCustomTitle: string | undefined;
+  let foundAiTitle: string | undefined;
+  let foundLastPrompt: string | undefined;
 
-      let foundCustomTitle: string | undefined;
-      let foundAiTitle: string | undefined;
-      let foundLastPrompt: string | undefined;
-
-      for (let index = 0; index < lines.length; index += 1) {
-        const line = lines[index]?.trim();
-        if (!line) {
-          continue;
-        }
-
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(line);
-        } catch {
-          continue;
-        }
-
-        const data = parsed as Record<string, unknown>;
-        const eventType = typeof data.type === 'string' ? data.type : undefined;
-        const eventSessionId = typeof data.sessionId === 'string' ? data.sessionId : undefined;
-
-        if (eventSessionId !== sessionId) {
-          continue;
-        }
-
-        if (eventType === 'custom-title') {
-          const title = typeof data.customTitle === 'string' ? data.customTitle : undefined;
-          if (title?.trim()) {
-            foundCustomTitle = title;
-          }
-        } else if (eventType === 'ai-title') {
-          const title = typeof data.aiTitle === 'string' ? data.aiTitle : undefined;
-          if (title?.trim()) {
-            foundAiTitle = title;
-          }
-        } else if (eventType === 'last-prompt') {
-          const prompt = typeof data.lastPrompt === 'string' ? data.lastPrompt : undefined;
-          if (prompt?.trim()) {
-            foundLastPrompt = prompt;
-          }
-        }
-      }
-
-      return foundCustomTitle || foundAiTitle || foundLastPrompt;
-    } catch {
-      // Ignore missing/unreadable files so sync can continue.
+  for (const data of rows) {
+    const eventType = typeof data.type === 'string' ? data.type : undefined;
+    const eventSessionId = typeof data.sessionId === 'string' ? data.sessionId : undefined;
+    if (eventSessionId !== sessionId) {
+      continue;
     }
 
-    return undefined;
+    if (eventType === 'custom-title') {
+      const title = typeof data.customTitle === 'string' ? data.customTitle : undefined;
+      if (title?.trim()) {
+        foundCustomTitle = title;
+      }
+    } else if (eventType === 'ai-title') {
+      const title = typeof data.aiTitle === 'string' ? data.aiTitle : undefined;
+      if (title?.trim()) {
+        foundAiTitle = title;
+      }
+    } else if (eventType === 'last-prompt') {
+      const prompt = typeof data.lastPrompt === 'string' ? data.lastPrompt : undefined;
+      if (prompt?.trim()) {
+        foundLastPrompt = prompt;
+      }
+    }
   }
+
+  return foundCustomTitle || foundAiTitle || foundLastPrompt;
 }

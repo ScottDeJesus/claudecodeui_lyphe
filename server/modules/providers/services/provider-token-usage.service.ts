@@ -6,6 +6,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 
 import { sessionCompactionsDb, sessionsDb } from '@/modules/database/index.js';
+import { readClaudeUsageRows } from '@/modules/transcript-engine/index.js';
 import type { AnyRecord } from '@/shared/types.js';
 import { AppError, getOpenCodeDatabasePath } from '@/shared/utils.js';
 
@@ -24,6 +25,8 @@ type ProviderTokenUsageServiceDependencies = {
   fileExists: (filePath: string) => boolean;
   readDirectory: (directoryPath: string) => Promise<Dirent[]>;
   readTextFile: (filePath: string) => Promise<string>;
+  /** A Claude transcript's assistant usage rows, read whole by the transcript engine (`@/modules/transcript-engine`). */
+  readClaudeUsageRows: (filePath: string) => Promise<AnyRecord[]>;
   readTextFileTail: (filePath: string, maxBytes: number) => Promise<FileTail>;
   getClaudeContextWindow: () => string | undefined;
   getReportedClaudeContextWindow: (providerSessionId: string) => number | undefined;
@@ -78,6 +81,7 @@ const defaultDependencies: ProviderTokenUsageServiceDependencies = {
   fileExists: (filePath) => fsSync.existsSync(filePath),
   readDirectory: (directoryPath) => fsp.readdir(directoryPath, { withFileTypes: true }),
   readTextFile: (filePath) => fsp.readFile(filePath, 'utf8'),
+  readClaudeUsageRows,
   readTextFileTail: async (filePath, maxBytes) => {
     const handle = await fsp.open(filePath, 'r');
     try {
@@ -712,14 +716,14 @@ export function createProviderTokenUsageService(
       let holdsWholeTranscript: boolean;
 
       if (includeSessionTotal) {
-        entries = parseClaudeUsageEntries(await dependencies.readTextFile(sessionFilePath));
+        entries = await dependencies.readClaudeUsageRows(sessionFilePath);
         holdsWholeTranscript = true;
       } else {
         const tail = await dependencies.readTextFileTail(sessionFilePath, TOKEN_USAGE_TAIL_BYTES);
         entries = parseClaudeUsageEntries(tail.content);
         holdsWholeTranscript = tail.isComplete;
         if (!claudeEntriesHaveUsage(entries) && !tail.isComplete) {
-          entries = parseClaudeUsageEntries(await dependencies.readTextFile(sessionFilePath));
+          entries = await dependencies.readClaudeUsageRows(sessionFilePath);
           holdsWholeTranscript = true;
         }
       }

@@ -10,6 +10,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
 
+import { transcriptEngineStatus } from '@/modules/transcript-engine/index.js';
 import { AppError, findApplicationRoot, getModuleDirectory, IS_PLATFORM, terminalTextStyles } from '@/shared/utils.js';
 import { createAppsModule } from '@/modules/apps/index.js';
 import { createCodeModeModule } from '@/modules/code-mode/index.js';
@@ -200,7 +201,8 @@ app.get('/health', (req, res) => {
         status: 'ok',
         timestamp: new Date().toISOString(),
         installMode,
-        version: RUNNING_VERSION
+        version: RUNNING_VERSION,
+        transcriptEngine: transcriptEngineStatus()
     });
 });
 

@@ -7677,6 +7677,9 @@ server beside the running one and retires the old one only when the new one repo
 A `server/` edit that fails to load never parks the API: the previous server keeps serving
 and the journal carries one `[supervisor] boot failed — previous server kept:` line naming
 the error; fix the edit and it hands over. Chat sessions ride the keepalive through both.
+The transcript engine (`rust/transcript-engine/`) is not server code: it is built with
+`npm run build:engine` and needs no restart, since the server runs the binary per call and a
+rebuilt one is live at the next call.
 
 Ports live in `.env` and are deliberately not upstream's defaults: the backend is on
 **3011** because a Caddy container for another local service already owns 3001, and Vite is

@@ -168,3 +168,4 @@ toolsets.local.json
 # Per-box build records and design exports: kept on disk, never published.
 /docs/plans/
 /design/
+rust/target/

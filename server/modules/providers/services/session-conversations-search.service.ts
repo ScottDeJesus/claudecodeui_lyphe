@@ -7,8 +7,8 @@ import { rgPath } from '@vscode/ripgrep';
 
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
 import { addSessionResult, listCompactedTranscriptRows } from '@/modules/providers/services/session-conversations-compacted.js';
-import { isClaudeTurnLookalike, isResumePlaceholderRow } from '@/shared/claude-transcript-rows.js';
-import { localCommandDisplayText, stripTransparentWrapperPrefix, type LocalCommandPayload } from '@/shared/local-commands.js';
+import { buildClaudeSearchJob, fileResultsFromRecord } from '@/modules/providers/services/session-conversations-engine.js';
+import { openTranscriptSearch, type TranscriptSearchFileRecord, type TranscriptSearchRun } from '@/modules/transcript-engine/index.js';
 import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 
 type AnyRecord = Record<string, any>;
@@ -19,7 +19,7 @@ type SearchSnippetHighlight = {
   end: number;
 };
 
-type SessionConversationMatch = {
+export type SessionConversationMatch = {
   role: string;
   snippet: string;
   highlights: SearchSnippetHighlight[];
@@ -28,7 +28,7 @@ type SessionConversationMatch = {
   messageUuid?: string | null;
 };
 
-type SessionConversationResult = {
+export type SessionConversationResult = {
   sessionId: string;
   provider: SearchableProvider;
   sessionSummary: string;
@@ -67,20 +67,21 @@ type SearchSessionConversationsInput = {
 };
 
 type SessionRepositoryRow = ReturnType<typeof sessionsDb.getAllSessions>[number];
-type SearchableSessionRow = SessionRepositoryRow & {
+export type SearchableSessionRow = SessionRepositoryRow & {
   provider: SearchableProvider;
   jsonl_path: string;
 };
 
-type SearchRuntime = {
+export type SearchRuntime = {
   matchesQuery: (text: string) => boolean;
   buildSnippet: (text: string) => { snippet: string; highlights: SearchSnippetHighlight[] };
   limit: number;
   totalMatches: number;
   isAborted: () => boolean;
-  matchedSessionKeys: Set<string>;
   claudeSessionsByFileKey: Map<string, SearchableSessionRow[]>;
   claudeFileResultsCache: Map<string, Map<string, SessionConversationResult>>;
+  /** The engine's run over every Claude transcript of this search, and each file's index in it. */
+  claudeSearch: { run: TranscriptSearchRun; indexByFileKey: Map<string, number> };
 };
 
 type SearchablePathEntry = {
@@ -101,13 +102,6 @@ const MAX_MATCHES_PER_SESSION = 2;
 const RIPGREP_FILE_CHUNK_SIZE = 40;
 const RIPGREP_CHUNK_CONCURRENCY = 6;
 const UNKNOWN_PROJECT_KEY = '__unknown_project__';
-
-const INTERNAL_CONTENT_PREFIXES = [
-  '<system-reminder>',
-  'Caveat:',
-  'Invalid API key',
-  '[Request interrupted',
-] as const;
 
 /**
  * Codex includes extra internal metadata tags that should not surface as
@@ -233,10 +227,6 @@ function findSessionTitleResults(
     .map(({ matchIndex: _matchIndex, ...result }) => result);
 }
 
-function isInternalContent(content: string): boolean {
-  return INTERNAL_CONTENT_PREFIXES.some((prefix) => content.startsWith(prefix));
-}
-
 function isInternalCodexContent(content: string): boolean {
   const normalized = content.trimStart();
   return CODEX_INTERNAL_CONTENT_PREFIXES.some((prefix) => normalized.startsWith(prefix));
@@ -357,150 +347,6 @@ function createWordMatcher(
   };
 
   return { matchesQuery, buildSnippet };
-}
-
-function extractClaudeText(content: unknown): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  if (!Array.isArray(content)) {
-    return '';
-  }
-
-  return content
-    .filter((part: AnyRecord) => part?.type === 'text' && typeof part?.text === 'string')
-    .map((part: AnyRecord) => String(part.text))
-    .join(' ');
-}
-
-function extractTaggedContent(content: string, tagName: string): string | null {
-  const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = new RegExp(`<${escapedTagName}>([\\s\\S]*?)<\\/${escapedTagName}>`).exec(content);
-  return match ? match[1] : null;
-}
-
-type ClaudeLocalCommandPayload = LocalCommandPayload;
-
-function parseClaudeLocalCommandPayload(content: string): ClaudeLocalCommandPayload | null {
-  const commandName = extractTaggedContent(content, 'command-name');
-  const commandMessage = extractTaggedContent(content, 'command-message');
-  const commandArgs = extractTaggedContent(content, 'command-args');
-
-  if (commandName === null && commandMessage === null && commandArgs === null) {
-    return null;
-  }
-
-  return {
-    commandName: commandName ?? '',
-    commandMessage: commandMessage ?? '',
-    commandArgs: commandArgs ?? '',
-  };
-}
-
-
-function stripAnsiFormatting(text: string): string {
-  return text.replace(/\u001B\[[0-9;?]*[ -/]*[@-~]/g, '');
-}
-
-type ClaudeSearchableMessage = {
-  text: string;
-  role: 'user' | 'assistant';
-};
-
-/**
- * Claude mixes visible chat, compact summaries, and local command wrappers into
- * the same transcript stream. Search should operate on the user-visible meaning
- * of those rows rather than the raw wrapper syntax.
- */
-function extractClaudeSearchableMessage(entry: AnyRecord): ClaudeSearchableMessage | null {
-  if (!entry.message?.content || entry.isApiErrorMessage) {
-    return null;
-  }
-
-  // Neither is something said in the chat: a bookkeeping record that wears a turn's shape would
-  // surface every prompt a second time (a hit with no uuid and no time to jump to), and the CLI's
-  // resume stand-in would read as the chat's last assistant text.
-  if (isClaudeTurnLookalike(entry) || isResumePlaceholderRow(entry)) {
-    return null;
-  }
-
-  const rawRole = entry.message.role;
-  if (rawRole !== 'user' && rawRole !== 'assistant') {
-    return null;
-  }
-
-  // A user row the harness wrote (a skill body, hook feedback): never something
-  // the user typed, so it must not surface as a user hit. Compact summaries are
-  // meta too but are re-labelled as assistant text below, so they pass through.
-  if (rawRole === 'user' && entry.isMeta === true && entry.isCompactSummary !== true) {
-    return null;
-  }
-
-  if (typeof entry.message.content === 'string') {
-    const content = String(entry.message.content);
-
-    if (entry.isCompactSummary === true && content.trim()) {
-      return {
-        text: content,
-        role: 'assistant',
-      };
-    }
-
-    const localCommand = parseClaudeLocalCommandPayload(content);
-    if (localCommand) {
-      const displayText = localCommandDisplayText(localCommand);
-      return displayText
-        ? {
-            text: displayText,
-            role: 'user',
-          }
-        : null;
-    }
-
-    const localCommandStdout = extractTaggedContent(content, 'local-command-stdout');
-    if (localCommandStdout !== null) {
-      const stdoutText = stripAnsiFormatting(localCommandStdout).trim();
-      return stdoutText
-        ? {
-            text: stdoutText,
-            role: 'assistant',
-          }
-        : null;
-    }
-
-    if (!content || isInternalContent(content)) {
-      return null;
-    }
-
-    return {
-      text: content,
-      role: rawRole,
-    };
-  }
-
-  const text = extractClaudeText(entry.message.content);
-  if (!text) {
-    return null;
-  }
-
-  if (entry.isCompactSummary === true) {
-    return {
-      text,
-      role: 'assistant',
-    };
-  }
-
-  if (isInternalContent(text)) {
-    return null;
-  }
-
-  // A send with an image is a content array the CLI does not expand: its text block still wears the
-  // plain-mode `/plain `, which the chat takes off (`claude-sessions.provider.ts`) and a hit must too.
-  return {
-    text: rawRole === 'user' ? stripTransparentWrapperPrefix(text) : text,
-    role: rawRole,
-  };
 }
 
 function extractCodexText(content: unknown): string {
@@ -859,160 +705,24 @@ async function parseClaudeSessionMatches(
   }
 
   if (!runtime.claudeFileResultsCache.has(fileKey)) {
-    const sessionsForFile = runtime.claudeSessionsByFileKey.get(fileKey) || [];
-    const matchedSessionsForFile = sessionsForFile.filter((candidate) =>
-      runtime.matchedSessionKeys.has(getSessionKey(candidate)),
-    );
-
-    const targetSessions = matchedSessionsForFile.length > 0
-      ? matchedSessionsForFile
-      : [session];
-
-    // Transcript lines are tagged with the provider session id (e.g. Claude's own
-    // conversation UUID), which is not necessarily the app-facing `session_id`.
-    // Match and attribute by the provider id, but map results back to the
-    // internal `session_id` the rest of the app uses to identify sessions.
-    const providerToInternalId = new Map<string, string>();
-    const customNameBySessionId = new Map<string, string | null>();
-    for (const candidate of targetSessions) {
-      const providerId = candidate.provider_session_id || candidate.session_id;
-      providerToInternalId.set(providerId, candidate.session_id);
-      customNameBySessionId.set(providerId, candidate.custom_name ?? null);
-    }
-    const targetSessionIds = new Set(providerToInternalId.keys());
-
-    type ClaudeSessionSearchState = {
-      matches: SessionConversationMatch[];
-      pendingSummaries: Map<string, string>;
-      fallbackUserText: string | null;
-      fallbackAssistantText: string | null;
-      resolvedSummary: string | null;
-    };
-
-    const sessionStateById = new Map<string, ClaudeSessionSearchState>();
-    const getSessionState = (sessionId: string): ClaudeSessionSearchState => {
-      if (!sessionStateById.has(sessionId)) {
-        sessionStateById.set(sessionId, {
-          matches: [],
-          pendingSummaries: new Map<string, string>(),
-          fallbackUserText: null,
-          fallbackAssistantText: null,
-          resolvedSummary: null,
-        });
+    const index = runtime.claudeSearch.indexByFileKey.get(fileKey);
+    let fileResults = new Map<string, SessionConversationResult>();
+    if (index !== undefined) {
+      let record: TranscriptSearchFileRecord;
+      try {
+        record = await runtime.claudeSearch.run.forFile(index);
+      } catch (error) {
+        // A search its caller left ends the engine under it; that is not a failure to report.
+        if (runtime.isAborted()) {
+          return null;
+        }
+        throw error;
       }
-      return sessionStateById.get(sessionId) as ClaudeSessionSearchState;
-    };
-
-    let currentSessionId: string | null = null;
-
-    try {
-      const fileStream = fsSync.createReadStream(session.jsonl_path);
-      const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
-
-      for await (const line of rl) {
-        if (runtime.totalMatches >= runtime.limit || runtime.isAborted()) {
-          break;
-        }
-        if (!line.trim()) {
-          continue;
-        }
-
-        let entry: AnyRecord;
-        try {
-          entry = JSON.parse(line) as AnyRecord;
-        } catch {
-          continue;
-        }
-
-        if (entry.sessionId) {
-          currentSessionId = String(entry.sessionId);
-        }
-        const entrySessionId = entry.sessionId
-          ? String(entry.sessionId)
-          : currentSessionId;
-        if (!entrySessionId || !targetSessionIds.has(entrySessionId)) {
-          continue;
-        }
-
-        const state = getSessionState(entrySessionId);
-
-        if (entry.type === 'summary' && entry.summary) {
-          const summaryValue = String(entry.summary);
-          if (entry.sessionId) {
-            state.resolvedSummary = summaryValue;
-          } else if (entry.leafUuid) {
-            state.pendingSummaries.set(String(entry.leafUuid), summaryValue);
-          }
-        }
-
-        if (!state.resolvedSummary && entry.parentUuid) {
-          const pendingSummary = state.pendingSummaries.get(String(entry.parentUuid));
-          if (pendingSummary) {
-            state.resolvedSummary = pendingSummary;
-          }
-        }
-
-        const searchableMessage = extractClaudeSearchableMessage(entry);
-        if (!searchableMessage) {
-          continue;
-        }
-
-        const { text, role } = searchableMessage;
-
-        /**
-         * Claude compact summaries are the most faithful session-summary source
-         * after a `/compact` because they describe the post-compaction state that
-         * the resumed session actually continues from. Prefer them over generic
-         * fallback user text when present.
-         */
-        if (entry.isCompactSummary === true) {
-          state.resolvedSummary = text;
-        }
-
-        if (role === 'user') {
-          state.fallbackUserText = text;
-        } else {
-          state.fallbackAssistantText = text;
-        }
-
-        if (!runtime.matchesQuery(text)) {
-          continue;
-        }
-
-        const { snippet, highlights } = runtime.buildSnippet(text);
-        addSessionMatch(runtime, state.matches, {
-          role,
-          snippet,
-          highlights,
-          timestamp: entry.timestamp ? String(entry.timestamp) : null,
-          provider: 'claude',
-          messageUuid: entry.uuid ? String(entry.uuid) : null,
-        });
-      }
-    } catch {
-      runtime.claudeFileResultsCache.set(fileKey, new Map());
-      return null;
-    }
-
-    const fileResults = new Map<string, SessionConversationResult>();
-    for (const [sessionId, state] of sessionStateById.entries()) {
-      if (state.matches.length === 0) {
-        continue;
-      }
-
-      const internalSessionId = providerToInternalId.get(sessionId) ?? sessionId;
-      fileResults.set(internalSessionId, {
-        sessionId: internalSessionId,
-        provider: 'claude',
-        sessionSummary: toSummaryText(
-          customNameBySessionId.get(sessionId) ?? null,
-          state.resolvedSummary || state.fallbackUserText || state.fallbackAssistantText,
-          'New Session',
-        ),
-        matches: state.matches,
+      fileResults = fileResultsFromRecord(record, runtime.claudeSessionsByFileKey.get(fileKey) ?? [session], runtime, {
+        addSessionMatch: (matches, match) => addSessionMatch(runtime, matches, match),
+        toSummaryText,
       });
     }
-
     runtime.claudeFileResultsCache.set(fileKey, fileResults);
   }
 
@@ -1214,25 +924,26 @@ export async function searchConversations(
     pathSessions.push(session);
   }
 
+  // Ripgrep gates the Codex transcripts; the engine gates each Claude transcript as it reads it.
+  const codexPathEntries = searchablePathEntries.filter((entry) =>
+    (sessionsByPathKey.get(entry.normalizedPath) ?? []).some((session) => session.provider === 'codex'),
+  );
   const matchedFileKeys = await findMatchedFileKeys(
-    searchablePathEntries,
+    codexPathEntries,
     safeQuery,
     words,
     signal ?? undefined,
   );
-  if (isAborted() || matchedFileKeys.size === 0) {
+  if (isAborted()) {
     return { results: [], titleResults, totalMatches: 0, query: safeQuery };
   }
 
   const matchedSessionKeys = new Set<string>();
   for (const fileKey of matchedFileKeys) {
-    const sessions = sessionsByPathKey.get(fileKey);
-    if (!sessions) {
-      continue;
-    }
-
-    for (const session of sessions) {
-      matchedSessionKeys.add(getSessionKey(session));
+    for (const session of sessionsByPathKey.get(fileKey) ?? []) {
+      if (session.provider === 'codex') {
+        matchedSessionKeys.add(getSessionKey(session));
+      }
     }
   }
 
@@ -1241,66 +952,80 @@ export async function searchConversations(
   const results: ProjectConversationResult[] = [];
   let scannedProjects = 0;
 
+  const claudeSessionsByFileKey = new Map<string, SearchableSessionRow[]>();
+  for (const [fileKey, sessions] of sessionsByPathKey.entries()) {
+    const claudeSessions = sessions.filter((session) => session.provider === 'claude');
+    if (claudeSessions.length > 0) {
+      claudeSessionsByFileKey.set(fileKey, claudeSessions);
+    }
+  }
+
+  const { job, indexByFileKey } = buildClaudeSearchJob({
+    buckets: projectBuckets,
+    sessionsByFileKey: claudeSessionsByFileKey,
+    fileKeyOf: (session) => normalizeComparablePath(session.jsonl_path),
+    words,
+    maxPerSession: MAX_MATCHES_PER_SESSION,
+  });
+  const claudeRun = openTranscriptSearch(job, { signal: signal ?? undefined });
+
   const runtime: SearchRuntime = {
     ...createWordMatcher(safeQuery, words),
     limit: safeLimit,
     totalMatches: 0,
     isAborted,
-    matchedSessionKeys,
-    claudeSessionsByFileKey: new Map<string, SearchableSessionRow[]>(),
+    claudeSessionsByFileKey,
     claudeFileResultsCache: new Map<string, Map<string, SessionConversationResult>>(),
+    claudeSearch: { run: claudeRun, indexByFileKey },
   };
 
-  for (const [fileKey, sessions] of sessionsByPathKey.entries()) {
-    const claudeSessions = sessions.filter((session) => session.provider === 'claude');
-    if (claudeSessions.length > 0) {
-      runtime.claudeSessionsByFileKey.set(fileKey, claudeSessions);
-    }
-  }
-
-  for (const bucket of projectBuckets) {
-    if (runtime.totalMatches >= runtime.limit || runtime.isAborted()) {
-      break;
-    }
-
-    const projectResult: ProjectConversationResult = {
-      projectId: bucket.projectId,
-      projectName: bucket.projectName,
-      projectDisplayName: bucket.projectDisplayName,
-      sessions: [],
-    };
-
-    for (const session of bucket.sessions) {
+  try {
+    for (const bucket of projectBuckets) {
       if (runtime.totalMatches >= runtime.limit || runtime.isAborted()) {
         break;
       }
-      if (!matchedSessionKeys.has(getSessionKey(session))) {
-        continue;
+
+      const projectResult: ProjectConversationResult = {
+        projectId: bucket.projectId,
+        projectName: bucket.projectName,
+        projectDisplayName: bucket.projectDisplayName,
+        sessions: [],
+      };
+
+      for (const session of bucket.sessions) {
+        if (runtime.totalMatches >= runtime.limit || runtime.isAborted()) {
+          break;
+        }
+        if (session.provider === 'codex' && !matchedSessionKeys.has(getSessionKey(session))) {
+          continue;
+        }
+
+        const sessionResult = await parseSessionMatches(session, runtime);
+        if (sessionResult) {
+          addSessionResult(projectResult.sessions, sessionResult);
+        }
       }
 
-      const sessionResult = await parseSessionMatches(session, runtime);
-      if (sessionResult) {
-        addSessionResult(projectResult.sessions, sessionResult);
+      scannedProjects += 1;
+      if (projectResult.sessions.length > 0) {
+        results.push(projectResult);
+        onProjectResult?.({
+          projectResult,
+          totalMatches: runtime.totalMatches,
+          scannedProjects,
+          totalProjects,
+        });
+      } else if (onProjectResult && scannedProjects % 10 === 0) {
+        onProjectResult({
+          projectResult: null,
+          totalMatches: runtime.totalMatches,
+          scannedProjects,
+          totalProjects,
+        });
       }
     }
-
-    scannedProjects += 1;
-    if (projectResult.sessions.length > 0) {
-      results.push(projectResult);
-      onProjectResult?.({
-        projectResult,
-        totalMatches: runtime.totalMatches,
-        scannedProjects,
-        totalProjects,
-      });
-    } else if (onProjectResult && scannedProjects % 10 === 0) {
-      onProjectResult({
-        projectResult: null,
-        totalMatches: runtime.totalMatches,
-        scannedProjects,
-        totalProjects,
-      });
-    }
+  } finally {
+    claudeRun.end();
   }
 
   return {

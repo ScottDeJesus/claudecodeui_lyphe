@@ -1,7 +1,8 @@
 /**
  * The chat text for a slash command the user typed, rebuilt from the tagged
  * row Claude writes for it (`<command-name>`, `<command-message>`,
- * `<command-args>`). Shared by the transcript normalizer and transcript search
+ * `<command-args>`). Read by the transcript normalizer, and twinned in the
+ * transcript engine's search (`rust/transcript-engine/src/search/claude_row.rs`),
  * so a command reads the same in the chat and in a search hit.
  */
 
@@ -18,7 +19,7 @@ export type LocalCommandPayload = {
  * what lets the optimistic echo of the typed text retire against this row
  * instead of standing beside it as a second bubble.
  */
-const TRANSPARENT_WRAPPER_COMMANDS = new Set(['/plain']);
+export const TRANSPARENT_WRAPPER_COMMANDS = new Set(['/plain']);
 
 /**
  * `text` with a leading transparent wrapper command taken off (`/plain hello`
@@ -31,6 +32,9 @@ const TRANSPARENT_WRAPPER_COMMANDS = new Set(['/plain']);
  * Unwrapped here the same way, the saved row carries the words the user typed —
  * which is what lets the optimistic echo retire against it, and what a search
  * hit shows.
+ *
+ * Twin: `strip_transparent_wrapper_prefix` in `rust/transcript-engine/src/search/claude_row.rs`,
+ * which transcript search reads with; the two change together.
  */
 export function stripTransparentWrapperPrefix(text: string): string {
   const trimmed = text.trimStart();
@@ -48,6 +52,9 @@ export function stripTransparentWrapperPrefix(text: string): string {
  * Prefers the slash-prefixed command name because that most closely matches
  * what the user typed, and falls back to the message body only when the name
  * is unavailable in older transcript variants.
+ *
+ * Twin: `local_command_display_text` in `rust/transcript-engine/src/search/claude_row.rs`,
+ * which transcript search reads with; the two change together.
  */
 export function localCommandDisplayText(payload: LocalCommandPayload): string {
   const commandName = payload.commandName.trim();
