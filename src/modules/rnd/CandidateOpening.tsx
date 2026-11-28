@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { OPENING_WIDTH_PX, hostOf, statusOf } from '@/modules/rnd/rndWords';
 import type { RndCandidate } from '@/shared/rnd-types';
 import type { AstrolabePoint } from '@/shared/types';
-import { Banner, Button, Excerpt, KeyValueList, Opening, Rule } from '@/shared/ui';
+import { Badge, Banner, Button, Excerpt, KeyValueList, Opening, Rule } from '@/shared/ui';
 import { formatRelativeTime } from '@/shared/utils';
 
 type CandidateOpeningProps = {
@@ -34,6 +34,11 @@ type CandidateOpeningProps = {
   onReopen: () => void;
   /** The question open over it (Reject): drawn inside, so a press in one never reads as a press outside. */
   children?: ReactNode;
+  /**
+   * At a desk: drawn in the page, as the pane beside the list, and never as a plate hung from a row. It has no way back, because
+   * it is always there; the list beside it chooses what it holds.
+   */
+  inline?: boolean;
 };
 
 /** How many lines of evidence stand at once; the rest scroll inside the excerpt. */
@@ -58,8 +63,20 @@ function evidenceOf(candidate: RndCandidate): { sentence: string; rest: string }
   return { sentence: lines[0].trim(), rest: lines.slice(1).join('\n') };
 }
 
-/** The candidate's facts, in the order he needs them: what it is, why, the question, where it is from, then what has happened to it. */
-function factsOf(candidate: RndCandidate, t: TFunction, onOpenLauncher: () => void): Array<readonly [string, ReactNode]> {
+/** The three things he reads to decide, each with its label: what it is, why it might help, the question a spike would settle. */
+function readsOf(candidate: RndCandidate, t: TFunction): Array<readonly [string, string]> {
+  return [
+    [t('rnd.opening.what'), candidate.what],
+    [t('rnd.opening.why'), candidate.why],
+    [t('rnd.opening.question'), candidate.question],
+  ];
+}
+
+/**
+ * The candidate's facts, in the order he needs them: what it is, why, the question, where it is from, then what has happened to
+ * it. The pane at a desk sets the first three as prose of their own (`readsOf`) and asks for the rest alone (`afterReads`).
+ */
+function factsOf(candidate: RndCandidate, t: TFunction, onOpenLauncher: () => void, afterReads = false): Array<readonly [string, ReactNode]> {
   const source = (
     <a
       className="underline underline-offset-2 finger:inline-block finger:py-3.5"
@@ -72,9 +89,7 @@ function factsOf(candidate: RndCandidate, t: TFunction, onOpenLauncher: () => vo
     </a>
   );
   const facts: Array<readonly [string, ReactNode]> = [
-    [t('rnd.opening.what'), said(candidate.what)],
-    [t('rnd.opening.why'), said(candidate.why)],
-    [t('rnd.opening.question'), said(candidate.question)],
+    ...(afterReads ? [] : readsOf(candidate, t).map(([label, words]) => [label, said(words)] as const)),
     [t('rnd.opening.source'), source],
   ];
   // A spike that never answers stays spiking until he presses again: how long it has been out is the one sign of that.
@@ -124,9 +139,12 @@ function factsOf(candidate: RndCandidate, t: TFunction, onOpenLauncher: () => vo
  *
  * A REFUSAL IS SAID OVER THE ACTS in the dispatcher's own sentence, beside the press that drew it.
  *
+ * AT A DESK IT IS THE PANE BESIDE THE LIST (`inline`), read as a page: its title large, the acts under it, what it is as the lead
+ * paragraph, why and the question side by side where the pane is wide, then the rest of its facts and the evidence.
+ *
  * Rendered by RndPanel, which hands it the open row's mark, the side the room allows and the question open over it.
  */
-export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal, onClose, onSpike, onOpenChat, onOpenLauncher, onAdopt, onReject, onReopen, children }: CandidateOpeningProps) {
+export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal, onClose, onSpike, onOpenChat, onOpenLauncher, onAdopt, onReject, onReopen, children, inline = false }: CandidateOpeningProps) {
   const { t } = useTranslation();
   const evidenceId = useId();
 
@@ -182,6 +200,47 @@ export function CandidateOpening({ candidate, anchor, avoid, side, busy, refusal
     }
     return <p className="text-xs text-muted-foreground">{t('rnd.opening.adoptedNote')}</p>;
   };
+
+  if (inline) {
+    if (candidate === null) return null;
+    const status = statusOf(candidate);
+    const [what, why, question] = readsOf(candidate, t);
+    return (
+      <article className="flex flex-col gap-7 pb-10" data-rnd-pane="" data-rnd-opening={candidate.name} data-rnd-opening-word={candidate.word}>
+        <header className="flex flex-col gap-4">
+          <p className="font-mono text-[10px] font-medium uppercase leading-3 tracking-[0.18em] text-muted-foreground">{caption}</p>
+          <div className="flex items-start gap-4">
+            <h2 className="min-w-0 flex-1 text-2xl font-normal leading-8 text-foreground">{candidate.title}</h2>
+            <Badge as="span" tone={status.tone} className="mt-1.5 flex-none">{t('rnd.word.' + status.word)}</Badge>
+          </div>
+          {refusal !== null && <Banner tone="warn">{refusal}</Banner>}
+          <div className="flex flex-wrap items-center gap-2.5" data-rnd-acts={candidate.word}>
+            {acts()}
+          </div>
+        </header>
+        <section className="flex flex-col gap-2">
+          <Rule level={4}>{what[0]}</Rule>
+          <p className="whitespace-pre-line break-words text-base leading-7 text-foreground">{what[1]}</p>
+        </section>
+        <div className="grid grid-cols-1 gap-x-10 gap-y-7 2xl:grid-cols-2">
+          {[why, question].map(([label, words]) => (
+            <section key={label} className="flex flex-col gap-2">
+              <Rule level={4}>{label}</Rule>
+              <p className="whitespace-pre-line break-words text-sm leading-6 text-foreground">{words}</p>
+            </section>
+          ))}
+        </div>
+        <KeyValueList items={factsOf(candidate, t, onOpenLauncher, true)} />
+        {evidence.trim() !== '' && (
+          <section aria-labelledby={evidenceId} className="flex flex-col gap-2">
+            <Rule id={evidenceId} level={4}>{t('rnd.opening.evidence')}</Rule>
+            <Excerpt text={evidence} label={t('rnd.opening.evidence')} start={2} rows={EVIDENCE_ROWS} />
+          </section>
+        )}
+        {children}
+      </article>
+    );
+  }
 
   return (
     <Opening

@@ -10,6 +10,7 @@ import type { RndLaunchKind } from '@/modules/rnd/RndSettingsSheet';
 import { OPENING_BESIDE_PX, RND_VIEWS, countOf, rowsOf, scoutLine } from '@/modules/rnd/rndWords';
 import type { RndView } from '@/modules/rnd/rndWords';
 import { useRnd } from '@/modules/rnd/hooks/useRnd';
+import { useRndDesk } from '@/modules/rnd/hooks/useRndDesk';
 import { useRndLaunch } from '@/modules/rnd/hooks/useRndLaunch';
 import { stampRndSeen } from '@/modules/rnd/hooks/useRndSeen';
 import { useRndWrites } from '@/modules/rnd/hooks/useRndWrites';
@@ -35,8 +36,10 @@ type Asking = 'reject';
  * one is out the line wears the loop and Scout now waits; with no source to read it is held, and the empty view offers the press
  * that fixes it.
  *
- * IT IS READ IN THE PAGE'S FRAME (`SCREEN_FRAME`), under a head that keeps to it: at a wide desk the list stands at the frame's start,
- * under the arrow, and the room beside it, to the frame's end, is where a row opens.
+ * AT A DESK IT IS TWO PANES IN THE PAGE'S FRAME (`SCREEN_FRAME`, `useRndDesk`): the views and their rows in a column at the frame's
+ * start, and beside it, to the frame's end, the chosen candidate read whole (`CandidateOpening`'s `inline`). A candidate is always
+ * open there: the view's first until he chooses another, so the page is never a list beside empty room. In a narrower window it
+ * is the one column, where a row opens its plate.
  *
  * THE VIEWS' SWITCH IS DRAWN ONCE, IN ONE OF TWO SPELLINGS. Four words and four count pills are wider than a phone, and a word cut
  * short is no label: under 640 px each count is said inside its word ("Waiting 6"), from there up it is the tray's own pill.
@@ -59,6 +62,8 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
   const [openSide, setOpenSide] = useState<'right' | 'below'>('right');
   const [asking, setAsking] = useState<Asking | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // A desk's room: the list and the open candidate stand side by side, and a candidate is always open.
+  const desk = useRndDesk();
   // The place's own box: the room an Opening measures its side in.
   const roomRef = useRef<HTMLDivElement>(null);
   // Each drawn row's node by its candidate's name: the open one is the mark its Opening hangs from.
@@ -68,10 +73,10 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
   useEffect(() => {
     if (asking !== null) asked.current = asking;
     else if (asked.current !== null) {
-      if (openName !== null) roomRef.current?.querySelector<HTMLElement>('[data-rnd-act="' + asked.current + '"]')?.focus();
+      if (openName !== null || desk) roomRef.current?.querySelector<HTMLElement>('[data-rnd-act="' + asked.current + '"]')?.focus();
       asked.current = null;
     }
-  }, [asking, openName]);
+  }, [asking, openName, desk]);
 
   const { picture, failure, retry: onRetry } = useRnd();
   const writes = useRndWrites();
@@ -109,7 +114,8 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
   const adoptedAt = view === 'verdicts' ? rows.findIndex((candidate) => candidate.word === 'adopted') : -1;
   const lead = adoptedAt === -1 ? rows : rows.slice(0, adoptedAt);
   const adopted = adoptedAt === -1 ? [] : rows.slice(adoptedAt);
-  const opened = openName === null ? undefined : rows.find((candidate) => candidate.name === openName);
+  // At a desk the pane is never empty while the view holds a row: with none chosen, or the chosen one gone from the view, it is the first.
+  const opened = (openName === null ? undefined : rows.find((candidate) => candidate.name === openName)) ?? (desk ? rows[0] : undefined);
   const openedBusy = opened !== undefined && busy === opened.name;
   const openedRefusal = opened !== undefined && refusal !== null && refusal.where === opened.name ? refusal.sentence : null;
   const scoutRefusal = refusal !== null && refusal.where === 'scout' ? refusal.sentence : null;
@@ -131,6 +137,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
   };
   const pressRow = (name: string) => {
     setAsking(null);
+    if (desk) return setOpenName(name);
     if (openName === name) return setOpenName(null);
     const box = rowNodes.current.get(name)?.getBoundingClientRect();
     const room = roomRef.current?.getBoundingClientRect();
@@ -161,6 +168,51 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
     <EmptyState title={t('rnd.empty.' + view + '.title')} message={t('rnd.empty.' + view + '.message')} />
   );
 
+  const viewsWide = (
+    <SegmentedControl
+      label={t('rnd.views.label')}
+      options={RND_VIEWS.map((value) => ({ value, label: t('rnd.views.' + value), count: countOf(picture, value) }))}
+      value={view}
+      onChange={pickView}
+    />
+  );
+  const lists = (
+    <>
+      {lead.length > 0 && <ul aria-label={t('rnd.views.' + view)}>{lead.map(row)}</ul>}
+      {adopted.length > 0 && (
+        <>
+          {lead.length === 0 && <EmptyState size="sm" title={t('rnd.empty.noProved')} />}
+          <Rule id={adoptedId} className="px-3 pb-1 pt-6" end={adopted.length}>{t('rnd.word.adopted')}</Rule>
+          <ul aria-labelledby={adoptedId}>{adopted.map(row)}</ul>
+        </>
+      )}
+    </>
+  );
+  // The open candidate: the pane beside the list at a desk, the plate hung from its row elsewhere.
+  const opening = (
+    <CandidateOpening
+      inline={desk}
+      candidate={opened ?? null}
+      anchor={anchor}
+      avoid={avoid}
+      side={openSide}
+      busy={openedBusy}
+      // A refusal is said where its question is: in the Opening only while no question is open over it.
+      refusal={askingReject ? null : openedRefusal}
+      onClose={foldBack}
+      onSpike={() => opened !== undefined && onSpike(opened.name)}
+      onOpenChat={() => { const chat = opened?.spike?.session; if (chat) onOpenChat(chat); }}
+      onOpenLauncher={() => { const chat = opened?.spike?.launched_from; if (chat) onOpenChat(chat); }}
+      onAdopt={() => opened !== undefined && onAdopt(opened.name)}
+      onReject={() => setAsking('reject')}
+      onReopen={() => opened !== undefined && onReopen(opened.name)}
+    >
+      {opened !== undefined && askingReject && (
+        <RejectDialog candidate={opened} busy={openedBusy} refusal={openedRefusal} onReject={(why) => onReject(opened.name, why)} onClose={() => setAsking(null)} />
+      )}
+    </CandidateOpening>
+  );
+
   return (
     <div ref={roomRef} className="relative flex h-full min-h-0 flex-col" data-rnd-panel={failure === null ? 'ready' : 'stale'} data-rnd-view={view}>
       {/* The place's own presses, in the screen's head before the Menu: Scout now (its word at a desk, its mark under a finger,
@@ -184,14 +236,14 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
         </Button>
       </HeadTools>
 
-      <header className={cn(SCREEN_FRAME, 'flex-none pt-2 finger:pt-4')}>
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground" data-rnd-scout={scout.out ? 'out' : 'in'}>
+      <header className={cn(SCREEN_FRAME, 'flex-none pt-2 finger:pt-4', desk && 'flex items-baseline justify-between gap-8')}>
+        <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground" data-rnd-scout={scout.out ? 'out' : 'in'}>
           {scout.out && <SignalLoop state="working" signal="secondary" />}
           {scout.trouble !== null && <Badge as="span" tone="warn">{scout.trouble}</Badge>}
           <span>{scout.line}</span>
           {scout.scouts !== null && <span data-rnd-scouts="">{scout.scouts}</span>}
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{scout.schedule}</p>
+        <p className={cn('text-xs text-muted-foreground', desk ? 'flex-none' : 'mt-0.5')}>{scout.schedule}</p>
       </header>
 
       {(failure !== null || scoutRefusal !== null) && (
@@ -205,64 +257,50 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
         </div>
       )}
 
-      <div className={cn(SCREEN_FRAME, 'flex-none pt-4 sm:hidden')} data-rnd-views="narrow">
-        <SegmentedControl
-          label={t('rnd.views.label')}
-          options={RND_VIEWS.map((value) => ({ value, label: t('rnd.views.counted', { view: t('rnd.views.' + value), n: countOf(picture, value) }) }))}
-          value={view}
-          onChange={pickView}
-        />
-      </div>
-      <div className={cn(SCREEN_FRAME, 'hidden flex-none pt-4 sm:block')} data-rnd-views="wide">
-        <SegmentedControl
-          label={t('rnd.views.label')}
-          options={RND_VIEWS.map((value) => ({ value, label: t('rnd.views.' + value), count: countOf(picture, value) }))}
-          value={view}
-          onChange={pickView}
-        />
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center p-4">{empty}</div>
-      ) : (
-        <ScrollArea className="min-h-0 flex-1">
-          {/* The frame is the list's room: from 63rem of it the list keeps the plate's width free at the frame's end. The list
-              stands a row's inset out into the gutter, so a row's words start under the scout's line. */}
-          <div className={cn(SCREEN_FRAME, '[container-type:inline-size]')}>
-            <div className="-mx-3 flex max-w-3xl flex-col pb-8 pt-2 [@container(min-width:63rem)]:max-w-[min(48rem,calc(100%-33rem))]">
-              {lead.length > 0 && <ul aria-label={t('rnd.views.' + view)}>{lead.map(row)}</ul>}
-              {adopted.length > 0 && (
-                <>
-                  {lead.length === 0 && <EmptyState size="sm" title={t('rnd.empty.noProved')} />}
-                  <Rule id={adoptedId} className="px-3 pb-1 pt-6" end={adopted.length}>{t('rnd.word.adopted')}</Rule>
-                  <ul aria-labelledby={adoptedId}>{adopted.map(row)}</ul>
-                </>
-              )}
-            </div>
+      {desk ? (
+        <div className={cn(SCREEN_FRAME, 'flex min-h-0 flex-1 pt-5')} data-rnd-desk="">
+          {/* The list's column: the views over their rows, a hairline at its end running the page's height. */}
+          <div className="flex w-[32rem] flex-none flex-col border-r border-border pr-6" data-rnd-list-column="">
+            <div className="flex-none" data-rnd-views="wide">{viewsWide}</div>
+            <ScrollArea className="-ml-3 mt-3 min-h-0 flex-1">
+              <div className="flex flex-col pb-8">{lists}</div>
+            </ScrollArea>
           </div>
-        </ScrollArea>
-      )}
+          {/* The pane: the chosen candidate read whole, or what the view says while it holds nothing. */}
+          {opened === undefined ? (
+            <div className="flex min-w-0 flex-1 items-center justify-center p-4">{empty}</div>
+          ) : (
+            <ScrollArea className="min-h-0 min-w-0 flex-1">
+              <div className="pl-10 pt-1">{opening}</div>
+            </ScrollArea>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className={cn(SCREEN_FRAME, 'flex-none pt-4 sm:hidden')} data-rnd-views="narrow">
+            <SegmentedControl
+              label={t('rnd.views.label')}
+              options={RND_VIEWS.map((value) => ({ value, label: t('rnd.views.counted', { view: t('rnd.views.' + value), n: countOf(picture, value) }) }))}
+              value={view}
+              onChange={pickView}
+            />
+          </div>
+          <div className={cn(SCREEN_FRAME, 'hidden flex-none pt-4 sm:block')} data-rnd-views="wide">{viewsWide}</div>
 
-      <CandidateOpening
-        candidate={opened ?? null}
-        anchor={anchor}
-        avoid={avoid}
-        side={openSide}
-        busy={openedBusy}
-        // A refusal is said where its question is: in the Opening only while no question is open over it.
-        refusal={askingReject ? null : openedRefusal}
-        onClose={foldBack}
-        onSpike={() => opened !== undefined && onSpike(opened.name)}
-        onOpenChat={() => { const chat = opened?.spike?.session; if (chat) onOpenChat(chat); }}
-        onOpenLauncher={() => { const chat = opened?.spike?.launched_from; if (chat) onOpenChat(chat); }}
-        onAdopt={() => opened !== undefined && onAdopt(opened.name)}
-        onReject={() => setAsking('reject')}
-        onReopen={() => opened !== undefined && onReopen(opened.name)}
-      >
-        {opened !== undefined && askingReject && (
-          <RejectDialog candidate={opened} busy={openedBusy} refusal={openedRefusal} onReject={(why) => onReject(opened.name, why)} onClose={() => setAsking(null)} />
-        )}
-      </CandidateOpening>
+          {rows.length === 0 ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center p-4">{empty}</div>
+          ) : (
+            <ScrollArea className="min-h-0 flex-1">
+              {/* The list stands a row's inset out into the gutter, so a row's words start under the scout's line. */}
+              <div className={SCREEN_FRAME}>
+                <div className="-mx-3 flex max-w-3xl flex-col pb-8 pt-2">{lists}</div>
+              </div>
+            </ScrollArea>
+          )}
+
+          {opening}
+        </>
+      )}
 
       <RndSettingsSheet
         open={sheetOpen}
