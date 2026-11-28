@@ -1,7 +1,7 @@
 // The indexer has no title read of its own (rust-transcript-engine, interface 5 and the docs of phase 2): the title rows
 // come from the engine through readTitleRows and pickSessionTitle chooses among them; the whole-file read and
 // extractSessionTitle are gone from the tree; the engine's titles.rs takes absolute paths and spells no directory; the
-// engine's row (MAN-10329) states the titles verb, and MAN-9468's indexer lines name the new home and not the old.
+// engine's row (MAN-10329, read with its parts) states the titles verb, and MAN-9468's indexer lines name the new home and not the old.
 //
 // protects: server/modules/providers/list/claude/claude-session-synchronizer.provider.ts, rust/transcript-engine/src/titles.rs, server/modules/transcript-engine/MANUAL.md
 // writes: none
@@ -41,7 +41,10 @@ runCase(async () => {
     if (spelled) wrong.push("titles.rs spells a directory: " + spelled[0]);
   }
 
-  const engineRow = row("MAN-10329");
+  const parent = row("MAN-10329");
+  const parts = parent === null ? [] : ((/^parts: (.+)$/m.exec(parent) || [])[1] || "").split(/,\s*/).map((token) => token.trim()).filter(Boolean);
+  const partRows = parts.map(row);
+  const engineRow = parent === null || partRows.includes(null) ? null : [parent, ...partRows].join("\n");
   const indexRow = row("MAN-9468");
   if (engineRow === null || indexRow === null) return cannotRun("docstore get did not answer for " + (engineRow === null ? "MAN-10329" : "MAN-9468"));
   if (!/\btitles\b/.test(engineRow) || !engineRow.includes("\"files\"")) wrong.push("MAN-10329 does not state the titles verb's {\"files\":[…]} job");

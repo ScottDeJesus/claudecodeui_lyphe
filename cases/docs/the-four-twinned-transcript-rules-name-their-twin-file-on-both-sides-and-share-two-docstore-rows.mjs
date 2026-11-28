@@ -2,7 +2,8 @@
 // isClaudeTurnLookalike and isResumePlaceholderRow (server/shared/claude-transcript-rows.ts), stripTransparentWrapperPrefix
 // and localCommandDisplayText (server/shared/local-commands.ts). Each TypeScript rule's comment names its twin's file,
 // rust/transcript-engine/src/search/claude_row.rs; claude_row.rs names each TypeScript file at least twice (one twin
-// comment per rule); and docstore govern names both MAN-8054 and the engine's manual row MAN-10329 for all three files,
+// comment per rule); and docstore govern names both MAN-8054 and the engine's manual row MAN-10329 (the row or one of its
+// parts) for all three files,
 // so whoever edits one side is shown the other.
 //
 // protects: server/shared/claude-transcript-rows.ts, server/shared/local-commands.ts, rust/transcript-engine/src/search/claude_row.rs
@@ -23,7 +24,15 @@ const TWINS = [
   ["server/shared/claude-transcript-rows.ts", ["isClaudeTurnLookalike", "isResumePlaceholderRow"]],
   ["server/shared/local-commands.ts", ["stripTransparentWrapperPrefix", "localCommandDisplayText"]],
 ];
-const ROWS = ["MAN-8054", "MAN-10329"];
+const SHARED = "MAN-8054";
+const ENGINE = "MAN-10329";
+
+/** The engine's manual row and its parts: govern names whichever of them is nearest the file. */
+function engineTokens() {
+  const out = spawnSync(DOCSTORE, ["get", ENGINE, "--text"], { encoding: "utf8", timeout: 30000 });
+  const parts = (/^parts: (.+)$/m.exec(String(out.stdout || "")) || [])[1] || "";
+  return [ENGINE, ...parts.split(/,\s*/).map((token) => token.trim()).filter(Boolean)];
+}
 
 /** The lines between the previous declaration (or a closing brace) and the rule's export line. */
 function commentAbove(source, name) {
@@ -62,13 +71,16 @@ runCase(async () => {
     }
   }
   const seen = [];
+  const engine = engineTokens();
   for (const file of [TWINS[0][0], TWINS[1][0], RUST]) {
     const answer = governing(file);
     if (answer.why) { wrong.push(answer.why); continue; }
-    const absent = ROWS.filter((token) => !answer.tokens.has(token));
+    const absent = [];
+    if (!answer.tokens.has(SHARED)) absent.push(SHARED);
+    if (!engine.some((token) => answer.tokens.has(token))) absent.push(ENGINE + " or any of its parts (" + engine.slice(1).join(", ") + ")");
     if (absent.length) wrong.push("docstore govern " + file + " does not name " + absent.join(" and "));
-    seen.push(path.basename(file) + ": " + ROWS.filter((token) => answer.tokens.has(token)).join("+"));
+    seen.push(path.basename(file) + ": " + [SHARED, ...engine].filter((token) => answer.tokens.has(token)).join("+"));
   }
   if (wrong.length) return broken(wrong.join("; "));
-  return held("each of the four TypeScript rules names claude_row.rs, claude_row.rs names both TypeScript files per rule, and govern names " + ROWS.join(" and ") + " for all three (" + seen.join(", ") + ")");
+  return held("each of the four TypeScript rules names claude_row.rs, claude_row.rs names both TypeScript files per rule, and govern names " + SHARED + " and " + ENGINE + " or a part of it for all three (" + seen.join(", ") + ")");
 });
