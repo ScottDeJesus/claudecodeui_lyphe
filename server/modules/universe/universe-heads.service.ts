@@ -25,6 +25,18 @@ const SHA = /^[0-9a-f]{40}$/;
 /** `gitdir: <path>` — the whole content of a worktree's `.git` file, relative or absolute. */
 const GITDIR_LINE = /^gitdir:\s*(.+)$/;
 
+/** The file in the head dir that names the checked-out ref, or holds the sha when HEAD is detached. */
+const HEAD_FILE = 'HEAD';
+
+/** What a HEAD that names a ref starts with. */
+const REF_PREFIX = 'ref: ';
+
+/** Where a `gc` keeps the refs it packed, in the ref dir. */
+const PACKED_REFS_FILE = 'packed-refs';
+
+/** One file a repo's HEAD is read from: the directory it sits in and its name there. */
+export type HeadFile = { dir: string; name: string };
+
 /** What a repo's HEAD reads as, or `null` when it could not be read. */
 export type RepoHeads = Record<string, string | null>;
 
@@ -42,7 +54,7 @@ function readTrimmed(file: string): string | null {
  * which are skipped by not matching the ref name. `null` when the ref is not packed.
  */
 function packedRef(gitDir: string, ref: string): string | null {
-  const packed = readTrimmed(path.join(gitDir, 'packed-refs'));
+  const packed = readTrimmed(path.join(gitDir, PACKED_REFS_FILE));
   if (packed === null) return null;
   for (const line of packed.split('\n')) {
     const [sha, name] = line.split(' ');
@@ -58,7 +70,7 @@ function packedRef(gitDir: string, ref: string): string | null {
  * `.git` is a directory, or a FILE naming the git dir git keeps for that worktree. A worktree's own
  * HEAD lives there — but its BRANCH refs do not: they live in the common git dir that `<gitdir>/`
  * `commondir` names (relative, and usually `../..`), alongside `packed-refs` and `objects`. Reading
- * a worktree's branch ref out of its own git dir finds nothing, every tick, forever — which is the
+ * a worktree's branch ref out of its own git dir finds nothing, on every read, forever — which is the
  * same failure as a `gc`'d repo, arriving through a different door. A worktree's git dir carries
  * `commondir` only when it is a linked one; a main checkout has none and both are its git dir.
  */
@@ -79,12 +91,12 @@ function gitDirsOf(repoPath: string): { headDir: string; refDir: string } {
 
 function readRepoHead(repoPath: string): string | null {
   const { headDir, refDir } = gitDirsOf(repoPath);
-  const head = readTrimmed(path.join(headDir, 'HEAD'));
+  const head = readTrimmed(path.join(headDir, HEAD_FILE));
   if (head === null) return null;
   // A detached HEAD holds the sha directly; anything else that is not a ref is not a reading.
-  if (!head.startsWith('ref: ')) return SHA.test(head) ? head : null;
+  if (!head.startsWith(REF_PREFIX)) return SHA.test(head) ? head : null;
 
-  const ref = head.slice('ref: '.length).trim();
+  const ref = head.slice(REF_PREFIX.length).trim();
   // The worktree's own store first — a per-worktree ref lives there — then the common one, where an
   // ordinary branch ref is. Both are the same directory in a main checkout.
   for (const dir of refDir === headDir ? [headDir] : [headDir, refDir]) {
@@ -95,8 +107,29 @@ function readRepoHead(repoPath: string): string | null {
 }
 
 /**
+ * The files one repo's HEAD is read from, as `readRepoHead` reads them: HEAD in the head dir; the ref
+ * it names under the head dir and, for a linked worktree, under the ref dir; and `packed-refs` in the
+ * ref dir. Git replaces each by renaming a `.lock` over it, so a watch on each one's directory, for
+ * its name, hears every move of the sha. This is the one place a watcher learns git's layout.
+ */
+export function headFilesOf(repoPath: string): HeadFile[] {
+  const { headDir, refDir } = gitDirsOf(repoPath);
+  const files: HeadFile[] = [{ dir: headDir, name: HEAD_FILE }];
+  const head = readTrimmed(path.join(headDir, HEAD_FILE));
+  if (head !== null && head.startsWith(REF_PREFIX)) {
+    const ref = head.slice(REF_PREFIX.length).trim();
+    for (const dir of refDir === headDir ? [headDir] : [headDir, refDir]) {
+      const refFile = path.join(dir, ref);
+      files.push({ dir: path.dirname(refFile), name: path.basename(refFile) });
+    }
+  }
+  files.push({ dir: refDir, name: PACKED_REFS_FILE });
+  return files;
+}
+
+/**
  * Every registered repo's current HEAD, keyed by repo id. Synchronous and small on purpose: it is
- * called on a timer. The registry read is shared with the journal tap rather than parsed twice —
+ * called on every settled HEAD move. The registry read is shared with the journal tap rather than parsed twice —
  * one file, one set of defaults.
  */
 export function readHeads(): RepoHeads {

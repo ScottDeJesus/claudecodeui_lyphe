@@ -1,9 +1,9 @@
 {
   "name": "cerberus-warden",
-  "version": "0.13.0",
+  "version": "0.15.1",
   "private": true,
   "cerberus": {
-    "note": "the http kind fills every {nonce} in a url with one fresh token per run, so a probe of a caching dev server (Vite) is answered by a fresh compile, never from cache; a url without {nonce} is sent as before"
+    "note": "watched probes: a turn whose watch opened since the last read (at last, or again after a loss) reads instead of re-sending the kept reading, so a write made while nothing listened is not hidden"
   },
   "type": "module",
   "engines": {

@@ -23,9 +23,9 @@ import { readJob, stepOf, writeJob } from './update-job.js';
 
 /** How long a reboot request of OURS stands unanswered before the step is put back for another press.
  *  A handover takes seconds; a minute of silence is a supervisor that is not going to answer. */
-const REBOOT_ANSWER_TIMEOUT_MS = 60_000;
+export const REBOOT_ANSWER_TIMEOUT_MS = 60_000;
 
-/** What these handlers need from the tick that calls them: its own directory, the ways out of a job,
+/** What these handlers need from the reconciler that calls them: its own directory, the ways out of a job,
  *  and the same collaborators the reconciler was built with. Everything here is per-instance — the
  *  state machine itself lives in `update-reconciler.ts`, which owns when any of this runs. */
 export type UpdateStateDependencies = {
@@ -36,9 +36,9 @@ export type UpdateStateDependencies = {
   /** Whether the reconciler is started: a reboot answer that arrives after `stop()` is not this
    *  process's answer any more, and must not spawn a runner. */
   isStarted: () => boolean;
-  /** Ends the job: the state, the clock, the file, a fresh check, and no more ticking. */
+  /** Ends the job: the state, the clock, the file, a fresh check, and nothing armed. */
   finish: (job: ClaudeUpdateJob, state: ClaudeUpdateJobState) => void;
-  /** Arms the tick again — a failed boot leaves a rollback runner to watch, and the job it writes is
+  /** Arms the reconciler again — a failed boot leaves a rollback runner to watch, and the job it writes is
    *  in a state the runner owns. */
   arm: () => void;
   /** The cached reading of the binary a run would spawn, through the cli-version barrel (MAN-502). */
@@ -132,7 +132,7 @@ export function createUpdateStates(dependencies: UpdateStateDependencies): {
 
       const restart = stepOf(job, 'restart');
       // The runner only writes `installed` when every install step is done, so an unfinished sdk step —
-      // or no restart step — is a file this build cannot drive: end it rather than tick at it forever.
+      // or no restart step — is a file this build cannot drive: end it rather than wake on it forever.
       if (sdk.state !== 'done' || restart === null) {
         finish(job, 'failed');
         return;

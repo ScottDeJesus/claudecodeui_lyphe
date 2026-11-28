@@ -10,7 +10,9 @@ import {
   type CerberusRedMeta,
 } from '@/modules/notifications/index.js';
 import type { CerberusOverview } from '@/shared/cerberus-types.js';
+import { createDeadlineTimer, type DeadlineTimer } from '@/shared/deadline-timer.js';
 
+import { onHintSent } from './cerberus-broadcast.js';
 import { pushDiagnosisOf } from './red-watch-diagnosis.js';
 import { planRedWatch, type RedWatchPlan } from './red-watch-plan.js';
 import { tellTickets } from './red-watch-tickets.js';
@@ -19,12 +21,17 @@ import { wardenLinks } from './warden-links.js';
 /**
  * The red watch: a check that stays failing or denied for an hour wakes the operator's phone.
  *
- * Every 60 seconds the tick reads the overview (the same one the tab reads, so the watch and the screen cannot
+ * A plan reads the overview (the same one the tab reads, so the watch and the screen cannot
  * disagree about what is red), asks `planRedWatch` what moved, records it in `cerberus_red_alerts`, and hands
  * ONE event per recipient to the notification orchestrator — never one per check, so nine checks that cross
  * the hour together are one push, not nine. The orchestrator gates it by the user's `events.error` preference
  * and the ntfy channel publishes it (priority and tags by code, `ntfy-channel.service.ts`); this file never
  * talks to ntfy.
+ *
+ * WHEN IT PLANS: on every hint Cerberus sends (`onHintSent`: a result, a link up or down, a mute), at most one plan per
+ * turn of the event loop however many arrive, and at the plan's own `nextAt` (`red-watch-plan.ts`), the nearest instant
+ * the clock alone changes what it decides, armed on one deadline timer (`shared/deadline-timer.ts`). Nothing runs
+ * between, and the line `[red-watch] next plan at <iso>` (or `nothing to wait for`) says what it waits for.
  *
  * WHO IS PAGED: every user with an enabled ntfy endpoint. With none, the tick still records its incidents —
  * the table is the truth about what is red and since when — and says so in one log line instead of a push.
@@ -53,13 +60,16 @@ import { wardenLinks } from './warden-links.js';
  *
  * Started by the module's `soleDuties()`, never by a process that merely booted: a second API process would
  * page the same incident from its own memory. A convenience of a running server, never a reason for a process
- * to stay up (`unref`), and a tick that throws loses that tick only.
+ * to stay up (`unref`); a plan that throws is logged and tried again `RETRY_AFTER_THROW_MS` later, or at the next hint.
  *
  * Consumers: `cerberus.module.ts` (`startRedWatch` from `soleDuties`, `stopRedWatch` from `stop`).
  */
 
-/** One tick a minute; an hour's threshold does not need a finer clock, and a quiet tick costs one overview read. */
-const TICK_INTERVAL_MS = 60_000;
+/** The first plan's wait after start (`startRedWatch`): the listeners attach and the wardens reconnect inside it. */
+const FIRST_PLAN_AFTER_MS = 60_000;
+
+/** After a plan threw, the next try, unless a hint comes first. */
+const RETRY_AFTER_THROW_MS = 60_000;
 
 /** The ntfy channel's name in `notification_channel_endpoints`. */
 const NTFY_CHANNEL = 'ntfy';
@@ -70,7 +80,15 @@ const NTFY_CHANNEL = 'ntfy';
  */
 const PAGES_HALTED = true;
 
-let tickTimer: NodeJS.Timeout | null = null;
+/** The watch's one timer: armed for the first plan's minute, then at each plan's `nextAt`. Null while stopped. */
+let deadline: DeadlineTimer | null = null;
+let unsubscribe: (() => void) | null = null;
+/** The plan asked for on this turn of the loop; every hint after it on the same turn rides it. */
+let pendingPlan: NodeJS.Immediate | null = null;
+/** False until the first plan's minute has passed: a hint before it waits for it. */
+let settled = false;
+/** What the last `next plan` line said, so the line is written when it changes, not at every plan. */
+let lastSaidNextAt: number | null | undefined;
 
 type RedWatchCode = 'cerberus.red' | 'cerberus.red.reminder' | 'cerberus.recovered';
 
@@ -164,10 +182,10 @@ function pushToUsers(applied: AppliedTick, userIds: number[], now: number): void
 }
 
 /**
- * One tick over `overview`: record what moved, push it, log the one line. Quiet when nothing moved.
- * Exported as the tick itself, so the same function the timer runs can be handed a fleet.
+ * One plan over `overview`: record what moved, push it, log the one line. Quiet when nothing moved. Answers the
+ * plan's `nextAt`. Exported as the plan itself, so the same function the watch runs can be handed a fleet.
  */
-export function tickRedWatch(overview: CerberusOverview): void {
+export function tickRedWatch(overview: CerberusOverview): number | null {
   const now = overview.now;
   const plan = planRedWatch({
     overview,
@@ -175,7 +193,7 @@ export function tickRedWatch(overview: CerberusOverview): void {
     lastClosed: (node, key) => cerberusRedAlertsDb.lastClosed(node, key),
     clockOffsetMs: (node) => wardenLinks.clockOffsetMs(node),
   });
-  if (plan.opens.length + plan.reminders.length + plan.recoveries.length + plan.closes.length === 0) return;
+  if (plan.opens.length + plan.reminders.length + plan.recoveries.length + plan.closes.length === 0) return plan.nextAt;
 
   const applied = applyPlan(plan, now);
   // After the incident is recorded, never before it: the lookup reads the store and adds a cause, it never decides a page
@@ -188,50 +206,75 @@ export function tickRedWatch(overview: CerberusOverview): void {
   const closed = applied.closedSilently > 0 ? `, closed ${applied.closedSilently} silently` : '';
   if (moved === 0) {
     if (applied.closedSilently > 0) console.log(`[red-watch] ${counts}${closed} → nothing to push`);
-    return;
+    return plan.nextAt;
   }
 
   if (PAGES_HALTED) {
     console.log(`[red-watch] ${counts}${closed} → pages halted, nobody paged`);
-    return;
+    return plan.nextAt;
   }
   const userIds = notificationChannelEndpointsDb.getUserIdsWithEnabledEndpoint(NTFY_CHANNEL);
   if (userIds.length === 0) {
     console.log(`[red-watch] ${counts}${closed} → no enabled ntfy endpoint, nobody paged`);
-    return;
+    return plan.nextAt;
   }
   pushToUsers(applied, userIds, now);
   console.log(`[red-watch] ${counts}${closed} → pushed to ${userIds.length} user${userIds.length === 1 ? '' : 's'}`);
+  return plan.nextAt;
 }
 
-function tick(overview: () => CerberusOverview): void {
+/** One plan over the overview as it stands now, then the deadline armed at its `nextAt`. */
+function runPlan(overview: () => CerberusOverview): void {
+  pendingPlan = null;
+  let nextAt: number | null;
   try {
-    tickRedWatch(overview());
+    nextAt = tickRedWatch(overview());
   } catch (error) {
-    console.error(`[red-watch] a tick did nothing: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`[red-watch] a plan did nothing: ${error instanceof Error ? error.message : String(error)}`);
+    nextAt = Date.now() + RETRY_AFTER_THROW_MS;
   }
+  deadline?.arm(nextAt);
+  if (nextAt === lastSaidNextAt) return;
+  lastSaidNextAt = nextAt;
+  console.log(nextAt === null ? '[red-watch] nothing to wait for' : `[red-watch] next plan at ${new Date(nextAt).toISOString()}`);
 }
 
 /**
- * Starts the watch: the first tick one interval from now, then one a minute. `overview` is read at each tick. A
- * second call while running does nothing.
+ * Starts the watch: it plans on every hint Cerberus sends, at most one plan per turn of the loop, and at each plan's
+ * `nextAt`; its first plan runs a minute from now. `overview` is read at each plan. A second call while running does
+ * nothing.
  *
- * NO TICK AT THE MOMENT OF ARMING, unlike the self-checks. The duties arm before the server has finished
- * starting: the notification history and the companion's alert feed attach to the orchestrator in the `listen`
- * callback, after `cerberus.start()`, and an event raised before they attach is heard by neither (measured on
- * the first page: pushed, and absent from the history). A boot also reads the fleet from the store before the
- * wardens have reconnected; a minute later it has heard them. A process that lives under a minute pages nothing,
- * which costs nothing: the incidents are in the table, and the next process to live a minute reads them there.
+ * NO TICK AT THE MOMENT OF ARMING, unlike the self-checks: a hint before the first minute waits for it. The duties arm
+ * before the server has finished starting: the notification history and the companion's alert feed attach to the
+ * orchestrator in the `listen` callback, after `cerberus.start()`, and an event raised before they attach is heard by
+ * neither (measured on the first page: pushed, and absent from the history). A boot also reads the fleet from the store
+ * before the wardens have reconnected; a minute later it has heard them. A process that lives under a minute pages
+ * nothing, which costs nothing: the incidents are in the table, and the next process to live a minute reads them there.
  */
 export function startRedWatch(overview: () => CerberusOverview): void {
-  if (tickTimer) return;
-  tickTimer = setInterval(() => tick(overview), TICK_INTERVAL_MS);
-  // A convenience of a running server, never a reason for a process to stay up.
-  tickTimer.unref();
+  if (deadline) return;
+  const requestPlan = (): void => {
+    if (!settled || pendingPlan) return;
+    // Not unref'd: an unref'd immediate waits for the loop's next wake instead of its next turn. It lives one turn.
+    pendingPlan = setImmediate(() => runPlan(overview));
+  };
+  // The first firing is the settle minute's end; every later one is a plan's `nextAt`.
+  deadline = createDeadlineTimer(() => {
+    settled = true;
+    requestPlan();
+  });
+  deadline.arm(Date.now() + FIRST_PLAN_AFTER_MS);
+  unsubscribe = onHintSent(requestPlan);
 }
 
-/** Stops the ticks. The incidents are in the store and the next process reads them there. */
+/** Stops the watch: no more hints heard, its timer and its pending plan gone. The incidents are in the store. */
 export function stopRedWatch(): void {
-  if (tickTimer) clearInterval(tickTimer);
-  tickTimer = null;
+  unsubscribe?.();
+  unsubscribe = null;
+  deadline?.clear();
+  deadline = null;
+  if (pendingPlan) clearImmediate(pendingPlan);
+  pendingPlan = null;
+  settled = false;
+  lastSaidNextAt = undefined;
 }

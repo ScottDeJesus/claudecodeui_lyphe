@@ -60,6 +60,9 @@ export type CerberusDocStatus = 'green' | 'yellow' | 'red' | 'muted';
  */
 export type CerberusProbeKind = 'health_doc' | 'http' | 'tcp' | 'exec' | 'file_age' | 'sql';
 
+/** The unit an `exec` probe's `ages` names: what its leading number counts time in. */
+export type CerberusAgeUnit = 's' | 'm' | 'h' | 'd';
+
 /**
  * The six words a warden reports an update's progress in, in the order a healthy update says them:
  * `waiting` (a fix or diagnosis is running and the restart will not interrupt it — said before the
@@ -231,6 +234,9 @@ export type CerberusWelcomeBody = {
  * `probes` holds the probe's own fields (the kind's fields as JSON, `every`, `timeout`, `cadence`)
  * and the `checks` row of the check it reports holds `pass`, `warn` and `staleAfter`, so a
  * `checks.set` is built by joining the two; a `file_age` spec without its `pass` cannot be judged.
+ * An `exec` probe may carry `watch`, the absolute path of the file its command reads, and `ages`,
+ * the unit its leading number counts time in, always together: the warden then reads it when that
+ * file changes and ages its reading in between (`warden/src/watched-probe.mjs`).
  * Sent by center inside `CerberusChecksSet`, read by the warden's scheduler. It is also the one
  * wire-born shape the browser file repeats, because the definition document carries probes as their
  * spec.
@@ -246,6 +252,8 @@ export type CerberusProbeSpec = {
   host?: string;
   port?: number;
   cmd?: string;
+  watch?: string;
+  ages?: CerberusAgeUnit;
   path?: string;
   dsn?: string;
   query?: string;

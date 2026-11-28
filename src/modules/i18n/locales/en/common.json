@@ -571,6 +571,7 @@
     "launchMissing": "The launch table has no rnd.scout or rnd.spike row yet.",
     "weeklyOn": "{{day}}s at {{time}}",
     "dailyAt": "every day at {{time}}",
+    "monthlyOn": "on day {{day}} of each month at {{time}}",
     "loading": "Reading what the scout has filed…",
     "unreachable": {
       "title": "R&D is not answering",
@@ -597,8 +598,8 @@
       "lastTrouble": "Last scout {{ago}} ended without an answer",
       "never": "No scout has gone out yet",
       "noSources": "No sources yet, so a scout has nothing to read",
-      "weekly": "Goes out by itself: {{when}}",
-      "noWeekly": "No weekly scout is scheduled; one goes out only when you press Scout now",
+      "scheduled": "Goes out by itself: {{when}}",
+      "noSchedule": "No scout is scheduled; one goes out only when you press Scout now",
       "outcome": {
         "failed": "Failed",
         "lost": "Lost"
@@ -628,7 +629,7 @@
     "empty": {
       "noSources": {
         "title": "No sources yet",
-        "message": "Give the scout a page to read each week: a changelog, a blog, a release feed.",
+        "message": "Give the scout a page to read each time it goes out: a changelog, a blog, a release feed.",
         "action": "Add a source"
       },
       "noProved": "No yes is waiting for your Adopt",
@@ -709,12 +710,12 @@
       "undo": "Undo",
       "add": "Add",
       "addLabel": "Add a source",
-      "addHelper": "The address of a page the scout reads each week. Changes here are saved as you make them.",
+      "addHelper": "The address of a page the scout reads each time it goes out. Changes here are saved as you make them.",
       "addPlaceholder": "https://…",
       "launch": "Scout and spike",
       "launchLoading": "Reading the launch table…",
       "scout": "Scout",
-      "scoutAbout": "The weekly reader. It reads the sources and files candidates; it changes nothing.",
+      "scoutAbout": "The scheduled reader. It reads the sources and files candidates; it changes nothing.",
       "spike": "Spike",
       "spikeAbout": "The chat that tries one candidate and answers yes or no.",
       "adopt": "Adopt's placer",
@@ -726,6 +727,18 @@
       "scoutsRun": "Scouts run",
       "scoutsRunOne": "One at a time",
       "scoutsRunAll": "All at once",
+      "frequency": "How often",
+      "frequencyAbout": "When the scout goes out by itself, on this machine's clock. Off leaves only Scout now.",
+      "frequencyOff": "Off",
+      "frequencyDaily": "Daily",
+      "frequencyWeekly": "Weekly",
+      "frequencyMonthly": "Monthly",
+      "weekday": "Day",
+      "monthDay": "Day of the month",
+      "monthDayHelper": "1 to 28, so no month is skipped",
+      "time": "Time",
+      "timeHelper": "On this machine's clock",
+      "timeInvalid": "A whole time of day, hours and minutes",
       "scoutsRunAbout": "Each source has its own scout. One at a time sends the next when the last one ends; all at once sends every one together.",
       "webOff": "Off. They read the sources and named public downloads only."
     }

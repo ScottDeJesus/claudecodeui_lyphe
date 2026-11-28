@@ -39,6 +39,8 @@ type UserDependencies = {
   };
   /** Told after a queued message is appended or cleared, so every open tab's card follows the server. */
   tellDraftsChanged(): void;
+  /** Asks the dispatcher to send a saved queued message now if its session is idle. */
+  requestQueuedPass(): void;
   readSystemGitConfig(): Promise<GitConfig>;
   applyGlobalGitConfig(gitName: string, gitEmail: string): Promise<void>;
   logInfo(message: string): void;
@@ -255,6 +257,7 @@ export function createUserService(dependencies: UserDependencies) {
         );
       }
       dependencies.tellDraftsChanged();
+      dependencies.requestQueuedPass();
       return { success: true, queuedMessage: result.queuedMessage, appended: result.appended };
     },
 

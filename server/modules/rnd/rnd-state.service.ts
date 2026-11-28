@@ -23,6 +23,8 @@ const PLACING_STATES = ['out', 'failed'] as const;
 const SCOUT_TRIGGERS = ['weekly', 'now'] as const;
 const SCOUT_OUTCOMES = ['done', 'failed', 'lost'] as const;
 const SCOUTS_RUN = ['one_at_a_time', 'all_at_once'] as const;
+const FREQUENCIES = ['off', 'daily', 'weekly', 'monthly'] as const;
+const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 const SOURCE_SCOUT_STATES = ['waiting', 'out', 'ended'] as const;
 const RANKER_STATES = ['waiting', 'out', 'ended', 'skipped'] as const;
 
@@ -81,9 +83,16 @@ export type RndCandidate = {
   } | null;
   placing: { state: (typeof PLACING_STATES)[number]; at: string | null; why: string | null } | null;
 };
+/** How often the scout goes out by itself: a day only where one applies, and the crontab line's expression derived from it (none when off). */
+type RndSchedule =
+  | { frequency: 'off'; day: null; time: string; cron: null }
+  | { frequency: 'daily'; day: null; time: string; cron: string }
+  | { frequency: 'weekly'; day: (typeof WEEKDAYS)[number]; time: string; cron: string }
+  | { frequency: 'monthly'; day: number; time: string; cron: string };
+
 export type RndPicture = {
   generated_at: string;
-  settings: { web_search: boolean; weekly: string | null; scouts_run: (typeof SCOUTS_RUN)[number]; sources: RndSource[] };
+  settings: { web_search: boolean; schedule: RndSchedule; scouts_run: (typeof SCOUTS_RUN)[number]; sources: RndSource[] };
   scout: { out: RndScoutOut | null; last: RndScoutLast | null };
   standing: Record<RndWord, number>;
   candidates: RndCandidate[];
@@ -105,7 +114,7 @@ function readPicture(value: unknown): RndPicture {
     generated_at: text(document['generated_at'], 'generated_at'),
     settings: {
       web_search: flag(settings['web_search'], 'settings.web_search'),
-      weekly: textOrNull(settings['weekly'], 'settings.weekly'),
+      schedule: readSchedule(settings['schedule'], 'settings.schedule'),
       scouts_run: oneOf(settings['scouts_run'], SCOUTS_RUN, 'settings.scouts_run'),
       sources: list(settings['sources'], 'settings.sources').map((source, at) => readSource(source, `settings.sources[${at}]`)),
     },
@@ -122,6 +131,17 @@ function readPicture(value: unknown): RndPicture {
     },
     candidates: list(document['candidates'], 'candidates').map((candidate, at) => readRndCandidate(candidate, `candidates[${at}]`)),
   };
+}
+
+function readSchedule(value: unknown, where: string): RndSchedule {
+  const fields = record(value, where);
+  const time = text(fields['time'], `${where}.time`);
+  const frequency = oneOf(fields['frequency'], FREQUENCIES, `${where}.frequency`);
+  if (frequency === 'off') return { frequency, day: null, time, cron: null };
+  const cron = text(fields['cron'], `${where}.cron`);
+  if (frequency === 'daily') return { frequency, day: null, time, cron };
+  if (frequency === 'weekly') return { frequency, day: oneOf(fields['day'], WEEKDAYS, `${where}.day`), time, cron };
+  return { frequency, day: count(fields['day'], `${where}.day`), time, cron };
 }
 
 function readSource(value: unknown, path: string): RndSource {

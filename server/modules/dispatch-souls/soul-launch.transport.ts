@@ -37,7 +37,14 @@ const BRIEF_PREAMBLE_BYTES = 16 * 1024;
  * first line once its start-up hooks answer. It ended at byte 12,422 at the furthest of the newest 400
  * logs on disk, so 64 KiB is five times the worst case and a sliver of a log that grows to megabytes.
  */
-const CHILD_LOG_HEAD_BYTES = 64 * 1024;
+export const CHILD_LOG_HEAD_BYTES = 64 * 1024;
+
+/** The launcher's names in a launch directory: read here, and watched by name in `launch-watch.service.ts`. */
+export const SPEC_FILE = 'spec.json';
+export const RESULT_FILE = 'result.json';
+export const LAUNCHER_PID_FILE = 'launcher.pid';
+export const CHILD_PID_FILE = 'child.pid';
+export const CHILD_LOG_FILE = 'child.log';
 
 /** Picks the init line out of a head full of long hook events, so only that one line is ever parsed. */
 const INIT_EVENT_MARK = /"subtype"\s*:\s*"init"/;
@@ -232,7 +239,7 @@ function modelOfInitLine(line: string): string {
  * default model (`spec.json` says `model: ""`) while it runs. Only the head of the log is read.
  */
 function readServedModel(dir: string): string {
-  const head = readHead(path.join(dir, 'child.log'), CHILD_LOG_HEAD_BYTES);
+  const head = readHead(path.join(dir, CHILD_LOG_FILE), CHILD_LOG_HEAD_BYTES);
   for (const line of head.text.split('\n')) {
     if (!INIT_EVENT_MARK.test(line)) continue;
     const model = modelOfInitLine(line);
@@ -247,7 +254,7 @@ function readServedModel(dir: string): string {
  * asks a chain's stage launches who owns them and has no use for their pids or briefs.
  */
 export function readLaunchSpec(dir: string): unknown {
-  return readJson(path.join(dir, 'spec.json'));
+  return readJson(path.join(dir, SPEC_FILE));
 }
 
 /**
@@ -257,7 +264,7 @@ export function readLaunchSpec(dir: string): unknown {
  * Exported for `running-launchers.service.ts`; the verdict itself stays `classifyLaunch`'s.
  */
 export function hasLaunchReceipt(dir: string): boolean {
-  return fs.existsSync(path.join(dir, 'result.json'));
+  return fs.existsSync(path.join(dir, RESULT_FILE));
 }
 
 /**
@@ -286,14 +293,14 @@ export function readLaunchFiles(
   servedModelByLaunchId?: Map<string, string>,
 ): SoulLaunchFiles {
   const spec = readLaunchSpec(dir);
-  const result = readJson(path.join(dir, 'result.json'));
+  const result = readJson(path.join(dir, RESULT_FILE));
   const briefPath = field(spec, 'brief_path');
   return {
     launchId,
     spec,
     result,
-    launcherAlive: owns(dir, 'launcher.pid', LAUNCHER_NEEDLE),
-    childAlive: owns(dir, 'child.pid', CHILD_NEEDLE),
+    launcherAlive: owns(dir, LAUNCHER_PID_FILE, LAUNCHER_NEEDLE),
+    childAlive: owns(dir, CHILD_PID_FILE, CHILD_NEEDLE),
     briefLine: typeof briefPath === 'string' ? readBriefLine(briefPath) : '',
     servedModel: servedModelByLaunchId === undefined
       ? ''

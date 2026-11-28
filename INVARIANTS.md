@@ -768,35 +768,6 @@ probe-key: 31d1ed41dc86d1d1e39110f466ccc43ef130be61
 
 governs: /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_blocks.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_orphans.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_wire.py
 
-## INV-6574 — probe — the module's "said once per distinct message" bound does not hold for the failure it is most likely to meet as the store grows: a document past the 1 MiB ceiling is reported as a prefix of itself, and that prefix carries `generated_at`, so every tick is a new line and a new Set entry
-
-the module's "said once per distinct message" bound does not hold for the failure it is most likely to meet as the store grows: a document past the 1 MiB ceiling is reported as a prefix of itself, and that prefix carries `generated_at`, so every tick is a new line and a new Set entry
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && P=$(mktemp -d /tmp/athena-flood-XXXXXX) && case "$P" in /tmp/athena-flood-*) ;; *) exit 1;; esac && cat > $P/bin <<'EOF'
-#!/bin/sh
-printf '{"generated_at":"%s","pad":"' "$(date -u +%FT%TZ)"; head -c 1200000 /dev/zero | tr '\0' ' '; printf '"}'
-EOF
-chmod +x $P/bin && cat > $P/p.mts <<'EOF'
-const lines: string[] = [];
-console.error = (...a: unknown[]) => { lines.push(a.join(' ')); };
-const { createRoadmapModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/index.ts');
-const roadmap = createRoadmapModule();
-roadmap.start();
-await new Promise((r) => setTimeout(r, 6500));
-roadmap.stop();
-console.log('journal lines:', lines.length, '| distinct:', new Set(lines).size);
-process.exit(0);
-EOF
-DATABASE_PATH=$P/db.sqlite DISPATCHER_BIN=$P/bin TSX_TSCONFIG_PATH=/home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json node --import tsx $P/p.mts 2>&1 | tail -1; case "$P" in /tmp/athena-flood-*) rm -rf "$P";; esac
-expect: prints `journal lines: 4 | distinct: 4` (one new line per tick) while the failure sentence quotes the document's opening; `journal lines: 1` once it names the buffer
-```
-
-measured 2026-10-03 by chain chain-roadmap--lane--module-20261003-171345-f0be, finding L2, LOW
-probe-key: 12b2c45f141fbdbc3a1583e8aa2f0b652a137b81
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-relay.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-state.service.ts
-
 ## INV-6579 — probe — `roadmap.step.idea` and `roadmap.step.proposed` have no phrase; a generic `t(`roadmap.step.${step}`)` draws the key path
 
 `roadmap.step.idea` and `roadmap.step.proposed` have no phrase; a generic `t(`roadmap.step.${step}`)` draws the key path
@@ -25209,3 +25180,19 @@ measured 2026-11-26 by chain chain-pollers-hooks--write-triggers--registry-20261
 probe-key: e04355068638d230809e603ca4820100eb3fe0cb
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-cli.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-crontab.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-sync.service.ts, /home/lyphe/.claude/scripts/crontab, /home/lyphe/.claude/state/cron-registry.log
+
+## INV-11991 — probe — LOW — a command doc still states a 15 s sweep
+
+LOW — a command doc still states a 15 s sweep
+
+```probe
+D=$(mktemp -d) || exit 1; cat > "$D/p.sh" <<'EOF'
+grep -n -i '15 s\b\|15 seconds\|every 15\|15s' ~/.claude/commands/learn.md ~/.claude/commands/remember.md ~/.claude/hooks/INVARIANTS.md 2>/dev/null | grep -i 'sweep\|pending\|pass\|queue' | wc -l | sed 's/^/command-doc lines stating a 15 s sweep: /'
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-27 by chain chain-pollers-hooks--file-watches--spools-heads-20261127-074424-8140, finding L2, LOW
+probe-key: 69680be9d0f05e8f8b6b0191ca0e18fe5e5636d2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/kanban-spill.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-spill.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe-heads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe-heads.watch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/spool-watch.service.ts

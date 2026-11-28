@@ -1,38 +1,24 @@
-import { readDispatcherJson } from '@/shared/dispatcher-command.js';
+import { dispatcherHome, runDispatcherCommand } from '@/shared/dispatcher-command.js';
 import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf } from '@/shared/document-fields.js';
 import type { DispatcherCpuWait, DispatcherModelWord, DispatcherPlanningPause, DispatcherStall } from '@/shared/types.js';
+
+import { readKeptDocument } from './dispatcher-kept.reader.js';
 
 // The dispatcher lane's readers import the field vocabulary from here, so its import surface is
 // the one it always had; the readers themselves live in `@/shared/document-fields.ts`.
 export { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, isWholeFrom, need, oneOf } from '@/shared/document-fields.js';
 
 /**
- * The dispatcher lane's side of reading `dispatcher status --json`: the one command it runs, the
- * ceiling its document may weigh, and the tolerant readers for fields a build older than the field
- * did not write — and nothing about what the body MEANS.
+ * The dispatcher lane's side of reading the status document: where it comes from, and the tolerant
+ * readers for fields a build older than the field did not write — and nothing about what the body MEANS.
  *
- * The dispatcher is a command, not a directory: this lane has no files to stat and no receipt to
- * classify, only one process to run and one document to parse. That document is printed whole by a
- * process that then exits (`hooks/dispatcher/cmd/status.py`), so there is no file a live writer may be
- * replacing at this instant and no torn read to be patient with. The process and its failure sentences
- * are `@/shared/dispatcher-command.ts`'s; every failure of it is a THROW, and the caller's contract
- * (`dispatcher-state.service.ts`) is to keep the last good picture rather than to guess.
+ * The document is the dispatcher keeper's kept picture (`hooks/dispatcher/keeper_files.py`), read off its
+ * files under `<home>/status` by `dispatcher-kept.reader.ts`: key for key what `dispatcher status --json`
+ * prints. Every file there is written tmp-then-rename, so there is no torn read to be patient with. Every
+ * failure is a THROW, and the caller's contract (`dispatcher-state.service.ts`) is to keep the last good
+ * picture rather than to guess.
  */
 
-/**
- * How much the document may weigh.
- *
- * A plan's `goal` is free text of any length and `report.py` carries it whole, so a store of a few
- * dozen plans runs to megabytes: `execFile`'s own 1 MiB is not headroom enough here. Stated rather
- * than left to the default, so the ceiling is a number written down here. A document past it reaches
- * the journal as `did not answer:` and the document's own opening, not as a word about the buffer
- * (`readDispatcherJson` says why) — a line that quotes the document is this number too low.
- *
- * Measured 2026-10-09: the live document weighs 4.22 MB over 74 plans (one finished plan alone carries
- * 520 KB of events), so the ceiling is 16 MiB. A read past the ceiling fails whole: the lane then answers
- * `the dispatcher has not been read yet` and draws nothing.
- */
-const STATUS_MAX_BUFFER = 16 * 1024 * 1024;
 
 // --------------------------- reading a field a build older than it did not write ---------------------------
 
@@ -164,14 +150,20 @@ export function modelSince(value: unknown, where: string): DispatcherModelWord |
 }
 
 /**
- * One `dispatcher status --json`, as the parsed body — `readDispatcherJson` with this lane's argv and
- * ceiling. `env` comes from the caller — `dispatcher.module.ts` is the one place that reads the
- * environment.
+ * The status document as the keeper last kept it (`readKeptDocument`), for the home `env` names as the
+ * dispatcher would. A home with no picture yet runs `dispatcher keep` once, by argv, within `timeoutMs`.
+ * `env` comes from the caller — `dispatcher.module.ts` is the one place that reads the environment.
  */
 export async function readDispatcherDocument(
   bin: string,
   timeoutMs: number,
   env: NodeJS.ProcessEnv,
 ): Promise<unknown> {
-  return readDispatcherJson(['status', '--json'], { bin, timeoutMs, env }, STATUS_MAX_BUFFER);
+  const keepOnce = async (): Promise<void> => {
+    const result = await runDispatcherCommand(['keep'], { bin, timeoutMs, env });
+    if (result.ok) return;
+    const said = result.stdout.trim().split('\n')[0] || result.stderr.trim().split('\n')[0] || 'nothing';
+    throw new Error(`dispatcher keep kept no picture (exit ${String(result.exit)}): ${said}`);
+  };
+  return readKeptDocument(dispatcherHome(env), keepOnce);
 }

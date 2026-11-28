@@ -1,0 +1,25 @@
+# DEPLOY (new to systemd, so enable --now; install.sh renders the template and daemon-reloads):
+#   deploy/systemd/install.sh cloudcli-client-prod-build-watch.service
+#   sudo systemctl enable --now cloudcli-client-prod-build-watch.service
+[Unit]
+Description=CloudCLI production client (:5184) build watcher (runs scripts/prod-client-build.sh after a settled burst of saves to a build input)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO__
+Environment=NODE_ENV=production
+Environment=PATH=__REPO__/node_modules/.bin:__HOME__/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
+# A build competes with the live chat for CPU; it can wait. The build script inherits this.
+Nice=10
+ExecStart=/usr/bin/node __REPO__/deploy/prod-client-watch/watch-build.mjs
+Restart=always
+RestartSec=5
+# SIGTERM reaches the watcher alone: it stops watching and exits once a running build has ended, so a
+# stop never kills a build mid-write. A build is ~30 s idle and can be several times that under load.
+KillMode=mixed
+TimeoutStopSec=600
+User=__USER__
+
+[Install]
+WantedBy=multi-user.target

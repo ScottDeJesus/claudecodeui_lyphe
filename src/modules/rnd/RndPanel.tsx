@@ -13,7 +13,7 @@ import { useRnd } from '@/modules/rnd/hooks/useRnd';
 import { useRndLaunch } from '@/modules/rnd/hooks/useRndLaunch';
 import { stampRndSeen } from '@/modules/rnd/hooks/useRndSeen';
 import { useRndWrites } from '@/modules/rnd/hooks/useRndWrites';
-import { sayWeekly } from '@/modules/rnd/weeklyWords';
+import { saySchedule } from '@/modules/rnd/scheduleWords';
 import { HEAD_PRESS, HEAD_WORD_PRESS, SCREEN_FRAME } from '@/shared/constants';
 import { HeadTools } from '@/shared/context/HeadToolsContext';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
@@ -76,12 +76,11 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
   const { picture, failure, retry: onRetry } = useRnd();
   const writes = useRndWrites();
   const { busy, refusal, dismiss: onDismissRefusal, scoutNow: onScoutNow, adopt: onAdopt, reject: onReject, reopen: onReopen } = writes;
-  const { addSource: onAddSource, removeSource: onRemoveSource, webSearch: onWebSearch, scoutsRun: onScoutsRun } = writes;
+  const { addSource: onAddSource, removeSource: onRemoveSource, webSearch: onWebSearch, scoutsRun: onScoutsRun, schedule: onSchedule } = writes;
   const { sendMessage } = useWebSocket();
   // The wheel's goChat: the station's "Open the chat" door, the one every open of a chat goes through.
   const onOpenChat = useStationDoors().openChatInWorkspace;
   const onSpike = (name: string) => writes.spike(name, projectPath, sendMessage, onOpenChat);
-  const weeklyWords = (expression: string) => sayWeekly(expression, t, i18n.language);
   const { launch, launchFailure, save: saveLaunch } = useRndLaunch();
   const onLaunch = (kind: RndLaunchKind, slot: 'model' | 'effort', next: string | null) => writes.saveLaunch(() => saveLaunch(kind, slot, next));
   // While he stands here, what has been filed is seen: each new picture moves the stamp, and the wheel's mark lights again only
@@ -103,7 +102,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
     );
   }
 
-  const scout = scoutLine(picture, t, weeklyWords);
+  const scout = scoutLine(picture, t, (schedule) => saySchedule(schedule, t, i18n.language));
   const noSources = picture.settings.sources.length === 0;
   const rows = rowsOf(picture, view);
   // Verdicts alone holds two words: the proved first, then the adopted under their own rule.
@@ -192,7 +191,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
           <span>{scout.line}</span>
           {scout.scouts !== null && <span data-rnd-scouts="">{scout.scouts}</span>}
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{scout.weekly}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{scout.schedule}</p>
       </header>
 
       {(failure !== null || scoutRefusal !== null) && (
@@ -278,6 +277,7 @@ export function RndPanel({ projectPath }: { projectPath: string | null }) {
         onRemoveSource={onRemoveSource}
         onWebSearch={onWebSearch}
         onScoutsRun={onScoutsRun}
+        onSchedule={onSchedule}
         onLaunch={onLaunch}
       />
     </div>

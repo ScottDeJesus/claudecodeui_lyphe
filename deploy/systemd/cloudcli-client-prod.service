@@ -1,6 +1,7 @@
 # DEPLOY:
-#   deploy/systemd/install.sh cloudcli-client-prod.service cloudcli-client-prod-build.service cloudcli-client-prod-build.timer
-#   sudo systemctl daemon-reload && sudo systemctl enable --now cloudcli-client-prod.service cloudcli-client-prod-build.timer
+#   deploy/systemd/install.sh cloudcli-client-prod.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now cloudcli-client-prod.service
+# Its rebuilds come from cloudcli-client-prod-build-watch.service, whose header carries its own commands.
 [Unit]
 Description=CloudCLI production client (vite preview of the built app, :5184 on the LAN and Tailscale; Docker bridges dropped)
 After=network.target cloudcli-server-dev.service
@@ -20,8 +21,8 @@ Environment=PATH=__REPO__/node_modules/.bin:__HOME__/.npm-global/bin:/usr/local/
 # dropped the same way, by interface. Cerberus's cloudcli/bridge.dropped check counts them every five
 # minutes and its entry puts back any that went missing.
 ExecStartPre=+/bin/sh -c 'for i in docker0 br-+; do /usr/sbin/iptables -C INPUT -p tcp --dport 5184 -i $i -j DROP 2>/dev/null || /usr/sbin/iptables -I INPUT -p tcp --dport 5184 -i $i -j DROP; done'
-# A first boot with no build yet builds one before serving.
-ExecStartPre=/bin/sh -c 'test -L .prod-client/current || scripts/prod-client-build.sh --force'
+# A first boot with no build yet builds one before serving, waiting out a watcher build that holds the lock.
+ExecStartPre=/bin/sh -c 'test -L .prod-client/current || scripts/prod-client-build.sh --wait-lock --force'
 # Vite 7 exits on stdin EOF, and systemd hands services /dev/null — the same never-ending stdin as
 # the dev client. --outDir names the symlink the build script swaps; every request re-resolves it.
 ExecStart=/bin/bash -c 'exec __REPO__/node_modules/.bin/vite preview --host 0.0.0.0 --port 5184 --strictPort --outDir .prod-client/current < <(sleep infinity)'

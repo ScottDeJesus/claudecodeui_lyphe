@@ -249,8 +249,17 @@ export function createJob(dir: string, request: JobRequest): ClaudeUpdateJob {
  * A spawn that fails asynchronously reports it as an `error` event, and an unhandled one is thrown
  * into the API. There is no caller left to hand it to, so it is said in the journal, and the pid
  * check below catches the synchronous half of the same failure.
+ *
+ * The child's exit is the event a runner's end is heard on: `onExit` runs when it comes. The listener
+ * keeps nothing alive — the child stays detached and unref'd, and a runner that outlives this process
+ * simply reaches no one, which is why the reconciler looks at a runner it did not spawn on a clock.
  */
-export function spawnUpdateRunner(appRoot: string, dir: string, mode: 'install' | 'rollback'): number {
+export function spawnUpdateRunner(
+  appRoot: string,
+  dir: string,
+  mode: 'install' | 'rollback',
+  onExit?: () => void,
+): number {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     TSX_TSCONFIG_PATH: path.join(appRoot, 'server', 'tsconfig.json'),
@@ -282,6 +291,8 @@ export function spawnUpdateRunner(appRoot: string, dir: string, mode: 'install' 
     child.on('error', (error) => {
       console.error(`[claude-updates] the update runner did not start: ${error.message}`);
     });
+
+    child.on('exit', () => onExit?.());
 
     const pid = child.pid;
     if (pid === undefined) throw new Error('the update runner was spawned without a pid');

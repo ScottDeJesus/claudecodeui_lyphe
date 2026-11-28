@@ -5,16 +5,16 @@ import type { DispatcherPicture } from './dispatcher-state.service.js';
 
 /**
  * The lane behind the `dispatcher_state` frame: every plan on this host, read off
- * `dispatcher status --json` and put on the wire when the picture moves.
+ * the dispatcher keeper's files (`dispatcher-kept.reader.ts`) and put on the wire when the picture moves.
  *
  * The mechanism — when it reads, when it speaks and when it stays quiet, and why a reading that
  * fails never takes the lane down with it — is `server/shared/polled-lane.service.ts`, where the lanes
  * that share it can read it once. This lane has no interval: it reads when
- * `dispatcher-store-watch.service.ts` pokes it for a write to something the document is read from,
- * and on a backstop for what no write announces. What is THIS lane's is named here: the frame it
+ * `dispatcher-store-watch.service.ts` pokes it when the keeper writes its index, and on nothing else:
+ * what no write announces is the keeper's own deadline unit, which writes the index too. What is THIS lane's is named here: the frame it
  * sends, and the snapshot it takes.
  *
- * This is the one lane on the server whose reading is a SUBPROCESS, so its snapshot answers a
+ * Its reading is file reads (and, on a home with no picture yet, one `dispatcher keep`), so its snapshot answers a
  * promise; the lane's own rules cover that (a tick with a reading still out is skipped, the picture
  * it serves is the last one that landed, and until the first one lands there is no picture at all —
  * `current()` answers `null` and a reader waits the gap out through `whenLanded`). It is also the
@@ -23,7 +23,7 @@ import type { DispatcherPicture } from './dispatcher-state.service.js';
  */
 
 export type DispatcherWatcherDependencies = PolledLaneClock & {
-  /** The whole picture as of now, off the dispatcher's own command. Called on every tick; it never resolves on a body it cannot read. */
+  /** The whole picture as of now, off the keeper's files. Called on every tick; it never resolves on a body it cannot read. */
   snapshot: () => Promise<DispatcherPicture>;
   /** Puts one frame on every open chat socket. Called only when the picture changed. */
   broadcast: (frame: DispatcherStateEvent) => void;

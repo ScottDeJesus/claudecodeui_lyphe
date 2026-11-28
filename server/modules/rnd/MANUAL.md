@@ -18,7 +18,7 @@ THE ROUTES. Every write runs over the bug hunters' relay (`runVerb`, `relayJson`
 | route | body | dispatcher |
 |---|---|---|
 | GET / | | the lane's picture |
-| PUT /settings | `{webSearch?: boolean, scoutsRun?: 'one_at_a_time'\|'all_at_once'}`, at least one | `rnd config [--web-search on\|off] [--scouts-run one-at-a-time\|all-at-once] --json` — answers the settings as they now stand |
+| PUT /settings | `{webSearch?: boolean, scoutsRun?: 'one_at_a_time'\|'all_at_once', frequency?: 'off'\|'daily'\|'weekly'\|'monthly', day?: 'mon'..'sun' \| 1-28, time?: 'HH:MM'}`, at least one | `rnd config [--web-search on\|off] [--scouts-run one-at-a-time\|all-at-once] [--frequency …] [--day …] [--time …] --json` — answers the settings as they now stand; the schedule words move the rnd-scout crontab line through the verb, which refuses a day its frequency cannot take in its own sentence |
 | POST /sources | `{url, label?}` | `rnd source add <url> [--label=<words>]` |
 | DELETE /sources | `{url}` | `rnd source remove <url>` |
 | POST /scout | | `rnd scout --now` |

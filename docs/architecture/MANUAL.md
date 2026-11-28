@@ -715,14 +715,14 @@ flowchart TD
 
 There are eleven broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), the session host's `session_host_liveness` (`host-liveness.ts`, session-host MAN-695: pushed the moment a chat gains its first or loses its last host, and sent once to each socket, held until the hosts are re-adopted), and FOUR STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
-feeds of the estate, the systemd journal and the Claude transcripts. The three polled lanes — the launcher-souls lane, the dispatcher's plans and the roadmap — read and put a frame on the wire only when the picture actually changed — the launcher-souls lane on a two-second tick, the dispatcher's and the roadmap on a write to the files they read (MAN-9543), and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
+feeds of the estate, the systemd journal and the Claude transcripts. The three polled lanes — the launcher-souls lane, the dispatcher's plans and the roadmap — read and put a frame on the wire only when the picture actually changed — the launcher-souls lane on a write to the launch directories it reads (MAN-534), the dispatcher's on the keeper's index landing and the roadmap on a write to the files it reads (MAN-9543), and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
 instead of being suppressed as unchanged — the frame carries the whole picture, so a client
 receiving it twice receives it once. All of them reach `connectedClients` through the websocket
 module's own barrel, never a deep import.
 
 That loop is written once, in `server/shared/polled-lane.service.ts` (`createPolledLane`); each lane
-supplies only its own `snapshot` and `frame`, and which clock makes it read (a `pollMs` interval, or `backstopMs` and a poke). The universe lane is the one STATE LANE that runs through NEITHER that shape NOR a single
+supplies only its own `snapshot` and `frame`, and which clock makes it read (a `pollMs` interval, or `backstopMs` — a number, `null`, or a function of the picture — and a poke). The universe lane is the one STATE LANE that runs through NEITHER that shape NOR a single
 kind — it sends `universe_map`
 and `universe_activity`, and the reason differs for each.
 
@@ -746,7 +746,7 @@ than a picture of state that persists between ticks, so there is nothing cheap o
 against a previous snapshot — an empty window is silence, not an unchanged picture, and a lane that sent
 it anyway would be ten frames a second saying nothing.
 
-Reasoning that belongs to the four lanes' shared mechanism — why two of them poll and two are poked by a watch, and what the backstop
+Reasoning that belongs to the four lanes' shared mechanism — why three of them are poked by a watch and what the backstop
 is for — lives at `polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
 directory, how it classifies a soul and which provider its pin paints — is
 [docs/MANUAL.md (dispatch-souls)](../MANUAL.md).
@@ -6225,7 +6225,7 @@ section: 09-universe/001 Mental model
 
 1. **One registry entry is the whole of adding a repo.** `state/universe/repos.json` names every galaxy, and
    nothing is ever written into a repo it names (`scripts/universe/registry.py:1-22`).
-2. **A map is stale exactly when the heads it was built from have moved** — which is why the watcher reads
+2. **A map is stale exactly when the heads it was built from have moved**, and the lane is told, never asks on a clock. It watches the files each HEAD is read from — HEAD, the ref it names, `packed-refs` (`headFilesOf`, `server/modules/universe/universe-heads.service.ts`) — one inotify watch per directory plus the registry's (`universe-heads.watch.ts`, re-matched after every event; a missing directory is waited for at its nearest ancestor). A commit's renames settle for 300 ms into one judgement, one at a time; a crawl that does not land arms one retry 30 s later. The judgement reads
    `.git/HEAD` rather than asking the lane for its own `mapId`
    (`server/modules/universe/universe-heads.service.ts:6-20`).
 3. **Two taps, one window.** Both push raw rows into ONE coalescer that drains at most one frame per 100 ms and
@@ -6240,7 +6240,7 @@ section: 09-universe/002 The pieces
 | --- | --- |
 | `scripts/universe-crawl:2`, `scripts/universe/{registry,gitcrawl,blobs,nodes,build,merge,resolve}.py`, `edges/`, `routedump.py` | The crawler: the registry and its entry shape, git facts per repo, the line cache, the node list, the four resolvers, the three derived lanes and their caps, one live app's route table, and the build — **the map schema's one home** (`build.py:1-103`) |
 | `server/modules/universe/universe-journal.tap.ts`, `universe-transcript.{tap,tail}.ts` | Tap 1: `journalctl -f -o json` per unit, resolved to a star (`:116-257`); tap 2: the byte-offset tail (`tail:1-17`), and what a tool call means (`tap:9-29`) |
-| `server/modules/universe/universe.module.ts`, `{universe-activity,universe-map,universe-route-match,universe-state,universe-registry}.service.ts`, `universe.routes.ts` | The lane: held map, route, HEADS watcher, taps, broadcast (`:48-148`); The throttle, the held map, route matching, the layout, the registry read (`activity:39-99`); `GET /api/universe/map`, and deliberately no rebuild endpoint (`routes:5-13`) |
+| `server/modules/universe/universe.module.ts`, `{universe-activity,universe-map,universe-route-match,universe-state,universe-registry}.service.ts`, `universe.routes.ts` | The lane: held map, route, the HEAD watch (`universe-heads.watch.ts`: one directory watch per HEAD, ref and `packed-refs` directory of every registered repo and the registry's, from `headFilesOf`), one reconcile at a time with a settled move re-running it, taps, broadcast; The throttle, the held map, route matching, the layout, the registry read (`activity:39-99`); `GET /api/universe/map`, and deliberately no rebuild endpoint (`routes:5-13`) |
 | `src/modules/universe/{UniverseFeed,UniversePanel,UniverseCanvas}.tsx`, `hooks/`, `utils/`, `src/shared/types.ts:425-506`, `src/modules/live-bus/topics.ts` | The live-bus door (`Feed:9-38`); the tab and its chrome (`Panel:19-43`); the sky — five stacked canvases and the cadence that repaints them, per its own header (`Canvas:43-78`); the hooks and the engine; the four universe types and `universe:*` in the bus allowlist; the frame's own cost, published every frame at `window.__universePerf` for a probe to read (`utils/universePerf.ts:1-51`) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe-journal.tap.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

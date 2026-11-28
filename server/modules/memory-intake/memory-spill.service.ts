@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { watchSpool } from '@/shared/spool-watch.service.js';
+import type { SpoolWatch } from '@/shared/spool-watch.service.js';
 import { expandHome } from '@/shared/utils.js';
 
 import { stageMemoryCandidate, validateMemoryArgs } from './memory.service.js';
@@ -12,11 +14,11 @@ import type { MemoryCandidateInput } from './memory.service.js';
  *
  * WHY THIS EXISTS. A session cannot write a memory — the operator's approval IS the lane, and the
  * write destinations are guarded surfaces. So a session PROPOSES: it writes one JSON file into
- * `pending-memories/` and this picks it up within 15 seconds and stages it as a reviewable
+ * `pending-memories/` and this picks it up as the rename lands and stages it as a reviewable
  * candidate. The lane is the only writer; a session is only ever a petitioner.
  *
  * *THIS* MODULE SWEEPS *THIS* QUEUE. The board's lesson queue has its own door in its own module,
- * with the same cadence and the same discipline. There is no third home that knows about both, and
+ * with the same trigger and the same discipline. There is no third home that knows about both, and
  * none is wanted: the two queues have different door rules, different stage verbs and different
  * failure vocabularies, so a shared engine would be a layer that exists only to be parameterised.
  *
@@ -35,8 +37,8 @@ import type { MemoryCandidateInput } from './memory.service.js';
  * the operator denies one from the queue. A duplicate is cheap; a silent loss is not.
  *
  * A REFUSAL LEAVES THE SCAN SET, AND ANY STORE FAULT DOES NOT. A file the DOOR refuses is moved to
- * `failed/` — a SUBDIR the non-recursive scan never descends into — so it is never re-read every 15
- * seconds forever, and its bytes are kept for the person to inspect. Everything that comes out of
+ * `failed/` — a SUBDIR the non-recursive scan never descends into — so it is never re-read on
+ * every pass forever, and its bytes are kept for the person to inspect. Everything that comes out of
  * `stageMemoryCandidate` is deferred instead, with the file left queued: the stage verb is a bare
  * INSERT whose only failures are the store's own condition (a peer's write lock, a disk fault, and
  * load-bearingly "no such table" — this sweep's first pass runs while `server/index.ts` is still
@@ -50,16 +52,13 @@ import type { MemoryCandidateInput } from './memory.service.js';
  * losing a proposal one second before it could have been staged.
  */
 
-/** The sweep's cadence. Latency only — staging is idempotent at the operator's review. */
-const SPILL_INTERVAL_MS = 15_000;
-
 /**
  * The running sweep, or null before it starts.
  *
  * ONE SWEEP PER PROCESS, not one per module construction: a second construction — a second mount, a
  * reload seam — would otherwise race the first over one directory and stage the same proposal twice.
  */
-let sweepTimer: ReturnType<typeof setInterval> | null = null;
+let sweepWatch: SpoolWatch | null = null;
 
 /**
  * The spill root, read at CALL time and redirected by one variable (Interfaces §10).
@@ -105,7 +104,7 @@ function refuse(file: string, reason: string): void {
     try {
       fs.unlinkSync(file);
     } catch {
-      // Leave it: the next pass re-attempts, and 15 seconds apart is never a tight loop.
+      // Leave it: the retry a pass that leaves a .json arms (SPILL_RETRY_MS) re-attempts it, never a tight loop.
     }
   }
 }
@@ -164,11 +163,16 @@ function ingestMemoryFile(file: string): void {
   }
 }
 
+/** A name the scan reads: the producer renames its `.tmp` to this only once the document is whole. */
+function isQueuedName(name: string): boolean {
+  return name.endsWith('.json');
+}
+
 /** Every `.json` file waiting in the queue, oldest first, or none when the directory is absent. */
 function queuedFiles(dir: string): string[] {
   try {
     // Name order IS age order: `remember.md` writes an `<epoch>-<slug>.json` name.
-    return fs.readdirSync(dir).filter((name) => name.endsWith('.json')).sort();
+    return fs.readdirSync(dir).filter(isQueuedName).sort();
   } catch {
     // A queue that does not exist yet is the COMMON case, not a fault.
     return [];
@@ -190,27 +194,18 @@ export function sweepMemoriesOnce(): void {
 /**
  * Starts the sweep. Called once per process from `memory-intake.module.ts`, idempotent thereafter.
  *
- * The first pass runs immediately rather than at the first tick, so a proposal dropped while the
- * server was down is staged as soon as it is up. It runs at MODULE-EVALUATION time, i.e. before
- * `initializeDatabase()`, so on a database whose schema has not landed yet its stage fails with "no
- * such table" — deferred, never refused, and the next pass stages it 15 seconds later.
- *
- * The timer is unref'd: a pending sweep must never be
- * a reason for the process to stay alive. The pass is wrapped because an exception out of an interval
- * callback is an uncaught exception — the whole server would go down over one unreadable file.
+ * A pass runs at once, so a proposal dropped while the server was down is staged as soon as it is
+ * up, then on every `.json` name the queue's watch hears. The first pass runs at MODULE-EVALUATION
+ * time, before `initializeDatabase()`, so on a schema that has not landed its stage fails with "no
+ * such table" — deferred, never refused — and the retry `watchSpool` arms for a pass that leaves a
+ * file queued stages it.
  */
 export function startMemorySpillSweep(): void {
-  if (sweepTimer !== null) return;
-
-  const tick = (): void => {
-    try {
-      sweepMemoriesOnce();
-    } catch (error) {
-      console.warn(`[memory-spill] sweep error (continuing): ${describe(error)}`);
-    }
-  };
-
-  tick();
-  sweepTimer = setInterval(tick, SPILL_INTERVAL_MS);
-  sweepTimer.unref();
+  if (sweepWatch !== null) return;
+  sweepWatch = watchSpool({
+    dir: memoryQueueDir(),
+    isQueued: isQueuedName,
+    sweep: sweepMemoriesOnce,
+    logError: (message) => console.warn(`[memory-spill] ${message}`),
+  });
 }

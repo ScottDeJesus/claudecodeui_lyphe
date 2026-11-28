@@ -11,7 +11,7 @@
 | the state directory, `releases/`, `current`, what survives a restart | MAN-7836 | `state.mjs`, `chain.mjs` |
 | the link: headers, connect signature, pinned center key, welcome, heartbeat, backoff, `readRefusal` | MAN-7824 | `link.mjs`, `wire.mjs`, `ack-watch.mjs` |
 | the outbox: resend, seq floor, the 20 000-result cap | MAN-7835 | `outbox.mjs` |
-| the scheduler: `checks.set`, `probe.run`, timers, the batch, `prevAt` | MAN-7821 | `probes.mjs` |
+| the scheduler: `checks.set`, `probe.run`, timers, the batch, `prevAt`; watched probes | MAN-7821 | `probes.mjs`, `watched-probe.mjs` |
 | the catalog and the runner: `catalog.set` acked, `run.start` checked against it, `run.output`, the timeout | MAN-7895 | `catalog.mjs`, `runner.mjs`, `run-lines.mjs`, `.verify/warden-catalog-runner.mjs` |
 | the probe kinds `http` `tcp` `exec` `file_age` `sql`, the expression grammar, `judge` | MAN-7818 | `expr.mjs`, `probe-support.mjs`, `probe-kinds/` |
 | the `health_doc` kind | MAN-7820 | `probe-kinds/health-doc.mjs` |
@@ -41,9 +41,9 @@ The five kinds a warden runs itself, and the one comparison they are judged by. 
 ## Files
 | file | owns |
 |---|---|
-| `warden/src/expr.mjs` | `parseExpr(text)`, `evaluate(expr, metrics)`, `judge(spec, outcome)` |
-| `warden/src/probe-support.mjs` | `finishProbe`, `unrunnable`, `missingField`, `describeNetworkError`, `deadlineMs`, `MAX_TIMER_MS`, `clip`, `formatSeconds`, `elapsedMs`, `withDeadline`, `runProcess` |
-| `warden/src/probe-kinds/{http,tcp,exec,file-age,sql}.mjs` | one `run(spec, _memory)` each → `{ status, value, data, tookMs }`; none uses `memory` |
+| `warden/src/expr.mjs` | `parseExpr(text)`, `evaluate(expr, metrics)`, `judge(spec, outcome)`, `boundsOf(spec, metric)` |
+| `warden/src/probe-support.mjs` | `finishProbe`, `unrunnable`, `missingField`, `describeNetworkError`, `deadlineMs`, `MAX_TIMER_MS`, `waitFor`, `clip`, `formatSeconds`, `elapsedMs`, `withDeadline`, `runProcess` |
+| `warden/src/probe-kinds/{http,tcp,exec,file-age,sql}.mjs` | one `run(spec, memory)` each → `{ status, value, data, tookMs }`; `file_age`, and `exec` with `ages`, keep their reading in `memory.kept` and export `aged` and `agingOf` for the watched probes (MAN-7821); the others leave `memory` alone |
 
 ## Expression grammar
 One comparison: `<metric> <op> <number>[unit]`, one regular expression (`COMPARISON`).
@@ -89,7 +89,7 @@ One comparison: `<metric> <op> <number>[unit]`, one regular expression (`COMPARI
 |---|---|---|---|
 | `http` | `url` | one GET via `node:http(s)`, fresh connection, body never read, redirect NOT followed (302 stays 302); every `{nonce}` in `url` is replaced, before the url is read, with one fresh 16-hex-digit token per run (the same token in each), which nothing the probe returns carries | `HTTP 200 in 7 ms`; `No answer within 5 s`; the network sentence |
 | `tcp` | `host` `port` | `net.connect`, closed on connect, nothing sent | `Connected in 3 ms`; `No answer within 5 s`; the network sentence |
-| `exec` | `cmd` | `/bin/sh -c cmd`, cwd `$HOME`, own process group; `value` = leading number of the last non-empty stdout line, `null` when none | that line cut to 200 chars; `Exited <code>` when silent; `Did not finish within 1 s`; `Could not start the command (<code>)` |
+| `exec` | `cmd` | `/bin/sh -c cmd`, cwd `$HOME`, own process group; `value` = leading number of the last non-empty stdout line, `null` when none; optional `watch` + `ages` (below) | that line cut to 200 chars; `Exited <code>` when silent; `Did not finish within 1 s`; `Could not start the command (<code>)` |
 | `file_age` | `path` | a file, or the newest regular file directly inside a directory (symlinks, subdirectories, `*.partial` not counted) | `Newest file written 8 h ago (docstore-2.dump)`; `No file in <path>`; `Cannot read <path> (<code>)`; `No answer within 5 s` |
 | `sql` | `dsn` `query` | `psql -X -A -t -w -d <dsn> -c <query>`; password from `~/.pgpass`; `value` = first column of first row, a number when it parses | `Answered in 39 ms`; psql's first stderr line (cut to 200 chars) or `Exited <code>`; `psql is not installed on this node`; `Could not start psql (<code>)`; `Did not finish within 1 s` |
 
@@ -99,6 +99,8 @@ One comparison: `<metric> <op> <number>[unit]`, one regular expression (`COMPARI
 - A missing or unreadable field never throws: `unrunnable` → `failing`, `tookMs` 0, `data.error` `definition`. Sentences: `The definition has no <field>`; `The definition's url can't be read`; `The definition's port can't be read` (`port` an integer 1–65 535).
 - `tcp` refuses a missing `host`. why: `net.connect` would turn it into localhost.
 - `timeout` is whole seconds in the spec; every kind turns it into a timer delay through `deadlineMs(spec)`.
+- `boundsOf(spec, metric)` → the numbers `pass` (or the kind's default) and `warn` compare `metric` to, in its base unit, read through `parseExpr` (`age < 26h` → 93 600), so a bound's one home is the definition. Consumer: `flipAt` (`watched-probe.mjs`).
+- Watched `exec`: `watch` (an absolute path, the file the command reads) and `ages` (`s` `m` `h` `d`, the unit its leading number counts) come together; center refuses either alone, a relative `watch`, another unit, and both on any other kind. A completed run whose last line starts with a plainly printed number (`-?\d+(\.\d+)?`) keeps `{ value, line, measuredAtMs, exit, tookMs }`; `aged(spec, kept, nowMs)` is the value plus the time since in `ages`, unrounded (the metric `pass`/`warn` judge, so it crosses a bound at the instant `flipAt` names), the line's leading number rewritten at the decimals the line printed (`5.1 h since the newest copy …` three hours on reads `8.1 h since …`). `file_age` keeps `{ name, mtimeMs }`; its `aged` rebuilds the age and the sentence. A run that did not complete drops `kept`. A watched probe is read at start, on a change of its file and at the flip `flipAt` names; between those, the scheduler's every-seconds turn re-sends `aged` to now and runs nothing (MAN-7821).
 
 ## Process runner — `runProcess(file, args, { cwd, timeoutMs, keepStderr })`
 Resolves, never rejects: `{ ended: 'done', code, signal, stdout, stderr }` · `{ ended: 'timeout' }` · `{ ended: 'error', code }` (spawn failed: `ENOENT`, or a thrown refusal such as a NUL byte).
@@ -225,6 +227,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/probe-kinds/health-do
 - A probe never overlaps itself: a run in flight (tracked by key, so a redefined probe's old run counts) makes the next turn skip. A run that ends after its probe left or was redefined is dropped, not sent.
 - `kind` is looked up in a `Map`; a kind this warden does not run is a `failing` result, "This warden does not know that kind of probe". A kind that throws is a `failing` result, "The warden could not run this probe", and the log line carries only the error's code or name.
 
+## Watched probes (`watched-probe.mjs`)
+A `file_age` probe, and an `exec` probe carrying `watch` and `ages` (MAN-7818), also hold a watch. `watchTarget(spec)` → `{ dir, name }` or null: a directory path is watched as itself (`name` null), a file as its parent filtered to its name, so a rename into place is heard; any other kind, or an exec without `ages`, is null. `fs.watch(dir, { persistent: false })`; an event for a `*.partial` name is not a change.
+- Reads: at start (beside the turn's random first delay); on a change, 2 s after the last change heard and no sooner than 30 s after its previous read ended; at its flip, `flipAt(spec, kept)` + 1 s, the instant the kept reading aged reaches the least bound of `pass`/`warn` above it (null: no timer), whose read is flushed at once. Each logs `probe <key>: read at start | on a change | at its flip`; the watch logs `probe <key>: watching <dir>[ for <name>]`.
+- A change or flip that falls due during a read is read after it, never beside it; a read for a key whose (redefined) run is in flight goes through `runAgain`.
+- The every-seconds turn reads nothing while the watch is open and a reading is kept: `resendKept` enqueues `resultsOf(spec, agedOutcome(spec, kept, now), now)` through `enqueue` and the 1 s batch, so its `prevAt` is stamped at flush as a read's is (INV-7028). While the watch is not open (`open()` tries it again on that turn) or nothing is kept (a kind drops `kept` when its read did not complete), or the watch opened since its last read began (`openedSinceRead()`: at last, or again after a lost watch, so a write made while nothing listened is read, not hidden), the turn reads as an unwatched probe's does. `every` stays as defined, 300 s for eis1's two, so center's `staleAfter` of 900 keeps its three-to-one margin over the re-sent results. `runNow` (`probe.run`) still reads now.
+- A watch that cannot open, or is lost, is logged once and tried again on every turn; meanwhile the probe is read on its turns as an unwatched one is. The target is resolved again at every open: a folder that does not exist yet is watched in its parent for its name, and the watch moves into the folder when that name is heard. fs.watch holds the directory's inode and goes silent with no 'error' when it is removed, so every rename event checks the directory is still the one watched (inode and birth time: a folder made again at once gets the same inode number); a removed or replaced one is logged as lost (`removed`), reopened at once (in its parent while it is gone) and read.
+- Its waits go through `waitFor`; `stop()` and a redefinition close the watch and clear both. An unchanged definition keeps its watch and `memory.kept`; a redefined one drops `kept`.
+- Measured 2026-11-27 on eis1, warden 0.15.0: both probes `read at start` at 2026-11-27T07:44:36-08:00, and no read line in the turns after (to 2026-11-27T07:52:06-08:00), while center's acked `at` for both checks kept advancing on the 300 s turns (`chain.json`).
+
 ## `runNow(probeKey)` → boolean
 Center's recheck after a fix (`probe.run`). The probe runs once now and its result is flushed at once, not after the 1 s batch window; its timer is not touched. A probe whose run is in flight finishes, then runs once more (any number of asks meanwhile make ONE more run), so the answer is never the read that began before the fix. A key this warden does not schedule is logged, "ignoring probe.run for <key>: this warden does not schedule it", and answers false. `stop()` forgets a run asked for and not yet started.
 
@@ -239,7 +250,7 @@ Center's recheck after a fix (`probe.run`). The probe runs once now and its resu
 - `prevAt` is stamped at flush: the `at` of the last result flushed for that check, read from the `previousAt` map. `createProbes({ link, previousAt })` takes that map from the daemon, which seeds it from `chain.json` — what center had acked before the last stop (INV-7028, `chain.mjs`) — so the first result after a restart carries the `at` it bridges to, and center's reader keeps vouching for the minutes before the stop. A bare `createProbes({ link })` starts an empty map, and a first result then carries null.
 - When `link.outbox.overflowing` is true at a flush, every result goes to `outbox.keepLatest` instead of a frame and the `prevAt` memory is cleared; the first result per check after the drain therefore carries `prevAt` null. A link with no `outbox` never overflows.
 - `link.send` throwing (the outbox could not reserve a seq on a full disk) drops that frame's results with one log line and forgets those checks' `prevAt` memory, so each one's next result carries `prevAt` null and center records a lapse. (Center never compares a `prevAt` with what it stored: a chain left naming the lost result would read as an unbroken stretch and vouch for the old status across the gap.)
-- `stop()` clears every timer, kills the process group of every probe command still going (`killLiveProcesses`, MAN-7818), and flushes what waits; runs still going are dropped.
+- `stop()` clears every timer, closes every watch, kills the process group of every probe command still going (`killLiveProcesses`, MAN-7818), and flushes what waits; runs still going are dropped.
 - `probesRunning` = the number of runs in flight, a measurement the verify probes read. `scheduled` = the probes on the schedule (0 after `stop()`): what the daemon sends as the heartbeat's `probesRunning` (the wire's "how many probes it has scheduled", `cerberus-types.ts`) and writes to `run.json`.
 
 ## Measured

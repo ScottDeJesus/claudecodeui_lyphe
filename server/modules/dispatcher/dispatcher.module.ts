@@ -44,29 +44,13 @@ import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
  */
 
 /**
- * How long the lane goes without reading when nothing has poked it. The document is read when
- * something it is read from is WRITTEN (`dispatcher-store-watch.service.ts` pokes the lane); this is
- * the one clock left, and it exists for the state no write announces — a walker, a soul or the daemon
- * killed with nothing left to write (`report_stall` calls a walk ended only after a 60 s grace
- * of silence, and nothing writes when that grace runs out), the UTC hour a peak window ends at
- * (`route.peak_until`, `offpeak_at`), the pacer's projection drifting on its own clock.
- *
- * Sixty seconds because every one of those is a minute-scale fact — the shortest is that grace — and a
- * reading costs over a second of CPU (`status --json` walks every plan's chain record and asks systemd
- * once for every plan's armed hour): a shorter backstop would buy nothing a reader could see at the
- * price of a continuous load. It is measured from the last reading that settled, so a lane that is
- * being poked often never fires it.
- */
-const BACKSTOP_MS = 60_000;
-
-/**
  * Wall-clock ceiling for one relayed verb. The verbs act on the store and may kick the daemon before
  * their process exits — seconds rather than milliseconds.
  */
 const VERB_TIMEOUT_MS = 20000;
 
 /**
- * How long a read of the plan list waits for this boot's first `dispatcher status --json`.
+ * How long a read of the plan list waits for this boot's first reading of the kept picture.
  *
  * The read the lane starts at construction lands in tens of milliseconds on an ordinary host, so this
  * bound is only ever felt when the dispatcher's command is slow or wedged — and a reader is owed an
@@ -195,17 +179,6 @@ export type DispatcherModule = {
   relay(order: RelayOrder): Promise<RelayAnswer>;
 };
 
-/** The chains of the phases running in this picture: the records `dispatcher-store-watch.service.ts` keeps watched. */
-function runningChainIds(picture: DispatcherPicture): string[] {
-  const ids: string[] = [];
-  for (const plan of picture.plans) {
-    for (const phase of plan.phases) {
-      if (phase.status === 'running' && phase.chain_id) ids.push(phase.chain_id);
-    }
-  }
-  return ids;
-}
-
 /** `storeWatch` is the one watch both dispatcher lanes share; the server entrypoint builds it and starts it before either lane. */
 export function createDispatcherModule(storeWatch: DispatcherStoreWatch): DispatcherModule {
   const bin = dispatcherBin();
@@ -267,7 +240,7 @@ export function createDispatcherModule(storeWatch: DispatcherStoreWatch): Dispat
   const followups = createDispatcherFollowups(logErrorOnce);
 
   const watcher = createDispatcherWatcher({
-    // One subprocess, and the promise support in `polled-lane.service.ts` is what a tick does with
+    // One read of the kept files (and, on a home with no picture yet, one `dispatcher keep`), and the promise support in `polled-lane.service.ts` is what a tick does with
     // it: a tick that arrives while this read is still out is SKIPPED rather than queued (a poke
     // that lands mid-read is remembered and answered by one more), and a
     // read that throws (a different build's document, a store mid-move) leaves the last good picture
@@ -281,9 +254,6 @@ export function createDispatcherModule(storeWatch: DispatcherStoreWatch): Dispat
       followups.settle(store);
       const picture = lanePictureOf(store);
       storeArcs = store.arcs;
-      // The running phases name the chain records the watch follows: a walk's progress is written there
-      // and nowhere in the store until it ends.
-      storeWatch.followChains(runningChainIds(picture));
       return picture;
     },
     // Endings are read off the same picture the tabs receive, and only when it changed — which an
@@ -301,7 +271,8 @@ export function createDispatcherModule(storeWatch: DispatcherStoreWatch): Dispat
       prompts.observe(frame);
       broadcast(frame);
     },
-    backstopMs: BACKSTOP_MS,
+    // No clock at all: what no write announces (a grace running out, a window ending) is the keeper's own deadline unit,
+    // which rewrites the kept picture like any run, and that write pokes this lane (`dispatcher-store-watch.service.ts`).
     logError: logErrorOnce,
   });
 

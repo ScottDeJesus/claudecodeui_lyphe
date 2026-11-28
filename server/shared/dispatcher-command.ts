@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import os from 'node:os';
+import path from 'node:path';
 import { promisify } from 'node:util';
 
 import { expandHome } from './utils.js';
@@ -55,6 +56,12 @@ const DEFAULT_DISPATCHER_BIN = '~/.claude/scripts/dispatcher';
  */
 export function dispatcherBin(env: NodeJS.ProcessEnv = process.env): string {
   return expandHome(env.DISPATCHER_BIN || DEFAULT_DISPATCHER_BIN);
+}
+
+/** The dispatcher's home as its own code finds it (`store.home()`): `$DISPATCHER_HOME` when set, else the live store. */
+export function dispatcherHome(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env.DISPATCHER_HOME;
+  return explicit && explicit.trim() ? explicit : path.join(os.homedir(), '.claude', 'state', 'dispatcher');
 }
 
 /**

@@ -2,8 +2,9 @@
 // writes: none
 //
 // pollers-hooks--client-pushes, seam 8: the store watch's accounts lane. An event on the door's account files
-// (accounts.json, chosen.json) in the account home pokes the status lane (the document names the account in use) and
-// the accounts lane (accounts_changed and the usage window); any other file there pokes no accounts lane. The store
+// (accounts.json, chosen.json) in the account home pokes the accounts lane and never the status lane (the status document,
+// the keeper's kept picture, reads no account file; its one poke is status/index.json). The accounts lane carries
+// accounts_changed and the usage window; any other file there pokes no accounts lane. The store
 // watch runs over a scratch state root whose account home is the case's own; nothing live is written.
 
 import fs from "node:fs";
@@ -58,7 +59,7 @@ runCase(async (t: any) => {
     fs.writeFileSync(path.join(accountDir, name), JSON.stringify({ digest: "cafe0001", slug: "case" }));
     await sleep(2000);
     if (counts.accounts === 0) return broken("a write to " + name + " poked no accounts lane within 2 s" + (errors[0] ? " (" + errors[0] + ")" : ""));
-    if (counts.status === 0) return broken("a write to " + name + " poked the accounts lane but not the status lane");
+    if (counts.status > 0) return broken("a write to " + name + " poked the status lane, whose document reads no account file (the keeper's index.json is its one poke)");
   }
-  return held("chosen.json and accounts.json each poked the accounts and status lanes within 2 s; tokens.json poked no accounts lane");
+  return held("chosen.json and accounts.json each poked the accounts lane within 2 s and not the status lane; tokens.json poked no accounts lane");
 });

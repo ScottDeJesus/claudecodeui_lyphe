@@ -3,7 +3,7 @@
 // last one ended without an answer (lost or failed, said as a word for a badge); the last one filed something (with the count);
 // the last one found nothing new. The out line says how many of the run's source scouts are read (rnd.scout.outRun, read of
 // total); every run carries its source scouts and its ranker (the run shape since the scouts-run choice, 1f5ca56f).
-// Its weekly line says the installed expression through the caller's words, or that none is.
+// Its schedule line says the setting through the caller's words, or that none is (off).
 // Every key it hands to t() is in the English words file.
 //
 // rndWords.ts is transpiled with the repo's TypeScript and run with formatRelativeTime stubbed and t() echoing its key.
@@ -34,7 +34,7 @@ async function loadWords() {
 
 const said = [];
 const t = (key, options) => { said.push(key); return options ? key + JSON.stringify(options) : key; };
-const weeklyWords = (expression) => "W(" + expression + ")";
+const scheduleWords = (schedule) => "W(" + schedule.cron + ")";
 const SOURCE = { url: "https://example.org/feed", label: "feed", added_at: "2026-11-01T00:00:00Z" };
 const OUT = {
   id: 9, launch: "L9", trigger: "now", started_at: "2026-11-21T06:30:00Z",
@@ -47,7 +47,7 @@ const OUT = {
 const last = (outcome, filed) => ({ id: 8, launch: "L8", trigger: "weekly", started_at: "2026-11-17T06:30:00Z", ended_at: "2026-11-17T06:50:00Z", scouts: [], ranker: { state: "ended", outcome }, outcome, filed });
 const picture = (out, sources, lastRun, weekly) => ({
   generated_at: "2026-11-21T07:00:00Z",
-  settings: { web_search: true, weekly, sources },
+  settings: { web_search: true, schedule: weekly === null ? { frequency: "off", day: null, time: "06:30", cron: null } : { frequency: "weekly", day: "mon", time: "06:30", cron: weekly }, sources },
   scout: { out, last: lastRun },
   standing: { waiting: 0, spiking: 0, proved: 0, adopted: 0, rejected: 0 },
   candidates: [],
@@ -82,7 +82,7 @@ runCase(async () => {
     ["found nothing", picture(null, [SOURCE], last("done", 0), null), "rnd.scout.lastNothing", false, null],
   ];
   for (const [label, pic, line, out, trouble] of cases) {
-    const got = words.scoutLine(pic, t, weeklyWords);
+    const got = words.scoutLine(pic, t, scheduleWords);
     if (!String(got.line).startsWith(line)) wrong.push(label + " says " + got.line + ", not " + line);
     if (got.out !== out) wrong.push(label + " has out " + got.out);
     if (got.trouble !== trouble) wrong.push(label + " has trouble " + got.trouble);
@@ -90,8 +90,8 @@ runCase(async () => {
     if (label === "one out" && !(String(got.line).includes('"read":1') && String(got.line).includes('"total":2'))) wrong.push("the out line does not say 1 of 2 sources read: " + got.line);
     if (label === "one out" && typeof got.scouts !== "string") wrong.push("the out run's scouts are not said: " + got.scouts);
     if (label !== "one out" && got.scouts !== null) wrong.push(label + " says scouts for a run with none: " + got.scouts);
-    const weekly = pic.settings.weekly === null ? "rnd.scout.noWeekly" : 'rnd.scout.weekly{"when":"W(30 6 * * 1)"}';
-    if (got.weekly !== weekly) wrong.push(label + " says the weekly as " + got.weekly);
+    const schedule = pic.settings.schedule.frequency === "off" ? "rnd.scout.noSchedule" : 'rnd.scout.scheduled{"when":"W(30 6 * * 1)"}';
+    if (got.schedule !== schedule) wrong.push(label + " says the schedule as " + got.schedule);
   }
   if (EN) {
     let tree = null;

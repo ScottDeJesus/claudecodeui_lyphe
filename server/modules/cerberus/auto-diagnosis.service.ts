@@ -5,6 +5,7 @@ import {
   cerberusUpdatesDb,
 } from '@/modules/database/index.js';
 import type { CerberusOverview, CerberusReadInputs } from '@/shared/cerberus-types.js';
+import { createDeadlineTimer } from '@/shared/deadline-timer.js';
 import { AppError } from '@/shared/utils.js';
 
 import {
@@ -81,9 +82,6 @@ import { wardenLinks } from './warden-links.js';
 /** The first plan runs this long after arming; a hint before then plans nothing. See the header. */
 const SETTLE_MS = 60_000;
 
-/** The longest delay `setTimeout` takes (a signed 32-bit count of ms); a nearer deadline is re-armed by the plan it fires. */
-const LONGEST_TIMER_MS = 2_147_483_647;
-
 /** How long after a plan threw the same plan is tried again. */
 const PLAN_RETRY_MS = 30_000;
 
@@ -94,9 +92,10 @@ let unsubscribe: (() => void) | null = null;
 let settleTimer: NodeJS.Timeout | null = null;
 /** The one plan scheduled for the next turn of the event loop, if any. */
 let pendingPlan: NodeJS.Immediate | null = null;
-let deadlineTimer: NodeJS.Timeout | null = null;
-/** When the live deadline fires (center's clock); null once it has fired, and when none is armed. */
-let deadlineAt: number | null = null;
+/** What the deadline asks for when it comes: the plan request of the trigger that armed it. */
+let deadlineRequest: (() => void) | null = null;
+/** The live deadline (center's clock): `armedAt()` is when it fires, null once it has fired and when none is armed. */
+const deadline = createDeadlineTimer(() => deadlineRequest?.());
 /** Plans that threw one after another. */
 let throwsInARow = 0;
 let settled = false;
@@ -142,20 +141,10 @@ function sayExhausted(exhausted: AutoDiagnosisStart[]): void {
   }
 }
 
-/** Replaces the deadline: one unref'd timer at `at` (center's clock), or none when the clock alone will change nothing. */
+/** Replaces the deadline: one unref'd wake at `at` (center's clock), a far one waited out in steps, or none when the clock alone will change nothing. */
 function armDeadline(at: number | null, requestPlan: () => void): void {
-  if (deadlineTimer) clearTimeout(deadlineTimer);
-  deadlineTimer = null;
-  deadlineAt = null;
-  if (at === null) return;
-  deadlineAt = at;
-  deadlineTimer = setTimeout(() => {
-    deadlineTimer = null;
-    deadlineAt = null;
-    requestPlan();
-  }, Math.min(LONGEST_TIMER_MS, Math.max(0, at - Date.now())));
-  // A deadline on work the plan computed, never a reason for a process to stay up.
-  deadlineTimer.unref();
+  deadlineRequest = requestPlan;
+  deadline.arm(at);
 }
 
 /** After a plan threw: try it again `PLAN_RETRY_MS` on, unless a nearer deadline is already armed or the retries in a row are spent. */
@@ -163,7 +152,8 @@ function retryAfterThrow(requestPlan: () => void): void {
   throwsInARow += 1;
   if (throwsInARow > PLAN_RETRIES) return;
   const retryAt = Date.now() + PLAN_RETRY_MS;
-  if (deadlineAt === null || retryAt < deadlineAt) armDeadline(retryAt, requestPlan);
+  const armedAt = deadline.armedAt();
+  if (armedAt === null || retryAt < armedAt) armDeadline(retryAt, requestPlan);
 }
 
 /** One plan over the store as it stands now, applied: arm the deadline, say what is exhausted, start what is ready. */
@@ -245,9 +235,8 @@ export function stopAutoDiagnosis(): void {
   settleTimer = null;
   if (pendingPlan) clearImmediate(pendingPlan);
   pendingPlan = null;
-  if (deadlineTimer) clearTimeout(deadlineTimer);
-  deadlineTimer = null;
-  deadlineAt = null;
+  deadline.clear();
+  deadlineRequest = null;
   throwsInARow = 0;
   settled = false;
   saidExhausted.clear();

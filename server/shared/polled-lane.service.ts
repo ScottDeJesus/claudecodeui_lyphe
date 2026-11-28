@@ -17,7 +17,8 @@
  * `pollMs`: no interval at all, a reading at start, a reading each time the lane's owner `poke`s it —
  * the watch does, on a write to anything the document is read from — and one more reading
  * `backstopMs` after the last one settled, for exactly what no write announces: a process that died
- * with nothing left to write, a grace that ran out, a window that ends on the hour.
+ * with nothing left to write, a grace that ran out, a window that ends on the hour. The dispatcher lane passes `null`:
+ * its picture is the keeper's files, and the keeper's own deadline unit rewrites them at those very instants.
  *
  * The frame is sent only when the picture actually changed, so a quiet host puts nothing on the
  * wire. What "changed" means is the lane's own serialization of its picture — for most of this
@@ -29,7 +30,7 @@
  * read, and in nothing below.
  *
  * A PICTURE MAY TAKE ITS TIME TO ARRIVE. Most of those lanes answer from memory, but the dispatcher's
- * whole picture is one `dispatcher status --json` — a subprocess — so its `snapshot` answers a
+ * whole picture is read from the keeper's files (`dispatcher-kept.reader.ts`), so its `snapshot` answers a
  * PROMISE. Such a lane is never allowed to pile readings up: a tick that arrives while the previous
  * reading is still out is SKIPPED rather than queued, because a queue of readings answers with
  * pictures the host has already moved past. What the lane serves meanwhile is the last picture that
@@ -44,20 +45,21 @@
  */
 
 /**
- * What makes a lane read. Exactly one of the two, so a lane can never be both on a clock and on
- * pokes by accident:
+ * What makes a lane read. At most one of the two, so a lane can never be both on a clock and on
+ * pokes by accident; with neither, the lane reads at start and on every `poke` and arms no timer at all:
  *   - `pollMs` — a fixed interval: the lane looks that often whether or not anything moved;
  *   - `backstopMs` — no interval: the lane reads at start and on every `poke`, and, when this is a
- *     number, once that long after its last reading settled (the timer is re-armed by each reading,
+ *     number (or a function of the picture the lane holds, answering one), once that long after its last reading settled (the timer is re-armed by each reading,
  *     so a lane that is being poked often never fires it). `null` is no backstop at all. A reading that
  *     FAILED arms it too: the lane keeps its last picture and reads again at the next poke or after
  *     `backstopMs` — a store caught mid-move is being written, and its next write is the poke.
  */
-export type PolledLaneClock =
+export type PolledLaneClock<TPicture = unknown> =
   | { pollMs: number; backstopMs?: undefined }
-  | { backstopMs: number | null; pollMs?: undefined };
+  | { backstopMs: number | null | ((picture: TPicture | null) => number | null); pollMs?: undefined }
+  | { pollMs?: undefined; backstopMs?: undefined };
 
-export type PolledLaneDependencies<TPicture, TFrame> = PolledLaneClock & {
+export type PolledLaneDependencies<TPicture, TFrame> = PolledLaneClock<TPicture> & {
   /**
    * The whole picture as of now. Called on every tick; it is expected to be cheap and to never
    * throw — and it may answer a PROMISE, for a lane whose reading is not from memory (see the note
@@ -213,6 +215,7 @@ export function createPolledLane<TPicture, TFrame>(
    */
   const land = (next: TPicture): void => {
     inFlight = null;
+    hasStalePicture = false;
     // The picture is the lane's from here on, and every reader waiting for a first one has it. Both
     // happen BEFORE the compare below: a picture that landed is a picture, whether or not the frame
     // carrying it makes it out to some socket.
@@ -243,8 +246,12 @@ export function createPolledLane<TPicture, TFrame>(
   /** A reading did not come back. The lane is free again, and the picture it serves is unchanged. */
   const fail = (error: unknown): void => {
     inFlight = null;
+    hasStalePicture = true;
     report(error);
   };
+
+  /** The last reading failed, so the picture held is one it could not refresh: a function backstop is not asked about it. */
+  let hasStalePicture = false;
 
   /** A `poke` arrived while a reading was out: that reading may have taken the picture without the write. A flag, never a queue. */
   let pokedWhileReading = false;
@@ -255,9 +262,15 @@ export function createPolledLane<TPicture, TFrame>(
    * last time the lane looked.
    */
   const armBackstop = (): void => {
-    if (!running || dependencies.backstopMs === undefined || dependencies.backstopMs === null) return;
+    const { backstopMs } = dependencies;
+    if (!running || backstopMs === undefined) return;
     if (timer !== null) clearTimeout(timer);
-    timer = setTimeout(tick, dependencies.backstopMs);
+    timer = null;
+    // After a failed reading a function backstop arms nothing (its answer for a stale picture may be 0 forever): the next poke reads.
+    if (typeof backstopMs === 'function' && hasStalePicture) return;
+    const waitMs = typeof backstopMs === 'function' ? backstopMs(picture) : backstopMs;
+    if (waitMs === null) return;
+    timer = setTimeout(tick, waitMs);
     // The backstop is never a reason for the process to stay alive at shutdown.
     timer.unref();
   };

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { watchSpool } from '@/shared/spool-watch.service.js';
+import type { SpoolWatch } from '@/shared/spool-watch.service.js';
 import { AppError, expandHome } from '@/shared/utils.js';
 
 import { stageLesson } from './kanban-lessons.service.js';
@@ -12,7 +14,7 @@ import type { KanbanLessonInput } from './kanban-lessons.service.js';
  *
  * WHY THIS EXISTS. `stageLesson` has ONE ingest path and ONE front door, this sweep. A session (a
  * plain Claude Code session, a subagent, another project) has no verb that reaches the board, so it
- * writes one JSON file into `pending-lessons/` and this stages it within 15 seconds. The MEMORY lane
+ * writes one JSON file into `pending-lessons/` and this stages it as the rename lands. The MEMORY lane
  * keeps its OWN door in its own module: the two queues' door rules are genuinely different, so a
  * shared sweeper would be a third thing that has to know both.
  *
@@ -29,7 +31,7 @@ import type { KanbanLessonInput } from './kanban-lessons.service.js';
  *
  * QUARANTINE WHAT RE-READING WOULD REPEAT; DEFER EVERYTHING ELSE. A malformed file, a door refusal,
  * a `cardId` naming no card: facts about these bytes, so the file moves to `failed/` — a SUBDIR the
- * non-recursive scan never descends into — and is never re-read every 15 seconds forever. Anything
+ * non-recursive scan never descends into — and is never re-read on every pass forever. Anything
  * else out of the store is the STORE's condition, not the file's, and the file stays queued for the
  * next pass. That arm covers a peer's write lock (`SQLITE_BUSY`/`SQLITE_LOCKED`) and, load-bearingly,
  * "no such table" — what this sweep sees when its first pass runs while `server/index.ts` is still
@@ -39,9 +41,6 @@ import type { KanbanLessonInput } from './kanban-lessons.service.js';
  * nothing will fix costs one log line per pass, which a person can see and act on.
  */
 
-/** The sweep's cadence. Latency only — staging is idempotent at the operator's review. */
-const SPILL_INTERVAL_MS = 15_000;
-
 /** The lesson contract's two length bounds, in characters. Over either one is REFUSED, never cut. */
 const NAME_MAX_CHARS = 80;
 const SUMMARY_MAX_CHARS = 60;
@@ -50,10 +49,10 @@ const SUMMARY_MAX_CHARS = 60;
  * The running sweep, or null before it starts.
  *
  * ONE SWEEP PER PROCESS, not one per module construction. The board's router is built once, for
- * `/api/kanban`; a per-construction interval would scan one directory with two timers and stage the
- * same file twice if a second construction ever ran.
+ * `/api/kanban`; a per-construction watch would sweep one directory twice over and stage the same
+ * file twice if a second construction ever ran.
  */
-let sweepTimer: ReturnType<typeof setInterval> | null = null;
+let sweepWatch: SpoolWatch | null = null;
 
 /**
  * The spill root, read at CALL time and redirected by one variable (Interfaces §10).
@@ -178,7 +177,7 @@ function refuse(file: string, reason: string): void {
     try {
       fs.unlinkSync(file);
     } catch {
-      // Leave it: the next pass re-attempts, and 15 seconds apart is never a tight loop.
+      // Leave it: the retry a pass that leaves a .json arms (SPILL_RETRY_MS) re-attempts it, never a tight loop.
     }
   }
 }
@@ -238,11 +237,16 @@ function ingestLessonFile(file: string): void {
   }
 }
 
+/** A name the scan reads: the producer renames its `.tmp` to this only once the document is whole. */
+function isQueuedName(name: string): boolean {
+  return name.endsWith('.json');
+}
+
 /** Every `.json` file waiting in the queue, oldest first, or none when the directory is absent. */
 function queuedFiles(dir: string): string[] {
   try {
     // Name order IS age order: `learn.md` writes an `<epoch>-<slug>.json` name.
-    return fs.readdirSync(dir).filter((name) => name.endsWith('.json')).sort();
+    return fs.readdirSync(dir).filter(isQueuedName).sort();
   } catch {
     // A queue that does not exist yet is the COMMON case, not a fault: nothing has been dropped yet.
     return [];
@@ -264,29 +268,18 @@ export function sweepLessonsOnce(): void {
 /**
  * Starts the sweep. Called once per process from `kanban.module.ts`, and idempotent thereafter.
  *
- * The first pass runs immediately rather than at the first tick, so a lesson dropped while the
- * server was down is staged as soon as it is up. It runs at MODULE-EVALUATION time, i.e. before
- * `initializeDatabase()`, so on a database whose schema has not landed yet its stage fails with "no
- * such table" — the deferral arm, never a refusal, and the next pass stages it 15 seconds later.
- * That ordering is why the polarity in `isPermanentStoreRefusal` matters: with a refusal there, a
- * queued lesson would be destroyed a second before it could have been read.
- *
- * The timer is unref'd: a pending sweep must never be
- * a reason for the process to stay alive. The pass is wrapped because an exception out of an interval
- * callback is an uncaught exception — the whole server would go down over one unreadable file.
+ * A pass runs at once, so a lesson dropped while the server was down is staged as soon as it is up,
+ * then on every `.json` name the queue's watch hears. The first pass runs at MODULE-EVALUATION time,
+ * before `initializeDatabase()`, so on a schema that has not landed its stage fails with "no such
+ * table" — the deferral arm, never a refusal — and the retry `watchSpool` arms for a pass that leaves
+ * a file queued stages it. That is why the polarity in `isPermanentStoreRefusal` matters.
  */
 export function startLessonSpillSweep(): void {
-  if (sweepTimer !== null) return;
-
-  const tick = (): void => {
-    try {
-      sweepLessonsOnce();
-    } catch (error) {
-      console.warn(`[kanban-spill] sweep error (continuing): ${describe(error)}`);
-    }
-  };
-
-  tick();
-  sweepTimer = setInterval(tick, SPILL_INTERVAL_MS);
-  sweepTimer.unref();
+  if (sweepWatch !== null) return;
+  sweepWatch = watchSpool({
+    dir: lessonQueueDir(),
+    isQueued: isQueuedName,
+    sweep: sweepLessonsOnce,
+    logError: (message) => console.warn(`[kanban-spill] ${message}`),
+  });
 }

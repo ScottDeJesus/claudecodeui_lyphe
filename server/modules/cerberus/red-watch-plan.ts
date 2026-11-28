@@ -30,6 +30,10 @@ import type { CerberusCheckView, CerberusOverview } from '@/shared/cerberus-type
  * began after it is a new episode — the check recovered while the mute or the silence hid it — and, like a close by
  * `ok`, waits for nothing: it has to last its own hour to be a candidate at all.
  *
+ * THE NEXT INSTANT. `nextAt` is the nearest moment after `now` at which the clock alone would change this answer: a red
+ * on a reporting link reaching its hour, an open incident's reminder falling due, a held re-open's cadence ending, a mute
+ * on a paging check running out. Everything else that moves the answer is a hint, and the service plans on hints too.
+ *
  * Consumed by `red-watch.service.ts`.
  */
 
@@ -54,6 +58,8 @@ export type RedWatchPlan = {
   recoveries: Array<{ id: number; item: CerberusRedItem }>;
   /** Incidents that end with no push. */
   closes: Array<{ id: number; by: Exclude<CerberusRedAlertClosedBy, 'ok'> }>;
+  /** The nearest instant after `now` at which the clock alone changes the plan (center's clock, epoch ms), or null. */
+  nextAt: number | null;
 };
 
 export type RedWatchInputs = {
@@ -96,15 +102,27 @@ export function planRedWatch({ overview, open, lastClosed, clockOffsetMs }: RedW
   const beganAt = (check: CerberusCheckView): number | null =>
     check.since === null ? null : check.since + clockOffsetMs(check.node);
 
+  // The instants at which the clock alone changes what a plan decides; `nextAt` is the nearest still ahead.
+  const instants: number[] = [];
+  for (const check of fleet.values()) {
+    // A muted check reads `muted` whatever its reading; the mute's end is the moment a red under it may count again.
+    // One millisecond past `until`, so the plan reads the mute as run out.
+    if (check.mute !== null && (check.status === 'muted' || PAGING_STATUSES.has(check.status))) instants.push(check.mute.until + 1);
+  }
+
   const candidates = new Map<string, { check: CerberusCheckView; redSince: number }>();
   for (const { check } of overview.needsYou) {
     const redSince = beganAt(check);
     if (!PAGING_STATUSES.has(check.status) || check.mute !== null || redSince === null) continue;
-    if (links.get(check.node) !== 'reporting' || now - redSince < RED_AFTER_MS) continue;
+    if (links.get(check.node) !== 'reporting') continue;
+    if (now - redSince < RED_AFTER_MS) {
+      instants.push(redSince + RED_AFTER_MS);
+      continue;
+    }
     candidates.set(`${check.node}/${check.key}`, { check, redSince });
   }
 
-  const plan: RedWatchPlan = { opens: [], reminders: [], recoveries: [], closes: [] };
+  const plan: RedWatchPlan = { opens: [], reminders: [], recoveries: [], closes: [], nextAt: null };
   const openKeys = new Set(open.map((row) => `${row.node}/${row.key}`));
 
   for (const row of open) {
@@ -124,6 +142,9 @@ export function planRedWatch({ overview, open, lastClosed, clockOffsetMs }: RedW
       const candidate = candidates.get(slot);
       if (candidate && now - lastPushAt(row) >= REMINDER_EVERY_MS) {
         plan.reminders.push({ id: row.id, item: itemOf(candidate.check, (now - candidate.redSince) / 60_000) });
+        instants.push(now + REMINDER_EVERY_MS);
+      } else if (candidate) {
+        instants.push(lastPushAt(row) + REMINDER_EVERY_MS);
       }
     }
   }
@@ -137,9 +158,16 @@ export function planRedWatch({ overview, open, lastClosed, clockOffsetMs }: RedW
       previous.closed_by !== 'ok' &&
       redSince <= previous.opened_at &&
       now - lastPushAt(previous) < REMINDER_EVERY_MS;
-    if (held) continue;
+    if (held) {
+      instants.push(lastPushAt(previous) + REMINDER_EVERY_MS);
+      continue;
+    }
     plan.opens.push({ item: itemOf(check, (now - redSince) / 60_000), redSince });
+    // The page goes out now; the incident's first reminder is the cadence from it.
+    instants.push(now + REMINDER_EVERY_MS);
   }
 
+  const ahead = instants.filter((at) => at > now);
+  plan.nextAt = ahead.length === 0 ? null : Math.min(...ahead);
   return plan;
 }
